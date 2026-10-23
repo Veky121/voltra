@@ -4,12 +4,29 @@
 .desktop-connect form{display:grid;gap:16px;margin-top:28px}
 .desktop-brand{display:flex;align-items:center;gap:12px;font-weight:650}
 .desktop-version{font-size:12px;margin-top:28px}
-.desktop-bar{position:fixed;inset:0 0 auto 0;height:48px;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 16px;background:var(--surface,#1b1c20);border-bottom:1px solid var(--border,#303239);font-size:13px}
-.desktop-bar small{margin-left:12px;opacity:.65}
-.desktop-bar .button{font-size:12px;padding:5px 10px;min-height:30px}
-body.voltra-desktop .app-shell{height:calc(100dvh - 48px);margin-top:48px}
-body.voltra-desktop .desktop-bar+.error{position:fixed;top:48px;left:25%;z-index:101}
+.desktop-bar{--wails-draggable:drag;position:fixed;inset:0 0 auto;height:40px;z-index:200;display:flex;align-items:center;gap:12px;padding:0 0 0 14px;background:#17191d;border-bottom:1px solid var(--line,#303239);color:var(--text,#eceef2);font-size:12px;user-select:none}
+.desktop-title{display:flex;align-items:center;gap:9px;flex:1;min-width:0;font-weight:600}
+.desktop-title>svg,.desktop-title>img{width:20px;height:20px;flex-shrink:0}
+.desktop-version-label{font-size:10px;color:var(--muted);font-weight:400;white-space:nowrap}
+.desktop-panel-address{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px;font-weight:400}
+.desktop-title-actions,.desktop-updates{--wails-draggable:no-drag;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0}
+.desktop-bar .button{min-height:26px;height:26px;padding:3px 8px;border-color:transparent;border-radius:5px;background:transparent;font-size:11px;font-weight:400;white-space:nowrap;color:var(--text)}
+.desktop-bar .button:hover{background:#ffffff0b;border-color:#ffffff12}
+.desktop-updates select{--wails-draggable:no-drag;width:80px;min-width:0;height:26px;min-height:26px;padding:2px 5px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);font-size:11px;cursor:pointer}
+.desktop-updates select:hover{background:#ffffff09}
+.desktop-update-message{font-size:10px;color:var(--muted);white-space:nowrap}
+.desktop-update-error{font-size:10px;color:#ff9a9a;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desktop-window-controls{--wails-draggable:no-drag;display:flex;align-items:center;align-self:stretch;flex-shrink:0;margin-left:2px;border-left:1px solid #ffffff0b}
+.desktop-window-controls button{--wails-draggable:no-drag;display:grid;place-items:center;width:44px;height:39px;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:#bfc4ce;box-shadow:none}
+.desktop-window-controls button:hover{background:#ffffff10;color:#fff;filter:none}
+.desktop-window-controls .desktop-window-close:hover{background:#c42b1c;color:#fff}
+.desktop-window-controls button:focus-visible,.desktop-bar .button:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.desktop-window-controls svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.2;pointer-events:none}
+body.voltra-desktop .app-shell{height:calc(100dvh - 40px);margin-top:40px}
+.desktop-banner{position:fixed;top:44px;left:25%;z-index:201}
+@media(max-width:1050px){.desktop-panel-address,.desktop-update-message{display:none}.desktop-bar{gap:8px}.desktop-title-actions,.desktop-updates{gap:3px}}
 .desktop-device{border-top:1px solid var(--border,#303239);padding:16px 0}
 .desktop-device h4{margin:0 0 8px}
 .desktop-pairing{margin-top:24px;display:grid;gap:12px}
 @media(max-width:800px){.desktop-bar small{display:none}.desktop-connect{padding:16px}.desktop-connect>.card{padding:24px}}
+.desktop-app-info{max-width:720px}.desktop-app-info .field{max-width:320px}.desktop-app-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.desktop-app-panel{overflow-wrap:anywhere}.desktop-app-info hr{border:0;border-top:1px solid var(--line);margin:24px 0}.desktop-bar a.button{text-decoration:none;display:inline-flex;align-items:center}

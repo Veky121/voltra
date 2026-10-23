@@ -57,9 +57,25 @@ func main() {
 	if err = configureUpdater(app, host); err != nil {
 		log.Fatal(err)
 	}
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "main", Title: "Voltra", Width: 1440, Height: 940, MinWidth: 900, MinHeight: 640,
-		BackgroundColour: application.NewRGB(17, 19, 24), URL: launch,
+		BackgroundColour: application.NewRGB(17, 19, 24), URL: launch, Frameless: true,
+	})
+	host.setWindowControl(func(action string) (bool, error) {
+		switch action {
+		case "minimize":
+			window.Minimise()
+		case "maximize":
+			window.ToggleMaximise()
+		case "close":
+			// Quit invokes OnShutdown. Let this request finish before the host drains.
+			maximized := window.IsMaximised()
+			go app.Quit()
+			return maximized, nil
+		case "drag":
+			window.HandleMessage("wails:drag")
+		}
+		return window.IsMaximised(), nil
 	})
 	if err = app.Run(); err != nil {
 		log.Fatal(err)

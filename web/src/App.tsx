@@ -76,6 +76,7 @@ function AppShell({account}:{account:Record<string,any>}){
      {accountOpen&&<div className="sidebar-account-menu" id="sidebar-account-menu" aria-label="Account menu">
       <span className="account-menu-heading">Your account</span>
       <Link to="/account"><Icon name="users"/>Profile</Link><Link to="/account"><Icon name="settings"/>Settings</Link>
+      {import.meta.env.VITE_DESKTOP==='true'&&<Link to="/account/app"><Icon name="settings"/>App &amp; updates</Link>}
       {session.canSignOut&&<button disabled={logoutBusy} className="account-signout" onClick={async()=>{setLogoutBusy(true);setLogoutError('');try{await session.signOut()}catch(e){setLogoutError(e instanceof Error?e.message:String(e))}finally{setLogoutBusy(false)}}}><Icon name="logout"/>{logoutBusy?'Signing out…':'Sign out'}</button>}
       {logoutError&&<p role="alert">{logoutError}</p>}
      </div>}

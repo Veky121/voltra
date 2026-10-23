@@ -1,3 +1,4 @@
+import {DesktopAppInfo} from '../desktop';
 import {NavIcon} from "../Icons";
 import DesktopApps from "./DesktopApps";
 import { useState } from "react";
@@ -401,6 +402,7 @@ export function Account() {
         <NavLink to="/account/api"><NavIcon name="key"/><span>API keys</span></NavLink>
         <NavLink to="/account/ssh"><NavIcon name="console"/><span>SSH keys</span></NavLink>
         <NavLink to="/account/desktop"><NavIcon name="console"/><span>Desktop apps</span></NavLink>
+        {import.meta.env.VITE_DESKTOP==='true'&&<NavLink to="/account/app"><NavIcon name="settings"/><span>App &amp; updates</span></NavLink>}
         <NavLink to="/account/activity"><NavIcon name="activity"/><span>Activity</span></NavLink>
       </nav>
       <Routes>
@@ -408,6 +410,7 @@ export function Account() {
         <Route path="api" element={<APIKeys />} />
         <Route path="ssh" element={<SSHKeys />} />
         <Route path="desktop" element={<DesktopApps />} />
+        {import.meta.env.VITE_DESKTOP==='true'&&<Route path="app" element={<DesktopAppInfo />} />}
         <Route
           path="activity"
           element={<Activity path="/api/client/account/activity" />}

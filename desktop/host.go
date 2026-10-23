@@ -31,6 +31,7 @@ type desktopHost struct {
 	assets                            fs.FS
 	client                            *http.Client
 	updates                           *updateController
+	windowControl                     func(string) (bool, error)
 	// Tracked sockets close when the device is unlinked or the app exits.
 	sockets map[*websocket.Conn]struct{}
 }
@@ -151,6 +152,10 @@ func (h *desktopHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.FS(h.assets)).ServeHTTP(w, clone)
 }
 func (h *desktopHost) desktop(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/desktop/window" || strings.HasPrefix(r.URL.Path, "/desktop/window/") {
+		h.serveWindow(w, r)
+		return
+	}
 	switch r.Method + " " + r.URL.Path {
 	case "GET /desktop/status":
 		h.mu.RLock()
