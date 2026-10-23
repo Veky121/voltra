@@ -1,0 +1,12 @@
+{
+  "lac": {
+    "version": "1.9.7",
+    "url": "https://www.lacrimesonline.com/builds/LAC_Linux_v1.9.7.zip",
+    "sha256": "85a2592a3fafc3d92bb1021f860f29c7b4debb0869fd313cf16ce3db7f96eb8e",
+    "bytes": 159821766,
+    "identity": "Recorded SHA256 from official HTTPS distribution; no independent publisher checksum",
+    "license": "Publisher-distributed dedicated server; no open-source license assumed"
+  },
+  "onset": {"appid": 1204170, "publisher": "https://dev.playonset.com/wiki/DedicatedServer"},
+  "jc3": {"appid": 619960, "publisher": "https://just-cause.mp/docs/hosting/server-configuration"}
+}

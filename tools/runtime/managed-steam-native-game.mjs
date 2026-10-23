@@ -74,6 +74,10 @@ if(command==='create'){
  }else if(command==='maintenance'){
   if(!['check','update','verify'].includes(args[0]))throw Error('Choose check,update,verify');
   result=await api('POST',prefix+'/steam/'+args[0],{});
+ }else if(command==='reinstall-client'){
+  result=await api('POST',prefix+'/settings/reinstall',{});
+ }else if(command==='reinstall-admin'){
+  result=await api('POST','/api/application/servers/'+encodeURIComponent(state.uuid)+'/reinstall',{});
  }else if(command==='startup')result=await api('GET',prefix+'/startup');
  else throw Error('Choose create,status,power,console,settings,maintenance,startup');
  console.log(JSON.stringify(redact(result)));

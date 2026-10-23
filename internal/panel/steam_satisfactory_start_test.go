@@ -7,7 +7,7 @@ import (
 )
 
 func TestSteamSatisfactoryLegacyStartupPublicationAndRollback(t *testing.T) {
-	for _, scenario := range []string{"success", "sync failure", "power failure", "cancel", "duplicate", "malformed", "superseding startup", "superseding installation", "lost lease", "commit failure"} {
+	for _, scenario := range []string{"success", "sync failure", "power failure", "cancel", "duplicate", "malformed", "superseding startup", "superseding installation", "superseding node", "lost lease", "commit failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			rt := steamRuntime(t)
 			base := "./FactoryServer.sh -unattended -custom=keep"
@@ -41,6 +41,18 @@ func TestSteamSatisfactoryLegacyStartupPublicationAndRollback(t *testing.T) {
 				rt.cancelSync = cancel
 			}
 			if strings.HasPrefix(scenario, "superseding") || scenario == "lost lease" {
+				var replacementNode int64
+				if scenario == "superseding node" {
+					original, err := rt.app.one(ctx, "SELECT location_id FROM nodes WHERE id=$1", rt.server["node_id"])
+					if err != nil {
+						t.Fatal(err)
+					}
+					node, err := rt.app.insert(ctx, "nodes", M{"uuid": newUUID(), "name": "replacement fixture node", "location_id": original["location_id"], "fqdn": "replacement.invalid", "daemon_token_id": "replacement-fixture", "daemon_token": "fixture"})
+					if err != nil {
+						t.Fatal(err)
+					}
+					replacementNode = num(node["id"])
+				}
 				rt.syncMutation = func() {
 					var err error
 					switch scenario {
@@ -48,6 +60,8 @@ func TestSteamSatisfactoryLegacyStartupPublicationAndRollback(t *testing.T) {
 						err = rt.app.exec(context.Background(), "UPDATE servers SET startup=$2 WHERE id=$1", rt.server["id"], base+" -operator-change")
 					case "superseding installation":
 						err = rt.app.exec(context.Background(), "UPDATE servers SET installation_id='new-installation' WHERE id=$1", rt.server["id"])
+					case "superseding node":
+						err = rt.app.exec(context.Background(), "UPDATE servers SET node_id=$2 WHERE id=$1", rt.server["id"], replacementNode)
 					case "lost lease":
 						err = rt.app.exec(context.Background(), "UPDATE steam_jobs SET lease_token='different-owner' WHERE id=$1", job["id"])
 					}

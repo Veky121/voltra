@@ -5,7 +5,7 @@ from pathlib import Path,PurePosixPath
 import steam_template
 from session_servers_runtime import APPS,confined
 
-EXILED_PIN={'tag_name':'v9.15.2','prerelease':False,'draft':False,'published_at':'2026-10-01T00:00:00Z','assets':[{'name':'Exiled.tar.gz','size':1153101,'digest':'sha256:6b0537f92f911657e2187b079905781c9c0606fc8e6cef0ce8f737f4d8308ec8','browser_download_url':'https://github.com/ExMod-Team/EXILED/releases/download/v9.15.2/Exiled.tar.gz'}]}
+EXILED_PIN={'tag_name':'v9.15.2','prerelease':False,'draft':False,'published_at':'2026-10-16T23:32:22Z','assets':[{'name':'Exiled.tar.gz','size':1153101,'digest':'sha256:6b0537f92f911657e2187b079905781c9c0606fc8e6cef0ce8f737f4d8308ec8','browser_download_url':'https://github.com/ExMod-Team/EXILED/releases/download/v9.15.2/Exiled.tar.gz'}]}
 DOTNET={'url':'https://builds.dotnet.microsoft.com/dotnet/Runtime/9.0.21/dotnet-runtime-9.0.21-linux-x64.tar.gz','sha512':'6faa847e25a02b87c737c8222c6f5f9fd5f20945b7d239a080a7e3d99b97af48e6b6121aa55dee2e797cc89fe7eb97d235e12422b1b22786cbf169420156ae1e'}
 
 def fetch(url,limit):
@@ -45,6 +45,7 @@ def archive_files(data,exiled=False):
  result=[];seen=set();total=0
  with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
   for member in archive:
+   if member.isdir() and member.name in ['.','./']:continue
    name=member.name.removeprefix('./');parts=PurePosixPath(name).parts
    if not parts or name.startswith('/') or '\\' in name or any(p in ['..','.'] for p in parts):raise ValueError('Unsafe publisher archive path')
    if member.isdir():continue
@@ -82,11 +83,21 @@ def install(root,game,env):
    for name in files:
     target=Path(parent)/name
     if target.stat().st_size>16*1024*1024 or sum(len(row[1]) for row in saved)+target.stat().st_size>128*1024*1024:raise ValueError('Existing configuration tree exceeds preservation budget')
-    saved.append((str(target.relative_to(root)),target.read_bytes()))
+    saved.append((str(target.relative_to(root)),target.read_bytes(),target.stat()))
  try:
   receipt=steam_template.update(root,int(app),env,required=('Binaries/Win64/KFGameSteamServer.bin.x86_64',) if game=='kf2' else ('LocalAdmin',))
  finally:
-  for name,content in saved:steam_template._publish(root,name,lambda out,value=content:out.write(value),0o600)
+  for name,content,metadata in saved:
+   steam_template._publish(root,name,lambda out,value=content:out.write(value),0o600)
+   # Steam may replace an existing file with root-owned/new-mode content. Restore
+   # pre-update metadata through the same anchored, no-follow publication parent.
+   with steam_template._publication_parent(root,name) as (parent,leaf,volume):
+    descriptor=os.open(leaf,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=parent)
+    try:
+     current=os.fstat(descriptor)
+     if (current.st_uid,current.st_gid)!=(metadata.st_uid,metadata.st_gid):os.fchown(descriptor,metadata.st_uid,metadata.st_gid)
+     os.fchmod(descriptor,metadata.st_mode & 0o777)
+    finally:os.close(descriptor)
  if game!='kf2':
   data=fetch(DOTNET['url'],64*1024*1024)
   if hashlib.sha512(data).hexdigest()!=DOTNET['sha512']:raise ValueError('Microsoft runtime digest mismatch')

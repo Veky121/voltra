@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -20,7 +21,7 @@ import (
 func eggEncodingPHP(t *testing.T, script string, input []byte) []byte {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "encoding-oracle.php")
-	if err := os.WriteFile(path, []byte("<?php error_reporting(0);"+script), 0600); err != nil {
+	if err := os.WriteFile(path, []byte("<?php error_reporting(0);if(PHP_VERSION_ID<80500||PHP_VERSION_ID>=80600){exit(77);}"+script), 0600); err != nil {
 		t.Fatal(err)
 	}
 	var command *exec.Cmd
@@ -41,6 +42,10 @@ func eggEncodingPHP(t *testing.T, script string, input []byte) []byte {
 	command.Stderr = &diagnostics
 	output, err := command.Output()
 	if err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == 77 {
+			t.Skip("Native encoding oracle requires the pinned PHP 8.5 codec registry")
+		}
 		t.Fatalf("Encoding native oracle failed: %v %s %s", err, output, diagnostics.String())
 	}
 	if diagnostics.Len() > 0 {

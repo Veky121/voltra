@@ -82,10 +82,10 @@ def launch(root,game,env):
 
 def main():
  game=sys.argv[1];root=Path.cwd();env=dict(os.environ)
- # Validate all typed controls before update or configuration mutation.
- argv,environment,stop,ready=launch(root,game,env)
  auto=env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','0' if game=='exiled' else '1'))
  if auto not in ['0','1']:raise ValueError('AUTO_UPDATE must be 0 or 1')
+ # Validate all typed controls before update.
+ argv,environment,stop,ready=launch(root,game,env)
  if auto=='1':
   from session_servers_install import install
   install(root,game,env)

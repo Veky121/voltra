@@ -239,7 +239,7 @@ func TestConnectorAdvertisesAndRoutesSteamWithoutWings(t *testing.T) {
 	case got := <-hello:
 		want := []string{}
 		if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
-			want = []string{steamapi.Capability}
+			want = steamapi.Capabilities()
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("capabilities %v want %v", got, want)

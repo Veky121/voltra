@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {isMinecraftModpackRecipe} from './catalog-policy.mjs';
+import {isExcludedGameRecipe} from './catalog-policy.mjs';
 
 const revision = process.argv[2];
 if (!/^[a-f0-9]{40}$/.test(revision || '')) throw Error('Pass an explicit reviewed upstream commit SHA.');
@@ -20,7 +20,7 @@ async function download(url) {
 const repository = 'https://github.com/pterodactyl/game-eggs';
 const tree = JSON.parse(await download(`https://api.github.com/repos/pterodactyl/game-eggs/git/trees/${revision}?recursive=1`));
 if (tree.truncated || tree.sha !== revision || !Array.isArray(tree.tree)) throw Error('Upstream tree is incomplete or does not match the requested commit.');
-const files = tree.tree.filter(entry => entry.type === 'blob' && /(?:^|\/)eggs?-[^/]+\.json$/.test(entry.path) && !isMinecraftModpackRecipe(entry.path));
+const files = tree.tree.filter(entry => entry.type === 'blob' && /(?:^|\/)eggs?-[^/]+\.json$/.test(entry.path) && !isExcludedGameRecipe(entry.path));
 const entries = [];
 let next = 0;
 await Promise.all(Array.from({length: 6}, async () => {

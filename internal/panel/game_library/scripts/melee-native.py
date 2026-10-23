@@ -113,15 +113,19 @@ def configure(root,game,env):
         token=text(env,'AUTH_TOKEN','',16384)
         if not token:raise ValueError('Bannerlord requires a real in-game generated server auth token; anonymous hosting is unsupported')
         config=text(env,'SERVER_CONFIG','tdm_config.txt',128)
-        if not re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.-]*\.txt',config):raise ValueError('Bannerlord config must be a Native-module text filename')
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*\.txt',config):raise ValueError('Bannerlord config must be a Native-module text filename')
         path=confined(root,root/'Modules/Native'/config)
         if not path.is_file():raise ValueError('Upload the original tdm_config.txt or your legitimate publisher-compatible Native module config; old upstream paste is unavailable')
-        modules=text(env,'SERVER_MODULES','Native,Multiplayer,DedicatedCustomServerHelper',512).split(',')
+        modules=text(env,'SERVER_MODULES','Native,Multiplayer',512).split(',')
         if not modules or len(modules)>32 or len(set(modules))!=len(modules) or any(not re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.-]{0,100}',name) for name in modules):raise ValueError('Invalid native module list')
         # Documented native argument transport; never shell-expanded or printed.
         # Privileged host process inspection can see the original native token.
         return binary.parent,['wine',str(binary),'/port',str(integer(env,'SERVER_PORT',7210)),'/dedicatedcustomserverauthtoken',token,'/dedicatedcustomserverconfigfile',config,'_MODULES_*'+'*'.join(modules)+'*_MODULES_'],(token,)
     ports=service_ports(env);windows=game=='mordhau-wine'
+    mapname=text(env,'DEFAULT_MAP','/Game/Mordhau/Maps/Contraband/FFA_Contraband' if windows else 'Grad/FL_Grad',256)
+    if mapname and (not re.fullmatch('[A-Za-z0-9_/-]+',mapname) or '..' in mapname.split('/')):raise ValueError('Default map must be a literal native package path')
+    if not windows and not mapname:raise ValueError('Linux recipe requires its original default map')
+    if not windows and not mapname.startswith('/Game/'):mapname='/Game/Mordhau/Maps/'+mapname
     mapping={'ServerName':text(env,'SERVER_NAME','Pterodactyl Server',4096),'ServerPassword':text(env,'GAME_PASSWORD'),'AdminPassword':text(env,'ADMIN_PASSWORD'),'MaxSlots':str(integer(env,'MAX_PLAYERS',48 if not windows else 24,1,60))}
     relative='Mordhau/Saved/Config/'+('WindowsServer' if windows else 'LinuxServer')+'/Game.ini';path=confined(root,root/relative)
     previous=path.read_text(encoding='utf-8-sig') if path.exists() else ''
@@ -130,20 +134,24 @@ def configure(root,game,env):
         if previous:steam._publish(root,'.voltra/melee-config-backups/'+str(time.time_ns())+'-Game.ini',lambda output:output.write(previous.encode()),0o600)
         mode=path.stat().st_mode&0o777 if path.exists() else 0o600
         steam._publish(root,relative,lambda output:output.write(updated.encode()),mode)
-    mapname=text(env,'DEFAULT_MAP','/Game/Mordhau/Maps/Contraband/FFA_Contraband' if windows else 'Grad/FL_Grad',256)
-    if mapname and (not re.fullmatch('[A-Za-z0-9_/-]+',mapname) or '..' in mapname.split('/')):raise ValueError('Default map must be a literal native package path')
-    if not windows and not mapname:raise ValueError('Linux recipe requires its original default map')
-    if not windows and not mapname.startswith('/Game/'):mapname='/Game/Mordhau/Maps/'+mapname
     argv=(['wine',str(binary)] if windows else [str(binary)])+([mapname] if mapname else [])
     argv+=(['-log','MaxSlots='+mapping['MaxSlots']] if windows else ['-MaxSlots='+mapping['MaxSlots']])
     argv+=['-USEALLAVAILABLECORES','-Port='+str(ports['primary']),'-QueryPort='+str(ports['QUERY_PORT']),'-Beaconport='+str(ports['BEACON_PORT'])]
-    return root,argv,(mapping['ServerPassword'],mapping['AdminPassword'])
+    native_secrets=[]
+    for line in updated.splitlines():
+        match=re.match(r'^\s*(?:RconPassword|ServerModAuthToken)\s*=\s*(.*?)\s*$',line,re.IGNORECASE)
+        if match and match[1]:native_secrets.append(match[1].strip('"'))
+    return root,argv,tuple([mapping['ServerPassword'],mapping['AdminPassword'],*native_secrets])
 
 def run(root,game,env):
     if env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1':install(root,game,env,validate=env.get('VALIDATE','0')=='1')
     cwd,argv,secrets=configure(root,game,env);environment=dict(env)
     for key in ('PYTHONHOME','PYTHONPATH','LD_LIBRARY_PATH','LD_PRELOAD','AUTH_TOKEN','ADMIN_PASSWORD','GAME_PASSWORD','STEAM_PASS','STEAM_AUTH'):environment.pop(key,None)
     environment['HOME']=str(root)
+    previous_ld=text(env,'VOLTRA_NATIVE_LD_LIBRARY_PATH','',4096)
+    environment.pop('VOLTRA_NATIVE_LD_LIBRARY_PATH',None)
+    if previous_ld:environment['LD_LIBRARY_PATH']=previous_ld
+    if game=='mordhau':environment['LD_LIBRARY_PATH']=str(root/'.steam/sdk64')+(':'+previous_ld if previous_ld else '')
     console=helper('native-console')
     if game=='mordhau':return console.run(cwd,argv,environment,'\x03',secrets,terminal_input=True)
     # Stock image initializes original fixed winetricks requirements. Own a
