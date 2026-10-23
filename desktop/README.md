@@ -1,5 +1,7 @@
 # Voltra desktop
 
+Connect to your own Voltra panel to manage games hosted on your hardware with friends. The desktop app is a client, not a rented game server or a public hosting service.
+
 Windows desktop client built with Wails v3.0.0-beta.34 and the panel's existing
 React/Vite frontend. The executable embeds the UI and connects to a running
 Voltra panel. Server management still runs on the panel and Wings.

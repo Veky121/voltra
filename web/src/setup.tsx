@@ -209,6 +209,7 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
   return <SetupFrame title="Set up your panel"><p className="setup-progress muted">{step < 2 ? "Administrator" : step < 4 ? "Address" : "Checks"}</p><h2 ref={heading} tabIndex={-1}>{titles[step]}</h2><form onSubmit={submit}>
     <fieldset disabled={!!busy} className="setup-fields">
       {step === 0 && <>
+        <p className="muted">Host games on your own hardware and share them with friends. This panel manages your servers.</p>
         <Field label="Username"><input required name="username" minLength={2} maxLength={64} pattern="[a-zA-Z0-9_.\-]+" title="Use letters, numbers, underscores, dots, or hyphens." autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} autoFocus /></Field>
         <Field label="Email"><input required name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
       </>}

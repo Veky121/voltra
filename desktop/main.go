@@ -39,7 +39,7 @@ func main() {
 	defer closeHost()
 	var app *application.App
 	app = application.New(application.Options{
-		Name: "Voltra", Description: "Voltra server management",
+		Name: "Voltra", Description: "Game servers on your hardware, with friends",
 		Icon:       appIcon,
 		Windows:    application.WindowsOptions{WebviewUserDataPath: filepath.Join(dir, "WebView2")},
 		Mac:        application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},

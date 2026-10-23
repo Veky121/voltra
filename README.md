@@ -1,6 +1,12 @@
 # Voltra
 
-Voltra is a game server management panel with a Go backend, PostgreSQL, and a React/TypeScript frontend built with Vite. It manages game servers through Wings and provides a browser UI, application and client APIs, and a Windows desktop client.
+Host game servers on your own hardware and play with friends.
+
+Voltra is built for home servers, personal computers and small friend groups. You supply the hardware and game licences; Voltra helps you install and manage the servers. This project does not provide rented servers or a public hosting service. An optional VPS can relay traffic to your hardware when you do not want router port forwarding.
+
+Run the panel on your server, then connect through the browser or Windows desktop app. Friends see only the servers their accounts can access. The desktop app connects to your panel; installing it alone does not create or host game servers.
+
+The panel uses Go, PostgreSQL and React/TypeScript, and manages game processes through Wings.
 
 This repository is the Go rewrite and derivative of Pterodactyl Panel developed as Voltra. It preserves Pterodactyl-compatible APIs, egg formats, and Wings protocols where needed for interoperability. It is an independent project, not an official Pterodactyl release. Compatibility does not imply complete parity or verified gameplay for every game recipe.
 
