@@ -1,0 +1,7 @@
+FROM golang:1.27.3-alpine
+RUN apk add --no-cache gcc musl-dev git
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+ENV CGO_ENABLED=1
+CMD ["go","test","-race","./...","-count=1","-timeout=180s"]

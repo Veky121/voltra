@@ -1,0 +1,51 @@
+import fs from 'node:fs';
+const base='internal/panel/game_library/scripts/',catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),prior=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),profiles={};
+for(const[path,game]of[['arma/arma3/egg-arma3.json','arma3'],['arma/arma_reforger/egg-arma-reforger.json','reforger']]){
+ const original=catalog.entries.find(e=>e.path===path);if(!original)throw Error(path);
+ const egg=structuredClone(original.egg),revision=game+'-typed-native-v1';
+ const add=(key,value,rules,description,visible=true)=>egg.variables.push({name:key,env_variable:key,default_value:value,rules,description,user_viewable:visible,user_editable:visible,field_type:'text'});
+ const variable=key=>egg.variables.find(v=>v.env_variable===key);
+ egg.docker_images={'Pinned Debian Steam runtime':'ghcr.io/ptero-eggs/steamcmd@sha256:c8a93dc0e256d1dba10aed6a0d8d6e739d4f1809f4e3b7428d0c01adc6e6e68b'};
+ egg.features=[...new Set([...(egg.features||[]),'voltra_steam_template'])];
+ egg.startup=`exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/arma-native.py run ${game}`;
+ egg.config={...egg.config,files:'{}',stop:'^SIGTERM'};
+ const port_rules=[];
+ if(game==='arma3'){
+  for(const key of['STEAM_USER','STEAM_PASS']){variable(key).default_value='';variable(key).rules='nullable|string|max:255';variable(key).description+=' Private Steam transport is currently unavailable. No credentials are sent. Use existing legitimately installed files with updates disabled.';}
+  add('INSTALL_MODE','steam','required|in:steam,existing','Steam mode requires the unavailable reviewed private account transport and fails explicitly. Existing mode uses legitimately uploaded native server files; set UPDATE_SERVER=0 and DISABLE_MOD_UPDATES=1.');
+  add('AUTO_UPDATE','0','required|in:0','Internal stock-image updater guard. Original UPDATE_SERVER remains the Arma update control.',false);
+  add('BASIC_SHA256','','nullable|regex:/^[a-fA-F0-9]{64}$/','Required exact checksum when using a custom HTTPS BASIC_URL.');
+  add('SERVER_CFG_SHA256','','nullable|regex:/^[a-fA-F0-9]{64}$/','Exact checksum for server.cfg next to custom BASIC_URL. Existing configurations are never replaced.');
+  variable('DISABLE_MOD_UPDATES').user_viewable=true;variable('DISABLE_MOD_UPDATES').user_editable=true;
+  variable('STEAMCMD_ATTEMPTS').rules='required|integer|between:1,100';
+  variable('BASIC_URL').description+=' Original mutable default resolves to the checksum-pinned imported catalog revision. Custom HTTPS defaults require both config checksums.';
+  port_rules.push({minimum:1,maximum:65535,count:5,offsets:[1,2,3,4]});
+ }else{
+  add('PUBLIC_ADDRESS','','nullable|string|max:64','Blank lets the publisher detect public IPv4. Use local or the reachable LAN/Tailscale IPv4 explicitly; never advertise the Docker container address.');
+  for(const key of['A2S_PORT','RCON_PORT']){add(key,'0','required|integer|between:0,65535','Optional native UDP listener. Zero disables it; nonzero must select a distinct additional allocation.');port_rules.push({environment:key,condition:'nonzero',allocated_value:true,exclude_primary:true,minimum:1,maximum:65535,count:2});}
+  add('RCON_PASSWORD','','nullable|string|max:128','Operator-chosen native RCON password; required with at least eight non-space characters when RCON_PORT is nonzero. Native default permission is monitor; edit config.json for admin/whitelist policy.');
+  variable('REGION').description+=' Preserved original API field. Neither original install/startup/config used it; current publisher schema provides no region override.';
+  variable('AUTO_JOINABLE').description+=' Preserved original API field. Neither original install/startup/config used it; use VISIBLE, SERVER_PASS and native joinQueue configuration for supported access settings.';
+  variable('SRCDS_APPID').rules='required|in:1874900,1890870';variable('SRCDS_APPID').description+=' Official stable1874900 or experimental1890870. Clients must match the chosen branch.';
+ }
+ let script='#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\ncd /mnt/server\n';
+ if(game==='arma3')script+='if [[ "${INSTALL_MODE:-steam}" != existing || "${UPDATE_SERVER:-1}" != 0 || "${DISABLE_MOD_UPDATES:-0}" != 1 ]]; then echo "Arma 3 private Steam/Workshop transport is unavailable. Use legitimately uploaded files, INSTALL_MODE=existing, UPDATE_SERVER=0, DISABLE_MOD_UPDATES=1. No credentials sent." >&2; exit 1; fi\ndpkg --add-architecture i386\n';
+ script+='apt-get update\napt-get install -y --no-install-recommends python3 ca-certificates lib32gcc-s1 lib32stdc++6'+(game==='arma3'?' libnss-wrapper:amd64 libnss-wrapper:i386 libsdl2-2.0-0:amd64 libsdl2-2.0-0:i386':'')+'\nmkdir -p .voltra\n';
+ for(const[source,target]of[['arma-native.py','arma-native.py'],['arma-releases.json','arma-releases.json'],['native-config.py','native-config.py'],['steam-template.py','steam_template.py'],['bundle-debian-python.py','bundle-debian-python.py']])script+=`cat > .voltra/${target} <<'VOLTRA_ARMA_SOURCE'\n${fs.readFileSync(base+source,'utf8')}\nVOLTRA_ARMA_SOURCE\n`;
+ script+=`python3 .voltra/bundle-debian-python.py\npython3 .voltra/arma-native.py install ${game}\n`;
+ egg.scripts.installation={container:'debian:bookworm-slim',entrypoint:'bash',script};
+ profiles[path]={upstream_sha256:original.sha256,revision,platforms:['linux/amd64'],defaults:{memory:4096,disk:game==='arma3'?32768:65536},required_ports:game==='arma3'?5:1,port_rules,egg,verification:prior[path]?.revision===revision?prior[path].verification:'not_verified',detail:prior[path]?.revision===revision?prior[path].detail:'Source adapter and fixtures staged. Native lifecycle/configuration/protocol/reinstall acceptance has not run.',setup_steps:game==='arma3'?[
+  'Arma 3 dedicated server233780 needs a real Steam account; Workshop107410 additionally needs game ownership. Private Steam credentials are not supported by the reviewed shared transport. Steam install/update and Workshop downloads fail explicitly without sending credentials. Preserve your account and install legally outside this adapter, then upload the files and select existing mode with both updates disabled. This is an unresolved install prerequisite, not full native verification.',
+  'All original22 controls remain, including branch/CDLC/retry/validation fields, four binary choices, additional native parameters, launcher HTML/manual/server/optional mod roles, lowercase repair and up to five headless clients. Branch/update fields are retained but cannot execute until private transport is reviewed. Profiling binaries must already exist in uploaded assets.',
+  'Allocate five same-address UDP ports: game, game+1 query, game+2 Steam, reserved game+3, and game+4 BattlEye. Publisher recommends at least100 between instances. Native Ctrl-C is forwarded to the server and owned headless clients. Actual headless connections depend on your mission and genuine account/BattlEye requirements; no player joins are fabricated.',
+  'Top-level password/player/headless settings are typed while mission classes, admin passwords, mods, signatures and unknown CFG fields remain editable. Optional mod keys use the original optional_ID prefix and an ownership ledger. Lowercase repair rejects collisions and symbolic links; CLEAR_CACHE explicitly clears only owned headless profiles except Player.',
+  'Original configs resolve to the pinned imported revision with SHA256 verification, seeded only when absent. NSS wrapper and actual legacy TBB2 compatibility libraries retain publisher/Debian legal notices. Proprietary game assets and original client files are never supplied. Source fixtures do not prove native startup, gameplay or reinstall retention.',
+ ]:[
+  'Downloads the official anonymous Linux dedicated server via reviewed SteamCMD. Default stable1874900; experimental1890870 is an explicit original app-ID choice and needs matching clients. Proprietary game files are fetched directly from Steam. Steam manifest/build/depot receipts record the installed release; Steam mutable depots are not represented as immutable SHA-pinned releases.',
+  'Every original15 control remains. REGION and AUTO_JOINABLE were unused in the original installer/startup/config, so remain documented legacy no-ops. Use VISIBLE, join password, native admins and operating.joinQueue for current publisher-supported settings. Original MAX_PLAYERS allows256; current publisher documentation lists128, so larger values remain available but are not promised compatible.',
+  'Typed config.json preserves mods, admins, gameProperties, operating, persistence and unknown fields. String values such as true, quotes and dollar signs stay strings; only actual booleans/numbers are converted. Publisher admin passwords cannot contain spaces. Optional A2S and RCON each require a distinct allocated UDP port; zero disables the listener. Keep RCON private and choose your own password.',
+  'Blank PUBLIC_ADDRESS uses publisher detection; local or a reachable LAN/Tailscale IPv4 can be supplied. No Docker-only IP is advertised by default. Startup retains scenario listing, game project, logs, profile, temporary addon directory, FPS cap and exact LOG_INTERVAL milliseconds. Native Ctrl-C is forwarded. Preserve native profile/mods and stop before maintenance.',
+  'Install/readiness, query, save/restart, reinstall retention and real client gameplay remain separate acceptance steps. No native acceptance has run for this adapter, no accounts are created and no BattlEye or other external agreement is automatically accepted.',
+ ]};
+}
+fs.mkdirSync('.local/arma-games',{recursive:true});fs.writeFileSync('.local/arma-games/profiles.json',JSON.stringify(profiles,null,2)+'\n');console.log('Staged Arma3 and Reforger exact recipes.');

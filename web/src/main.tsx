@@ -1,0 +1,12 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import {createBrowserRouter,RouterProvider} from 'react-router-dom';
+import App from './App';
+import DesktopGate from './desktop';
+import './styles.css';
+import './theme.css';
+import './sidebar.css';
+const desktop=import.meta.env.VITE_DESKTOP==='true';
+if(desktop)document.body.classList.add('voltra-desktop');
+const router=createBrowserRouter([{path:'*',element:desktop?<DesktopGate><App/></DesktopGate>:<App/>}]);
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><RouterProvider router={router}/></React.StrictMode>);

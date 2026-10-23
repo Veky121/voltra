@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "acquired_at": "2026-10-23T08:17:15.896Z",
+  "upstreams": [
+    {
+      "repository": "https://github.com/gorcon/rcon-cli",
+      "tag": "v0.10.3",
+      "commit": "0835f305382e708991842f376aaf82615a738fd1",
+      "files": [
+        {
+          "path": "LICENSE",
+          "bytes": 1081,
+          "sha256": "b48680d43e2a545ef6202e316741aa6517e150dd37c5a770a71e971b8183bc4f"
+        },
+        {
+          "path": "cmd/gorcon/main.go",
+          "bytes": 477,
+          "sha256": "45443aa5cb6856d0224e782f4fb36e58b53c1940d19ebb151e2141a2ad7dee9c"
+        },
+        {
+          "path": "go.mod",
+          "bytes": 580,
+          "sha256": "fef7430d86e8d6ff3cd94c11476913279b30f51ed01825589cd6e28ed7a141bf"
+        },
+        {
+          "path": "go.sum",
+          "bytes": 3121,
+          "sha256": "82bbcfbbeaf2829d1db56af25268cbf89334e1ff9e3f25d17e1a4d7a9b902d7c"
+        },
+        {
+          "path": "internal/config/config.go",
+          "bytes": 2650,
+          "sha256": "7f748bb4ddfcec468bf55b338f0ff5c9961ed961586aeaf3292ecac353ea147a"
+        },
+        {
+          "path": "internal/config/config_test.go",
+          "bytes": 4029,
+          "sha256": "b462acebf19f729e0eaefaac1921a6ffe0a882c0b61a5ac25236d4ff9bb9bd3a"
+        },
+        {
+          "path": "internal/config/session.go",
+          "bytes": 911,
+          "sha256": "582c4843131f854b275471a24abbe4c1d6afc45669b1a4c2d12503285d6859e4"
+        },
+        {
+          "path": "internal/executor/executor.go",
+          "bytes": 9218,
+          "sha256": "52ad01acd05b7ac18623df2c1b410a33cafd2a2e4fedb270887fa9af5977c323"
+        },
+        {
+          "path": "internal/executor/executor_test.go",
+          "bytes": 26786,
+          "sha256": "8b4849b6ba48b5c036524fae3c1ce6cf2a37fed3504b66e22730af1ef6779633"
+        },
+        {
+          "path": "internal/logger/logger.go",
+          "bytes": 1685,
+          "sha256": "5905e73fdf6e7a513316cb1b4fe5ba2653389108650b959b1048320b8652b1b4"
+        },
+        {
+          "path": "internal/logger/logger_test.go",
+          "bytes": 1358,
+          "sha256": "2c8745bc6ea931aa73c1cbf96537954bfc4dd6f147ba6508d3afb4eb49086c5c"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/gorcon/telnet",
+      "tag": "v1.2.2",
+      "commit": "40b503333f1c81a2f1947f32fdb516963e43f404",
+      "files": [
+        {
+          "path": "LICENSE",
+          "bytes": 1081,
+          "sha256": "9b0b2bb107e9b5c46ad50ce43ea2940b84615a683bbd5bf2867e40c51c859324"
+        },
+        {
+          "path": "go.mod",
+          "bytes": 41,
+          "sha256": "6e9f5888637dd82539134d4cad329561ae88d0b5cd749211ca05b3ac6daf066e"
+        },
+        {
+          "path": "go.sum",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "option.go",
+          "bytes": 923,
+          "sha256": "44e3106d6e9d4e9099b30f996131fc0f692a5e1bf6fa5d7ce672012d1d4b5fb3"
+        },
+        {
+          "path": "telnet.go",
+          "bytes": 7533,
+          "sha256": "b21f9fe4bef5df5cad9adb7902f316cb63880e130a916fb14c917adc1fb20857"
+        },
+        {
+          "path": "telnet_test.go",
+          "bytes": 16143,
+          "sha256": "612fc1f651bd22c9cdb2895c1681b22e5f20b5abc75ce98b8bc672bd3928603e"
+        },
+        {
+          "path": "telnettest/context.go",
+          "bytes": 832,
+          "sha256": "3725712baac531bc81e2c12172d5e2708f1454cb6312a84a7ce381a613a28f32"
+        },
+        {
+          "path": "telnettest/example_test.go",
+          "bytes": 1667,
+          "sha256": "365af2e776b2053ce18e1553dbb8b26733462a3b9704fce19dd2a693deea9c7c"
+        },
+        {
+          "path": "telnettest/option.go",
+          "bytes": 617,
+          "sha256": "4b6255539f72d13f35b1afff0434e97304f5f640f763ee8060132f16cd7ea0dd"
+        },
+        {
+          "path": "telnettest/server.go",
+          "bytes": 6306,
+          "sha256": "283d012caeb4c9115df5bd84ac4b76cfa5981380c7b73972cf5d753592ba353d"
+        },
+        {
+          "path": "telnettest/server_test.go",
+          "bytes": 2852,
+          "sha256": "36d6974ae195aa5e1fb57620294b56765ac6dbef28fa7955e672a55d4fa947b8"
+        }
+      ]
+    }
+  ]
+}

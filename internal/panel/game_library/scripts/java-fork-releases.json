@@ -1,0 +1,69 @@
+{
+  "glowstone": {
+    "version": "2021.8.0",
+    "url": "https://github.com/GlowstoneMC/Glowstone/releases/download/2021.8.0/glowstone.jar",
+    "java": 8,
+    "sha256": "825b38efc340c1489ce91f31a50e3a632438dde92e5770f2d84486314d42cbbd",
+    "bytes": 23977310
+  },
+  "magma": {
+    "version": "b4bdd80",
+    "url": "https://github.com/TonimatasDEV-Storage/MagmaMaintained-1.20.1/releases/download/b4bdd80/magma-1.20.1-47.2.20-b4bdd80-server.jar",
+    "java": 17,
+    "sha256": "b2cf7b244df04435d20380563d810d8b811940910de3c85860360153bfd6c819",
+    "bytes": 10445089
+  },
+  "spongeforge": {
+    "version": "1.20.6-50.0.22-11.0.0",
+    "url": "https://repo.spongepowered.org/repository/maven-releases/org/spongepowered/spongeforge/1.20.6-50.0.22-11.0.0/spongeforge-1.20.6-50.0.22-11.0.0-universal.jar",
+    "java": 21,
+    "sha256": "634bf20e17ab0197cac710533ae8ff63c5b13a98bd801269f6c996e24d750c3e",
+    "bytes": 7835503,
+    "publisher_checksum": {
+      "algorithm": "sha512",
+      "value": "700cb7aa6eaa58911b31356eda056158a6f3f3750fb1cc3ccba7ab7aa9797151ba2079250286a2dd5864cab6359050f4b165e2464ac657576f645965601f896c"
+    }
+  },
+  "mohist": {
+    "project": "mohist",
+    "minecraft": "1.20.1",
+    "api_id": 921,
+    "version": "71a84ff74bf6b12c6efbb7ff81b3d0cc5fc42662",
+    "url": "https://api.mohistmc.com/project/mohist/1.20.1/builds/921/download",
+    "sha256": "ade8962d51108f70a9facb8a7680990e50768cab83a2559d8bb64889f043471c",
+    "bytes": 140522640,
+    "java": 17,
+    "loader": {
+      "forge_version": "47.4.23",
+      "neoforge_version": "47.1.106"
+    },
+    "legacy_v2_version": "b562929a2a69aed40a99293d84d7c210bc811705"
+  },
+  "banner": {
+    "project": "banner",
+    "minecraft": "1.20.1",
+    "api_id": 145,
+    "version": "c7b20b2ebb05c5a96b18138dccd53873ebc00be1",
+    "url": "https://api.mohistmc.com/project/banner/1.20.1/builds/145/download",
+    "sha256": "412d6d8a9b1d00d9f2c2adba27871980e89acfcc473ae7c97c2bb1f44666f834",
+    "bytes": 53525872,
+    "java": 17,
+    "loader": {
+      "fabric_version": "0.16.14"
+    },
+    "legacy_v2_version": "800"
+  },
+  "krypton": {
+    "java": 17,
+    "available": false,
+    "repaired_source": {
+      "available": true,
+      "version": "a9eff54633-voltra-data-cb27856f",
+      "commit": "a9eff5463328f34072cdaf37aae3e77b14fcac93",
+      "minecraft": "1.19.3",
+      "recipe": "krypton-source-releases.json",
+      "native_verified": false
+    },
+    "prerequisite": "Archived publisher; originalCI and currentofficial downloadAPI DNS unavailable. Supply an entitled existing serverJAR or await official endpoint recovery."
+  }
+}

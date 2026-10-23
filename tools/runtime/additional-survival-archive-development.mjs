@@ -1,0 +1,7 @@
+import fs from'node:fs';import{execFileSync}from'node:child_process';
+const dir='.local/additional-survival/barotrauma';const s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+const observed=JSON.parse(fs.readFileSync(dir+'/observation.json'));
+execFileSync(process.execPath,['tools/runtime/game-node-baseline.mjs',dir+'/node-baseline.json',dir+'/private.json','artifacts/barotrauma-development-cleanup.json'],{stdio:'inherit'});
+fs.writeFileSync('artifacts/barotrauma-development.json',JSON.stringify({uuid:s.uuid,profile:'barotrauma-native-v1',native_version:'1.13.4.0',buildid:23799137,native_ready:observed.logs.includes('Server started'),native_quit_timeout:true,console_corrupted:true,scoped_native_sigterm_cleanup:true,exit_code:observed.container.ExitCode,query_timeout_expected_private_mode:true,fix:'Opt-in terminal status/cursor replies in shared PTY supervisor; fresh corrected candidate required.',observed_at:new Date().toISOString()},null,2)+'\n');
+execFileSync(process.execPath,['tools/runtime/batch-queue.mjs','release',JSON.stringify({owner:'game_batch_inventory',lease_id:s.lease_id,outcome:'released',resources_removed:true})],{env:{...process.env,GAME_BATCH_STATE:dir+'/queue.json'},stdio:'inherit'});
+if(fs.existsSync(dir+'-development'))throw Error('Development archive already exists');fs.renameSync(dir,dir+'-development');console.log('Development failure and cleanup archived separately.');

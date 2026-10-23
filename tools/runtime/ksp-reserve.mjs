@@ -1,0 +1,3 @@
+import fs from 'node:fs';import {transact} from './batch-queue.mjs';
+const games=['ksp/DMP/egg-k-s-p-d-m-p.json','ksp/LMP/egg-k-s-p--l-m-p.json'],plan=JSON.parse(fs.readFileSync('artifacts/game-batch-plan.json'));
+transact('.local/game-batch/queue.json',state=>{state.reservations||=[];for(const game of games){const existing=state.reservations.find(row=>row.game===game);if(existing&&existing.owner!=='game_batch_inventory')throw Error('KSP recipe already owned');if(!existing){if(!plan.games.some(row=>row.path===game&&row.state==='queued'))throw Error('KSP recipe not queued');state.reservations.push({game,owner:'game_batch_inventory'});}}return games;});console.log({reserved:games});

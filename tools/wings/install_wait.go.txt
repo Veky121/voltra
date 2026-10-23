@@ -1,0 +1,34 @@
+// Voltra's narrow installer result patch for Wings v1.13.3. See LICENSE.
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/docker/docker/api/types/container"
+)
+
+// A stopped Docker container is not necessarily a successful installation.
+func waitForInstallResult(ctx context.Context, results <-chan container.WaitResponse, failures <-chan error) error {
+	select {
+	case result, ok := <-results:
+		if !ok {
+			return errors.New("installation wait ended without a container result")
+		}
+		if result.Error != nil {
+			return fmt.Errorf("installation container wait failed: %s", result.Error.Message)
+		}
+		if result.StatusCode != 0 {
+			return fmt.Errorf("installation container exited with code %d", result.StatusCode)
+		}
+		return nil
+	case err, ok := <-failures:
+		if !ok || err == nil {
+			return errors.New("installation wait ended without a container result")
+		}
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}

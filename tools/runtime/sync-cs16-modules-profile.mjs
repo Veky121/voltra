@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {join} from 'node:path';
+const directory='.local/cs16-modules';fs.mkdirSync(directory,{recursive:true});
+const generated=spawnSync(process.execPath,['tools/runtime/sync-goldsrc-profiles.mjs',join(directory,'base-profiles.json')],{encoding:'utf8',windowsHide:true});
+if(generated.status)throw Error(generated.stderr);
+const recipe='counter_strike/counter_strike_1.6_rehlds/egg-cs 1.6-rehlds.json';
+const catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));
+const source=catalog.entries.find(entry=>entry.path===recipe);
+const current=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const base=JSON.parse(fs.readFileSync(join(directory,'base-profiles.json')))['hlds_server/vanilla/egg-custom-h-l-d-s-engine-game.json'];
+const profile=structuredClone(base),egg=profile.egg;
+egg.name=source.egg.name;egg.description=source.egg.description;
+const variables=new Map(source.egg.variables.map(v=>[v.env_variable,structuredClone(v)]));
+for(const variable of egg.variables) variables.set(variable.env_variable,{...variables.get(variable.env_variable),...variable});
+egg.variables=[...variables.values()];
+for(const variable of egg.variables){
+ const key=variable.env_variable;
+ if(key==='HLDS_GAME')Object.assign(variable,{default_value:'cstrike',rules:'required|string|in:cstrike',user_editable:false});
+ if(key==='HOSTNAME')variable.default_value='Counter-Strike 1.6 Server';
+ if(key==='SRCDS_BETAID')Object.assign(variable,{default_value:'steam_legacy',rules:'required|string|in:steam_legacy'});
+ if(key==='VERSION')Object.assign(variable,{default_value:'latest',rules:'required|string|in:latest,87b606ded4cdf754284dacb9bd3664e08b100519',description:'Reviewed immutable community module bundle. latest selects commit 87b606ded4cdf754284dacb9bd3664e08b100519; upstream previously ignored this variable.'});
+ if(key==='INSTALL_MODULES')Object.assign(variable,{rules:'nullable|string|max:128|regex:/^(rehlds|reunion|amxmodx|metamod-r|reapi|ReGameDLL_CS)(,(rehlds|reunion|amxmodx|metamod-r|reapi|ReGameDLL_CS))*$/',description:'Comma separated native modules. Reunion needs ReHLDS and Metamod; AMXX needs Metamod; ReAPI needs ReHLDS and AMXX. Empty installs publisher CS1.6 only.'});
+}
+egg.startup=egg.startup.replace('goldsrc_runtime.py','cs16_modules_runtime.py');
+let embedded='';
+for(const [source,target] of [['native-release.py','native_release.py'],['cs16-modules-install.py','cs16_modules_install.py'],['cs16-modules-runtime.py','cs16_modules_runtime.py'],['cs16-modules-release.json','cs16-modules-release.json'],['cs16-modules-license.txt','cs16-modules-license.txt']])embedded+=`cat > .voltra/${target} <<'VOLTRA_SOURCE'\n${fs.readFileSync('internal/panel/game_library/scripts/'+source,'utf8')}\nVOLTRA_SOURCE\n`;
+egg.scripts.installation.script=egg.scripts.installation.script.replace('python3 .voltra/bundle_debian_python.py\n',()=>embedded+'python3 .voltra/bundle_debian_python.py\n').replace('PYTHONPATH=.voltra python3 .voltra/goldsrc_install.py\n','PYTHONPATH=.voltra python3 .voltra/cs16_modules_install.py\n');
+Object.assign(profile,{upstream_sha256:source.sha256,revision:'cs16-modules-native-v1',verification:current[recipe]?.verification||'not_verified',detail:current[recipe]?.detail||'Typed CS1.6 community module installer implemented; native module acceptance pending.'});
+profile.setup_steps.push('Choose supported modules explicitly. Reinstall preserves existing addons, plugin settings, stats and Reunion salt. Changing modules does not remove existing operator plugins; remove them deliberately through the file manager.');
+fs.writeFileSync(join(directory,'profiles.json'),JSON.stringify({[recipe]:profile},null,2)+'\n');
+console.log('Staged CS1.6 module profile: '+join(directory,'profiles.json'));

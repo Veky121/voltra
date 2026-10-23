@@ -1,0 +1,66 @@
+.files-workspace{min-width:0}
+.files-workspace.is-editing{display:grid;grid-template-columns:250px minmax(0,1fr);gap:14px;align-items:start}
+.file-editor-pane{min-width:0;position:relative;animation:file-pane-enter .18s ease-out}
+.file-editor-pane .file-editor-panel{min-width:0}
+.file-editor-title{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-height:48px;background:#181c24;border-bottom:1px solid #2d3545;color:#c1d3ee;font-size:14px}
+.file-editor-title>span{display:flex;align-items:center;gap:9px;min-width:0;overflow-wrap:anywhere}
+.file-editor-title svg{width:15px;height:15px;flex-shrink:0;color:#729ee6}
+.file-editor-title .file-icon-button{height:36px;min-height:36px;width:36px;border:1px solid #3c4a61;background:#253044}
+.file-editor-title .file-icon-button svg{width:18px;height:18px;color:#c9dbf8}
+.file-editor-pane .file-code-editor .cm-editor{height:calc(100dvh - 284px);min-height:360px}
+.file-editor-pane.has-draft .file-code-editor .cm-content{padding-bottom:100px}
+.file-explorer{display:flex;flex-direction:column;height:calc(100dvh - 120px);min-height:450px;max-height:1500px;min-width:0;background:linear-gradient(160deg,#111923,#101318 50%);border:1px solid #28374c;border-radius:9px;overflow:hidden;animation:file-pane-enter .18s ease-out}
+.file-explorer-header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:6px 10px;border-bottom:1px solid #263246;color:#b7c8e1;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.file-explorer-header>div{display:flex;gap:2px}
+.file-explorer-header .file-icon-button{width:32px;height:32px;min-height:32px;padding:6px}
+.file-explorer-header svg{width:16px;height:16px}
+.file-explorer-search{display:flex;align-items:center;gap:7px;padding:9px 11px;border-bottom:1px solid #242e3d}
+.file-explorer-search>svg{width:14px;height:14px;color:#6d87ac;flex-shrink:0}
+.file-explorer-search input{min-width:0;min-height:30px;padding:0;background:transparent;border:0;box-shadow:none;color:#c4d4eb;font-size:13px}
+.file-explorer-search input:focus{box-shadow:none}
+.file-explorer-tree{flex:1;min-height:0;overflow:auto;padding:6px;scrollbar-width:thin;scrollbar-color:#31415a transparent}
+.file-explorer-tree ul{margin:0;padding:0;list-style:none}
+.explorer-row{display:flex;align-items:center;justify-content:flex-start;gap:7px;width:100%;min-width:0;min-height:34px;padding:6px 9px;background:transparent;border:1px solid transparent;border-radius:4px;color:#bdcee6;font-size:13px;font-weight:400;text-align:left}
+.explorer-row>svg{width:14px;height:14px;flex-shrink:0;color:#739ad2}
+.explorer-row>span:not(.explorer-chevron){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.explorer-row:hover{background:#1c2a3f;color:#d7e7ff;filter:none}
+.explorer-row:focus-visible{outline:1px solid #638dd1;outline-offset:-1px}
+.explorer-folder-button>svg{fill:#3a77c83b;color:#5794e3}
+.explorer-chevron{width:8px;text-align:center;flex-shrink:0;font-size:16px;line-height:1;color:#728aa9;transition:transform .15s ease}
+.explorer-chevron.is-expanded{transform:rotate(90deg)}
+.explorer-root{font-size:12px;margin-bottom:4px;color:#c0d5f5;background:#172234}
+.explorer-file.is-active{background:linear-gradient(90deg,#224a7d,#183252);border-color:#35649a;color:#e3eeff;box-shadow:inset 2px 0 #6aa9ff}
+.explorer-draft-dot{width:6px;height:6px;border-radius:50%;background:#edbc70;flex-shrink:0;margin-left:auto}
+.explorer-message{padding:8px 12px;font-size:12px;line-height:1.5;color:#9eb1cc}
+.explorer-message.is-error{color:#d5a4ae}
+.explorer-message button{display:block;font-size:10px;min-height:24px;padding:3px 7px;margin-top:5px;background:#24324a}
+.file-draft-bar{position:sticky;z-index:30;bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:60px;margin:-82px 18px 22px;padding:12px 14px;border:1px solid #414c61;border-radius:9px;background:#222832f5;box-shadow:0 8px 28px #0009;backdrop-filter:blur(10px);color:#e4e8ef}
+.file-draft-bar:focus{outline:none}
+.file-draft-bar>div:first-child{display:flex;align-items:center;gap:10px;min-width:0}
+.file-draft-bar>div:first-child>svg{width:18px;height:18px;color:#e1ba7b;flex-shrink:0}
+.file-draft-bar p{margin:0;font-size:14px;line-height:1.5}
+.file-draft-bar .actions{gap:8px;flex-wrap:nowrap;flex-shrink:0}
+.file-draft-bar .button{min-height:36px;font-size:13px;padding:8px 12px}
+.file-draft-bar .draft-save{background:#33805a;border-color:#438f69;color:#fff}
+.file-draft-bar .draft-save:hover{background:#3c9068}
+.file-draft-bar.is-attention{border-color:#edaa68;background:#3b2b25f5;animation:draft-nudge .45s ease-in-out 2;box-shadow:0 0 0 2px #b87a3c35,0 8px 28px #0009}
+.file-draft-bar.is-attention p{color:#ffdcad}
+@keyframes draft-nudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@keyframes file-pane-enter{from{opacity:.65;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+@media(max-width:1200px){.files-workspace.is-editing{grid-template-columns:210px minmax(0,1fr)}.file-draft-bar{gap:8px;margin-left:10px;margin-right:10px;padding:10px}.file-draft-bar p{font-size:13px}}
+@media(min-width:761px){
+  .server-topbar~.file-browser{min-height:calc(100dvh - 124px)}
+  .server-topbar~.file-browser .file-explorer{height:calc(100dvh - 196px)}
+  .server-topbar~.file-browser .file-editor-pane .file-code-editor .cm-editor{height:calc(100dvh - 360px)}
+}
+@media(max-width:1000px){.file-draft-bar{flex-wrap:wrap}.file-draft-bar .actions{margin-left:auto}}
+@media(max-width:760px){
+  .server-topbar~.file-browser{min-height:calc(100dvh - 190px)}
+  .files-workspace.is-editing{grid-template-columns:minmax(0,1fr);gap:12px}
+  .file-explorer{height:210px;min-height:0}
+  .file-explorer-header{min-height:36px}
+  .file-editor-pane .file-code-editor .cm-editor{height:55dvh;min-height:350px}
+  .file-draft-bar{bottom:12px;margin-bottom:14px;gap:8px}
+  .file-draft-bar .button{min-height:32px}
+}
+@media(prefers-reduced-motion:reduce){.file-draft-bar.is-attention,.file-editor-pane,.file-explorer{animation:none}.explorer-chevron{transition:none}}

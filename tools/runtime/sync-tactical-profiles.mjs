@@ -1,0 +1,40 @@
+import fs from 'node:fs';
+const dir='.local/tactical-servers',base='internal/panel/game_library/scripts/';fs.mkdirSync(dir,{recursive:true});
+const catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),current=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),profiles={};
+const helpers=['steam-template.py','source-install.py','source-next-install.py','bundle-debian-python.py','native-console.py','tactical-install.py','tactical-runtime.py'];
+for(const [recipe,kind,app,disk] of [['insurgency_sandstorm/egg-insurgency--sandstorm.json','sandstorm',581330,32768],['squad/egg-squad.json','squad',403240,65536],['post_scriptum/egg-post-scriptum.json','postscriptum',746200,65536]]){
+ const original=catalog.entries.find(e=>e.path===recipe);if(!original)throw Error('Missing exact tactical recipe');const egg=structuredClone(original.egg);
+ egg.features=[...new Set([...(egg.features||[]),'voltra_steam_template'])];
+ egg.docker_images={'Debian Steam runtime':'ghcr.io/ptero-eggs/steamcmd@sha256:c8a93dc0e256d1dba10aed6a0d8d6e739d4f1809f4e3b7428d0c01adc6e6e68b'};
+ egg.startup='exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/tactical_runtime.py';
+ egg.config={files:'{}',startup:JSON.stringify({done:kind==='sandstorm'?'LogGameState: Match State Changed from LoadingAssets to WaitingToStart':'Engine Initialization'}),logs:'{}',stop:'^C'};
+ const add=(key,name,value,rules,description,hidden=false)=>{const v=egg.variables.find(v=>v.env_variable===key),fields={name,default_value:value,rules,description,user_viewable:!hidden,user_editable:!hidden,field_type:'text'};if(v)Object.assign(v,fields);else egg.variables.push({env_variable:key,...fields});};
+ add('VOLTRA_TACTICAL','Tactical recipe',kind,`required|string|in:${kind}`,'Fixed original dedicated application.',true);
+ add('AUTO_UPDATE','Automatic updates',egg.variables.find(v=>v.env_variable==='AUTO_UPDATE')?.default_value||'0','required|boolean','Check publisher updates at startup. Existing server configuration, saves and private state survive successful and failed updates.');
+ const serviceKeys=['QUERY_PORT',...(kind==='squad'?['BEACON_PORT','RCON_PORT']:kind==='postscriptum'?['RCON_PORT']:[])];
+ for(const key of serviceKeys)add(key,key.replaceAll('_',' '),'','nullable|integer|between:1025,65535','Blank automatically selects a complete distinct service group; explicit nonzero values retain your assigned ports. Zero cannot disable this mandatory native role. Squad query requires its adjacent +1 allocation.');
+ add('SRCDS_BETAID','Steam branch','','nullable|string|max:64|regex:/^[A-Za-z0-9_.-]+$/','Empty uses the publisher public branch. Back up before switching branches.');
+ add('SRCDS_BETAPASS','Protected beta password','','nullable|string|max:128','Retained credential control; protected Steam credentials are explicitly refused before side effects until parser fidelity is verified.');
+ for(const v of egg.variables){
+  if(v.env_variable==='SRCDS_APPID')v.rules=(kind==='sandstorm'?'nullable':'required')+`|string|in:${app}`;
+  if(['maxplayers','MAX_PLAYERS'].includes(v.env_variable))v.rules=`required|integer|between:1,${kind==='sandstorm'?128:100}`;
+  if(v.env_variable==='reservedslots')v.rules='required|integer|between:0,100';
+  if(['allowteamchange','advertise','ptciu','teambal','recorddemos','team_change','teambalance','demo_recording'].includes(v.env_variable))v.rules='required|string|in:true,false';
+  if(['MAP_NAME','SCENARIO'].includes(v.env_variable))v.rules='required|string|max:128|regex:/^[A-Za-z0-9_\\/-]+$/';
+  if(v.env_variable==='WORKSHOP_ITEMS')v.rules='nullable|string|max:4096|regex:/^[1-9][0-9]*(,[1-9][0-9]*)*$/';
+ }
+ let script='#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\ncd /mnt/server\napt-get update\napt-get install -y --no-install-recommends python3 ca-certificates lib32gcc-s1 lib32stdc++6\nmkdir -p .voltra\n';
+ for(const name of helpers)script+=`cat > .voltra/${name.replaceAll('-','_')} <<'VOLTRA_SOURCE'\n${fs.readFileSync(base+name,'utf8')}\nVOLTRA_SOURCE\n`;
+ script+='python3 .voltra/bundle_debian_python.py\nPYTHONPATH=.voltra python3 - <<\'VOLTRA_INSTALL\'\nfrom pathlib import Path\nimport os\nfrom tactical_install import install\ninstall(Path.cwd(),dict(os.environ))\nVOLTRA_INSTALL\n';
+ egg.scripts.installation={script,container:'debian:bookworm-slim',entrypoint:'bash'};
+ const required=kind==='squad'?6:kind==='postscriptum'?3:2;
+ const portRules=[...(kind==='squad'?[{minimum:1025,maximum:65535,count:required,offsets:[1]}]:[]),...serviceKeys.map(environment=>({environment,condition:'nonzero',minimum:1025,maximum:65535,count:required,allocated_value:true,exclude_primary:true,auto_allocate:true,...(kind==='squad'?{exclude_offsets:[1]}:{}),...(kind==='squad'&&environment==='QUERY_PORT'?{allocated_offsets:[1]}:{})}))];
+ profiles[recipe]={upstream_sha256:original.sha256,revision:'tactical-native-v1',platforms:['linux/amd64'],required_ports:required,port_rules:portRules,defaults:{memory:8192,disk},egg,verification:current[recipe]?.verification||'not_verified',detail:current[recipe]?.detail||'Typed original tactical recipe implemented; native publisher/port/Stop acceptance pending.',setup_steps:[
+  kind==='squad'?'Allocate six native roles: game UDP and game+1; query and query+1; beacon; and native RCON. Blank controls select complete available service groups. Explicit ports are preserved and reserved before automatic choices. Zero cannot disable a mandatory native role.':kind==='sandstorm'?'Allocate separate game and Steam-query ports. Blank query selects an available allocation; explicit ports are preserved. Optional RCON through original ADDSWITCHES requires its own explicit assigned -RconListenPort. No speculative extra game listener is reserved.':'Allocate separate original gameplay, Steam-query and RCON ports. Blank service controls select distinct additional allocations; explicit ports are preserved. Original PostScriptum app746200 and native executable paths remain unchanged; implicit extra listeners require a later native socket audit.',
+  kind==='sandstorm'?'Retains original map, Scenario, player limit, name, GSLT, GameStats token and Additional Switches. Additional Switches are literal native -Option=value arguments, not shell commands; native mod.io flags remain available. Keep operator Game.ini, Engine.ini, GameUserSettings.ini, Mods.txt, Admins.txt and map cycles under Insurgency/Saved.':'All original lowercase aliases control ServerConfig/Server.cfg. Unknown settings/comments remain intact and original file metadata is retained. Admins, Bans, License, rotations, Rcon.cfg and Saved state survive validation.',
+  kind==='squad'?'Original WORKSHOP_ITEMS downloads anonymous Steam Workshop393380 IDs on reinstall and installs under SquadGame/Plugins/Mods. Acquisition must report success for every selected item; private/entitlement failures remain visible. Existing operator modifications and mod configuration are retained; no client assets are borrowed.':'Publisher installation uses the shared typed Steam helper. Private accounts and protected beta credentials remain explicitly unavailable until command parsing is verified.',
+  'Console and Stop retain original native SIGINT semantics through the shared PTY; no synthetic successful exit is produced. Publisher initialization markers are retained, and native launch/Stop/settings/query/gameplay verification remain pending.',
+  kind==='squad'?'Official server-list licensing is separate from installation and advertising. Apply through the publisher portal if needed; no license is generated. Existing License.cfg and admin/ban lists remain private operator state.':'Public listing, stats, moderation and mod.io authentication require the real publisher credentials and network reachability; no credentials or approvals are fabricated.'
+ ]};
+}
+fs.writeFileSync(dir+'/profiles.json',JSON.stringify(profiles,null,2)+'\n');console.log('Staged three disjoint tactical profiles.');

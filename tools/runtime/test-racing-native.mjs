@@ -1,0 +1,2 @@
+import {spawnSync} from 'node:child_process';import path from 'node:path';
+const result=spawnSync('docker',['run','--rm','--network','none','--memory','256m','--cpus','1','--mount',`type=bind,source=${path.resolve('.')},target=/workspace,readonly`,'-w','/workspace','python:3.13-slim','python3','-B','tools/runtime/test-racing-native.py'],{stdio:'inherit',windowsHide:true});process.exitCode=result.status??1;

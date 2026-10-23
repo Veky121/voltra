@@ -1,0 +1,5 @@
+import fs from 'node:fs';import {execFileSync} from 'node:child_process';import {api} from './openttd-compat-node.mjs';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const game=process.argv[2];if(!['banana','nuclear','puck'].includes(game))throw Error('Unknown game');const dir='.local/light-games-next/'+game,file=dir+'/private.json',{receipt:s}=await ownedStoppedServer(file);
+if(fs.existsSync(dir+'/install-request.json'))throw Error('Existing installer request; inspect it, never duplicate');
+execFileSync(process.execPath,['tools/runtime/cache-steamcmd-stage.mjs',file,'--updated'],{windowsHide:true,stdio:'inherit'});
+await api('/api/application/servers/'+s.internal_id+'/startup','PATCH',{environment:{},skip_scripts:false});fs.writeFileSync(dir+'/install-request.json',JSON.stringify({uuid:s.uuid,updated_public_steamcmd_seeded:true,game_payload_cache:false,phase:'requesting',at:new Date().toISOString()},null,2));await api('/api/application/servers/'+s.internal_id+'/reinstall','POST',{});console.log('First real anonymous game install requested with updated SteamCMD bootstrap; no game started.');

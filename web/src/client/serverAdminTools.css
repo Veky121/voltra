@@ -1,0 +1,54 @@
+.server-settings-tabs.tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 0 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+.server-settings-tabs.tabs > button {
+  flex: 0 0 auto;
+  padding: 12px 15px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 400;
+}
+.server-settings-tabs.tabs > button[aria-selected="true"] {
+  border-bottom-color: var(--blue);
+  color: #a5c7ff;
+}
+.server-settings-tabs > button:focus-visible,
+.server-admin-advanced > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+.server-admin-tools { min-width: 0; }
+.server-admin-tools > .toolbar { justify-content: space-between; align-items: flex-start; }
+.server-admin-tools > .toolbar h2 { margin-bottom: 6px; }
+.server-admin-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.server-admin-summary dt { color: var(--muted); margin-bottom: 5px; }
+.server-admin-summary dd { margin: 0; overflow-wrap: anywhere; }
+.server-admin-advanced > summary { cursor: pointer; padding: 8px 0; font-weight: 500; }
+.server-admin-advanced[open] > summary { margin-bottom: 16px; }
+.server-configuration-status,
+.server-configuration-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.server-configuration-status code { overflow-wrap: anywhere; }
+.server-configuration-field { margin-top: 24px; min-width: 0; }
+.server-configuration-field-heading > label { font-weight: 500; }
+.server-configuration-field > p { font-size: .85rem; margin: 8px 0 12px; }
+.server-configuration-inheritance { margin-bottom: 12px; }
+.server-configuration-inheritance > label { display: inline-flex; align-items: center; font-size: .85rem; }
+.server-configuration-field textarea { font-family: ui-monospace, Consolas, monospace; tab-size: 2; }
+.server-configuration-field input:disabled,
+.server-configuration-field textarea:disabled { opacity: .65; }
+.server-configuration-editor > .actions { margin-bottom: 20px; }
+.server-configuration-editor .card > p { line-height: 1.6; }
+@media (max-width: 700px) {
+  .server-settings-tabs.tabs > button { padding: 11px 12px; }
+  .server-admin-summary { grid-template-columns: minmax(0, 1fr); }
+  .server-configuration-status { align-items: flex-start; }
+  .server-configuration-field-heading .badge { white-space: normal; }
+}

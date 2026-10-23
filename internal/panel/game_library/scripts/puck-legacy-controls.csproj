@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>$(PuckManaged)</FrameworkPathOverride>
+    <AssemblyName>VoltraLegacyControls</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="netstandard"><HintPath>$(PuckManaged)/netstandard.dll</HintPath><Private>false</Private></Reference>
+    <Compile Include="puck_legacy_controls.cs" />
+    <Reference Include="Puck"><HintPath>$(PuckManaged)/Puck.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(PuckManaged)/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(PuckManaged)/Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(PuckManaged)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Netcode.Runtime"><HintPath>$(PuckManaged)/Unity.Netcode.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SuperSimpleTcp"><HintPath>$(PuckManaged)/SuperSimpleTcp.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,80 @@
+{
+  "nwn": {
+    "version": "8193.37-17",
+    "url": "https://nwn.beamdog.net/downloads/nwnee-dedicated-8193.37-17.zip",
+    "sha256": "e46444749cbd1f8238802b8c6d603ba8ed9252e6f1f835f2b5bd4933db6b96f3"
+  },
+  "mods": {
+    "neos": {
+      "tag": "1.12.6",
+      "repository": "neos-modding-group/NeosModLoader",
+      "assets": [
+        {
+          "name": "NeosModLoaderHeadless.dll",
+          "url": "https://github.com/neos-modding-group/NeosModLoader/releases/download/1.12.6/NeosModLoaderHeadless.dll",
+          "sha256": "6543f5e8f77e5a5a25f6678849effc9009b0fb561b87c8819327880f22e7092e",
+          "size": 66560
+        },
+        {
+          "name": "0Harmony.dll",
+          "url": "https://github.com/neos-modding-group/NeosModLoader/releases/download/1.12.6/0Harmony.dll",
+          "sha256": "6928f117d52c0683c44683c0656cd5a345d21aa45720b11c64dc72a35771cac5",
+          "size": 911872
+        }
+      ],
+      "licenses": [
+        {
+          "name": "neos-mod-loader-LGPL.txt",
+          "url": "https://raw.githubusercontent.com/neos-modding-group/NeosModLoader/1.12.6/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+          "size": 7652
+        },
+        {
+          "name": "neos-harmony-MIT.txt",
+          "url": "https://raw.githubusercontent.com/pardeike/Harmony/v2.2.1.0/LICENSE",
+          "sha256": "a5883d0c45eb7e176d3d1631220e7f96e958e37064773d40245ae6db560bbd6d",
+          "size": 1073
+        }
+      ]
+    },
+    "resonite": {
+      "tag": "5.0.1",
+      "repository": "resonite-modding-group/ResoniteModLoader",
+      "assets": [
+        {
+          "name": "ResoniteModLoader.dll",
+          "url": "https://github.com/resonite-modding-group/ResoniteModLoader/releases/download/5.0.1/ResoniteModLoader.dll",
+          "sha256": "7a3a021d560963fdc5b307fcd7dc6d94f562efa2f034820c340ca5ec2c4bfeb7",
+          "size": 79360
+        },
+        {
+          "name": "0Harmony.dll",
+          "url": "https://github.com/resonite-modding-group/ResoniteModLoader/releases/download/5.0.1/0Harmony.dll",
+          "sha256": "fd77b88724f4104440df0cf979a851d35eec75ea3a7e86297d04abe47c71aff6",
+          "size": 2330624
+        }
+      ],
+      "licenses": [
+        {
+          "name": "resonite-mod-loader-LGPL.txt",
+          "url": "https://raw.githubusercontent.com/resonite-modding-group/ResoniteModLoader/5.0.1/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+          "size": 7652
+        },
+        {
+          "name": "resonite-harmony-MIT.txt",
+          "url": "https://raw.githubusercontent.com/pardeike/Harmony/v2.2.2.0/LICENSE",
+          "sha256": "a5883d0c45eb7e176d3d1631220e7f96e958e37064773d40245ae6db560bbd6d",
+          "size": 1073
+        }
+      ]
+    }
+  },
+  "nss": {
+    "version": "1.1.15-2",
+    "sha256": "9ed89f074054a8caf470ecfe3414773a99ea529b61b8fa156654440a5bf210dd",
+    "copyright_sha256": "3748318e83f580635c1a137345ed3cd45f0cc86b82924a0f2866fcd92a57d459",
+    "source": "Ubuntu24.04 signed package repositories, Linux amd64",
+    "upstream": "https://cwrap.org/nss_wrapper.html"
+  }
+}

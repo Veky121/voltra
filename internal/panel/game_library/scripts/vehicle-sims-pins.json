@@ -1,0 +1,46 @@
+{
+  "upstream_repository": "https://github.com/pterodactyl/game-eggs",
+  "upstream_revision": "c637a6d1e0449b167efeff81bb9a0177aa3df6c2",
+  "stormworks": {
+    "appid": 573090,
+    "platform": "windows",
+    "runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+    "ports": 2,
+    "source_path": "stormworks/egg-stormworks--build-and-rescue.json",
+    "source_sha256": "66af5d93ef7d47f4e2b93be6751d510b7936e7b4c7985eac5394c76832558073",
+    "config_sha256": "af1baf2b9c8a909128a6bba5a66d228e0c6414d9b17c78ea5ac071fe117ec295",
+    "acquisition": "Original owned-game content requires private Steam, unsupported by current transport; never silently substitute1247090 or anonymous",
+    "references": [
+      "https://eggs.pterodactyl.io/egg/games-stormworks-build-and-rescue",
+      "https://geometa.co.uk/wiki/stormworks/view/dedicated_servers"
+    ]
+  },
+  "carrier": {
+    "appid": 1489630,
+    "sdk_appid": 1007,
+    "platform": "windows-win32",
+    "runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+    "ports": 4,
+    "source_path": "carrier_command_2/egg-carrier-command2.json",
+    "source_sha256": "99f5c1b6087688b5ea84c635d10ce61b579bc2ee7cbac04b76e2ea8e8684e692",
+    "references": [
+      "https://geometa.co.uk/wiki/carrier_command_2/view/dedicated_servers"
+    ],
+    "acquisition": "Original owned-game account required; private Steam transport unavailable, original controls retained",
+    "persistence": "Original recipe warns server loads saves but cannot write them; no new persistence guarantee"
+  },
+  "archean": {
+    "appid": 3557220,
+    "platform": "linux",
+    "runtime": "ghcr.io/ptero-eggs/steamcmd@sha256:c8a93dc0e256d1dba10aed6a0d8d6e739d4f1809f4e3b7428d0c01adc6e6e68b",
+    "ports": 1,
+    "recommended_memory_mib": 8192,
+    "source_path": "Archean/egg-archean.json",
+    "source_sha256": "d1869acd07dd26c1aef06c579606153b0884dfecb15cd5c9db6576692dc82fc2",
+    "references": [
+      "https://wiki.archean.space/en/multiplayer/settingup.html"
+    ],
+    "acquisition": "Publisher documents anonymous dedicated Steam3557220; no native acquisition attempted"
+  },
+  "license": "Proprietary publisher binaries downloaded by authorized Steam or supplied by legitimate operator; none redistributed. Imported original recipe/template is MIT with upstream LICENSE preserved."
+}

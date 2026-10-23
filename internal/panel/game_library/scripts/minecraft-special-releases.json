@@ -1,0 +1,75 @@
+{
+  "cuberite": {
+    "version": "445",
+    "url": "https://builds.cuberite.org/job/linux-x86_64/445/artifact/Cuberite.tar.gz",
+    "sha256": "929293822b419c631493d7502b31f3fa04ba82deef82c79c83dea3316d1e2aae",
+    "bytes": 4964571,
+    "license": "Apache-2.0",
+    "source_commit": "ffa3279d66d82b2583363b3a6f2937196f9ca04b"
+  },
+  "mcgalaxy": {
+    "version": "publisher-release-2026-10-23",
+    "url": "https://cdn.classicube.net/client/mcg/release/MCGalaxy.zip",
+    "sha256": "d03cbe656d8fc49af03dc74281d33c02d3ef6938605eb6a75429ee67d885ed53",
+    "bytes": 2065072,
+    "license": "GPL-3.0-or-later OR ECL-2.0"
+  },
+  "purpur": {
+    "version": "26.3",
+    "url": "https://api.purpurmc.org/v2/purpur/26.3/2654/download",
+    "sha256": "a22d86bb993491a2d4fe77eca77c247541f1720ce19f68c7af0881c443b9878e",
+    "bytes": 58123798,
+    "license": "MIT Purpur changes; upstream Paper/Spigot/Minecraft retain their licenses",
+    "build": "2654"
+  },
+  "geyser": {
+    "version": "2.12.0",
+    "build": "1269",
+    "url": "https://download.geysermc.org/v2/projects/geyser/versions/2.12.0/builds/1269/downloads/spigot",
+    "sha256": "6537e1fb6ef1e115172653ca42c0f9c2e38d07ca2415142bb5e0fb9aeecd1e07",
+    "license": "MIT"
+  },
+  "floodgate": {
+    "version": "2.2.5",
+    "build": "141",
+    "url": "https://download.geysermc.org/v2/projects/floodgate/versions/2.2.5/builds/141/downloads/spigot",
+    "sha256": "21570aff9ce17d6983928e8552777760e1ede5050026b04c686b0ae112e6fd7e",
+    "license": "MIT"
+  },
+  "bridge": {
+    "commit": "cac7ab1cf177f68be28637200b7abe4e75c7a408",
+    "url": "https://codeload.github.com/ME1312/Bridge/zip/cac7ab1cf177f68be28637200b7abe4e75c7a408",
+    "sha256": "8eb6a90337a52f8d45e5198b16e1ead8c5b3ef1c53e7a197ac05bca525db9aae"
+  },
+  "vanillacord": {
+    "commit": "8d4493ac76052ff6ba68ce498f2bd5d7f5dae859",
+    "url": "https://codeload.github.com/ME1312/VanillaCord/zip/8d4493ac76052ff6ba68ce498f2bd5d7f5dae859",
+    "sha256": "984b357a7c677bbfbc8286bbbd3d251ad077c9ba35fad844c5dceb313c42b693"
+  },
+  "maven": {
+    "version": "3.9.11",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.zip",
+    "sha256": "0d7125e8c91097b36edb990ea5934e6c68b4440eef4ea96510a0f6815e7eeadb",
+    "license": "Apache-2.0"
+  },
+  "mcgalaxy_license": {
+    "url": "https://raw.githubusercontent.com/ClassiCube/MCGalaxy/62814eb15936d39e56163fcd8bae7280d2e52ef1/LICENSE",
+    "sha256": "d0495053051967ebe76fb1facd287d79d1ed800da1be75cf501a556bc39a0472"
+  },
+  "cuberite_license": {
+    "url": "https://raw.githubusercontent.com/cuberite/cuberite/ffa3279d66d82b2583363b3a6f2937196f9ca04b/LICENSE",
+    "sha256": "5249dac5ea72f189584298d83491167ffbc2e861b75f5ef7dc4a2b9a81373686"
+  },
+  "geyser_license": {
+    "url": "https://raw.githubusercontent.com/GeyserMC/Geyser/2565dc1c285ee259772343bbd2c806bbba08eb68/LICENSE",
+    "sha256": "7421fa1da9de486b73147a11a0facdc7994c03b3d502720a2e269d944055595a"
+  },
+  "floodgate_license": {
+    "url": "https://raw.githubusercontent.com/GeyserMC/Floodgate/81b65ccb766bf8024858ebf3eefa6974056aecc5/LICENSE",
+    "sha256": "dc36632b52c45458f3bddc88261cf282f09738007261de98bde565a8381fa94f"
+  },
+  "purpur_license": {
+    "url": "https://raw.githubusercontent.com/PurpurMC/Purpur/5cd359666a40bc4a41ce3aa7c755d2ad015ebfb0/LICENSE",
+    "sha256": "e59019889ed165d255ce9778f850e37dec743aaf422ef633d3c0361d43e4b74f"
+  }
+}

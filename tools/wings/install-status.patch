@@ -1,0 +1,24 @@
+diff --git a/server/install.go b/server/install.go
+index 0c18b50..44defd9 100644
+--- a/server/install.go
++++ b/server/install.go
+@@ -494,16 +494,10 @@ func (ip *InstallationProcess) Execute() (string, error) {
+ 	}(r.ID)
+ 
+ 	sChan, eChan := ip.client.ContainerWait(ctx, r.ID, container.WaitConditionNotRunning)
+-	select {
+-	case err := <-eChan:
+-		// Once the container has stopped running we can mark the install process as being completed.
+-		if err == nil {
+-			ip.Server.Events().Publish(DaemonMessageEvent, "Installation process completed.")
+-		} else {
+-			return "", err
+-		}
+-	case <-sChan:
++	if err := waitForInstallResult(ctx, sChan, eChan); err != nil {
++		return "", err
+ 	}
++	ip.Server.Events().Publish(DaemonMessageEvent, "Installation process completed.")
+ 
+ 	return r.ID, nil
+ }

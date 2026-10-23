@@ -1,37 +1,31 @@
-/vendor
-*.DS_Store*
-!.env.ci
+# Private runtime state, downloads, receipts and screenshots
+.local/
+/artifacts/
+node_modules/
+/web/dist/
+/desktop/frontend/*
+!/desktop/frontend/.gitkeep
+/desktop/bin/
+/desktop/build/
+# Local configuration and credentials
+.env
+.env.*
 !.env.example
-.env*
-.vagrant/*
-.vscode/*
-storage/framework/*
-/.idea
-/nbproject
-/.direnv
-
-node_modules
-*.log
-_ide_helper.php
-_ide_helper_models.php
-.phpstorm.meta.php
-.yarn
-public/assets/manifest.json
-
-# For local development with docker
-# Remove if we ever put the Dockerfile in the repo
-.dockerignore
-docker-compose.*
-!docker-compose.example.yml
-!docker-compose.example.yaml
-
-# for image related files
-misc
-.php-cs-fixer.cache
-coverage.xml
-resources/lang/locales.js
-.phpunit.result.cache
-
-/public/build
-/public/hot
-result
+!.env.ci
+*.pem
+*.key
+*.pfx
+*.p12
+*.sqlite
+*.sqlite3
+*.db
+# Generated programs and caches. Keep embedded runtime assets required by Go.
+*.exe
+*.test
+*.syso
+__pycache__/
+*.py[cod]
+coverage.out
+coverage/
+.DS_Store
+Thumbs.db

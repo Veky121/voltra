@@ -1,0 +1,15 @@
+import fs from 'node:fs';import crypto from 'node:crypto';
+import {api} from './openttd-compat-node.mjs';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const directory='.local/virtual-worlds/nwn',file=directory+'/private.json';
+const{receipt}=await ownedStoppedServer(file);
+if(fs.existsSync(directory+'/install-request.json'))throw Error('Install already requested; inspect existing job');
+const profile=JSON.parse(fs.readFileSync('.local/virtual-worlds/profiles.json'))[receipt.path];
+const actual=(await api('/api/admin/eggs/'+receipt.egg_id)).attributes;
+if(actual.script_install!==profile.egg.scripts.installation.script||actual.startup!==profile.egg.startup)throw Error('Current fixture egg differs from exact staged source');
+const sha=v=>crypto.createHash('sha256').update(v).digest('hex');
+const proof={at:new Date().toISOString(),uuid:receipt.uuid,egg_id:receipt.egg_id,script_sha256:sha(actual.script_install),startup:actual.startup,stage_script_equal:true,helpers:Object.fromEntries(['steam-template.py','native-console.py','virtual-worlds-install.py','virtual-worlds-runtime.py','virtual-worlds-releases.json'].map(name=>[name,{sha256:sha(fs.readFileSync('internal/panel/game_library/scripts/'+name)),bytes:fs.statSync('internal/panel/game_library/scripts/'+name).size}]))};
+fs.writeFileSync(directory+'/expected-source.json',JSON.stringify(proof,null,2)+'\n');
+await api('/api/application/servers/'+receipt.internal_id+'/startup','PATCH',{environment:{},skip_scripts:false});
+fs.writeFileSync(directory+'/install-request.json',JSON.stringify({phase:'requesting',uuid:receipt.uuid,at:new Date().toISOString()},null,2));
+await api('/api/application/servers/'+receipt.internal_id+'/reinstall','POST',{});
+console.log({uuid:receipt.uuid,phase:'public dedicated archive installer requested; no game start'});

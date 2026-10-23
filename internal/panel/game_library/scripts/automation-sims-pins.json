@@ -1,0 +1,33 @@
+{
+  "eco": {
+    "appid": 739590,
+    "platform": "linux",
+    "runtime": "ghcr.io/ptero-eggs/steamcmd@sha256:cb73ba0bc2e924ea5a0a28c2581781723217767f21b43e1dbf7c1075d6d4b424",
+    "runtime_base": "Debian12/bookworm per immutable image history; matching bundled Python",
+    "publisher": "https://wiki.play.eco/en/Server_on_Linux",
+    "license": "Proprietary Eco dedicated server downloaded by Steam; separate SLG account/license credentials remain required"
+  },
+  "foundry": {
+    "appid": 2915550,
+    "sdk_appid": 1007,
+    "platform": "windows",
+    "runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+    "runtime_base": "Debian13/trixie stock Wine image with Python3, Xvfb, Wine and winetricks per immutable image history",
+    "publisher": "https://dedicated.foundry-game.com/",
+    "config": {
+      "url": "https://dedicated.foundry-game.com/App.cfg",
+      "sha256": "ee02ef3f800282c0338ed49675b24e559e5974209d62f81c2bd2b893bb426751",
+      "bytes": 178
+    },
+    "license": "Proprietary Channel3 Entertainment game assets downloaded by Steam; stock image owns its Wine/Mono notices and setup"
+  },
+  "fortress": {
+    "appid": 443600,
+    "platform": "linux",
+    "branch": "linux_server_headless",
+    "runtime": "ghcr.io/ptero-eggs/steamcmd@sha256:c8a93dc0e256d1dba10aed6a0d8d6e739d4f1809f4e3b7428d0c01adc6e6e68b",
+    "runtime_base": "Reviewed Debian12 Steam runtime with matching bundled Python",
+    "publisher": "https://steamcommunity.com/sharedfiles/filedetails/?id=788739671",
+    "license": "Proprietary ProjectorGames dedicated server downloaded by Steam; no game binaries redistributed"
+  }
+}

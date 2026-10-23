@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "version": "0.10.3-voltra-auth1",
+  "compiler": "go version go1.25.5 windows/amd64",
+  "build_script_sha256": "d81d97ad70495ee9c8f977492cb545acc290aa899ed201c43c1ecb5572a761a8",
+  "build_flags": [
+    "-mod=readonly",
+    "-trimpath",
+    "-buildvcs=false",
+    "-ldflags=-s -w -buildid= -X main.Version=0.10.3-voltra-auth1"
+  ],
+  "build_environment": {
+    "GOOS": "linux",
+    "CGO_ENABLED": "0",
+    "GOAMD64": "v1",
+    "GOARM64": "v8.0",
+    "GOTOOLCHAIN": "local"
+  },
+  "source_tree_sha256": "fb9e6daaed0b9a1f820c4de61ceb866782b4b147efee345a8325bb319159975a",
+  "sources": [
+    {
+      "path": "cmd/gorcon/main.go",
+      "sha256": "45443aa5cb6856d0224e782f4fb36e58b53c1940d19ebb151e2141a2ad7dee9c"
+    },
+    {
+      "path": "go.mod",
+      "sha256": "3857c244bd56d0c227414a19a393e1e2094e4ce85a7d42a4390e4c216b6724f3"
+    },
+    {
+      "path": "go.sum",
+      "sha256": "82bbcfbbeaf2829d1db56af25268cbf89334e1ff9e3f25d17e1a4d7a9b902d7c"
+    },
+    {
+      "path": "internal/config/config_test.go",
+      "sha256": "b462acebf19f729e0eaefaac1921a6ffe0a882c0b61a5ac25236d4ff9bb9bd3a"
+    },
+    {
+      "path": "internal/config/config.go",
+      "sha256": "7f748bb4ddfcec468bf55b338f0ff5c9961ed961586aeaf3292ecac353ea147a"
+    },
+    {
+      "path": "internal/config/rcon-test-local.json",
+      "sha256": "0f0a849f82c6f49fae0efe7571e4b8a80b684f9d03fd8859c3cd2dcb9325ff76"
+    },
+    {
+      "path": "internal/config/rcon-test-local.yaml",
+      "sha256": "22e535589728d6d1fb5344e796b5a2f6bb91e21583e6aa4cb02771d1f0017b24"
+    },
+    {
+      "path": "internal/config/session.go",
+      "sha256": "582c4843131f854b275471a24abbe4c1d6afc45669b1a4c2d12503285d6859e4"
+    },
+    {
+      "path": "internal/config/unsupported-local.ini",
+      "sha256": "5938b6d325429efcd23ea0c74e212aba4ef8bc7f22351047f6205960daebf1da"
+    },
+    {
+      "path": "internal/executor/executor_test.go",
+      "sha256": "8b4849b6ba48b5c036524fae3c1ce6cf2a37fed3504b66e22730af1ef6779633"
+    },
+    {
+      "path": "internal/executor/executor.go",
+      "sha256": "52ad01acd05b7ac18623df2c1b410a33cafd2a2e4fedb270887fa9af5977c323"
+    },
+    {
+      "path": "internal/logger/logger_test.go",
+      "sha256": "2c8745bc6ea931aa73c1cbf96537954bfc4dd6f147ba6508d3afb4eb49086c5c"
+    },
+    {
+      "path": "internal/logger/logger.go",
+      "sha256": "5905e73fdf6e7a513316cb1b4fe5ba2653389108650b959b1048320b8652b1b4"
+    },
+    {
+      "path": "internal/logger/temp/tmpfile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "b48680d43e2a545ef6202e316741aa6517e150dd37c5a770a71e971b8183bc4f"
+    },
+    {
+      "path": "PATCHES.md",
+      "sha256": "728f985ea08467cb5a0a26f784f3c5148d55f0b0abc867e78b9a5f3170599746"
+    },
+    {
+      "path": "third_party/telnet/go.mod",
+      "sha256": "6e9f5888637dd82539134d4cad329561ae88d0b5cd749211ca05b3ac6daf066e"
+    },
+    {
+      "path": "third_party/telnet/go.sum",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "third_party/telnet/LICENSE",
+      "sha256": "9b0b2bb107e9b5c46ad50ce43ea2940b84615a683bbd5bf2867e40c51c859324"
+    },
+    {
+      "path": "third_party/telnet/option.go",
+      "sha256": "44e3106d6e9d4e9099b30f996131fc0f692a5e1bf6fa5d7ce672012d1d4b5fb3"
+    },
+    {
+      "path": "third_party/telnet/telnet_test.go",
+      "sha256": "2714da6cb4555a039ba02fbe705bf3f52e0483a7cd8f77b4c0c2198abb11d491"
+    },
+    {
+      "path": "third_party/telnet/telnet.go",
+      "sha256": "b394309ef4e19010d7bb590ec6a98f2478fdd302d358e676a2041f1b32ffea30"
+    },
+    {
+      "path": "third_party/telnet/telnettest/context.go",
+      "sha256": "3725712baac531bc81e2c12172d5e2708f1454cb6312a84a7ce381a613a28f32"
+    },
+    {
+      "path": "third_party/telnet/telnettest/example_test.go",
+      "sha256": "365af2e776b2053ce18e1553dbb8b26733462a3b9704fce19dd2a693deea9c7c"
+    },
+    {
+      "path": "third_party/telnet/telnettest/option.go",
+      "sha256": "4b6255539f72d13f35b1afff0434e97304f5f640f763ee8060132f16cd7ea0dd"
+    },
+    {
+      "path": "third_party/telnet/telnettest/server_test.go",
+      "sha256": "36d6974ae195aa5e1fb57620294b56765ac6dbef28fa7955e672a55d4fa947b8"
+    },
+    {
+      "path": "third_party/telnet/telnettest/server.go",
+      "sha256": "73bd88b549fadee2b5f5682f4ee3225d4b52f43bed55896a94848a56c5c1b1bb"
+    },
+    {
+      "path": "third_party/telnet/voltra_auth_test.go",
+      "sha256": "9a960ef2fd6d45708317703187f7dfa363625ff91918d57d882b779ecbb1f8bb"
+    },
+    {
+      "path": "upstream.json",
+      "sha256": "694bc88725d912ca47818df72a0bc17a869d7f3c18821735e635f7b0a5aee6f2"
+    }
+  ],
+  "upstreams": [
+    {
+      "repository": "https://github.com/gorcon/rcon-cli",
+      "tag": "v0.10.3",
+      "commit": "0835f305382e708991842f376aaf82615a738fd1"
+    },
+    {
+      "repository": "https://github.com/gorcon/telnet",
+      "tag": "v1.2.2",
+      "commit": "40b503333f1c81a2f1947f32fdb516963e43f404"
+    }
+  ],
+  "modules": [
+    {
+      "path": "github.com/gorcon/rcon-cli",
+      "version": "",
+      "sum": ""
+    },
+    {
+      "path": "github.com/BurntSushi/toml",
+      "version": "v1.2.1",
+      "sum": ""
+    },
+    {
+      "path": "github.com/cpuguy83/go-md2man/v2",
+      "version": "v2.0.2",
+      "sum": "h1:p1EgwI/C7NhT0JmVkwCD2ZBK8j4aeHQX2pMHHBfMQ6w="
+    },
+    {
+      "path": "github.com/davecgh/go-spew",
+      "version": "v1.1.0",
+      "sum": "h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8="
+    },
+    {
+      "path": "github.com/gorcon/rcon",
+      "version": "v1.3.4",
+      "sum": "h1:TExNhWI2mJlqpCg49vajUgznvEZbEzQWKujY1Sy+/AY="
+    },
+    {
+      "path": "github.com/gorcon/telnet",
+      "version": "v1.2.2",
+      "sum": ""
+    },
+    {
+      "path": "github.com/gorcon/websocket",
+      "version": "v1.1.2",
+      "sum": "h1:/OflFZiT8/vY3AJmehpAhSlQw771AzbFKf0wiUA9uUM="
+    },
+    {
+      "path": "github.com/gorilla/websocket",
+      "version": "v1.5.0",
+      "sum": "h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc="
+    },
+    {
+      "path": "github.com/pmezard/go-difflib",
+      "version": "v1.0.0",
+      "sum": "h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM="
+    },
+    {
+      "path": "github.com/russross/blackfriday/v2",
+      "version": "v2.1.0",
+      "sum": "h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk="
+    },
+    {
+      "path": "github.com/stretchr/objx",
+      "version": "v0.1.0",
+      "sum": ""
+    },
+    {
+      "path": "github.com/stretchr/testify",
+      "version": "v1.7.1",
+      "sum": "h1:5TQK59W5E3v0r2duFAb7P95B6hEeOyEnHRa8MjYSMTY="
+    },
+    {
+      "path": "github.com/urfave/cli/v2",
+      "version": "v2.25.0",
+      "sum": "h1:ykdZKuQey2zq0yin/l7JOm9Mh+pg72ngYMeB0ABn6q8="
+    },
+    {
+      "path": "github.com/xrash/smetrics",
+      "version": "v0.0.0-20201216005158-039620a65673",
+      "sum": "h1:bAn7/zixMGCfxrRTfdpNzjtPYqr8smhKouy9mxVdGPU="
+    },
+    {
+      "path": "gopkg.in/check.v1",
+      "version": "v0.0.0-20161208181325-20d25e280405",
+      "sum": "h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM="
+    },
+    {
+      "path": "gopkg.in/yaml.v3",
+      "version": "v3.0.1",
+      "sum": "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA="
+    }
+  ],
+  "artifacts": [
+    {
+      "architecture": "amd64",
+      "os": "linux",
+      "file": "console-linux-amd64",
+      "bytes": 8122516,
+      "sha256": "7de01fa95285b29afdc3993178f9114b87741766fe22a97322ea31de4984d2c5"
+    },
+    {
+      "architecture": "arm64",
+      "os": "linux",
+      "file": "console-linux-arm64",
+      "bytes": 7602324,
+      "sha256": "bf010375643720dc1e6bfbcd66e76b1ecc0fb55ac626aca2b3a92c0a8ac433e7"
+    }
+  ],
+  "licenses": [
+    {
+      "module": "github.com/gorcon/rcon-cli",
+      "version": "",
+      "file": "licenses/github.com_gorcon_rcon-cli-LICENSE",
+      "sha256": "b48680d43e2a545ef6202e316741aa6517e150dd37c5a770a71e971b8183bc4f"
+    },
+    {
+      "module": "github.com/cpuguy83/go-md2man/v2",
+      "version": "v2.0.2",
+      "file": "licenses/github.com_cpuguy83_go-md2man_v2-LICENSE.md",
+      "sha256": "a55959c4e3e8917bfa857359bb641115336276a6cc97408fd8197e079fb18470"
+    },
+    {
+      "module": "github.com/davecgh/go-spew",
+      "version": "v1.1.0",
+      "file": "licenses/github.com_davecgh_go-spew-LICENSE",
+      "sha256": "6a6ae99c69879233ddb1095938f7f3ea651fd91d82d46988fb0be6489c7a1bb6"
+    },
+    {
+      "module": "github.com/gorcon/rcon",
+      "version": "v1.3.4",
+      "file": "licenses/github.com_gorcon_rcon-LICENSE",
+      "sha256": "9b0b2bb107e9b5c46ad50ce43ea2940b84615a683bbd5bf2867e40c51c859324"
+    },
+    {
+      "module": "github.com/gorcon/telnet",
+      "version": "v1.2.2",
+      "file": "licenses/github.com_gorcon_telnet-LICENSE",
+      "sha256": "9b0b2bb107e9b5c46ad50ce43ea2940b84615a683bbd5bf2867e40c51c859324"
+    },
+    {
+      "module": "github.com/gorcon/websocket",
+      "version": "v1.1.2",
+      "file": "licenses/github.com_gorcon_websocket-LICENSE",
+      "sha256": "9b0b2bb107e9b5c46ad50ce43ea2940b84615a683bbd5bf2867e40c51c859324"
+    },
+    {
+      "module": "github.com/gorilla/websocket",
+      "version": "v1.5.0",
+      "file": "licenses/github.com_gorilla_websocket-LICENSE",
+      "sha256": "2be1b548b0387ca8948e1bb9434e709126904d15f622cc2d0d8e7f186e4d122d"
+    },
+    {
+      "module": "github.com/pmezard/go-difflib",
+      "version": "v1.0.0",
+      "file": "licenses/github.com_pmezard_go-difflib-LICENSE",
+      "sha256": "2eb550be6801c1ea434feba53bf6d12e7c71c90253e0a9de4a4f46cf88b56477"
+    },
+    {
+      "module": "github.com/russross/blackfriday/v2",
+      "version": "v2.1.0",
+      "file": "licenses/github.com_russross_blackfriday_v2-LICENSE.txt",
+      "sha256": "75e1ca97a84a9da6051dee0114333388216f2c4a5a028296b882ff3d57274735"
+    },
+    {
+      "module": "github.com/stretchr/testify",
+      "version": "v1.7.1",
+      "file": "licenses/github.com_stretchr_testify-LICENSE",
+      "sha256": "f8e536c1c7b695810427095dc85f5f80d44ff7c10535e8a9486cf393e2599189"
+    },
+    {
+      "module": "github.com/urfave/cli/v2",
+      "version": "v2.25.0",
+      "file": "licenses/github.com_urfave_cli_v2-LICENSE",
+      "sha256": "3e64f5c2419b8150badd1c21a143806db894a51e0ec7ffd1560ddd6819f2aa37"
+    },
+    {
+      "module": "github.com/xrash/smetrics",
+      "version": "v0.0.0-20201216005158-039620a65673",
+      "file": "licenses/github.com_xrash_smetrics-LICENSE",
+      "sha256": "1b0edc159f8b0395fc51dc72b95619404e494563b7df7d683d97e35e0a4a8650"
+    },
+    {
+      "module": "gopkg.in/yaml.v3",
+      "version": "v3.0.1",
+      "file": "licenses/gopkg.in_yaml.v3-LICENSE",
+      "sha256": "d18f6323b71b0b768bb5e9616e36da390fbd39369a81807cca352de4e4e6aa0b"
+    }
+  ]
+}

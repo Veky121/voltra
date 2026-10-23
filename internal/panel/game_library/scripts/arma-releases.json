@@ -1,0 +1,20 @@
+{
+  "basic.cfg": {
+    "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/arma/arma3/egg-arma3-config/basic.cfg",
+    "sha256": "c132533a4cf57a14390bcdc38fa2e78c2470fe8fa4634bada128ea445757d5a4"
+  },
+  "server.cfg": {
+    "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/arma/arma3/egg-arma3-config/server.cfg",
+    "sha256": "de5072277aa04d06848c5b2498b3a02951bd5fa107b10e49df381c858bbaebc5"
+  },
+  "tbb64": {
+    "url": "https://deb.debian.org/debian/pool/main/t/tbb/libtbb2_2020.3-1_amd64.deb",
+    "sha256": "87ac7778820cbd7a2c7485f7fccd2ac4437b39cbb390e49b3aeec38a826f5af9",
+    "bytes": 161200
+  },
+  "tbb32": {
+    "url": "https://deb.debian.org/debian/pool/main/t/tbb/libtbb2_2020.3-1_i386.deb",
+    "sha256": "1f56831d54f3043b32d92a50de7660c0d18bad22bfa38ea39b189f7c67c0f0ae",
+    "bytes": 165852
+  }
+}

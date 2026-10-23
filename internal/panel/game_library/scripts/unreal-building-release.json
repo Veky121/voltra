@@ -1,0 +1,92 @@
+{
+  "brickadia": {
+    "app": 3017590,
+    "defaults": {
+      "SRCDS_APPID": "3017590",
+      "AUTO_UPDATE": "1",
+      "SERVER_HOSTING_TOKEN": "",
+      "WORLD_NAME": "world",
+      "SERVER_NAME": "A Pterodactyl Server",
+      "SERVER_PASSWORD": "",
+      "SERVER_LIST_PUBLIC": "True"
+    },
+    "ready": "LogBrickadia: Finished preloading primary assets",
+    "ports": [],
+    "binary": "Brickadia/Binaries/Linux/BrickadiaServer-Linux-Shipping",
+    "config": ".config/Epic/Brickadia/Saved/Config/LinuxServer/GameUserSettings.ini",
+    "preserve": [
+      ".config/Epic/Brickadia/Saved"
+    ]
+  },
+  "longvinter": {
+    "app": 1007,
+    "defaults": {
+      "SERVER_NAME": "Pterodactyl Longvinter Server",
+      "SERVER_TAG": "Pterodactyl",
+      "MAX_PLAYERS": "32",
+      "SERVER_MOTD": "Welcome to Pterodactyl Island!",
+      "SERVER_PASSWORD": "",
+      "COMMUNITY_WEBSITE": "pterodactyl.io",
+      "ADMIN_ID": "",
+      "ENABLE_PVP": "true",
+      "ENABLE_TENTDECAY": "true",
+      "MAX_TENTS": "2",
+      "AUTO_UPDATE": "1",
+      "QUERY_PORT": "27015",
+      "SRCDS_APPID": "1007"
+    },
+    "ready": "CreateSession: Successfully created session",
+    "ports": [
+      "QUERY_PORT"
+    ],
+    "server_app": 1639880,
+    "binary": "longvinter-linux-server/Longvinter/Binaries/Linux/LongvinterServer-Linux-Shipping",
+    "config": "longvinter-linux-server/Longvinter/Saved/Config/LinuxServer/Game.ini",
+    "preserve": [
+      "longvinter-linux-server/Longvinter/Saved"
+    ],
+    "ini": {
+      "/Game/Blueprints/Server/GI_AdvancedSessions.GI_AdvancedSessions_C": {
+        "ServerName": "SERVER_NAME",
+        "ServerTag": "SERVER_TAG",
+        "MaxPlayers": "MAX_PLAYERS",
+        "ServerMOTD": "SERVER_MOTD",
+        "Password": "SERVER_PASSWORD",
+        "CommunityWebsite": "COMMUNITY_WEBSITE"
+      },
+      "/Game/Blueprints/Server/GM_Longvinter.GM_Longvinter_C": {
+        "AdminSteamID": "ADMIN_ID",
+        "PVP": "ENABLE_PVP",
+        "TentDecay": "ENABLE_TENTDECAY",
+        "MaxTents": "MAX_TENTS"
+      }
+    }
+  },
+  "frozen": {
+    "app": 1348640,
+    "defaults": {
+      "SRCDS_APPID": "1348640",
+      "MAX_PLAYERS": "10",
+      "QUERY_PORT": "25575",
+      "SERVER_NAME": "My Frozen Flame Server",
+      "SERVER_PASSWORD": "",
+      "AUTO_UPDATE": "1",
+      "RCON_PORT": "27015",
+      "RCON_PASSWORD": ""
+    },
+    "ready": "LogWorld: Bringing up level for play took",
+    "ports": [
+      "QUERY_PORT",
+      "RCON_PORT"
+    ],
+    "binary": "FrozenFlame/Binaries/Linux/FrozenFlameServer-Linux-Shipping",
+    "config": "FrozenFlame/Saved/Config/LinuxServer/Game.ini",
+    "preserve": [
+      "FrozenFlame/Saved"
+    ],
+    "default_config": {
+      "url": "https://raw.githubusercontent.com/DreamsideInteractive/FrozenFlameServer/5ba636b3b11c1371f382e506091b67b66fea795e/Game.ini",
+      "sha256": "05c25149123a6f12ff40abfdcc9a4d0b3551b472959e0b7ef8c615585d535813"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+/* Steam setup, maintenance and game Quick setup. No shared or Minecraft rules. */
+.steam-library-tile{font-weight:400;white-space:normal;min-height:235px;gap:0;text-decoration:none;color:inherit}
+.steam-library-tile:hover{text-decoration:none}
+.steam-game-mark{display:grid;place-items:center;width:54px;height:54px;border:1px solid #63503c;border-radius:14px;background:#382b1e;color:#edb876;margin-bottom:20px}
+.steam-game-mark svg{width:30px;height:30px}
+.steam-palworld .steam-game-mark{background:#193c3e;border-color:#326368;color:#81d8de}
+.steam-library-tile .game-tile-action{display:flex;justify-content:space-between;color:#a9caff!important}
+.steam-setup-page{max-width:1180px}
+.steam-back{display:inline-block;margin-bottom:10px;color:var(--muted);font-size:12px}
+.steam-setup-page .page-header h1{margin:0;font-size:26px}
+.steam-setup-page .page-header p{margin:8px 0 0;font-size:13px}
+.steam-setup-layout{display:grid;grid-template-columns:minmax(0,650px) minmax(220px,1fr);gap:24px;align-items:start}
+.steam-setup-layout>.card{margin:0}
+.steam-fields{min-width:0;border:0;padding:0;margin:0}
+.steam-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}
+.steam-fields .field{min-width:0;font-size:13px}
+.steam-fields .field small{font-size:12px;line-height:1.5}
+.steam-advanced{border-top:1px solid var(--line);margin:6px 0 22px;padding-top:16px}
+.steam-advanced summary,.steam-history summary{font-size:13px;color:#c6c6d0;cursor:pointer}
+.steam-advanced[open] summary{margin-bottom:20px}
+.steam-submit{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.steam-submit .muted{font-size:12px}
+.steam-next{padding:8px 0}
+.steam-next h2{font-size:16px;margin:0 0 12px}
+.steam-next p,.game-help p{font-size:13px;line-height:1.65;color:var(--muted);margin:6px 0 14px}
+.game-help{display:grid;gap:12px;margin-top:22px}
+.game-help strong{font-size:13px;font-weight:500}
+.game-help p:last-child{margin-bottom:0}
+.game-quick-page,.steam-maintenance-page{max-width:1300px}
+.game-quick-page>.page-header,.steam-maintenance-page>.page-header{align-items:center;gap:18px}
+.game-quick-page>.page-header h2,.steam-maintenance-page>.page-header h2{font-size:21px;margin:0}
+.game-quick-page>.page-header p,.steam-maintenance-page>.page-header p{font-size:13px;margin:7px 0 0}
+.game-quick-layout,.steam-maintenance-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,1fr);gap:20px;align-items:start}
+.game-quick-layout>.card,.steam-maintenance-layout>.card{min-width:0;margin:0}
+.game-quick-layout h3,.steam-maintenance-layout h3{font-size:15px;font-weight:600;margin:0 0 18px}
+.game-quick-layout .muted,.steam-maintenance-layout .muted{font-size:12px;line-height:1.65}
+.game-stop-note{border-left:2px solid #c99a57;padding:5px 12px;color:#ddc49c;font-size:12px;line-height:1.6;margin:14px 0 20px}
+.game-boolean{display:flex;align-items:center;gap:10px;font-size:13px;min-height:42px;margin-bottom:18px}
+.game-boolean input{width:16px;height:16px;min-height:0;margin:0}
+.game-folders ul,.steam-history ul{padding:0;list-style:none;margin:18px 0}
+.game-folders li{padding:16px 0;border-top:1px solid var(--line)}
+.game-folders li>a{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.game-folders code{display:block;font-size:11px;overflow-wrap:anywhere;white-space:normal;margin-top:7px;color:var(--muted)}
+.game-folders li p{margin:8px 0 0}
+.game-files-link{font-size:13px}
+.steam-card-heading,.steam-job>div,.steam-history li>div{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.steam-card-heading{margin-bottom:20px}
+.steam-card-heading h3{margin:0}
+.steam-builds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:0 0 18px}
+.steam-builds dt{color:var(--muted);font-size:11px;margin-bottom:6px}
+.steam-builds dd{font-size:13px;overflow-wrap:anywhere;margin:0}
+.steam-job{padding:16px;margin:18px 0;background:#192436;border:1px solid #30445f;border-radius:9px;font-size:13px}
+.steam-job progress{display:block;width:100%;height:5px;margin:15px 0;accent-color:var(--blue)}
+.steam-job p{color:#c5d1e2;font-size:12px;line-height:1.6;margin:0;overflow-wrap:anywhere}
+.steam-job-log{margin-top:14px;font-size:12px}
+.steam-job-log summary{cursor:pointer;color:#b7c9e3}
+.steam-job-log ol{list-style:none;padding:0;margin:12px 0 0;max-height:240px;overflow:auto}
+.steam-job-log li,.steam-history .steam-job-log li{display:grid;gap:4px;padding:9px 0;border-top:1px solid #ffffff12;border-bottom:0}
+.steam-job-log time{font-size:10px;color:var(--muted)}
+.steam-job-log li strong{font-size:11px;font-weight:500}
+.steam-job-log li p,.steam-history .steam-job-log li p{margin:0;font-size:11px;line-height:1.5}
+.steam-maintenance-actions{margin:20px 0 12px;gap:8px}
+.steam-maintenance-actions .button{font-size:12px}
+.steam-history{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.steam-history li{font-size:12px;padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.steam-history li strong{text-transform:capitalize;font-weight:500}
+.steam-history li p{line-height:1.6;margin:8px 0}
+.steam-cooldown{border-top:1px solid var(--line);padding-top:16px;font-size:12px;line-height:1.6;color:#bdc9de}
+@media(max-width:1050px){.game-quick-layout,.steam-maintenance-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){.steam-setup-layout{grid-template-columns:minmax(0,1fr)}.steam-form-grid,.steam-builds{grid-template-columns:minmax(0,1fr)}.game-quick-page>.page-header{align-items:flex-start;flex-direction:column}.steam-setup-page .page-header h1{font-size:23px}.steam-maintenance-actions{flex-wrap:wrap}.steam-maintenance-actions .button{flex:1 1 150px}.steam-submit{align-items:flex-start;flex-direction:column}}
+
+.game-template-catalog { margin-top: 2rem; }
+.game-template-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.template-description { white-space: pre-wrap; overflow-wrap: anywhere; }

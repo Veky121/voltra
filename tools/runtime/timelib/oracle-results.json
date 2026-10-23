@@ -1,0 +1,1481 @@
+{
+    "php_version": "8.5.4",
+    "timelib_version": 202215,
+    "timezone_db": "0.system",
+    "base": "2026-10-21T10:15:30.123456Z",
+    "cases": [
+        {
+            "name": "iso date",
+            "value": "2026-10-21",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "leap valid",
+            "value": "2024-02-29",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1709164800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "leap invalid",
+            "value": "2025-02-29",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1740787200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "overflow day",
+            "value": "2026-04-31",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1777593600,
+                "micros": 0
+            }
+        },
+        {
+            "name": "overflow hour normalized",
+            "value": "2026-10-21 24:00",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "named month",
+            "value": "21 October 2026",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "US slash",
+            "value": "10\/21\/2026",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "European dot",
+            "value": "21.10.2026",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "RFC date",
+            "value": "Wed, 21 Oct 2026 10:15:30 +0000",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "relative missing calendar rejected",
+            "value": "tomorrow",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "relative on explicit date",
+            "value": "2026-10-21 +1 day",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "weekday explicit date",
+            "value": "next Monday 2026-10-21",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792972800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "time only rejected",
+            "value": "10:15:30",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "Unix timestamp lacks calendar",
+            "value": "@1792577730",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "year too large",
+            "value": "+40000-01-01",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1200110860800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "year zero",
+            "value": "0000-01-01",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": -62167219200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "boolean rejected",
+            "value": true,
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            }
+        },
+        {
+            "name": "number calendar parse",
+            "value": 20261021,
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 20261021,
+                "micros": 0
+            }
+        },
+        {
+            "name": "strict padded",
+            "value": "2026-01-02",
+            "rules": "date_format:Y-m-d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1767312000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "unpadded rejected",
+            "value": "2026-1-2",
+            "rules": "date_format:Y-m-d",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1767312000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "unpadded permitted",
+            "value": "2026-1-2",
+            "rules": "date_format:Y-n-j",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1767312000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format leap invalid",
+            "value": "2025-02-29",
+            "rules": "date_format:Y-m-d",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1740787200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format alternatives",
+            "value": "21\/10\/2026",
+            "rules": "date_format:Y-m-d,d\/m\/Y",
+            "valid": true,
+            "failed": [],
+            "parsed": null
+        },
+        {
+            "name": "textual names",
+            "value": "Wednesday 21st October 2026",
+            "rules": "date_format:l jS F Y",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "12h meridian",
+            "value": "2026-10-21 03:04:05 pm",
+            "rules": "date_format:Y-m-d h:i:s a",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792595045,
+                "micros": 0
+            }
+        },
+        {
+            "name": "microseconds",
+            "value": "2026-10-21 10:15:30.123456",
+            "rules": "date_format:Y-m-d H:i:s.u",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "milliseconds",
+            "value": "2026-10-21 10:15:30.123",
+            "rules": "date_format:Y-m-d H:i:s.v",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 123000
+            }
+        },
+        {
+            "name": "escaped tokens",
+            "value": "2026 year 10 month 21",
+            "rules": "date_format:Y \\y\\e\\a\\r m \\m\\o\\n\\t\\h d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "timezone identifier",
+            "value": "2026-10-21 12:15:30 Europe\/Berlin",
+            "rules": "date_format:Y-m-d H:i:s e",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "timezone offset",
+            "value": "2026-10-21T12:15:30+02:00",
+            "rules": "date_format:Y-m-d\\TH:i:sP",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "timezone zero Z",
+            "value": "2026-10-21T10:15:30Z",
+            "rules": "date_format:Y-m-d\\TH:i:sp",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "timestamp format numeric loose equality",
+            "value": "0000",
+            "rules": "date_format:U",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 0,
+                "micros": 0
+            }
+        },
+        {
+            "name": "expanded positive year",
+            "value": "+12026-10-21",
+            "rules": "date_format:X-m-d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 317362060800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "expanded negative year",
+            "value": "-2026-10-21",
+            "rules": "date_format:X-m-d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": -126076262400,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format reset token rendered",
+            "value": "2026-10-21",
+            "rules": "date_format:!Y-m-d",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "!Y-m-d"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format wildcard rendered literal",
+            "value": "2026\/10\/21",
+            "rules": "date_format:Y?m?d",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y?m?d"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format ordinal day",
+            "value": "2026-293",
+            "rules": "date_format:Y-z",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format ordinal impossible",
+            "value": "2025-366",
+            "rules": "date_format:Y-z",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-z"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1767312000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format ISO week",
+            "value": "2026-W43-3",
+            "rules": "date_format:o-\\WW-N",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "o-\\WW-N"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "after literal",
+            "value": "2026-10-22",
+            "rules": "after:2026-10-21",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "after relative now",
+            "value": "tomorrow",
+            "rules": "after:now",
+            "timezone": "Europe\/Berlin",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792620000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "before relative tomorrow",
+            "value": "now",
+            "rules": "before:tomorrow",
+            "timezone": "America\/New_York",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "relative last weekday",
+            "value": "last Monday",
+            "rules": "before:today",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792368000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "relative first day next month",
+            "value": "first day of next month",
+            "rules": "after:tomorrow",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1793528130,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "relative compound",
+            "value": "next Thursday +2 weeks noon",
+            "rules": "after:tomorrow",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1793880000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "equal across offsets",
+            "value": "2026-10-21T12:00:00+02:00",
+            "rules": "date_equals:2026-10-21T10:00:00Z",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792576800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "same timestamp micros ignored unformatted",
+            "value": "2026-10-21T10:00:00.100000Z",
+            "rules": "date_equals:2026-10-21T10:00:00.900000Z",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792576800,
+                "micros": 100000
+            }
+        },
+        {
+            "name": "invalid equals invalid PHP nulls",
+            "value": "invalid one",
+            "rules": "date_equals:invalid two",
+            "valid": true,
+            "failed": [],
+            "parsed": null
+        },
+        {
+            "name": "invalid before positive PHP null",
+            "value": "invalid one",
+            "rules": "before:2026-01-01",
+            "valid": true,
+            "failed": [],
+            "parsed": null
+        },
+        {
+            "name": "negative before invalid PHP boolean null",
+            "value": "1960-01-01",
+            "rules": "before:invalid",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Before": [
+                        "invalid"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": -315619200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "after field",
+            "value": "2026-10-22",
+            "rules": "after:start",
+            "environment": {
+                "start": "2026-10-21"
+            },
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "literal takes precedence over field",
+            "value": "2026-10-22",
+            "rules": "after:2026-10-21",
+            "environment": {
+                "2026-10-21": "2030-01-01"
+            },
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "missing field null positive",
+            "value": "2026-10-22",
+            "rules": "after:missing",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "formatted comparison",
+            "value": "22\/10\/2026",
+            "rules": "date_format:d\/m\/Y|after:21\/10\/2026",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "formatted comparison fallback parser",
+            "value": "22\/10\/2026",
+            "rules": "date_format:d\/m\/Y|after:2026-10-21",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "formatted missing field true",
+            "value": "22\/10\/2026",
+            "rules": "date_format:d\/m\/Y|before:missing",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "formatted field distinct format",
+            "value": "22\/10\/2026",
+            "rules": "date_format:d\/m\/Y|after:start",
+            "environment": {
+                "start": "2026-10-21"
+            },
+            "other_rules": {
+                "start": "date_format:Y-m-d"
+            },
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "formatted microseconds compared",
+            "value": "2026-10-21 10:00:00.100000",
+            "rules": "date_format:Y-m-d H:i:s.u|before:2026-10-21 10:00:00.900000",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792576800,
+                "micros": 100000
+            }
+        },
+        {
+            "name": "DST spring normalization",
+            "value": "2026-03-29 02:30",
+            "rules": "date_equals:2026-03-29 03:30",
+            "timezone": "Europe\/Berlin",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1774747800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "DST fall standard fold",
+            "value": "2026-10-25 02:30",
+            "rules": "date_equals:2026-10-25T01:30:00Z",
+            "timezone": "Europe\/Berlin",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792891800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "Lord Howe half hour gap",
+            "value": "2026-10-04 02:15",
+            "rules": "date_equals:2026-10-04 02:45",
+            "timezone": "Australia\/Lord_Howe",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1791042300,
+                "micros": 0
+            }
+        },
+        {
+            "name": "numeric Carbon timestamp",
+            "value": 1792577730,
+            "rules": "after:2026-01-01",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "signed numeric string Carbon timestamp",
+            "value": "+1792577730",
+            "rules": "after:2026-01-01",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "raw timestamp string PHP not Carbon timestamp",
+            "value": "1792577730",
+            "rules": "after:2026-01-01",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "After": [
+                        "2026-01-01"
+                    ]
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "format timezone DST reject normalized",
+            "value": "2026-03-29 02:30 Europe\/Berlin",
+            "rules": "date_format:Y-m-d H:i e",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d H:i e"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1774747800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "abbreviation timezone",
+            "value": "2026-10-21 10:00:00 EST",
+            "rules": "date_format:Y-m-d H:i:s T",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792594800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "time 24 rejected by format roundtrip",
+            "value": "2026-10-21 24:00:00",
+            "rules": "date_format:Y-m-d H:i:s",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d H:i:s"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "null date rejected",
+            "value": null,
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            }
+        },
+        {
+            "name": "array date rejected",
+            "value": [
+                "2026-10-21"
+            ],
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            }
+        },
+        {
+            "name": "NUL trailing date native acceptance",
+            "value": "2026-10-21\u0000",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "compact date",
+            "value": "20261021",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "ordinal ISO date",
+            "value": "2026-294",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "ISO week date",
+            "value": "2026W433",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "month without day",
+            "value": "October 2026",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1790812800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "negative year",
+            "value": "-0001-01-01",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": -62198755200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "max supported year",
+            "value": "+32767-12-31",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 971890876800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "beyond supported year",
+            "value": "+32768-01-01",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 971890963200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "month zero",
+            "value": "2026-00-21",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": {
+                "seconds": 1766275200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "NUL interior invalid",
+            "value": "2026-10-21\u0000invalid",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "timezone nonexistent",
+            "value": "2026-10-21 Mars\/Future",
+            "rules": "date",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Date": []
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "leap second normalized",
+            "value": "2016-12-31 23:59:60 UTC",
+            "rules": "date",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1483228800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format month abbreviations",
+            "value": "21 Oct 2026",
+            "rules": "date_format:d M Y",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format short weekday",
+            "value": "Wed 21 Oct 2026",
+            "rules": "date_format:D d M Y",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format wrong weekday normalized",
+            "value": "Thu 21 Oct 2026",
+            "rules": "date_format:D d M Y",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "D d M Y"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792627200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format year two digits",
+            "value": "69-10-21",
+            "rules": "date_format:y-m-d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 3149539200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format nonpadded minutes invalid",
+            "value": "2026-10-21 3:4:5",
+            "rules": "date_format:Y-m-d G:i:s",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d G:i:s"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792551845,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format nonpadded hour",
+            "value": "2026-10-21 3:04:05",
+            "rules": "date_format:Y-m-d G:i:s",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792551845,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format fraction precision strict",
+            "value": "2026-10-21 10:15:30.1",
+            "rules": "date_format:Y-m-d H:i:s.u",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d H:i:s.u"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 100000
+            }
+        },
+        {
+            "name": "format fraction precision full",
+            "value": "2026-10-21 10:15:30.100000",
+            "rules": "date_format:Y-m-d H:i:s.u",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 100000
+            }
+        },
+        {
+            "name": "format positive offset no colon",
+            "value": "2026-10-21 10:15:30 +0545",
+            "rules": "date_format:Y-m-d H:i:s O",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792557030,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format negative offset",
+            "value": "2026-10-21 10:15:30 -03:30",
+            "rules": "date_format:Y-m-d H:i:s P",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792590330,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format Unix post2038",
+            "value": "4102444800",
+            "rules": "date_format:U",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 4102444800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format Unix negative",
+            "value": "-315619200",
+            "rules": "date_format:U",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": -315619200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format leap flag unsupported parse",
+            "value": "2024-02-29 1",
+            "rules": "date_format:Y-m-d L",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d L"
+                    ]
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "format month length unsupported parse",
+            "value": "2026-10-21 31",
+            "rules": "date_format:Y-m-d t",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d t"
+                    ]
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "format ISO combined token unsupported parse",
+            "value": "2026-10-21T10:15:30+00:00",
+            "rules": "date_format:c",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "c"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format trailing plus flag",
+            "value": "2026-10-21 trailing",
+            "rules": "date_format:Y-m-d+",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d+"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format reset trailing flag",
+            "value": "2026-10-21",
+            "rules": "date_format:Y-m-d|",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format escaped backslash",
+            "value": "2026\\10\\21",
+            "rules": "date_format:Y\\\\m\\\\d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format trailing NUL",
+            "value": "2026-10-21\u0000",
+            "rules": "date_format:Y-m-d",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-m-d"
+                    ]
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "format 12hour uppercase",
+            "value": "2026-10-21 12:00:00 AM",
+            "rules": "date_format:Y-m-d h:i:s A",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format ymd no time",
+            "value": "20261021",
+            "rules": "date_format:Ymd",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format year extended x",
+            "value": "+12026-10-21",
+            "rules": "date_format:x-m-d",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 317362060800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "format ISO day weeks",
+            "value": "2026-W43-3",
+            "rules": "date_format:Y-\\WW-N",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "DateFormat": [
+                        "Y-\\WW-N"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "after or equal equality",
+            "value": "2026-10-21",
+            "rules": "after_or_equal:2026-10-21",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "before or equal equality",
+            "value": "2026-10-21",
+            "rules": "before_or_equal:2026-10-21",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "strict after equality false",
+            "value": "2026-10-21",
+            "rules": "after:2026-10-21",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "After": [
+                        "2026-10-21"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "strict before equality false",
+            "value": "2026-10-21",
+            "rules": "before:2026-10-21",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "Before": [
+                        "2026-10-21"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 1792540800,
+                "micros": 0
+            }
+        },
+        {
+            "name": "now equals test clock",
+            "value": "now",
+            "rules": "date_equals:2026-10-21T10:15:30.123456Z",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "relative yesterday",
+            "value": "yesterday",
+            "rules": "before:today",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792454400,
+                "micros": 0
+            }
+        },
+        {
+            "name": "relative last day month",
+            "value": "last day of February 2028",
+            "rules": "date_equals:2028-02-29T00:00:00Z",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1835395200,
+                "micros": 0
+            }
+        },
+        {
+            "name": "relative business weekdays",
+            "value": "+2 weekdays",
+            "rules": "after:tomorrow",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792750530,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "relative negative month",
+            "value": "2026-03-31 -1 month",
+            "rules": "date_equals:2026-03-03",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1772496000,
+                "micros": 0
+            }
+        },
+        {
+            "name": "numeric decimal Carbon timestamp",
+            "value": 1792577730.123456,
+            "rules": "after:2026-01-01",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "numeric float string Carbon timestamp",
+            "value": "1792577730.123456",
+            "rules": "after:2026-01-01",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 1792577730,
+                "micros": 123456
+            }
+        },
+        {
+            "name": "numeric exponent Carbon timestamp",
+            "value": "1.792577730e9",
+            "rules": "after:2026-01-01",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "After": [
+                        "2026-01-01"
+                    ]
+                }
+            },
+            "parsed": {
+                "seconds": 10,
+                "micros": 792578
+            }
+        },
+        {
+            "name": "numeric hex is not PHP number",
+            "value": "0x1p31",
+            "rules": "after:2026-01-01",
+            "valid": false,
+            "failed": {
+                "value": {
+                    "After": [
+                        "2026-01-01"
+                    ]
+                }
+            },
+            "parsed": null
+        },
+        {
+            "name": "epoch zero vs missing null",
+            "value": "1970-01-01",
+            "rules": "date_equals:missing",
+            "valid": true,
+            "failed": [],
+            "parsed": {
+                "seconds": 0,
+                "micros": 0
+            }
+        }
+    ]
+}

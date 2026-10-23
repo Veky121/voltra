@@ -1,0 +1,17 @@
+import fs from 'node:fs';import crypto from 'node:crypto';import {api} from './openttd-compat-node.mjs';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/virtual-worlds/nwn',{receipt}=await ownedStoppedServer(dir+'/private.json');
+const phase=process.argv[2]||'nss-refresh';if(!/^[a-z0-9-]+$/.test(phase))throw Error('Expected named source phase');
+if(fs.existsSync(dir+'/'+phase+'-request.json'))throw Error('Named refresh already requested; inspect current installer');
+if(!fs.existsSync(dir+'/first-boot-expected-source.json'))fs.copyFileSync(dir+'/expected-source.json',dir+'/first-boot-expected-source.json');
+if(!fs.existsSync(dir+'/first-boot-failure-state.json'))fs.copyFileSync(dir+'/observation.json',dir+'/first-boot-failure-state.json');
+const profile=JSON.parse(fs.readFileSync('.local/virtual-worlds/profiles.json'))[receipt.path];
+await api('/api/admin/eggs/'+receipt.egg_id+'/scripts','PATCH',{script_install:profile.egg.scripts.installation.script,script_container:profile.egg.scripts.installation.container,script_entry:'bash',config_startup:JSON.parse(profile.egg.config.startup),config_stop:profile.egg.config.stop});
+const actual=(await api('/api/admin/eggs/'+receipt.egg_id)).attributes;
+if(actual.script_install!==profile.egg.scripts.installation.script.trimEnd())throw Error('Fixture script publication mismatch beyond API trailing-whitespace trim');
+const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
+if(JSON.stringify(actual.config_startup)!==profile.egg.config.startup)throw Error('Readiness configuration mismatch');
+const proof={at:new Date().toISOString(),uuid:receipt.uuid,egg_id:receipt.egg_id,script_sha256:sha(actual.script_install),startup:actual.startup,config_startup:actual.config_startup,stage_script_equal:true,helpers:Object.fromEntries(['steam-template.py','native-console.py','virtual-worlds-install.py','virtual-worlds-runtime.py','virtual-worlds-releases.json'].map(name=>[name,{sha256:sha(fs.readFileSync('internal/panel/game_library/scripts/'+name)),bytes:fs.statSync('internal/panel/game_library/scripts/'+name).size}]))};
+fs.writeFileSync(dir+'/expected-source.json',JSON.stringify(proof,null,2));
+fs.writeFileSync(dir+'/'+phase+'-request.json',JSON.stringify({uuid:receipt.uuid,at:new Date().toISOString(),phase:'requesting'},null,2));
+await api('/api/application/servers/'+receipt.internal_id+'/reinstall','POST',{});
+console.log({uuid:receipt.uuid,phase:'scoped NSS dependency/source reinstall requested; no game start'});

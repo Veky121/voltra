@@ -1,0 +1,3 @@
+import fs from 'node:fs';import {spawnSync} from 'node:child_process';
+const source=[['INI_SOURCE','native-config.py'],['DST_SOURCE','dst-config.py'],['STEAM_SOURCE','steam-template.py'],['INSTALL_SOURCE','dst-install.py'],['SHARDS_SOURCE','native-shards.py'],['RUNTIME_SOURCE','dst-runtime.py']].map(([key,name])=>key+'='+JSON.stringify(fs.readFileSync('internal/panel/game_library/scripts/'+name,'utf8'))).join('\n')+'\n'+fs.readFileSync('tools/runtime/test-dst.py','utf8');
+const result=spawnSync('ssh',['-o','BatchMode=yes','home-server-ai','python3 -'],{input:source,encoding:'utf8'});console.log(result.stdout+result.stderr);process.exitCode=result.status??1;

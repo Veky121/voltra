@@ -1,0 +1,30 @@
+{
+  "weekly": {
+    "x86_64": {
+      "name": "weekly-linux-x86_64-2026-10-21T11_29.zip",
+      "url": "https://github.com/veloren/veloren/releases/download/weekly/weekly-linux-x86_64-2026-10-21T11_29.zip",
+      "bytes": 470739814,
+      "sha256": "ad6ad879d6f680a06b0c270c74ecbeea74f20dbd49fc84ac2195a0d15916b16e"
+    },
+    "aarch64": {
+      "name": "weekly-linux-aarch64-2026-10-21T11_29.zip",
+      "url": "https://github.com/veloren/veloren/releases/download/weekly/weekly-linux-aarch64-2026-10-21T11_29.zip",
+      "bytes": 463612538,
+      "sha256": "ce3e6a97cef2da2937b39b38aea3af88803fd5472f73cf61203baca05d074105"
+    }
+  },
+  "nightly": {
+    "x86_64": {
+      "name": "nightly-linux-x86_64-2025-09-13T21_02.zip",
+      "url": "https://github.com/veloren/veloren/releases/download/nightly/nightly-linux-x86_64-2025-09-13T21_02.zip",
+      "bytes": 469298841,
+      "sha256": "18e664ef5f6f6e68cacd678b42b2826f7e67e4939ea6fb745d92582d0eb83ad1"
+    },
+    "aarch64": {
+      "name": "nightly-linux-aarch64-2025-09-13T21_02.zip",
+      "url": "https://github.com/veloren/veloren/releases/download/nightly/nightly-linux-aarch64-2025-09-13T21_02.zip",
+      "bytes": 457989485,
+      "sha256": "4d68267fde2f805d393c25ff70896ff53fb970a2a7e4da9ac5a638425b4e192d"
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "aloft": {
+    "app": 1660080,
+    "platform": "windows",
+    "defaults": {
+      "SRCDS_APPID": "1660080",
+      "WINETRICKS_RUN": "mono vcrun2022 wmp11 mf sound=disabled",
+      "SAVE_NAME": "Aloft",
+      "SERVER_NAME": "A_Pterodactyl_Hosted_Server",
+      "MAX_PLAYERS": "8",
+      "CREATIVE_MODE": "0",
+      "NUM_ISLANDS": "500",
+      "ADMIN_IDS": "",
+      "IS_VISIBLE": "true",
+      "PRIVATE_ISLANDS": "false",
+      "STEAM_USER": "",
+      "STEAM_PASS": "",
+      "WINDOWS_INSTALL": "1",
+      "SAVE_PATH": ".wine/drive_c/users/container/AppData/LocalLow/Astrolabe Interactive/Aloft/Data01/Saves",
+      "WINEDEBUG": "-all",
+      "WINEDLLOVERRIDES": "mscoree,mshtml=",
+      "WORLD_GENERATION_SYNTAX": "legacy",
+      "ISLAND_PRESET": "normal",
+      "CORRUPTION_PRESET": "normal"
+    },
+    "binary": "Aloft.exe",
+    "ready": "Server Ready",
+    "types": {
+      "MAX_PLAYERS": "number",
+      "CREATIVE_MODE": "boolean",
+      "NUM_ISLANDS": "number"
+    },
+    "preserve": [
+      ".wine/drive_c/users/container/AppData/LocalLow/Astrolabe Interactive/Aloft/Data01/Saves",
+      "ServerRoomCode*",
+      "*.log"
+    ]
+  },
+  "astro": {
+    "app": 2934900,
+    "platform": "linux",
+    "defaults": {
+      "SRCDS_APPID": "2934900",
+      "SERVER_NAME": "Astro Colony Dedicated Server",
+      "SERVER_PASSWORD": "",
+      "SERVER_MAXPLAYERS": "5",
+      "SERVER_MAPSEED": "7300",
+      "SERVER_MAPNAME": "YourMapName",
+      "SERVER_AUTOSAVEINTERVAL": "5.0",
+      "SERVER_AUTOSAVESCOUNT": "10",
+      "SERVER_ADMINS": "",
+      "SERVER_LOADLATESTSAVEGAME": "1",
+      "SERVER_SHAREDTECHNOLOGIES": "1",
+      "SERVER_OXYGENCONSUMPTION": "1",
+      "SERVER_FREECONSTRUCTION": "0",
+      "AUTO_UPDATE": "1",
+      "SERVER_QUERY_PORT": "27015"
+    },
+    "binary": "AstroColony/Binaries/Linux/AstroColonyServer",
+    "ready": "server create success",
+    "types": {
+      "SERVER_MAPSEED": "number",
+      "SERVER_AUTOSAVEINTERVAL": "number",
+      "SERVER_LOADLATESTSAVEGAME": "boolean",
+      "SERVER_SHAREDTECHNOLOGIES": "boolean",
+      "SERVER_OXYGENCONSUMPTION": "boolean",
+      "SERVER_FREECONSTRUCTION": "boolean",
+      "AUTO_UPDATE": "boolean",
+      "SERVER_QUERY_PORT": "number"
+    },
+    "ini": {
+      "/Script/ACFeature.EHServerSubsystem": {
+        "ServerPassword": "SERVER_PASSWORD",
+        "Seed": "SERVER_MAPSEED",
+        "MapName": "SERVER_MAPNAME",
+        "MaxPlayers": "SERVER_MAXPLAYERS",
+        "ShouldLoadLatestSavegame": "SERVER_LOADLATESTSAVEGAME",
+        "AdminList": "SERVER_ADMINS",
+        "SharedTechnologies": "SERVER_SHAREDTECHNOLOGIES",
+        "OxygenConsumption": "SERVER_OXYGENCONSUMPTION",
+        "FreeConstruction": "SERVER_FREECONSTRUCTION",
+        "AutosaveInterval": "SERVER_AUTOSAVEINTERVAL",
+        "AutosavesCount": "SERVER_AUTOSAVESCOUNT"
+      }
+    },
+    "preserve": [
+      "AstroColony/Saved"
+    ]
+  },
+  "aska": {
+    "app": 3246670,
+    "platform": "windows",
+    "defaults": {
+      "DISPLAY_NAME": "A Pterodactyl Server",
+      "SERVER_NAME": "A Pterodactyl Server",
+      "SERVER_PASSWORD": "",
+      "SERVER_REGION": "default",
+      "STEAM_GSLT": "",
+      "KEEP_SERVER_WORLD_ALIVE": "false",
+      "SRCDS_APPID": "3246670",
+      "WINDOWS_INSTALL": "1",
+      "SteamAppId": "1898300",
+      "WINEDEBUG": "-all",
+      "AUTO_UPDATE": "1"
+    },
+    "binary": "AskaServer.exe",
+    "ready": "Activating game state: GameState_Boot",
+    "types": {
+      "AUTO_UPDATE": "boolean"
+    },
+    "properties": {
+      "display name": "DISPLAY_NAME",
+      "server name": "SERVER_NAME",
+      "password": "SERVER_PASSWORD",
+      "region": "SERVER_REGION",
+      "keep server world alive": "KEEP_SERVER_WORLD_ALIVE",
+      "authentication token": "STEAM_GSLT"
+    },
+    "preserve": [
+      "server properties.txt",
+      "savegame_*"
+    ]
+  }
+}

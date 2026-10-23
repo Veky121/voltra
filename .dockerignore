@@ -1,0 +1,27 @@
+# Build context contains source, not private runtime data or test receipts.
+.git
+**/.git
+**/.local
+artifacts
+**/node_modules
+web/dist
+desktop/frontend
+desktop/bin
+desktop/build
+**/__pycache__
+**/*.pyc
+**/*.exe
+**/*.test
+**/*.syso
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.ci
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+coverage.out

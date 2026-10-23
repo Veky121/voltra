@@ -1,0 +1,172 @@
+name: Voltra release
+on:
+  push:
+    tags: ['v*']
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag, e.g. v0.1.0-beta.1'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: voltra-release-publication
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: github.repository == 'Veky121/voltra' && (github.event_name != 'schedule' || vars.VOLTRA_NIGHTLY_ENABLED == 'true')
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      channel: ${{ steps.plan.outputs.channel }}
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - id: plan
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ]; then
+            go run ./tools/release nightly VERSION "$(date -u +%Y%m%d)" "$RUN_NUMBER"
+          else
+            go run ./tools/release plan "$RELEASE_TAG"
+          fi
+      - id: source
+        env:
+          RELEASE_TAG: ${{ steps.plan.outputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = schedule ]; then
+            sha=$(git rev-parse HEAD)
+          else
+            sha=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          fi
+          git merge-base --is-ancestor "$sha" origin/main
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+  desktop:
+    needs: plan
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: desktop/go.mod
+          cache-dependency-path: desktop/go.sum
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: go -C desktop test ./...
+      - shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+          VOLTRA_UPDATER_PUBLIC_KEY: ${{ vars.VOLTRA_UPDATER_PUBLIC_KEY }}
+        run: |
+          if (!$env:VOLTRA_UPDATER_PUBLIC_KEY) { throw 'Configure VOLTRA_UPDATER_PUBLIC_KEY before releasing.' }
+          ./desktop/build.ps1 -Version $env:RELEASE_VERSION -UpdateManifestURL 'https://github.com/Veky121/voltra/releases/download/update-{{channel}}/manifest.json' -UpdatePublicKey $env:VOLTRA_UPDATER_PUBLIC_KEY
+          New-Item -ItemType Directory out | Out-Null
+          Copy-Item desktop/bin/Voltra.exe out/Voltra-windows-amd64.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-desktop
+          path: out/*
+          if-no-files-found: error
+  linux:
+    needs: plan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: npm run build --prefix web
+      - run: go test ./tools/release ./internal/nodeagent
+      - env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          VERSION: ${{ needs.plan.outputs.tag }}
+        run: |
+          mkdir out
+          for arch in amd64 arm64; do
+            GOARCH="$arch" go build -trimpath -ldflags='-s -w' -o "out/voltra-node-linux-$arch" ./cmd/node
+            GOARCH="$arch" go build -trimpath -ldflags="-s -w -X voltra/internal/panel.NodeReleaseVersion=$VERSION" -o "out/voltra-panel-linux-$arch" ./cmd/panel
+          done
+          tar -czf out/voltra-web.tar.gz -C web dist
+          go run ./tools/release checksums out/NODE-SHA256SUMS out/voltra-node-linux-*
+          go run ./tools/release checksums out/PANEL-SHA256SUMS out/voltra-panel-linux-* out/voltra-web.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-linux
+          path: out/*
+          if-no-files-found: error
+  publish:
+    needs: [plan, desktop, linux]
+    runs-on: ubuntu-24.04
+    # Only this job receives a write token or the signing key. PR CI never does.
+    permissions:
+      contents: write
+    environment: release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: out
+          merge-multiple: true
+      - name: Sign desktop artifact
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          VOLTRA_UPDATER_PRIVATE_KEY: ${{ secrets.VOLTRA_UPDATER_PRIVATE_KEY }}
+          VOLTRA_UPDATER_PUBLIC_KEY: ${{ vars.VOLTRA_UPDATER_PUBLIC_KEY }}
+        run: |
+          go run ./tools/release manifest "$RELEASE_TAG" out/Voltra-windows-amd64.exe out/manifest.json
+          go run ./tools/release checksums out/DESKTOP-SHA256SUMS out/Voltra-windows-amd64.exe
+      - name: Publish version assets and channel feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: Veky121/voltra
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+          RELEASE_SHA: ${{ needs.plan.outputs.sha }}
+          CREATE_NIGHTLY_TAG: ${{ github.event_name == 'schedule' && 'true' || 'false' }}
+        run: python3 tools/release/publish.py
+  wings:
+    needs: [plan, publish]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/wings.yml
+    with:
+      version: ${{ needs.plan.outputs.tag }}
+      ref: ${{ needs.plan.outputs.sha }}

@@ -1,0 +1,42 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/docker/docker/api/types/container"
+)
+
+func TestVoltraInstallWaitResult(t *testing.T) {
+	for _, spec := range []struct {
+		name string
+		result container.WaitResponse
+		want string
+	}{
+		{"successful", container.WaitResponse{}, ""},
+		{"failed shell", container.WaitResponse{StatusCode: 1}, "code 1"},
+		{"missing executable", container.WaitResponse{StatusCode: 127}, "code 127"},
+		{"killed", container.WaitResponse{StatusCode: 137}, "code 137"},
+		{"daemon result error", container.WaitResponse{Error: &container.WaitExitError{Message: "wait failed"}}, "wait failed"},
+	} {
+		t.Run(spec.name, func(t *testing.T) {
+			results := make(chan container.WaitResponse,1)
+			results <- spec.result
+			err := waitForInstallResult(context.Background(), results, make(chan error))
+			if spec.want == "" && err != nil { t.Fatal(err) }
+			if spec.want != "" && (err == nil || !strings.Contains(err.Error(),spec.want)) { t.Fatalf("expected %q, got %v",spec.want,err) }
+		})
+	}
+	results := make(chan container.WaitResponse)
+	failures := make(chan error,1)
+	failures <- errors.New("transport failed")
+	if err:=waitForInstallResult(context.Background(),results,failures);err==nil || err.Error()!="transport failed" { t.Fatal(err) }
+	close(results)
+	if err:=waitForInstallResult(context.Background(),results,make(chan error));err==nil { t.Fatal("closed result channel accepted") }
+	close(failures)
+	if err:=waitForInstallResult(context.Background(),make(chan container.WaitResponse),failures);err==nil { t.Fatal("closed error channel accepted") }
+	ctx,cancel:=context.WithCancel(context.Background());cancel()
+	if err:=waitForInstallResult(ctx,make(chan container.WaitResponse),make(chan error));!errors.Is(err,context.Canceled) { t.Fatal(err) }
+}

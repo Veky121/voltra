@@ -1,0 +1,10 @@
+[package]
+name = "voltra-veloren-query"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Native Veloren server query probe using the upstream client"
+
+[dependencies]
+veloren-query-server = { version = "=0.1.2", features = ["client"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }

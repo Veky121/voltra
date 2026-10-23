@@ -1,0 +1,3 @@
+import fs from 'node:fs';import {spawnSync} from 'node:child_process';
+const source=[['INI_SOURCE','native-config.py'],['STEAM_SOURCE','steam-template.py'],['CONSOLE_SOURCE','native-console.py'],['INSTALL_SOURCE','java-games-install.py'],['RUNTIME_SOURCE','java-games-runtime.py']].map(([key,file])=>key+'='+JSON.stringify(fs.readFileSync('internal/panel/game_library/scripts/'+file,'utf8'))).join('\n')+'\n'+fs.readFileSync('tools/runtime/test-java-games.py','utf8');
+const r=spawnSync('docker',['run','--rm','-i','--network','none','--read-only','--tmpfs','/tmp:rw,nosuid,nodev,size=64m','--memory','256m','--cpus','1','python:3.13-slim','python3','-'],{input:source,encoding:'utf8'});console.log(r.stdout+r.stderr);process.exitCode=r.status??1;

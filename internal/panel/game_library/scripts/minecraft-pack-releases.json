@@ -1,0 +1,118 @@
+{
+  "technic": {
+    "minecraft/java/technic/attack-of-the-bteam/egg-attack-of-the-b--team.json": {
+      "path": "minecraft/java/technic/attack-of-the-bteam/egg-attack-of-the-b--team.json",
+      "version": "1.0.12c",
+      "url_template": "https://servers.technicpack.net/Technic/servers/bteam/BTeam_Server_v$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/bteam/BTeam_Server_v1.0.12c.zip",
+      "sha256": "7011bff910cee395817c53c4e158125039b305dd279b7e1efd0d24f02a4d3387",
+      "bytes": 136654099,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar BTeam.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/blightfall/egg-blightfall.json": {
+      "path": "minecraft/java/technic/blightfall/egg-blightfall.json",
+      "version": "3.1.1-CE",
+      "url_template": "https://servers.technicpack.net/Technic/servers/blightfall/Blightfall_Server_$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/blightfall/Blightfall_Server_3.1.1-CE.zip",
+      "sha256": "cac19f658aded53e7c29ab3f63a0c675fd21ace935949bb05f529265d6d7036d",
+      "bytes": 340675823,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar Blightfall.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/hexxit/egg-hexxit.json": {
+      "path": "minecraft/java/technic/hexxit/egg-hexxit.json",
+      "version": "1.0.10",
+      "url_template": "https://servers.technicpack.net/Technic/servers/hexxit/Hexxit_Server_v$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/hexxit/Hexxit_Server_v1.0.10.zip",
+      "sha256": "6fb6cb7912861097263da44849b8f80b7213bcc9a11cda4f7ab83819598e3235",
+      "bytes": 48369253,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar Hexxit.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/Tekkit-2/egg-tekkit2.json": {
+      "path": "minecraft/java/technic/Tekkit-2/egg-tekkit2.json",
+      "version": "v1.0.5",
+      "url_template": "https://servers.technicpack.net/Technic/servers/tekkit-2/Tekkit-2_Server_$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/tekkit-2/Tekkit-2_Server_v1.0.5.zip",
+      "sha256": "d3e89f1bf32f5eeb9cf4c8aa9d01d76766a3b569f4891119c3274a7b16fcbcaa",
+      "bytes": 207487950,
+      "startup": "java -server  -Xms128M -Xmx{{SERVER_MEMORY}}M -Dfml.queryResult=confirm -jar forge.jar nogui",
+      "java": 8
+    },
+    "minecraft/java/technic/tekkit-classic/egg-tekkit-classic.json": {
+      "path": "minecraft/java/technic/tekkit-classic/egg-tekkit-classic.json",
+      "version": "3.1.2",
+      "url_template": "https://servers.technicpack.net/Technic/servers/tekkit/Tekkit_Server_$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/tekkit/Tekkit_Server_3.1.2.zip",
+      "sha256": "cd38058f1cac6208809c062fb006a9b29b7f55230af31ecbb52e0ff1cffe4b12",
+      "bytes": 14665243,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar Tekkit.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/tekkit-legends/egg-tekkit-legends.json": {
+      "path": "minecraft/java/technic/tekkit-legends/egg-tekkit-legends.json",
+      "version": "1.1.1",
+      "url_template": "https://servers.technicpack.net/Technic/servers/tekkit-legends/Tekkit_Legends_Server_v$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/tekkit-legends/Tekkit_Legends_Server_v1.1.1.zip",
+      "sha256": "050ec5517523efa68390ed5826b78e4802f4dfedfcfade231bc8375cd36aa84b",
+      "bytes": 105513466,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar TekkitLegends.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/tekkit-smp/egg-tekkit-smp.json": {
+      "path": "minecraft/java/technic/tekkit-smp/egg-tekkit-smp.json",
+      "version": "v1.0.5",
+      "url_template": "https://servers.technicpack.net/Technic/servers/tekkit-smp/Tekkit-SMP_Server_${MODPACK_VERSION}.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/tekkit-smp/Tekkit-SMP_Server_v1.0.5.zip",
+      "sha256": "587d1cb810ec0d194335c2552db3c4f4494c1e0e4fcb94a963a5f67f94c20f4b",
+      "bytes": 299385644,
+      "startup": "java -server -Xms128M -Xmx{{SERVER_MEMORY}}M -Dterminal.jline=false -Dterminal.ansi=true -Dfml.queryResult=confirm -jar forge.jar nogui",
+      "java": 8
+    },
+    "minecraft/java/technic/Tekkit/egg-tekkit.json": {
+      "path": "minecraft/java/technic/Tekkit/egg-tekkit.json",
+      "version": "v1.2.9g-2",
+      "url_template": "https://servers.technicpack.net/Technic/servers/tekkitmain/Tekkit_Server_$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/tekkitmain/Tekkit_Server_v1.2.9g-2.zip",
+      "sha256": "fc0a2c363bf7b657448635d989b49265c3315811e0a12c26dd8e28db3ef6578f",
+      "bytes": 84764834,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar Tekkit.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/the-1-12-2-pack/egg-the1-12-2-pack.json": {
+      "path": "minecraft/java/technic/the-1-12-2-pack/egg-the1-12-2-pack.json",
+      "version": "1.6.6",
+      "url_template": "https://servers.technicpack.net/Technic/servers/the-1122-pack/the-1122-pack_$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/the-1122-pack/the-1122-pack_1.6.6.zip",
+      "sha256": "251370b79725b9e918799fe187e1858b9f683fa193efbd38af8cb85b692b5244",
+      "bytes": 436081844,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar forge-*.jar",
+      "java": 8
+    },
+    "minecraft/java/technic/the-1-7-10-pack/egg-the1-7-10-pack.json": {
+      "path": "minecraft/java/technic/the-1-7-10-pack/egg-the1-7-10-pack.json",
+      "version": "0.10.15",
+      "url_template": "https://servers.technicpack.net/Technic/servers/the-1710-pack/the-1710-pack_$MODPACK_VERSION.zip",
+      "url": "https://servers.technicpack.net/Technic/servers/the-1710-pack/the-1710-pack_0.10.15.zip",
+      "sha256": "6ab74e85ee65a3cd73b733f513b4254e4cde0a0585ed6a737c148cc0716ad24f",
+      "bytes": 309591497,
+      "startup": "java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar forge-*.jar",
+      "java": 8
+    }
+  },
+  "ftb_installers": {
+    "linux": {
+      "url": "https://api.feed-the-beast.com/v1/modpacks/public/modpack/0/0/server/linux",
+      "sha256": "50184a29ea3fc858889c6eeec74848338ea2347385c940af4086af6480ed8542",
+      "bytes": 18161856,
+      "version": "observed-2026-10-23"
+    },
+    "arm/linux": {
+      "url": "https://api.feed-the-beast.com/v1/modpacks/public/modpack/0/0/server/arm/linux",
+      "sha256": "9d503bea6e0263fc4c1c904114abdb55ee7c67e0355423c72142c23a30336300",
+      "bytes": 16984534,
+      "version": "observed-2026-10-23"
+    }
+  }
+}

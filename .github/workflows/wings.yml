@@ -1,0 +1,95 @@
+name: Patched Wings release
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Existing Voltra release tag, e.g. v1.0.0
+        required: true
+        type: string
+      ref:
+        description: Exact 40-character Voltra source commit matching that tag
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing Voltra release tag, e.g. v1.0.0
+        required: true
+        type: string
+      ref:
+        description: Exact 40-character Voltra source commit matching that tag
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: wings-release-${{ inputs.version }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_REF: ${{ inputs.ref }}
+        run: |
+          [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]] || exit 1
+          [[ "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]] || exit 1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Confirm immutable tag source
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_REF: ${{ inputs.ref }}
+        run: |
+          git fetch --no-tags origin "refs/tags/$VERSION:refs/tags/$VERSION"
+          test "$(git rev-parse "refs/tags/$VERSION^{commit}")" = "$SOURCE_REF"
+          test "$(git rev-parse HEAD)" = "$SOURCE_REF"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Test installer in disposable Linux container
+        run: docker run --rm -v "$PWD:/src:ro" -w /src python:3.13-slim python tools/install/test_node.py
+      - name: Fetch pinned upstream and build
+        env:
+          VERSION: ${{ inputs.version }}
+          SOURCE_REF: ${{ inputs.ref }}
+        run: |
+          git init "$RUNNER_TEMP/wings"
+          git -C "$RUNNER_TEMP/wings" remote add origin https://github.com/pterodactyl/wings.git
+          git -C "$RUNNER_TEMP/wings" fetch --depth=1 origin 6987d5e6f0612133e031255a99655e822d30579a
+          git -C "$RUNNER_TEMP/wings" checkout --detach FETCH_HEAD
+          bash tools/wings/build-release.sh "$RUNNER_TEMP/wings" "$RUNNER_TEMP/wings-dist" "$VERSION"
+          cd "$RUNNER_TEMP/wings-dist"
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("wings-provenance.json"));p.voltra_commit=process.env.SOURCE_REF;p.version=process.env.VERSION;p.go="1.27.3";fs.writeFileSync("wings-provenance.json",JSON.stringify(p,null,2)+"\n")'
+          sha256sum voltra-wings-linux-amd64 voltra-wings-linux-arm64 WINGS-LICENSE wings-provenance.json install-node.sh > WINGS-SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: patched-wings
+          path: ${{ runner.temp }}/wings-dist/*
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: patched-wings
+          path: dist
+      - name: Append assets to existing release without replacing published files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release view "$VERSION" >/dev/null
+          gh release upload "$VERSION" dist/*

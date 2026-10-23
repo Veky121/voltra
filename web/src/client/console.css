@@ -1,0 +1,64 @@
+.console-view{display:flex;flex-direction:column;gap:16px;min-width:0}
+.console-connection{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;font-size:11px;color:#8f8f9c;line-height:1.5}
+.console-connection>span{width:5px;height:5px;border-radius:50%;background:#dda756}
+.console-connection.connection-connected>span{background:#38bd7c}
+.console-connection.connection-disconnected>span{background:#ef7886}
+.console-view>.error,.console-view>.success{margin:0;font-size:12px}
+.console-terminal{min-width:0;border:1px solid var(--line);border-radius:7px;background:var(--surface-muted)}
+.console-terminal-body{position:relative;min-width:0;background:inherit;border-radius:7px 7px 0 0}
+.console-terminal .console-output{display:block;width:100%;height:clamp(320px,44vh,520px);min-width:0;margin:0;padding:16px 250px 16px 14px;border:0;border-radius:7px 7px 0 0;background:var(--surface-muted);overflow:auto;white-space:pre;color:#efeff5;font:500 11.5px/1.5 'IBM Plex Mono',monospace;tab-size:4;scrollbar-color:#3b3e45 #111214;scrollbar-width:thin}
+.console-terminal .console-output:focus-visible{outline:1px solid var(--accent);outline-offset:-2px}
+.console-level-error{color:#ff8c9a}
+.console-level-warning{color:#f4cf83}
+.console-level-debug{color:#a0a4b3}
+.console-level-success{color:#86dba0}
+.console-level-daemon{color:#89b4ff}
+.console-log-tools{position:absolute;z-index:3;top:12px;right:12px;display:flex;align-items:center;gap:6px;background:#16171aef;padding:3px;border-radius:8px}
+.console-icon-button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:28px;height:28px;min-height:28px;padding:5px;border:0;border-radius:5px;background:transparent;color:#9898a6;list-style:none;cursor:pointer}
+.console-icon-button::-webkit-details-marker{display:none}
+.console-icon-button>svg{width:16px;height:16px}
+.console-icon-button:hover{background:#303037;color:#eeeef5;filter:none}
+.console-icon-button:focus-visible{outline:2px solid #6a9fff;outline-offset:2px}
+.console-icon-button[aria-pressed=true]{color:#a7c7ff;background:#29364e}
+.console-icon-button[aria-disabled=true]{opacity:.4;cursor:default}
+.console-paused{font-size:10px;color:#acacbc;padding:0 5px;white-space:nowrap}
+.console-options,.console-history{position:relative;flex-shrink:0}
+.console-tools-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:8;width:185px;padding:6px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);box-shadow:0 12px 35px #0007}
+.console-tools-menu button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;min-height:36px;padding:8px;border:0;border-radius:5px;background:transparent;color:#d7d7e2;font-size:12px;font-weight:400;text-align:left}
+.console-tools-menu button>svg{width:15px;height:15px;flex-shrink:0;color:#9595a9}
+.console-tools-menu button:hover,.console-tools-menu button:focus-visible{background:#303440;color:#f0f0f8;outline:0;filter:none}
+.console-tools-menu .console-force-stop,.console-tools-menu .console-force-stop>svg{color:#ff7d89}
+.console-command-bar{display:flex;align-items:center;gap:12px;min-width:0;min-height:52px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-muted);border-radius:0 0 7px 7px}
+.console-prompt{color:#92929f;font:20px/1 'IBM Plex Mono',monospace;flex-shrink:0}
+.console-command-bar>input{flex:1;min-width:0;width:0;min-height:30px;padding:0;border:0;border-radius:0;background:transparent;color:#e9e9f6;box-shadow:none;font:12px/1.5 'IBM Plex Mono',monospace}
+.console-command-bar>input::placeholder{color:#9292a0}
+.console-command-bar>input:focus{box-shadow:none}
+.console-command-bar .console-send{color:var(--accent)}
+.console-history-list{position:absolute;right:0;bottom:calc(100% + 14px);z-index:8;width:min(420px,calc(100vw - 360px));max-height:230px;overflow:auto;padding:6px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);box-shadow:0 12px 35px #0007}
+.console-history-list>p{padding:8px;margin:0 0 4px;color:#9494a8;font-size:10px;letter-spacing:.03em;text-transform:uppercase;border-bottom:1px solid #363640}
+.console-history-list>button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;min-width:0;min-height:34px;padding:8px;border:0;border-radius:5px;background:transparent;color:#dedeea;text-align:left}
+.console-history-list>button>svg{width:14px;height:14px;flex-shrink:0;color:#859ac0}
+.console-history-list code{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px}
+.console-history-list>button:hover,.console-history-list>button:focus-visible{background:#303440;outline:0;filter:none}
+.console-readonly{padding:14px;border-top:1px solid var(--line);font-size:12px;color:#8d8d9e}
+.console-view .server-metrics{gap:12px}
+.console-view .metric-card{min-height:72px;padding:12px 16px;background:var(--surface-muted);border-color:var(--line);gap:12px}
+.console-view .metric-icon{width:40px;height:40px;border-radius:5px;background:#aeb4bf10;box-shadow:none}
+.console-view .metric-icon svg{width:21px;height:21px}
+.console-view .metric-card h2{font-size:12px;color:#9ea9c0}
+.console-view .metric-card p{font-size:15px}
+.console-view .metric-card .metric-limit{font-size:12px;color:#c8c8d6}
+.console-view .usage-chart{min-height:230px}
+.console-view .usage-chart svg{height:165px}
+@media(max-width:760px){
+  .console-terminal .console-output{height:52dvh;min-height:320px;max-height:480px;padding:52px 12px 12px;font-size:11px;line-height:1.5}
+  .console-log-tools{top:10px;right:8px;gap:4px}
+  .console-paused{font-size:9px;max-width:65px;overflow:hidden;text-overflow:ellipsis}
+  .console-command-bar{padding:10px;gap:8px}
+  .console-command-bar>input{font-size:11px}
+  .console-history-list{width:min(360px,calc(100vw - 74px))}
+  .console-view .metric-card{padding:12px;gap:10px}
+  .console-view .metric-icon{width:32px;height:32px}
+  .console-view .metric-card p{font-size:13px}
+  .console-view .metric-card .metric-limit{font-size:11px}
+}

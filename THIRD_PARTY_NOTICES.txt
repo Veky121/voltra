@@ -1,0 +1,308 @@
+Voltra retains the original panel's MIT license in LICENSE.md.
+Go module licenses are provided by their respective upstream modules.
+
+Embedded compatibility libraries are compiled WebAssembly modules, loaded by
+wazero inside the Go process. They contain no PHP interpreter or web server.
+Their reproducible build scripts, pinned source hashes and notices are kept in:
+
+- tools/runtime/pcre/: PCRE2 10.46, BSD-3-Clause WITH PCRE2-exception.
+- tools/runtime/timelib/: timelib and PHP's date formatter; TIMELIB-LICENSE and
+  PHP-LICENSE preserve their original notices and license terms.
+- tools/runtime/encoding/: libmbfl decoders, LGPL 2.1, and PHP source notices.
+  Library source is available from the pinned PHP archive in the build scripts;
+  the wrapper source and complete rebuild procedure are included in the tree.
+
+Email validation's PHP filter grammar and Unicode 17 script data include their
+source notices and Unicode license under tests/fixtures/email/egg-email-*.
+
+Self-hosted IBM Plex Sans and IBM Plex Mono font files are licensed under the
+SIL Open Font License 1.1; licenses are in web/public/fonts/OFL-IBM-Plex-*.txt.
+
+File manager libraries:
+- SVAR React File Manager 2.6.0 and its UI dependencies, MIT, XB Software.
+  web/public/licenses/SVAR-MIT.txt preserves the license. The wx-icons CSS and
+  font files are self-hosted in web/public/fonts/svar, downloaded from
+  https://cdn.svar.dev/fonts/wxi/ on 2026-10-22. Upstream permits local bundling:
+  https://forum.svar.dev/d/282-fonts-and-icons-with-offline-react-file-manager
+- Uppy core, dashboard, React wrappers and tus uploader, MIT, Transloadit.
+  License: web/public/licenses/Uppy-MIT.txt. Source: https://github.com/transloadit/uppy
+- tusd v2.10.1, MIT, Transloadit. License: web/public/licenses/tusd-MIT.txt.
+  Source: https://github.com/tus/tusd. Used as a Go library for resumable uploads.
+
+Pterodactyl game-eggs catalog
+Source: https://github.com/pterodactyl/game-eggs
+Pinned revision: c637a6d1e0449b167efeff81bb9a0177aa3df6c2
+License: MIT, Copyright (c) 2024 Pterodactyl team and contributors.
+Full license: internal/panel/game_library/upstream/LICENSE
+The bundled catalog retains upstream authors and installation definitions.
+The DST default worldgen Lua files under game_library/scripts/dst-worldgen-*.lua
+come from dont_starve/worldgenoverride.{master,caves}.lua in this pinned revision
+and retain the same MIT license above. Custom HTTPS worldgen sources remain an
+operator choice; existing generation files are preserved.
+
+TShock external game server
+Reviewed installers download unmodified TShock 6.2.1 or legacy 4.5.18 on the node.
+Source and corresponding release: https://github.com/Pryaxis/TShock/tree/v6.2.1
+Legacy source: https://github.com/Pryaxis/TShock/tree/v4.5.18
+License: GNU GPL version 3, https://github.com/Pryaxis/TShock/blob/v6.2.1/COPYING
+TShock is a separate server process, not a library linked into the panel.
+
+tModLoader external game server
+Reviewed installer downloads unmodified tModLoader v2026.08.3.0 on the node.
+Source and project MIT license: https://github.com/tModLoader/tModLoader/tree/v2026.08.3.0
+License file: https://github.com/tModLoader/tModLoader/blob/v2026.08.3.0/LICENSE
+The matching official ExampleMod was used only for disposable acceptance testing.
+
+Factorio recipe runtime JSON helper
+The reviewed installer downloads unmodified jq 1.8.1 and verifies its SHA-256.
+Source and license: https://github.com/jqlang/jq/tree/jq-1.8.1
+License: MIT; https://github.com/jqlang/jq/blob/jq-1.8.1/COPYING
+Factorio is separately downloaded proprietary game-server software.
+
+Factorio staged mod updater
+Adapted from factoriotools/factorio-docker, revision
+a2ea39d069563c3c61c837889e7e569fb95486ef, docker/files/update-mods.sh.
+MIT license: internal/panel/game_library/scripts/FACTORIOTOOLS-LICENSE.
+Changes add staged replacement, environment-based credentials, strict game
+branches, dependency checks and explicit failure propagation.
+
+Wings installer result patch
+Targets pterodactyl/wings v1.13.3, commit
+6987d5e6f0612133e031255a99655e822d30579a. MIT license: tools/wings/LICENSE.
+Source, focused tests and application instructions: tools/wings/README.md.
+The patch checks Docker installer exit codes before reporting success.
+
+Clusterio external server manager
+Reviewed installers download @clusterio/controller, @clusterio/host and
+@clusterio/ctl version 2.0.2 from npm, with a persistent dependency lock.
+Source and MIT license: https://github.com/clusterio/clusterio/tree/v2.0.2
+License text: https://github.com/clusterio/clusterio/blob/v2.0.2/LICENSE.md
+Local launch helpers adapt new-instance defaults through its exported classes;
+upstream package files and existing game settings are not rewritten.
+
+ARM64 Factorio runtime
+Uses the external Ptero-Eggs Box64 image, pinned by ARM64 manifest digest.
+Image source and MIT license: https://github.com/Ptero-Eggs/yolks/tree/main/box64
+Box64 source and MIT license: https://github.com/ptitSeb/box64
+The panel does not bundle Box64 binaries or install host emulator registrations.
+
+Mindustry external server and launcher
+Reviewed installer downloads unmodified Mindustry v160.7 and verifies SHA-256.
+Server source and GPLv3 license: https://github.com/Anuken/Mindustry/tree/v160.7
+The separate VoltraMindustry.java launcher uses its native server APIs and is
+licensed GPL-3.0-only. Source and full license are included under
+internal/panel/game_library/scripts/VoltraMindustry.java and Mindustry-LICENSE.
+The installer compiles this launcher on the node; it is not linked into Go.
+
+Luanti external engine and ContentDB games
+Reviewed recipe builds Luanti 5.17.0 from checksum-pinned source on the node.
+Source and licenses: https://github.com/luanti-org/luanti/tree/5.17.0
+The source tree and license notices remain with the installed engine.
+The optional console adapter is LGPL-2.1-or-later, with source at
+internal/panel/game_library/scripts/luanti-plain-console.cpp.inc. It adds a
+line-oriented console path while preserving the original ncurses mode.
+The Ubuntu JsonCpp runtime library is installed beside the engine; its package
+copyright/license notice is copied to .voltra/luanti-licenses/JsonCpp-copyright.
+JsonCpp source/license: https://github.com/open-source-parsers/jsoncpp
+Game downloads use ContentDB; each downloaded game retains its own licenses.
+The default Minetest Game release is 38214, source commit
+c42e4d0c0ff9d27ff7b9b308c3cfc14098dd3a0f, LGPL-2.1-or-later with separate
+media licenses: https://github.com/luanti-org/minetest_game
+
+Veloren external server
+The reviewed default is weekly c5024ebf, 2026-10-21, downloaded unmodified
+from the official release assets with the publisher SHA-256 checked.
+Source and GPLv3 license: https://gitlab.com/veloren/veloren
+The downloaded game LICENSE is retained. Linux ARM64 and the older pinned
+nightly remain selectable but require separate runtime acceptance.
+
+Native RON settings helper
+Source and MIT license: tools/ron-config. It uses ron 0.12.2, serde 1.0.229
+and serde_json 1.0.154 under their MIT/Apache-2.0 licenses.
+Primary projects: https://github.com/ron-rs/ron,
+https://github.com/serde-rs/serde, https://github.com/serde-rs/json.
+The installer retains the helper source, Cargo.lock and dependency source/license
+files under .voltra/ron-config-src and .voltra/ron-config-vendor on the node.
+
+Veloren query acceptance tool
+tools/veloren-query is a separate GPL-3.0-or-later development tool using the
+upstream veloren-query-server client. License and locked dependencies are retained
+beside its source. It is not linked into the panel.
+https://gitlab.com/veloren/veloren/-/tree/master/common/query_server
+
+Vintage Story external server
+Downloaded unmodified from the publisher over HTTPS. The default 1.22.7 archive
+is checked against the publisher MD5 and the reviewed SHA-256. Game licenses and
+notices remain within the staged engine. Vintage Story is proprietary software;
+the panel does not redistribute the game archive or change its licensing terms.
+https://www.vintagestory.at/terms.html/
+
+Teeworlds native server and data
+Pinned 0.7.5 source and Linux release data are downloaded with reviewed SHA-256
+checks. The source distribution's license.txt and embedded-library licenses are
+retained under .voltra/teeworlds-source, with data notices beside the installed
+assets. Source: https://github.com/teeworlds/teeworlds/tree/0.7.5
+The marked MIT stdin adapter in teeworlds-console.cpp.inc adds dashboard input
+on the existing server thread without replacing UDP RCON or external console.
+
+Teeworlds development acceptance client
+tools/teeworlds-client uses teeworlds-go/protocol at commit
+edce0268a01cb67132cbcf0f0edd3da0d5a1196a under BSD-2-Clause, with huffman/v2
+2.0.0. Dependency source and licenses are vendored. Marked snapshot, reliability
+and field-width fixes are reproducible with fix-vendor.mjs and regression tests.
+This separate development module is not linked into the panel.
+https://github.com/teeworlds-go/protocol
+
+DDNet external native server
+The reviewed default is publisher DDNet 20.1.1, Linux x64, downloaded unmodified
+and checked against https://ddnet.org/downloads/sha256sums.txt . The complete
+publisher package retains its license.txt and component/media notices under
+ddnet. Source and license: https://github.com/ddnet/ddnet/tree/20.1.1
+The panel does not modify the engine; its MIT launcher uses the supported native
+input FIFO. Compatible headless acceptance reuses tools/teeworlds-client.
+
+OpenArena external native server/data
+The publisher 0.8.8 package is downloaded from the project's SourceForge release
+over HTTPS, with its published SHA-256 and exact size checked. Selected native
+server, baseoa/missionpack packages and COPYING are retained under openarena.
+The engine bytes are unmodified; executable permissions are repaired on install.
+Source and GPL notices: https://github.com/OpenArena/legacy
+Publisher package: https://sourceforge.net/projects/oarena/files/openarena-0.8.8.zip/download
+
+GameDig acceptance queries
+tools/game-query pins GameDig 5.3.3 under MIT. Its notice is retained in
+UPSTREAM_LICENSE and dependencies are locked separately from the application.
+It is not linked into the panel runtime.
+https://github.com/gamedig/node-gamedig
+
+Xonotic external native server/data
+The Linux profile downloads the unmodified publisher package over HTTPS and
+checks the publisher SHA-512. Stable 0.8.6 has a pinned checksum. Source, COPYING,
+GPL-2, GPL-3 and component/media notices remain under xonotic. The macOS
+application bundle is excluded from this Linux-only installation. Internal
+publisher file links are materialized as regular copies; the engine is unchanged.
+The application installer and launcher are MIT glue around native interfaces.
+https://xonotic.org/download/
+https://gitlab.com/xonotic/xonotic/-/tree/xonotic-v0.8.6
+
+Steam template runtime support
+The shared Steam template installer uses Valve's SteamCMD over the native CLI.
+SteamCMD and game files retain their respective publisher terms and are not
+included in this source checkout. The HTTPS bootstrap archive's digest is
+recorded locally; SteamCMD performs its native self-update and depot installation.
+The matching Debian runtime can receive a Debian-packaged Python interpreter
+and dependencies from its installer. Original package copyright files and a
+package/version manifest are retained beside that bundle under .voltra/python.
+The bundle helper and game-specific launch/configuration glue are MIT code.
+https://developer.valvesoftware.com/wiki/SteamCMD
+https://www.python.org/psf/license/
+
+External Java game runtimes
+Reviewed Java game installers download Eclipse Temurin from the publisher
+distribution and verify the selected archive SHA-256. Legacy Rising World uses
+Java 8; current StarMade releases require a separately selected newer runtime.
+OpenJDK is provided under GPLv2 with the Classpath Exception; the runtime's
+license and third-party notices remain in the extracted .voltra/java8 tree.
+Necesse uses its publisher-bundled runtime and retains its native notices.
+Game archives remain subject to their publisher terms and are not bundled into
+the panel executable. The installation and launch glue is MIT code.
+https://adoptium.net/about/
+https://openjdk.org/legal/gplv2+ce.html
+
+External ReHLDS engine
+The optional generic ReHLDS profile downloads a reviewed publisher engine
+archive separately from Valve's server files. The selected release's license
+and native notices remain with the engine distribution. ReHLDS 3.15 is MIT
+licensed; historical releases may use different terms. The install receipt
+records the selected release and archive identity. The panel's adapter is MIT.
+https://github.com/rehlds/ReHLDS
+
+ReHLDS current MIT notice, source:
+https://raw.githubusercontent.com/rehlds/ReHLDS/master/LICENSE
+
+MIT License
+
+Copyright (c) 2014–2025 ReHLDS Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+CS1.6 community module collection
+The optional recipe downloads separately pinned module archives from:
+https://github.com/Red-Banana-Official/cstrike1.6_rehlds
+Collection commit: 87b606ded4cdf754284dacb9bd3664e08b100519.
+The collection's GPL-3.0 notice is retained in each installed server at
+.voltra/cs16-modules-license.txt. Included modules retain their own upstream
+licenses and notices where shipped. Exact archive URLs and hashes are in
+internal/panel/game_library/scripts/cs16-modules-release.json.
+The external module binaries are not part of the panel source distribution.
+
+GE-Proton optional Enshrouded runtime
+The Enshrouded installer downloads the pinned, checksum-verified
+GE-Proton11-9 publisher distribution into that server's private volume.
+Project and corresponding source:
+https://github.com/GloriousEggroll/proton-ge-custom
+Pinned release and source tag:
+https://github.com/GloriousEggroll/proton-ge-custom/releases/tag/GE-Proton11-9
+GE-Proton combines Wine, Proton and other independently licensed components.
+The distribution's component licenses and notices are retained unchanged
+beside its files. Its binaries are not included in the panel source tree.
+
+Overview artwork
+Game artwork and Discord branding remain owned by their respective publishers.
+Stock photographs are sourced from Unsplash under the Unsplash License.
+Per-image source URLs and the original downloads are recorded in:
+web/public/artwork/SOURCES.md
+Artwork files are separate from the panel code's license.
+
+Brand asset build tools
+The local SVG rasterizer @resvg/resvg-js is distributed under the MPL-2.0
+license: https://github.com/yisibl/resvg-js
+The Windows resource generator uses github.com/tc-hib/winres v0.3.1 under
+the ISC license: https://github.com/tc-hib/winres
+These tools generate the icon files; their code is not linked into Voltra.exe.
+
+Steam cache VDF metadata parser
+The runtime cache tools vendor ValvePython/vdf 3.4, copyright (c) 2015
+Rossen Georgiev, under the MIT license. The complete permission notice is
+retained in tools/runtime/steam-game-cache-vendor/LICENSE.
+The pinned PyPI wheel SHA256 is
+68c1a125cc49e343d535af2dd25074e9cb0908c6607f073947c4a04bbe234534.
+This parser reads textual Steam metadata; native SteamCMD performs publisher
+content validation. No Steam client or game binaries are included here.
+
+Soldat configuration composition
+The Soldat2 installer vendors jju 1.4.0, copyright (c) 2013 Alex Kocharin,
+under the MIT license. It preserves existing JSON5 rule configuration while
+adding the dedicated-server lifecycle script. The complete upstream notice
+is retained in internal/panel/game_library/vendor/jju/LICENSE.
+
+Game library artwork
+Original game artwork and project logos remain owned by their respective
+publishers and creators, under the terms of their original sources. They are
+separate from the panel code's license. Per-image source pages, download URLs,
+creator credits, retrieval dates, and SHA-256 hashes are recorded in:
+web/public/game-artwork/sources.json
+The Game Library also includes an Artwork credits section. Downloaded images
+are unmodified; variants use their matching base game's artwork.
+
+Automatic server icon WebP decoder
+The panel uses golang.org/x/image v0.47.0, copyright 2009 The Go Authors,
+under the BSD 3-Clause license. Source: https://cs.opensource.google/go/x/image
+The complete copyright, redistribution conditions and disclaimer are retained
+in web/public/licenses/go-x-image-LICENSE.txt.

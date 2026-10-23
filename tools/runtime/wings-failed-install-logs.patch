@@ -1,0 +1,417 @@
+diff --git a/server/install.go b/server/install.go
+index 0c18b50..1a64fa4 100644
+--- a/server/install.go
++++ b/server/install.go
+@@ -213,18 +213,20 @@ func (ip *InstallationProcess) Run() error {
+ 	}
+ 
+ 	cID, err := ip.Execute()
+-	if err != nil {
+-		_ = ip.RemoveContainer()
+-		return err
+-	}
++	return finishInstallation(cID, err, ip.AfterExecute, func(err error) {
++		ip.Server.Log().WithField("error", err).Warn("failed to complete after-execute step of installation process")
++	})
++}
+ 
++// Diagnostic failure must never replace the result used by the panel callback.
++func finishInstallation(id string, executionErr error, capture func(string) error, warn func(error)) error {
+ 	// If this step fails, log a warning but don't exit out of the process. This is completely
+ 	// internal to the daemon's functionality, and does not affect the status of the server itself.
+-	if err := ip.AfterExecute(cID); err != nil {
+-		ip.Server.Log().WithField("error", err).Warn("failed to complete after-execute step of installation process")
++	if err := capture(id); err != nil {
++		warn(err)
+ 	}
+ 
+-	return nil
++	return executionErr
+ }
+ 
+ // Returns the location of the temporary data for the installation process.
+@@ -341,20 +343,47 @@ func (ip *InstallationProcess) GetLogPath() string {
+ // This grabs the logs from the process to store in the server configuration
+ // directory, and then destroys the associated installation container.
+ func (ip *InstallationProcess) AfterExecute(containerId string) error {
+-	defer ip.RemoveContainer()
++	// Completion may follow cancellation (for example server deletion). Retain
++	// diagnostics with an independent, bounded context before removing Docker data.
++	ctx, cancel := context.WithTimeout(context.WithoutCancel(ip.Server.Context()), 15*time.Second)
++	defer cancel()
++	defer func() {
++		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(ip.Server.Context()), 5*time.Second)
++		defer cleanupCancel()
++		if err := ip.client.ContainerRemove(cleanupCtx, ip.Server.ID()+"_installer", container.RemoveOptions{RemoveVolumes: true, Force: true}); err != nil && !client.IsErrNotFound(err) {
++			ip.Server.Log().WithField("error", err).Warn("failed to remove installation container after log capture")
++		}
++	}()
++	if containerId == "" {
++		containerId = ip.Server.ID() + "_installer"
++	}
+ 
+ 	ip.Server.Log().WithField("container_id", containerId).Debug("pulling installation logs for server")
+-	reader, err := ip.client.ContainerLogs(ip.Server.Context(), containerId, container.LogsOptions{
++	reader, err := ip.client.ContainerLogs(ctx, containerId, container.LogsOptions{
+ 		ShowStdout: true,
+ 		ShowStderr: true,
+ 		Follow:     false,
+ 	})
+ 
+-	if err != nil && !client.IsErrNotFound(err) {
++	if err != nil {
+ 		return err
+ 	}
++	defer reader.Close()
++	// Closing the response also bounds a stalled body copy after headers arrive.
++	stopClose := context.AfterFunc(ctx, func() { _ = reader.Close() })
++	defer stopClose()
+ 
+-	f, err := os.OpenFile(ip.GetLogPath(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
++	root, err := os.OpenRoot(config.Get().System.LogDirectory)
++	if err != nil {
++		return err
++	}
++	defer root.Close()
++	// OpenRoot confines even symlink resolution to the configured log directory.
++	id := ip.Server.ID()
++	if id == "" || strings.ContainsAny(id, "/\\") || id == "." || id == ".." {
++		return errors.New("invalid server ID for installation log")
++	}
++	f, err := root.OpenFile(filepath.Join("install", id+".log"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -395,8 +424,7 @@ func (ip *InstallationProcess) AfterExecute(containerId string) error {
+ 	if _, err := io.Copy(f, reader); err != nil {
+ 		return err
+ 	}
+-
+-	return nil
++	return ctx.Err()
+ }
+ 
+ // Execute executes the installation process inside a specially created docker
+@@ -476,7 +504,7 @@ func (ip *InstallationProcess) Execute() (string, error) {
+ 
+ 	ip.Server.Log().WithField("container_id", r.ID).Info("running installation script for server in container")
+ 	if err := ip.client.ContainerStart(ctx, r.ID, container.StartOptions{}); err != nil {
+-		return "", err
++		return r.ID, err
+ 	}
+ 
+ 	docker.SetCpuBurst(ctx, ip.client, r.ID, hostConf.Resources.CPUQuota)
+@@ -494,16 +522,10 @@ func (ip *InstallationProcess) Execute() (string, error) {
+ 	}(r.ID)
+ 
+ 	sChan, eChan := ip.client.ContainerWait(ctx, r.ID, container.WaitConditionNotRunning)
+-	select {
+-	case err := <-eChan:
+-		// Once the container has stopped running we can mark the install process as being completed.
+-		if err == nil {
+-			ip.Server.Events().Publish(DaemonMessageEvent, "Installation process completed.")
+-		} else {
+-			return "", err
+-		}
+-	case <-sChan:
++	if err := waitForInstallResult(ctx, sChan, eChan); err != nil {
++		return r.ID, err
+ 	}
++	ip.Server.Events().Publish(DaemonMessageEvent, "Installation process completed.")
+ 
+ 	return r.ID, nil
+ }
+diff --git a/server/install_wait.go b/server/install_wait.go
+new file mode 100644
+index 0000000..0d25012
+--- /dev/null
++++ b/server/install_wait.go
+@@ -0,0 +1,34 @@
++// Voltra's narrow installer result patch for Wings v1.13.3. See LICENSE.
++package server
++
++import (
++	"context"
++	"errors"
++	"fmt"
++
++	"github.com/docker/docker/api/types/container"
++)
++
++// A stopped Docker container is not necessarily a successful installation.
++func waitForInstallResult(ctx context.Context, results <-chan container.WaitResponse, failures <-chan error) error {
++	select {
++	case result, ok := <-results:
++		if !ok {
++			return errors.New("installation wait ended without a container result")
++		}
++		if result.Error != nil {
++			return fmt.Errorf("installation container wait failed: %s", result.Error.Message)
++		}
++		if result.StatusCode != 0 {
++			return fmt.Errorf("installation container exited with code %d", result.StatusCode)
++		}
++		return nil
++	case err, ok := <-failures:
++		if !ok || err == nil {
++			return errors.New("installation wait ended without a container result")
++		}
++		return err
++	case <-ctx.Done():
++		return ctx.Err()
++	}
++}
+diff --git a/server/install_wait_test.go b/server/install_wait_test.go
+new file mode 100644
+index 0000000..a485641
+--- /dev/null
++++ b/server/install_wait_test.go
+@@ -0,0 +1,55 @@
++package server
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"testing"
++
++	"github.com/docker/docker/api/types/container"
++)
++
++func TestVoltraInstallWaitResult(t *testing.T) {
++	for _, spec := range []struct {
++		name   string
++		result container.WaitResponse
++		want   string
++	}{
++		{"successful", container.WaitResponse{}, ""},
++		{"failed shell", container.WaitResponse{StatusCode: 1}, "code 1"},
++		{"missing executable", container.WaitResponse{StatusCode: 127}, "code 127"},
++		{"killed", container.WaitResponse{StatusCode: 137}, "code 137"},
++		{"daemon result error", container.WaitResponse{Error: &container.WaitExitError{Message: "wait failed"}}, "wait failed"},
++	} {
++		t.Run(spec.name, func(t *testing.T) {
++			results := make(chan container.WaitResponse, 1)
++			results <- spec.result
++			err := waitForInstallResult(context.Background(), results, make(chan error))
++			if spec.want == "" && err != nil {
++				t.Fatal(err)
++			}
++			if spec.want != "" && (err == nil || !strings.Contains(err.Error(), spec.want)) {
++				t.Fatalf("expected %q, got %v", spec.want, err)
++			}
++		})
++	}
++	results := make(chan container.WaitResponse)
++	failures := make(chan error, 1)
++	failures <- errors.New("transport failed")
++	if err := waitForInstallResult(context.Background(), results, failures); err == nil || err.Error() != "transport failed" {
++		t.Fatal(err)
++	}
++	close(results)
++	if err := waitForInstallResult(context.Background(), results, make(chan error)); err == nil {
++		t.Fatal("closed result channel accepted")
++	}
++	close(failures)
++	if err := waitForInstallResult(context.Background(), make(chan container.WaitResponse), failures); err == nil {
++		t.Fatal("closed error channel accepted")
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if err := waitForInstallResult(ctx, make(chan container.WaitResponse), make(chan error)); !errors.Is(err, context.Canceled) {
++		t.Fatal(err)
++	}
++}
+diff --git a/server/install_logs_test.go b/server/install_logs_test.go
+new file mode 100644
+index 0000000..a5890ab
+--- /dev/null
++++ b/server/install_logs_test.go
+@@ -0,0 +1,187 @@
++package server
++
++import (
++	"context"
++	"errors"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/docker/docker/api/types/container"
++	"github.com/docker/docker/client"
++	"github.com/pterodactyl/wings/config"
++	"github.com/pterodactyl/wings/remote"
++)
++
++func TestVoltraFailedInstallLogRetention(t *testing.T) {
++	config.Set(&config.Configuration{AuthenticationToken: "offline-test-only"})
++	for _, tc := range []struct {
++		name                          string
++		exit                          int64
++		logsFail, diskFail, cancelled bool
++	}{
++		{name: "nonzero", exit: 23}, {name: "success"},
++		{name: "log API failure", exit: 23, logsFail: true},
++		{name: "log file failure", exit: 23, diskFail: true},
++		{name: "cancelled server", exit: 23, cancelled: true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			directory := t.TempDir()
++			old := config.Get()
++			c := *old
++			c.System.LogDirectory = directory
++			config.Set(&c)
++			defer config.Set(old)
++			if !tc.diskFail {
++				if err := os.Mkdir(filepath.Join(directory, "install"), 0700); err != nil {
++					t.Fatal(err)
++				}
++			}
++			var actions []string
++			api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++				if r.Method == "DELETE" {
++					actions = append(actions, "remove")
++					w.WriteHeader(204)
++					return
++				}
++				if strings.HasSuffix(r.URL.Path, "/logs") {
++					actions = append(actions, "logs")
++					if tc.logsFail {
++						http.Error(w, "unavailable", 500)
++						return
++					}
++					_, _ = io.WriteString(w, "INSTALLER_FAILURE_MARKER\n")
++					return
++				}
++				t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
++				http.NotFound(w, r)
++			}))
++			defer api.Close()
++			docker, err := client.NewClientWithOpts(client.WithHost(api.URL), client.WithVersion("1.47"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer docker.Close()
++			ctx, cancel := context.WithCancel(context.Background())
++			defer cancel()
++			if tc.cancelled {
++				cancel()
++			}
++			s := &Server{ctx: ctx, cfg: Configuration{Uuid: "00000000-0000-4000-8000-000000000001"}}
++			p := &InstallationProcess{Server: s, Script: &remote.InstallationScript{}, client: docker}
++			result := make(chan container.WaitResponse, 1)
++			result <- container.WaitResponse{StatusCode: tc.exit}
++			primary := waitForInstallResult(context.Background(), result, make(chan error))
++			warnings := 0
++			got := finishInstallation("installer-id", primary, p.AfterExecute, func(error) { warnings++ })
++			if !errors.Is(got, primary) || (got == nil) != (tc.exit == 0) {
++				t.Fatalf("install status changed: %v => %v", primary, got)
++			}
++			if strings.Join(actions, ",") != "logs,remove" {
++				t.Fatalf("capture/remove order: %v", actions)
++			}
++			if tc.logsFail || tc.diskFail {
++				if warnings != 1 {
++					t.Fatal("capture failure not reported")
++				}
++				return
++			}
++			if warnings != 0 {
++				t.Fatal("unexpected capture warning")
++			}
++			data, err := os.ReadFile(p.GetLogPath())
++			if err != nil || !strings.Contains(string(data), "INSTALLER_FAILURE_MARKER") {
++				t.Fatalf("missing retained log: %v", err)
++			}
++			stat, err := os.Stat(p.GetLogPath())
++			if err != nil || stat.Mode().Perm() != 0600 {
++				t.Fatalf("log permissions: %v", err)
++			}
++		})
++	}
++}
++
++func TestVoltraInstallCaptureCannotReplacePrimaryFailure(t *testing.T) {
++	primary := errors.New("installer exited 23")
++	capture := errors.New("disk full")
++	reported := false
++	got := finishInstallation("", primary, func(string) error { return capture }, func(err error) { reported = errors.Is(err, capture) })
++	if !errors.Is(got, primary) || !reported {
++		t.Fatal("primary error or warning lost")
++	}
++}
++
++func TestVoltraInstallLogPathConfined(t *testing.T) {
++	dir := t.TempDir()
++	outside := filepath.Join(t.TempDir(), "untouched")
++	if err := os.WriteFile(outside, []byte("original"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Mkdir(filepath.Join(dir, "install"), 0700); err != nil {
++		t.Fatal(err)
++	}
++	id := "00000000-0000-4000-8000-000000000002"
++	if err := os.Symlink(outside, filepath.Join(dir, "install", id+".log")); err != nil {
++		t.Fatal(err)
++	}
++	c := &config.Configuration{AuthenticationToken: "offline-test-only"}
++	c.System.LogDirectory = dir
++	config.Set(c)
++	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if r.Method == "DELETE" {
++			w.WriteHeader(204)
++			return
++		}
++		_, _ = io.WriteString(w, "must not escape")
++	}))
++	defer api.Close()
++	d, err := client.NewClientWithOpts(client.WithHost(api.URL), client.WithVersion("1.47"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer d.Close()
++	p := &InstallationProcess{Server: &Server{ctx: context.Background(), cfg: Configuration{Uuid: id}}, Script: &remote.InstallationScript{}, client: d}
++	if err := p.AfterExecute("id"); err == nil {
++		t.Fatal("escaped symlink accepted")
++	}
++	data, err := os.ReadFile(outside)
++	if err != nil || string(data) != "original" {
++		t.Fatal("external file altered")
++	}
++}
++
++func TestVoltraInstallLogBodyTimeout(t *testing.T) {
++	dir := t.TempDir()
++	if err := os.Mkdir(filepath.Join(dir, "install"), 0700); err != nil {
++		t.Fatal(err)
++	}
++	c := &config.Configuration{AuthenticationToken: "offline-test-only"}
++	c.System.LogDirectory = dir
++	config.Set(c)
++	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if r.Method == "DELETE" {
++			w.WriteHeader(204)
++			return
++		}
++		w.WriteHeader(200)
++		w.(http.Flusher).Flush()
++		<-r.Context().Done()
++	}))
++	defer api.Close()
++	d, err := client.NewClientWithOpts(client.WithHost(api.URL), client.WithVersion("1.47"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer d.Close()
++	p := &InstallationProcess{Server: &Server{ctx: context.Background(), cfg: Configuration{Uuid: "00000000-0000-4000-8000-000000000003"}}, Script: &remote.InstallationScript{}, client: d}
++	start := time.Now()
++	err = p.AfterExecute("id")
++	if err == nil || time.Since(start) > 18*time.Second {
++		t.Fatalf("capture not bounded/reported: %v %v", err, time.Since(start))
++	}
++}

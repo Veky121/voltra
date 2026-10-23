@@ -1,0 +1,6 @@
+{
+  "name": "voltra-game-query-acceptance",
+  "private": true,
+  "type": "module",
+  "dependencies": { "gamedig": "5.3.3" }
+}

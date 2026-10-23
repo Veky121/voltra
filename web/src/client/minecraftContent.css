@@ -1,0 +1,22 @@
+.minecraft-content { display: grid; gap: 1.5rem; }
+.minecraft-content h1,.minecraft-content h2,.minecraft-content h3 { margin-top: 0; }
+.minecraft-content .mc-content-context { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.mc-content-search { display: flex; align-items: end; gap: .75rem; margin: 1rem 0; }
+.mc-content-search .field { flex: 1; }
+.mc-content-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+.mc-content-filters .field { min-width: min(100%,250px); }
+.mc-content-filters p { flex: 1; min-width: min(100%,240px); margin: 0; font-size: .85rem; }
+.mc-content-projects { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,280px),1fr)); gap: 1rem; }
+.mc-content-project { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+.mc-content-project > p { flex: 1; overflow-wrap: anywhere; margin: 0; }
+.mc-project-heading { display: flex; gap: .75rem; align-items: center; min-width: 0; }
+.mc-project-heading img { border-radius: .6rem; object-fit: contain; flex-shrink: 0; }
+.mc-project-heading h3 { margin-bottom: .25rem; overflow-wrap: anywhere; }
+.mc-installed { padding: 0; margin: 0; list-style: none; }
+.mc-installed li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border, #333); }
+.mc-installed li > div { display: grid; gap: .25rem; min-width: 0; overflow-wrap: anywhere; }
+.mc-content-warning { padding: .8rem 1rem; border: 1px solid #a48138; border-radius: .6rem; background: #a4813814; }
+.mc-content-warning p:first-child { margin-top: 0; }
+.mc-content-ack { display: flex; gap: .7rem; align-items: start; }
+.mc-content-ack input { width: auto; margin-top: .25rem; flex-shrink: 0; }
+@media(max-width:600px) { .mc-content-search { align-items: stretch; flex-direction: column; } .mc-installed li { align-items: start; } }

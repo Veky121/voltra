@@ -1,0 +1,123 @@
+{
+  "fabric": {
+    "version": "26.3",
+    "loader": "fabric",
+    "loader_version": "0.19.5",
+    "installer_version": "1.1.2",
+    "java": 25,
+    "files": [
+      {
+        "url": "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar",
+        "algorithm": "sha1",
+        "hash": "33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c",
+        "path": "server.jar"
+      }
+    ],
+    "installer": {
+      "url": "https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.2/fabric-installer-1.1.2.jar",
+      "algorithm": "sha256",
+      "hash": "61e035bf7bf70153e127440ce34de47c9036f0a2d0c65d1529454bd35ceefe4f",
+      "path": ".voltra-installer.jar",
+      "publisher_sha1": "74685b5a0178c4dabd4be741a276d35c59b5ec96"
+    },
+    "launch": "-jar fabric-server-launch.jar"
+  },
+  "quilt": {
+    "version": "26.3",
+    "loader": "quilt",
+    "loader_version": "0.30.1",
+    "installer_version": "0.15.1",
+    "java": 25,
+    "files": [
+      {
+        "url": "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar",
+        "algorithm": "sha1",
+        "hash": "33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c",
+        "path": "server.jar"
+      }
+    ],
+    "installer": {
+      "url": "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/0.15.1/quilt-installer-0.15.1.jar",
+      "algorithm": "sha256",
+      "hash": "0a229138caa1b87fd8f5622038410696f98bb85871a279640e7002404c4d0dc2",
+      "path": ".voltra-installer.jar",
+      "publisher_sha1": "e4c4e80c91c94d999ffe3468ec2043792b841051"
+    },
+    "launch": "-jar quilt-server-launch.jar"
+  },
+  "forge": {
+    "version": "26.3",
+    "loader": "forge",
+    "loader_version": "66.1.0",
+    "installer_version": "",
+    "java": 25,
+    "files": [
+      {
+        "url": "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar",
+        "algorithm": "sha1",
+        "hash": "33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c",
+        "path": "server.jar"
+      }
+    ],
+    "installer": {
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/26.3-66.1.0/forge-26.3-66.1.0-installer.jar",
+      "algorithm": "sha256",
+      "hash": "31b5d7272b97771b586f3bcad3b0ceab40b03117ef437f23ccc8afe11c462b4e",
+      "path": ".voltra-installer.jar",
+      "publisher_sha1": "0325b11053e85ae08b19e73be00871e1a5ca3a55"
+    },
+    "launch": "@libraries/net/minecraftforge/forge/26.3-66.1.0/unix_args.txt"
+  },
+  "neoforge": {
+    "version": "26.3",
+    "loader": "neoforge",
+    "loader_version": "26.3.0.95",
+    "installer_version": "",
+    "java": 25,
+    "files": [
+      {
+        "url": "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar",
+        "algorithm": "sha1",
+        "hash": "33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c",
+        "path": "server.jar"
+      }
+    ],
+    "installer": {
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.95/neoforge-26.3.0.95-installer.jar",
+      "algorithm": "sha256",
+      "hash": "59ed4c58cc5b49e3df876658196d34c23184f5f73986e352508cdbddc88aa7fb",
+      "path": ".voltra-installer.jar",
+      "publisher_sha1": "a848afac064ffe0e244bf7c2136fbbfc862f9c97"
+    },
+    "launch": "@libraries/net/neoforged/neoforge/26.3.0.95/unix_args.txt"
+  },
+  "spigot": {
+    "version": "26.3",
+    "java": 25,
+    "buildtools": {
+      "url": "https://hub.spigotmc.org/jenkins/job/BuildTools/201/artifact/target/BuildTools.jar",
+      "algorithm": "sha256",
+      "hash": "81ed06f5ce5fb705b558bf9b3cc2c5c53cdd9742406c5338c452faa13a1e1c24",
+      "path": "BuildTools.jar"
+    },
+    "source": {
+      "name": "4663",
+      "description": "Jenkins build 4663",
+      "refs": {
+        "BuildData": "39e62795554dcf6b62e922bc061705b3dc228f88",
+        "Bukkit": "29025a7ed5789807e11158a2263316b13ed50c3b",
+        "CraftBukkit": "c4db4c38d647c099a7c4736143043fa1440f648f",
+        "Spigot": "bed90fca391bc35f0dbbcdc7ce5d7bb28e533681"
+      },
+      "hashes": {
+        "CraftBukkit": "0bc09960dff3f4980e60110f6798d91c0aeeda3df410f07f4a9b4b06b58a04ec",
+        "Spigot": "59f4a101e03012e5182e43c77f06679cdcb15d779c7c4ab6899200c567d79537"
+      },
+      "toolsVersion": 197,
+      "javaVersions": [
+        69,
+        70
+      ]
+    }
+  }
+}

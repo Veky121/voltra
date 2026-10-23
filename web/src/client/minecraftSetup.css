@@ -1,0 +1,126 @@
+/* Minecraft setup and catalog. Keep these rules local to the Game Library. */
+.minecraft-library-tile{font-weight:400;white-space:normal;min-height:235px;gap:0}
+.minecraft-library-tile .game-tile-action{display:flex;color:#9fbedf!important}
+.mc-page{max-width:1440px}
+.mc-back{display:inline-block;font-size:12px;color:var(--muted);margin-bottom:10px}
+.mc-page-header{align-items:center}
+.mc-page-header h1{font-size:26px;margin:0}
+.mc-segments{--mc-count:2;--mc-index:0;position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(var(--mc-count),minmax(0,1fr));padding:3px;border:1px solid #343437;border-radius:9px;background:#151517;flex-shrink:0;max-width:100%}
+.mc-segment-indicator{position:absolute;inset:3px auto 3px 3px;z-index:-1;width:calc((100% - 6px)/var(--mc-count));border:1px solid #48484c;border-radius:6px;background:#333336;box-shadow:0 2px 5px #0003;transform:translateX(calc(var(--mc-index)*100%));transition:transform 240ms cubic-bezier(.22,1,.36,1)}
+.mc-segments button{border:0;background:transparent;color:#9999a3;min-height:28px;padding:5px 13px;font-size:12px;line-height:1.3;font-weight:500;white-space:normal}
+.mc-segments button[aria-pressed=true]{color:#f3f3f6}
+.mc-segments button:hover{filter:none;color:#fff}
+.mc-segments button:focus-visible,.mc-choice:focus-visible,.mc-loader:has(input:focus-visible){outline:2px solid #8ab5ff;outline-offset:3px}
+.mc-dialog{color:inherit;background:var(--surface,#171718);border:1px solid #3b3b40;border-radius:15px;width:min(680px,calc(100% - 32px));max-height:calc(100dvh - 48px);padding:26px;box-shadow:0 25px 100px #0009;overflow:auto}
+.mc-dialog::backdrop{background:#000a;backdrop-filter:blur(4px)}
+.mc-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}
+.mc-dialog>header h2{font-size:21px;margin:0}
+.mc-dialog>header button{min-height:30px;min-width:30px;padding:3px 8px;font-size:20px;background:#29292d;border-color:#39393e}
+.mc-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.mc-choice{display:flex;align-items:flex-start;flex-direction:column;padding:22px;border:1px solid #35353a;border-radius:11px;background:#1d1d20;color:inherit;min-width:0;transition:background .18s,border-color .18s}
+.mc-choice:hover{background:#22272f;border-color:#51729f;text-decoration:none}
+.mc-choice>.game-icon,.mc-choice>svg{width:37px;height:37px;margin-bottom:22px;color:#9bbfff}
+.mc-choice>strong{font-size:16px;margin-bottom:9px;font-weight:600}
+.mc-choice>span:not(.game-icon){font-size:13px;line-height:1.6;color:var(--muted)}
+.mc-choice .mc-choice-action{color:#a9caff!important;display:flex;justify-content:space-between;gap:12px;width:100%;margin-top:auto;padding-top:22px;font-size:12px!important}
+.mc-choice-search{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}
+.mc-choice-search .field{margin:0}
+.mc-search-row{display:flex;gap:8px}
+.mc-search-row input{min-width:0}
+.mc-setup-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:24px;align-items:start}
+.mc-form-fields{min-width:0;margin:0;padding:0;border:0}
+.mc-page .card{padding:24px;margin-bottom:18px}
+.mc-page .card h2{font-size:15px}
+.mc-page .field{font-size:13px}
+.mc-page .muted{font-size:12px;line-height:1.6}
+.mc-identity{display:flex;align-items:center;gap:20px}
+.mc-identity>.game-icon{width:58px;height:58px}
+.mc-identity>div{flex:1;min-width:0}
+.mc-identity .field{margin:0}
+.mc-identity input{font-size:16px}
+.mc-section-heading{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.mc-section-heading h2{margin:0!important}
+.mc-section-number{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#2b2b2f;color:#b2b2bb;font-size:11px}
+.mc-loader-fieldset{border:0;padding:0;margin:0 0 22px;min-width:0}
+.mc-loader-fieldset legend{font-size:13px;font-weight:500;margin-bottom:10px;padding:0}
+.mc-loaders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mc-loader{position:relative;display:flex;align-items:center;gap:9px;border:1px solid #36363c;border-radius:8px;padding:11px 12px;min-width:0;cursor:pointer;background:#111113;font-size:12px;transition:border-color .18s,background .18s}
+.mc-loader.is-selected{border-color:#5a9af6;background:#1a2b43;box-shadow:inset 0 0 0 1px #5a9af630}
+.mc-loader input{position:absolute;opacity:0;width:1px;height:1px;min-height:0;margin:0}
+.mc-loader-mark{display:grid;place-items:center;width:27px;height:27px;flex-shrink:0;border:1px solid #55555d;border-radius:6px;font-size:12px;font-weight:600;background:#303037;color:#d4d4dd}
+.mc-loader-vanilla{background:#254a31;border-color:#47744f;color:#b6e1a6}
+.mc-loader-paper{background:#354250;border-color:#637389;color:#d9e4f4}
+.mc-loader-fabric{background:#514a3b;border-color:#776c55;color:#e7d8b7}
+.mc-loader-neoforge{background:#5b3322;border-color:#996045;color:#ffc39b}
+.mc-loader-forge{background:#2e3e50;border-color:#52667f;color:#c0d9f7}
+.mc-loader-quilt{background:#4c324e;border-color:#7d5284;color:#ebc7f6}
+.mc-loader-versions{border-top:1px solid var(--line);padding-top:20px;margin-top:6px}
+.mc-field-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;font-size:13px;font-weight:500}
+.mc-field-heading .mc-segments{max-width:240px}
+.mc-loader-versions>.field{margin-bottom:0}
+.mc-unit-input{display:flex;align-items:center;position:relative;min-width:0}
+.mc-unit-input input{padding-right:46px}
+.mc-unit-input>span{position:absolute;right:13px;font-size:12px;pointer-events:none;color:var(--muted)}
+.mc-unit-input input::-webkit-inner-spin-button{margin-right:28px}
+.mc-help{margin-top:-5px;margin-bottom:0}
+.mc-advanced{margin-top:22px;border-top:1px solid var(--line);padding-top:17px}
+.mc-advanced summary{font-size:12px;font-weight:500;color:#b7b7c1;cursor:pointer;list-style-position:inside}
+.mc-advanced[open] summary{margin-bottom:20px}
+.mc-advanced .check{font-size:12px;margin:0 0 20px}
+.mc-advanced>.field:last-child{margin-bottom:0}
+.mc-install-summary{position:sticky;top:24px}
+.mc-summary-heading{display:flex;gap:13px;align-items:center;min-width:0}
+.mc-summary-heading>.game-icon,.mc-summary-heading>.mc-pack-icon{width:45px;height:45px;flex-shrink:0}
+.mc-summary-heading>div{min-width:0}
+.mc-summary-heading h2{margin:0 0 4px!important;line-height:1.4;overflow-wrap:anywhere}
+.mc-summary-heading p{font-size:11px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.mc-install-summary dl{display:block;margin:22px 0}
+.mc-install-summary dl>div{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--line);font-size:12px}
+.mc-install-summary dt{flex-shrink:0}
+.mc-install-summary dd{text-align:right;overflow-wrap:anywhere}
+.mc-eula{font-size:12px;line-height:1.7;align-items:flex-start;margin:0 0 20px;gap:4px}
+.mc-eula input{margin-top:5px;flex-shrink:0}
+.mc-install-summary button[type=submit]{width:100%}
+.mc-install-note{margin:13px 0 0;text-align:center;font-size:11px!important}
+.mc-inline-empty{font-size:12px;line-height:1.6;color:#d5b98a;background:#322a1f;border:1px solid #504330;border-radius:7px;padding:12px;margin-bottom:16px}
+.mc-state{display:flex;align-items:center;justify-content:center;gap:12px;min-height:160px;text-align:center;font-size:13px;color:var(--muted);padding:32px 20px}
+.mc-catalog-top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px}
+.mc-catalog-top h2{margin:0;font-size:18px}
+.mc-catalog-top .mc-segments{min-width:240px}
+.mc-catalog-filters{display:grid;grid-template-columns:minmax(180px,1fr) 180px 160px;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+.mc-catalog-filters .field{margin:0}
+.mc-catalog-count{font-size:12px;color:var(--muted);padding:20px 0 14px;min-height:49px}
+.mc-pack-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.mc-pack-card{display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:20px;transition:border-color .18s}
+.mc-pack-card:hover{border-color:#51515c}
+.mc-pack-heading{display:flex;gap:13px;align-items:center;min-width:0;margin-bottom:15px}
+.mc-pack-heading>div{min-width:0}
+.mc-pack-heading h3{font-size:15px;line-height:1.4;margin:0 0 4px;overflow-wrap:anywhere}
+.mc-pack-heading p{font-size:11px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.mc-pack-icon{display:grid;place-items:center;flex-shrink:0;width:48px;height:48px;border-radius:9px;border:1px solid #44444b;background:#2c2c33;overflow:hidden;color:#c0c0d6;font-size:23px;font-weight:500}
+.mc-pack-icon img{display:block;width:100%;height:100%;object-fit:cover}
+.mc-pack-description{font-size:12px;color:#a8a8b2;line-height:1.65;margin:0 0 20px;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow-wrap:anywhere}
+.mc-pack-card footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto}
+.mc-pack-card footer .muted{font-size:11px}
+.mc-pack-card footer button{font-size:12px;min-height:32px;padding:6px 10px}
+.mc-pagination{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:24px;font-size:12px;color:var(--muted)}
+.mc-pagination button{font-size:12px;min-height:34px}
+.mc-pack-detail{display:flex;align-items:flex-start;gap:14px;margin-bottom:24px}
+.mc-pack-detail p{font-size:13px;line-height:1.65;margin:0;overflow-wrap:anywhere}
+.mc-version-detail{display:block;font-size:13px;margin:10px 0 24px}
+.mc-version-detail>div{display:flex;justify-content:space-between;gap:24px;margin:10px 0}
+.mc-version-detail dd{text-align:right;overflow-wrap:anywhere}
+.mc-pack-filter{font-size:12px;margin-bottom:18px}
+.mc-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+.mc-selected-pack{display:flex;align-items:center;gap:14px}
+.mc-selected-pack>div{min-width:0;flex:1}
+.mc-selected-pack h2{margin:0 0 5px!important;overflow-wrap:anywhere}
+.mc-selected-pack p{font-size:12px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.mc-selected-pack button{font-size:12px}
+.mc-pack-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.mc-full{grid-column:1/-1;margin:0}
+@media(min-width:1450px){.mc-loaders{grid-template-columns:repeat(6,minmax(0,1fr))}.mc-loader{flex-direction:column;gap:10px;padding:15px 8px}}
+@media(max-width:1100px){.mc-setup-layout{grid-template-columns:minmax(0,1fr) 270px;gap:18px}.mc-page .card{padding:20px}.mc-pack-grid{grid-template-columns:1fr}.mc-catalog-filters{grid-template-columns:minmax(140px,1fr) 150px 140px;gap:12px}}
+@media(max-width:900px){.mc-setup-layout{grid-template-columns:minmax(0,1fr)}.mc-install-summary{position:static}.mc-install-summary .card{max-width:none}.mc-catalog-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.mc-catalog-filters>.field:first-child{grid-column:1/-1}}
+@media(max-width:560px){.mc-page-header{align-items:stretch}.mc-page-header h1{font-size:23px}.mc-page-header .mc-segments{width:100%}.mc-page .card{padding:18px}.mc-dialog{padding:20px;max-height:calc(100dvh - 24px)}.mc-dialog>header h2{font-size:18px}.mc-choices{grid-template-columns:1fr;gap:10px}.mc-choice{padding:18px}.mc-choice>.game-icon,.mc-choice>svg{margin-bottom:12px;width:30px;height:30px}.mc-choice .mc-choice-action{padding-top:12px}.mc-loaders{grid-template-columns:repeat(2,minmax(0,1fr))}.mc-field-heading{align-items:flex-start;flex-direction:column}.mc-field-heading .mc-segments{width:100%;max-width:none}.mc-catalog-top{align-items:stretch;flex-direction:column}.mc-catalog-top .mc-segments{width:100%}.mc-catalog-filters{padding:16px;gap:12px}.mc-identity{gap:14px}.mc-identity>.game-icon{width:40px;height:40px}.mc-pack-settings{grid-template-columns:1fr}.mc-pagination{gap:10px}.mc-pagination button{padding:6px 9px}.mc-selected-pack{flex-wrap:wrap}.mc-selected-pack>div{min-width:calc(100% - 68px)}.mc-selected-pack button{margin-left:auto}}
+@media(prefers-reduced-motion:reduce){.mc-segment-indicator,.mc-choice,.mc-loader,.mc-pack-card{transition:none}.mc-dialog::backdrop{backdrop-filter:none}}

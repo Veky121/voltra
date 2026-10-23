@@ -1,0 +1,13 @@
+# github.com/teeworlds-go/huffman/v2 v2.0.0
+## explicit; go 1.22.3
+github.com/teeworlds-go/huffman/v2
+# github.com/teeworlds-go/protocol v0.0.0-20260324075114-edce0268a01c
+## explicit; go 1.22.3
+github.com/teeworlds-go/protocol/chunk7
+github.com/teeworlds-go/protocol/messages7
+github.com/teeworlds-go/protocol/network7
+github.com/teeworlds-go/protocol/object7
+github.com/teeworlds-go/protocol/packer
+github.com/teeworlds-go/protocol/protocol7
+github.com/teeworlds-go/protocol/snapshot7
+github.com/teeworlds-go/protocol/teeworlds7

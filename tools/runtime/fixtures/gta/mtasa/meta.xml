@@ -1,0 +1,4 @@
+<meta>
+  <info author="Voltra acceptance" name="Native SQLite persistence acceptance" version="1.0" type="script" />
+  <script src="server.lua" type="server" />
+</meta>

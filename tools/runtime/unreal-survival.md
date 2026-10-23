@@ -1,0 +1,21 @@
+# Unreal survival source checkpoint
+
+Scope is exactly Abiotic Factor, HumanitZ and The Front from the pinned imported catalog. No native game acceptance has been run for these adapters.
+
+Primary references reviewed on 2026-10-23:
+
+- Abiotic Factor publisher documentation: https://github.com/DFJacob/AbioticFactorDedicatedServer/wiki and its Quickstart / Technical Launch Parameters pages. Original Windows app2857200, native performance arguments, password/name/slot and gameplay/query port controls remain. Private GE-Proton reuses the existing reviewed checksum-pinned `enshrouded-proton.py` without changing it. Current Proton compatibility, native stdout and shutdown/save need actual game acceptance. The original 1..32 slot input remains; current publisher documentation describes a 24-player cap. Values above24 therefore need publisher compatibility review and are not claimed effective.
+- HumanitZ official wiki: https://humanitz.wiki.gg/wiki/Dedicated_Linux_Server%3A_Manual_Install, https://humanitz.wiki.gg/wiki/Dedicated_Linux_Server%3A_LinuxGSM and https://humanitz.wiki.gg/wiki/Server_Configuration_Files. The first retains linuxbranch. The LinuxGSM page explicitly identifies current HumanitZServer/Binaries/Linux/HumanitZServer-Linux-Shipping and GameServerSettings.ini, replacing the pinned egg's older TSSGame layout. Both layouts are detected, never silently mixed. Every original Host Settings and World Settings mapping is retained. Native acceptance must establish which legacy keys the current publisher actually honors.
+- The Front publisher website https://www.playthefront.com/all/news/2023/1007/18.html confirms custom servers but supplies no exact current depot/platform contract. No third-party depot assertion is treated as publisher evidence. Original pinned catalog app2334200, Linux binary, extra app1007 SDK install and every startup switch remain. Direct current publisher depot verification is pending.
+
+The Front's imported WINDOWS_INSTALL=1 conflicts with its original Linux startup. Root approved changing only that default to0. Explicit1 remains selectable, requests Windows platform for the same original application and requires the actual expected Win64 executable. It never substitutes app2612550 or another application. Publisher missing-depot/authentication failures remain real failures.
+
+Service-port defaults change from fixed imported numbers to blank automatic selection over the operator's selected allocations. The Front originally assigned query and shutdown the same27017. The adapter requires four distinct allocations. Original variable names remain, and service ports are now editable. Runtime rejects unallocated or duplicate ports. The Front's invalid upper bound65536 becomes65535. Its CFG_NAME is explicitly constrained to one ASCII directory component to prevent save-directory escape. The imported stop `^^C` becomes supported Ctrl-C.
+
+Runtime uses argv arrays, never shell evaluation. Native passwords in Abiotic/The Front remain required native argv switches as in the original recipes, so same-UID process inspection can see them. Console output uses the existing redactor; no credentials are printed by fixtures or manifests. HumanitZ passwords are written to mode0600 native INI. Private Steam login/Guard/beta-password transport remains failclosed in the shared helper.
+
+Installation spools retained operator files to disk, restores bytes/mode/UID/GID even after publisher failure, and uses the anchored publication helper. Worlds, settings, server text lists and saves are preserved. Private Proton prefix is untouched by Steam publication rather than copied as ordinary files, because Wine legitimately stores distribution symlinks. No recursively changing ownership of the volume is used.
+
+The native terminal supervisor uses a PTY with ETX so SIGTERM on the wrapper produces real native SIGINT. A real-process fixture proves this on Linux. This proves terminal signal routing, not saving behavior of any proprietary game or Wine child.
+
+Run `node tools/runtime/stage-unreal-survival.mjs` to produce only `.local/unreal-survival/profiles.json`, exact helper source copies and SHA256 manifest. Canonical overrides are root-owned. Fixtures run without network in python:3.13-slim, read-only workspace, 256MiB maximum memory. No panel, node or game services are touched.

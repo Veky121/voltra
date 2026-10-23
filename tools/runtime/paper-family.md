@@ -1,0 +1,15 @@
+# Paper, Folia and Purpur setup
+
+These recipes use the existing managed Java settings, Minecraft setup, file manager, console and content browser. No separate game page or Java runtime is required. The original `MINECRAFT_VERSION`, `BUILD_NUMBER`, `SERVER_JARFILE` and download URL controls remain functional. Purpur exposes the download URL used by its original installer as an administrator field.
+
+`paper-family-install.py` pins current default release identities in `paper-family-releases.json`. Paper and Folia use official Fill metadata and SHA-256; Purpur validates its publisher checksum and records the downloaded SHA-256. Defaults additionally carry pinned SHA-256 values. Explicit versions/builds are resolved exactly; missing identities fail rather than silently installing another release. Custom public HTTPS downloads support `{{PROJECT}}`, `{{MINECRAFT_VERSION}}`, `{{BUILD_NUMBER}}`, `{{SERVER_JARFILE}}` and `${...}` substitutions as URL data. They are never shell evaluated. Optional `DOWNLOAD_SHA256` pins a custom download.
+
+Existing configuration, EULA, plugins, worlds, ownership and permissions survive installation. Fresh installation does not accept the Minecraft EULA. The operator accepts it through the existing application flow. Verified downloads are cached per volume for reinstall.
+
+The managed Java minimum remains 8 for historical/custom JARs. Automatic selection prefers Java 25 for current defaults; explicit compatible administrator runtime choices remain possible. Paper and Purpur 26.3 require Java 25. Folia defaults to its stable 1.21.11 build, which requires Java 21 or later; its newer alpha channel is available through explicit version/build selection. The server must use a runtime compatible with the chosen release.
+
+Folia uses exact `folia` Modrinth compatibility and only Folia-supported plugins. It is never labeled Paper to obtain more search results. CurseForge does not establish Folia scheduler compatibility, so those plugins are hidden by default. Explicit unverified-content selection and an author-compatibility acknowledgment are required before installing one; the strict server-only filter continues to exclude unknown results.
+
+Source checks: `node tools/runtime/test-paper-family.mjs`; `go test ./internal/panel -run '^(TestJava|TestMinecraftContent)' -count=1`; frontend TypeScript checks and the existing game setup/template model tests. PostgreSQL-backed API checks require `TEST_DATABASE_URL` and isolated fixtures. These checks are separate from native game acceptance.
+
+The acceptance-only `tools/game-query/VoltraPaperAcceptance.java` is compiled against the real publisher API. It records plugin boots and a world persistent-data marker using the global region scheduler shared by modern Paper and Folia. It is not included in production recipes. Native acceptance must prove real protocol status/nonce, console, saved configuration and plugin/world persistence, graceful stop, pinned reinstall preservation and final owned-resource cleanup before runtime verification.

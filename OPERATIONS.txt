@@ -1,0 +1,188 @@
+Voltra panel
+==================
+
+Local development
+
+Run commands from this directory. Docker Desktop, Go and Node/npm must be installed.
+
+  npm ci --prefix web
+  npm run build --prefix web
+  .\start-local.ps1
+
+Open http://127.0.0.1:8088. The startup script creates or starts the separate
+pteroclone-postgres container on 127.0.0.1:55432. It generates database and
+encryption secrets once in ignored .local/runtime.env. Preserve this file and
+the PostgreSQL volume together. Losing ENCRYPTION_KEY makes saved daemon,
+database, SMTP and S3 credentials unreadable.
+
+First-run setup at /setup creates an administrator with password sign-in.
+Existing development installs retain their loopback development identity until
+the wizard is explicitly completed. After completion, sessions are required
+even with DEV_MODE=true. Cloudflare Access remains deferred. Do not publish
+an unconfigured development server through a tunnel. Accounts, API keys,
+SSH keys, ownership and permissions are implemented independently of login.
+Inbound Wings callbacks and API keys still require their machine credentials.
+
+For frontend development, run this in another terminal:
+
+  npm run dev --prefix web
+
+Vite serves http://127.0.0.1:5180 and proxies the panel API and websockets.
+The Go server normally serves the built files from web/dist.
+
+Configuration
+
+DATABASE_URL and ENCRYPTION_KEY are required. LISTEN defaults to
+127.0.0.1:8088; PUBLIC_URL defaults to http://127.0.0.1:8088.
+DAEMON_URL is the panel callback address reachable by Wings; local Docker
+fixtures use http://host.docker.internal:8088. It can differ from PUBLIC_URL.
+APP_TIMEZONE defaults to UTC; the persisted app:timezone setting overrides it for schedules.
+WEB_DIR defaults to web/dist. LOCALES_DIR optionally overlays bundled locale
+JSON files. DEV_USER_ID selects a local development account (default 1).
+
+The Go process runs the schedule, notification and daemon revocation workers.
+SMTP is configured through Administration > Settings. Without SMTP,
+notifications stay in the durable queue and retry rather than disappear.
+Configure Wings from Administration > Nodes. Existing Wings is retained.
+Add nodes opens the automatic pairing flow. Select Local or External, install
+the node connector, and copy its connection string into the private
+terminal prompt. Approve each hostname after matching its verification code.
+The installer opens setup automatically. Ready requires an authenticated Wings
+health response, not just a connected connector. Check again retries a failed
+health probe. Reconnect creates an approved one-node recovery invitation and
+rotates credentials without changing UUID, servers, allocations or node settings.
+Limits, expiry and enrollment history are under Advanced. Pairing sessions
+expire, and every approved node gets separate generated credentials.
+
+Build self-hosted Linux amd64/arm64 downloads with .\tools\node\build.ps1.
+The Panel serves /install/node.sh and /downloads/voltra-node-linux-{arch}.
+NODE_DOWNLOAD_DIR optionally changes the binary directory; NODE_RELEASE_URL
+optionally supplies a release download link. No GitHub repository is assumed.
+Run the Panel from this directory so its installer file can be found.
+Installation supports systemd Linux; missing Docker/curl can be installed on
+Debian/Ubuntu. Existing Pterodactyl installations are not overwritten.
+
+Paired nodes initiate outbound HTTPS/WebSocket connections to the Panel's
+existing web port. Configure a reachable HTTPS PUBLIC_URL for external nodes.
+HTTP pairing is limited to localhost/loopback development. Manual direct Wings
+nodes keep their existing connection method. Connector streams carry ordinary
+Wings API calls, browser console and file transfers; there is no fallback to
+an inbound management listener when a paired node is offline. The installer
+writes private /etc/voltra/node.json and wings.yml files and enables
+voltra-node.service and voltra-wings.service. Wings HTTP and SFTP bind loopback.
+Game allocations/ports and optional SFTP networking remain operator settings.
+The first-run wizard verifies the chosen address reaches this Panel. Public
+access requires HTTPS, either an existing reverse proxy with a trusted
+certificate, or automatic certificates. Automatic mode requires explicit CA
+terms consent, a public domain and reachable port 443. It starts a managed
+HTTPS listener using TLS-ALPN-01, caches certificates in TLS_CACHE_DIR (default
+.local/certificates), and keeps HTTPS pending until a trusted self-probe succeeds.
+The normal bootstrap listener stays available on LISTEN for local recovery;
+do not configure LISTEN on :443 when using the additional automatic listener.
+Administrator passwords use bcrypt; browser sessions are hashed in PostgreSQL,
+expire after 12 hours, and use HttpOnly/SameSite cookies, with Secure on HTTPS.
+Setup is one-time and direct-loopback only. Login is rate limited; disabled users,
+expired sessions, cross-site mutations and old recovery credentials are rejected.
+See tools/node/README.md for
+installation, reconnect and interrupted-setup recovery details.
+
+Global credentials are managed under Administration > Integrations. Saved values
+are encrypted and write-only. Map credential fields to the exact environment
+variable names declared by the intended eggs. Game licences require an egg scope;
+an egg-specific integration takes precedence over a global one. Cloudflare entries
+store credentials only; they do not enable login or create DNS records/tunnels.
+New servers inherit mapped values unless an explicit environment value overrides
+them. The creation form marks inherited fields and offers per-server overrides.
+Servers retain encrypted credential snapshots, so global edits or deletion affect
+future servers. Preserve ENCRYPTION_KEY with the database to keep both readable.
+
+The server panel opens on Overview, with live total/running/stopped counts and
+server cards. Other states and unavailable resource readings are shown separately;
+searching the list does not change the totals. Resource polling runs every 15 seconds.
+Game Library currently installs vanilla Minecraft Java. An administrator selects
+name, stable release, memory, player limit, world settings and optional node, and
+explicitly accepts the Minecraft EULA. A free allocation and available node capacity
+are required. Java 17/21/25 is selected from official version metadata, and the
+installer checks the server download's SHA-1 before using it. Server creation uses
+the normal Wings workflow and starts the game after installation completes.
+The managed Minecraft egg is added on first install, without changing existing eggs.
+User quotas and member-driven provisioning are not enabled by this feature.
+The supplied runtime fixture scripts and daemons are test infrastructure,
+not an automatic production deployment.
+
+Build and checks
+
+  go build -o .local/panel.exe ./cmd/panel
+  .\test-local.ps1
+  .\test-local.ps1 -Race
+  .\test-local.ps1 -Json
+  .\test-local.ps1 -Race -Json
+
+The normal check runs the PostgreSQL-backed Go suite, go vet and TypeScript/
+Vite production build. Tests use separate PostgreSQL schemas. The race check
+uses a separate Linux Go test container and the same isolated-schema tests.
+Docker-dependent integration tests run where their required fixtures exist;
+test output records skips. Never interpret a skipped test as a passing runtime.
+
+Independent native inventories, route mappings and acceptance evidence live
+under artifacts/parity. Real Wings, game, browser, S3 and CLI artifacts live
+under artifacts. They state their scope and limitations. Import/export of a
+large egg corpus does not prove that every upstream installer or game works.
+
+The original Laravel/Vite tree, database and reference Wings were preserved.
+Legacy migration is explicit and does not happen when starting this server.
+Read tools/migration/README.md before exporting or importing. Private snapshots
+contain credentials; keep them under .local or another private directory.
+Migration dry-run rolls back. A real import requires an empty target and a
+separate deliberate Wings callback cutover.
+
+The CLI is available through go run ./cmd/panel help after loading the same
+configuration. It supports user, location and node management, bulk power,
+health, migrations, settings, maintenance, scheduler and snapshot operations.
+Use its help output for actual flags. PHP-only installation/update/cache
+commands have explicit Go equivalents or explain why they do not apply.
+
+Stopping
+
+Ctrl-C stops the panel and its workers gracefully. PostgreSQL data remains in
+the Docker volume. Wings and game containers run independently; stopping the
+panel does not stop games. Do not delete Docker volumes to restart the panel.
+
+Verification checkpoint (2026-10-21)
+
+artifacts/parity/report.json records the pinned native baseline, deferred auth,
+50 reviewed/exercised feature groups, 526 independent checks and exact limits.
+462 HTTP checks were repeated against the final running binary. The separate
+artifacts/verification.json records the binary hash, Go/race outputs, explicit
+skips, build checks and dependency audit. tools/runtime/summarize-checks.mjs
+regenerates that summary from the private local audit logs and Go JSON reports.
+
+The panel serves all fonts locally; UI loading does not need Google Fonts.
+Frontend builds retain previous hashed assets in web/dist so open tabs can
+still load their lazy Admin, Client and editor modules after an update. Do not
+delete or empty the live dist directory during publication. Old assets consume
+additional disk space; remove them only during a planned offline clean build
+when existing browser sessions will be refreshed. Missing assets return 404,
+while extensionless application routes continue to receive the HTML shell.
+Advanced egg validators embed small PCRE2, timelib and libmbfl Wasm libraries.
+No production PHP executable or interpreter is required. Rebuild scripts and
+licenses are included under tools/runtime; see THIRD_PARTY_NOTICES.txt.
+
+Wings host mount allowlists must be configured manually, as upstream requires.
+Changing Docker bind mounts takes effect on the next container start. The test
+host uses cgroup v2, where Wings cannot enforce OOM-disable; the runtime proof
+records that host limitation explicitly.
+
+Windows desktop
+
+The Wails v3 desktop app shares the React/Vite frontend. Build it with
+.\desktop\build.ps1 and run desktop\bin\Voltra.exe. Link an account through
+Account > Desktop apps in the web panel. Codes expire after ten minutes and
+work once; linked devices can be revoked from that account page. The desktop
+stores its session with Windows DPAPI. It connects to the existing panel and
+Wings, so a panel connection is required for server management.
+
+Signed self-updates use Wails' built-in updater and are disabled until a
+release manifest URL and signing public key are supplied at build time.
+GitHub setup, release publishing and native code signing remain future release
+tasks. See desktop/README.md for connection details, tests and release setup.

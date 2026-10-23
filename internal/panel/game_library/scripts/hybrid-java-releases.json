@@ -1,0 +1,49 @@
+{
+  "arclight": {
+    "version": "1.21.1",
+    "release": "FeudalKings/1.0.1",
+    "loader": "forge",
+    "channel": "stable",
+    "url": "https://github.com/IzzelAliz/Arclight/releases/download/FeudalKings/1.0.1/arclight-forge-1.21.1-1.0.1-8ec9529.jar",
+    "algorithm": "sha256",
+    "hash": "9556a10ca71898e107bd3032616e2ad7ed26998016d080dd19cec5e84d7906eb",
+    "java": 21,
+    "sha256": "9556a10ca71898e107bd3032616e2ad7ed26998016d080dd19cec5e84d7906eb",
+    "size": 7299512
+  },
+  "canvas": {
+    "version": "26.3",
+    "build": "991",
+    "url": "https://jenkins.canvasmc.io/job/Canvas/991/artifact/canvas-server/build/libs/canvas-build.991.jar",
+    "java": 25,
+    "sha256": "bfe28853a9088d87416d415dcf930bd5fb99ee9019f7923a10c7d2eeb26aef27",
+    "size": 56451177
+  },
+  "spongevanilla": {
+    "version": "1.21.10",
+    "release": "1.21.10-17.0.0",
+    "url": "https://repo.spongepowered.org/repository/maven-releases/org/spongepowered/spongevanilla/1.21.10-17.0.0/spongevanilla-1.21.10-17.0.0-universal.jar",
+    "algorithm": "sha1",
+    "hash": "e5479957aa6a7ed15975f9f26985cf2b1f385295",
+    "java": 21,
+    "sha256": "407f97fd0a07c93e7986f1bb5198e8e1d17f4849ac6e2306b640b2d5be429642",
+    "size": 8606046
+  },
+  "arclight_beta": {
+    "project": "arclight",
+    "version": "1.21.1",
+    "release": "1.0.2-SNAPSHOT-494b2c8",
+    "loader": "forge",
+    "channel": "beta",
+    "url": "https://files.hypertention.cn/v1/objects/230a11dce6112fcab46e6221b164c1f10b632c1d",
+    "algorithm": "sha1",
+    "hash": "230a11dce6112fcab46e6221b164c1f10b632c1d",
+    "sha256": "d881f24269f9e753681c2e6d11f4a472488f61dbc0c614ca887ab5a5b3c0b83d",
+    "size": 7333932,
+    "java": 21,
+    "publisher_branch": "FeudalKings",
+    "publisher_commit": "494b2c8",
+    "publisher_listing": "https://files.hypoglycemia.icu/v1/files/arclight/minecraft/1.21.1/loaders/forge/versions-snapshot",
+    "published_at": "2026-10-21T02:32:22.784Z"
+  }
+}

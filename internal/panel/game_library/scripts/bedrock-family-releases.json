@@ -1,0 +1,74 @@
+{
+  "bds": {
+    "version": "1.26.52.3",
+    "url": "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.52.3.zip",
+    "identity": "Recorded SHA256 from official Minecraft HTTPS; publisher has no independent SHA256",
+    "sha256": "f6348d84fa714d04ca194f207e89453ca6bba0a1359396475271a52a150471c6",
+    "bytes": 94927522
+  },
+  "nukkit": {
+    "version": "1.0-20260919.123832-1250",
+    "url": "https://repo.opencollab.dev/maven-snapshots/cn/nukkit/nukkit/1.0-SNAPSHOT/nukkit-1.0-20260919.123832-1250.jar",
+    "identity": "Recorded SHA256 from official Maven HTTPS",
+    "sha256": "b373dcdb240d0d32fccbc9e0f9e727c4591082580dad7d522f924b7b411daa49",
+    "bytes": 27105379
+  },
+  "pnx": {
+    "version": "3.0.5",
+    "url": "https://github.com/PowerNukkitX/PowerNukkitX/releases/download/3.0.5/powernukkitx.jar",
+    "bytes": 86100503,
+    "sha256": "bc3c54236256c8e3bf8573ecf090e3853785c7622891d7d28d780a398fc1de60",
+    "identity": "Publisher GitHub asset SHA256"
+  },
+  "pm5": {
+    "version": "5.44.3",
+    "url": "https://github.com/pmmp/PocketMine-MP/releases/download/5.44.3/PocketMine-MP.phar",
+    "bytes": 3354057,
+    "sha256": "d8b4d87a64124d83659f629c87d6a8e0e142192f6c719fe4684272ff44105539",
+    "identity": "Publisher GitHub asset SHA256"
+  },
+  "php5": {
+    "version": "pm5-latest",
+    "url": "https://github.com/pmmp/PHP-Binaries/releases/download/pm5-latest/PHP-8.2-Linux-x86_64-PM5.tar.gz",
+    "bytes": 12270982,
+    "sha256": "000fc605878d24be3d6faa6991c0d3a39ae90a0f9ff24d9f4e4722ef823082fc",
+    "identity": "Publisher GitHub asset SHA256"
+  },
+  "pm4": {
+    "version": "4.26.0",
+    "url": "https://github.com/pmmp/PocketMine-MP/releases/download/4.26.0/PocketMine-MP.phar",
+    "bytes": 2743377,
+    "identity": "Recorded SHA256 from official HTTPS; publisher has no independent SHA256",
+    "sha256": "b179fc35bd9750bdd7c6ce924c5e860bda80b6329763af691224fe17af7753f4"
+  },
+  "php4": {
+    "version": "pm4-latest",
+    "url": "https://github.com/pmmp/PHP-Binaries/releases/download/pm4-latest/PHP-8.1-Linux-x86_64-PM4.tar.gz",
+    "bytes": 11646384,
+    "identity": "Recorded SHA256 from official HTTPS; publisher has no independent SHA256",
+    "sha256": "d3adcb603a032a6389cc134ba88d96af3b971f4f4d47264e293b447cd747fe8c"
+  },
+  "gomint": {
+    "version": "1.0.0-RC6",
+    "url": "https://github.com/gomint/gomint/releases/download/1.0.0-RC6/1.0.0-RC6.zip",
+    "identity": "Recorded SHA256 from official GitHub HTTPS; publisher has no independent SHA256",
+    "sha256": "cafa0c1680bd000fb0b269a257906f58c7d6c88dcc9abfc559997532db8c2d7d",
+    "bytes": 34883787
+  },
+  "java21_arm": {
+    "version": "21.0.12.1+1",
+    "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_aarch64_linux_hotspot_21.0.12.1_1.tar.gz",
+    "sha256": "14be1f35ebdbd1f6e8d57eb911a3ffb74d6d9aa255abc5daf2b1302002cf2cf2",
+    "size": 51149460
+  },
+  "pm4_compile": {
+    "url": "https://raw.githubusercontent.com/pmmp/PHP-Binaries/b2bc1ff31d0254318c65cbe08e1012271b244dc1/compile.sh",
+    "sha256": "2fca6d2b2d6be1077f6178f13d6d3947891520127d202f76e7fa12f926c2852e",
+    "version": "b2bc1ff31d0254318c65cbe08e1012271b244dc1"
+  },
+  "pm5_compile": {
+    "url": "https://raw.githubusercontent.com/pmmp/PHP-Binaries/3296ff36d9957b97733d71d2774fd6747d04c994/compile.sh",
+    "sha256": "91f1524cc410752abf2223f8e7c9e5c2139b20f932b58d734e70a665c8536803",
+    "version": "3296ff36d9957b97733d71d2774fd6747d04c994"
+  }
+}

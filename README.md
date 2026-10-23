@@ -1,93 +1,58 @@
-<p align="center">
-  <a href="https://pterodactyl.io">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.svg">
-      <img alt="Pterodactyl" src=".github/assets/logo-light.svg" height="72">
-    </picture>
-  </a>
-</p>
+# Voltra
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/pterodactyl/panel/ci.yaml?label=Tests&style=for-the-badge&branch=1.0-develop)
-![Discord](https://img.shields.io/discord/122900397965705216?label=Discord&logo=Discord&logoColor=white&style=for-the-badge)
-![GitHub Releases](https://img.shields.io/github/downloads/pterodactyl/panel/latest/total?style=for-the-badge)
-![GitHub contributors](https://img.shields.io/github/contributors/pterodactyl/panel?style=for-the-badge)
+Voltra is a game server management panel with a Go backend, PostgreSQL, and a React/TypeScript frontend built with Vite. It manages game servers through Wings and provides a browser UI, application and client APIs, and a Windows desktop client.
 
-# Pterodactyl Panel
+This repository is the Go rewrite and derivative of Pterodactyl Panel developed as Voltra. It preserves Pterodactyl-compatible APIs, egg formats, and Wings protocols where needed for interoperability. It is an independent project, not an official Pterodactyl release. Compatibility does not imply complete parity or verified gameplay for every game recipe.
 
-Pterodactyl® is a free, open-source game server management panel built with PHP, React, and Go. Designed with security
-in mind, Pterodactyl runs all game servers in isolated Docker containers while exposing a beautiful and intuitive
-UI to end users.
+## Build and run locally
 
-Stop settling for less. Make game servers a first class citizen on your platform.
+Use the Go version declared in [go.mod](go.mod), Node.js with npm, and Docker Desktop for the Windows development helper. Run these commands from the repository root:
 
-## Pterodactyl v2 Beta is Out!
+```powershell
+npm ci --prefix web
+npm run build --prefix web
+.\start-local.ps1
+```
 
-Pterodactyl v2.0.0-beta.1 is now available! The next major version introduces a modernized tech stack, a redesigned admin area, and an extension SDK built into the panel. It remains 100% free and open source under the MIT license.
+Open <http://127.0.0.1:8088> and complete first-run administrator setup. The helper creates a separate local PostgreSQL instance and stores generated credentials in ignored `.local/runtime.env`. Keep that file and the database volume together. Losing the encryption key makes stored integration credentials unreadable.
 
-[![Watch: Introducing Pterodactyl v2](.github/assets/v2-video.jpg)](https://www.youtube.com/watch?v=1ER4kv0jVEU)
+For frontend development, run `npm run dev --prefix web` in another terminal. Vite uses <http://127.0.0.1:5180> and proxies API requests to the Go panel.
 
-- [Get started with v2](https://docs.pterodactyl.io/v2/panel/getting-started)
-- [Upgrade from v1](https://docs.pterodactyl.io/v2/upgrading/upgrading-from-v1)
-- [Release notes](https://github.com/pterodactyl/panel/releases/tag/v2.0.0-beta.1)
+## Build without the Windows helper
 
-Development happens on the [`2.0-develop`](https://github.com/pterodactyl/panel/tree/2.0-develop) branch. The v2 branch is currently in beta, while `1.0-develop` remains the current stable release line.
+Provision PostgreSQL and supply `DATABASE_URL` and a persistent `ENCRYPTION_KEY` through your private runtime configuration. Build the web UI, then build the panel:
 
-![Image](https://cdn.pterodactyl.io/site-assets/pterodactyl_v1_demo.gif)
+```sh
+npm ci --prefix web
+npm run build --prefix web
+go build -o voltra ./cmd/panel
+```
+
+Run `./voltra` from the repository root. `LISTEN` defaults to `127.0.0.1:8088`, `PUBLIC_URL` defaults to `http://127.0.0.1:8088`, and `WEB_DIR` defaults to `web/dist`. Set `PUBLIC_URL` to the deployed HTTPS address. `DAEMON_URL` supplies a separate callback address reachable by Wings when required. Configure nodes in Administration after completing setup. See [operations](OPERATIONS.txt) for configuration, node installation, HTTPS, and recovery details.
+
+Complete setup over a direct loopback connection before exposing the installation. `DEV_MODE=true` enables a local development identity before setup; completed installations require authentication. This repository does not ship game server downloads, Steam credentials, database contents, or a configured production installation.
+
+## Development checks
+
+```sh
+go test ./...
+npm run check --prefix web
+npm run test:editor --prefix web
+```
+
+Database integration tests require an isolated PostgreSQL database through `TEST_DATABASE_URL`. Runtime acceptance tools under `tools/` can install software and create game servers. Read their prerequisites and use isolated resources. A successful build or unit test does not prove a game client can join.
 
 ## Documentation
 
-* [Panel Documentation](https://pterodactyl.io/panel/1.0/getting_started.html)
-* [Wings Documentation](https://pterodactyl.io/wings/1.0/installing.html)
-* [Community Guides](https://pterodactyl.io/community/about.html)
-* Or, get additional help [via Discord](https://discord.gg/pterodactyl)
+- [Game setup](GAME_SETUP.md), [Minecraft](MINECRAFT_SETUP.md), and [Steam](STEAM.md)
+- [File manager](FILE_MANAGER.md) and [proxy gateways](FRP_PROXY.md)
+- [Desktop build and pairing](desktop/README.md)
+- [Brand assets](branding/README.md)
 
-## Sponsors
+Some engineering documents refer to local acceptance receipts under `artifacts/` or an adjacent reference checkout. Those private development files are excluded from this source repository and are not required for the normal panel build.
 
-I would like to extend my sincere thanks to the following sponsors for helping fund Pterodactyl's development.
-[Interested in becoming a sponsor?](https://github.com/sponsors/pterodactyl)
+## License and provenance
 
-| Company                                                                           | About                                                                                                                                                                                                                                           |
-|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [**Buildurly**](https://buildurly.com/)                                           | Buildurly is a hardware procurement company. They deliver tailored, enterprise-grade hardware solutions designed around your unique needs. From sourcing to delivery, Buildurly's white-glove service ensures a seamless, worry-free, professional experience.                                                                                                                                          |
-| [**Hosturly**](https://hosturly.com/)                                             | Hosturly is an enterprise hosting provider. They provide cost-effective, high-performance, and reliable services, including VPS, Web, Dedicated, and Colocation.                                                                                |
-| [**indifferent broccoli**](https://indifferentbroccoli.com/)                      | indifferent broccoli is a game server hosting and rental company. With them, you get top-notch computer power for your gaming sessions. They destroy lag, latency, and complexity--letting you focus on the fun stuff.                         |
-| [**Infraly, LLC**](https://infraly.co/)                                           | Infraly is an infrastructure company powering the next generation of online services. Through their brands, Infraly delivers cutting-edge solutions across multiple markets. Their vertically integrated approach provides unmatched performance, scalability, and reliability, giving our customers full control.                                                                                     |
-| [**MineStrator**](https://minestrator.com/)                                       | MineStrator is a game server hosting provider. Looking for the most high-end French hosting company for your Minecraft server? More than 24,000 members on our Discord trust us. Give us a try!                                                |
-| [**Physgun**](https://physgun.com/)                                               | Physgun is a game server hosting provider. Most providers rent rack space and rebrand a panel. At Physgun, they engineer the performance, write the features, and staff the support. Physgun truly is game hosting perfected!                   |
-| [**WISP**](https://wisp.gg/)                                                      | WISP is an industry-leading SaaS platform for game server management, designed for hosting companies, gaming organizations, and enthusiasts. WISP combines modern, intuitive interfaces with powerful tools, making server deployment and administration seamless, scalable, and efficient.                                                                                                                 |
+The panel code is distributed under the [MIT license](LICENSE.md), with the original Pterodactyl copyright and permission notice retained. Upstream project: <https://github.com/pterodactyl/panel>. Wings remains a separate upstream component: <https://github.com/pterodactyl/wings>.
 
-
-### Supported Games
-
-Pterodactyl supports a wide variety of games by utilizing Docker containers to isolate each instance. This gives
-you the power to run game servers without bloating machines with a host of additional dependencies.
-
-Some of our core supported games include:
-
-* Minecraft — including Paper, Sponge, Bungeecord, Waterfall, and more
-* Rust
-* Terraria
-* Teamspeak
-* Mumble
-* Team Fortress 2
-* Counter Strike: Global Offensive
-* Garry's Mod
-* ARK: Survival Evolved
-
-In addition to our standard nest of supported games, our community is constantly pushing the limits of this software
-and there are plenty more games available provided by the community. Some of these games include:
-
-* Factorio
-* San Andreas: MP
-* Pocketmine MP
-* Squad
-* Xonotic
-* Starmade
-* Discord ATLBot, and most other Node.js/Python discord bots
-* [and many more...](https://eggs.pterodactyl.io)
-
-## License
-
-Pterodactyl® Copyright © 2015 - 2022 Dane Everitt and contributors.
-
-Code released under the [MIT License](./LICENSE.md).
+Retain [third-party notices](THIRD_PARTY_NOTICES.txt) and component license files when redistributing source or binaries. Vendored recipes, libraries, fonts, and embedded runtime helpers retain their own notices. Game downloads, publisher artwork, and trademarks are governed by their owners' terms and are not relicensed by the panel's MIT license. Upstream names in protocols, source URLs, container image references, schemas, and attribution are preserved for compatibility and provenance.

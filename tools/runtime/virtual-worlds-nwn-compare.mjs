@@ -1,0 +1,12 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const dir='.local/virtual-worlds/nwn';
+const[beforePhase,afterPhase,label]=process.argv.slice(2);
+if(![beforePhase,afterPhase,label].every(value=>/^[a-z0-9-]+$/.test(value||'')))throw Error('Named evidence phases required');
+const before=JSON.parse(fs.readFileSync(dir+'/'+beforePhase+'-proof.json')),after=JSON.parse(fs.readFileSync(dir+'/'+afterPhase+'-proof.json'));
+assert.equal(before.uuid,after.uuid);
+const retained=before.rows.filter(r=>!r.path.includes('/__pycache__/')),current=after.rows.filter(r=>!r.path.includes('/__pycache__/'));
+const differences=retained.filter(r=>JSON.stringify(r)!==JSON.stringify(current.find(v=>v.path===r.path))).map(r=>({before:r,after:current.find(v=>v.path===r.path)}));
+const extra=current.filter(r=>!retained.some(v=>v.path===r.path));
+const proof={uuid:before.uuid,at:new Date().toISOString(),before:beforePhase,after:afterPhase,compared_rows:retained.length,fields:['sha256','bytes','mode','uid','gid'],excluded_ephemeral_python_bytecode:before.rows.length-retained.length,differences,extra,passed:!differences.length&&!extra.length};
+fs.writeFileSync(dir+'/'+label+'-comparison.json',JSON.stringify(proof,null,2));
+console.log(proof);assert.deepEqual(differences,[]);assert.deepEqual(extra,[]);

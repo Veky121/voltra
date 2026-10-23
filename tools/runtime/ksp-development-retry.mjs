@@ -1,0 +1,11 @@
+import fs from 'node:fs';import {spawnSync} from 'node:child_process';import {api} from './openttd-compat-node.mjs';
+const game=process.argv[2],dir='.local/ksp-games/'+game,s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+if(!['dmp','lmp'].includes(game)||fs.existsSync(dir+'/development-retry.json'))throw Error('Existing retry or invalid game');
+const server=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(server.uuid!==s.uuid||server.node!==202||server.egg!==s.egg_id||server.status!=='install_failed')throw Error('Not the owned failed development candidate');
+const info=JSON.parse(spawnSync('docker',['inspect',s.uuid],{encoding:'utf8'}).stdout)[0];if(info.State.Running||info.State.StartedAt!=='0001-01-01T00:00:00Z')throw Error('Development game has booted');
+const egg=JSON.parse(fs.readFileSync('.local/ksp-games/profiles.json'))[game==='dmp'?'ksp/DMP/egg-k-s-p-d-m-p.json':'ksp/LMP/egg-k-s-p--l-m-p.json'].egg;
+await api('/api/admin/eggs/'+s.egg_id+'/scripts','PATCH',{script_install:egg.scripts.installation.script,script_container:egg.scripts.installation.container,script_entry:'bash'});
+fs.copyFileSync(dir+'/observation.json',dir+'/development-first-installer-failure.json');
+fs.writeFileSync(dir+'/development-retry.json',JSON.stringify({uuid:s.uuid,reason:'Root-user installer image required by Wings root-owned temporary script',at:new Date().toISOString()},null,2));
+await api('/api/client/servers/'+s.identifier+'/settings/reinstall','POST',{});console.log('One corrected development install requested; no game started.');

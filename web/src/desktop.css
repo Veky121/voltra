@@ -1,0 +1,15 @@
+.desktop-connect{min-height:100vh;display:grid;place-items:center;padding:32px;background:var(--bg,#111214)}
+.desktop-connect>.card{width:min(100%,540px);padding:36px}
+.desktop-connect h1{margin:24px 0 12px;font-size:28px}
+.desktop-connect form{display:grid;gap:16px;margin-top:28px}
+.desktop-brand{display:flex;align-items:center;gap:12px;font-weight:650}
+.desktop-version{font-size:12px;margin-top:28px}
+.desktop-bar{position:fixed;inset:0 0 auto 0;height:48px;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 16px;background:var(--surface,#1b1c20);border-bottom:1px solid var(--border,#303239);font-size:13px}
+.desktop-bar small{margin-left:12px;opacity:.65}
+.desktop-bar .button{font-size:12px;padding:5px 10px;min-height:30px}
+body.voltra-desktop .app-shell{height:calc(100dvh - 48px);margin-top:48px}
+body.voltra-desktop .desktop-bar+.error{position:fixed;top:48px;left:25%;z-index:101}
+.desktop-device{border-top:1px solid var(--border,#303239);padding:16px 0}
+.desktop-device h4{margin:0 0 8px}
+.desktop-pairing{margin-top:24px;display:grid;gap:12px}
+@media(max-width:800px){.desktop-bar small{display:none}.desktop-connect{padding:16px}.desktop-connect>.card{padding:24px}}

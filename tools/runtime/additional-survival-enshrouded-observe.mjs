@@ -1,0 +1,10 @@
+import fs from'node:fs';import{spawnSync}from'node:child_process';import{api}from'./openttd-compat-node.mjs';
+const dir='.local/additional-survival/enshrouded',s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+if(!/^[a-f0-9-]{36}$/.test(s.uuid)||s.node!==202)throw Error('Owned identity mismatch');
+const status=(await api('/api/application/servers/'+s.internal_id)).attributes.status;
+const inspect=spawnSync('docker',['inspect',s.uuid],{encoding:'utf8'}),info=inspect.status===0?JSON.parse(inspect.stdout)[0]:null;
+const logs=spawnSync('docker',['logs','--tail','80',s.uuid],{encoding:'utf8'});
+const installer=spawnSync('docker',['logs','--tail','20',s.uuid+'_installer'],{encoding:'utf8'});
+let text=logs.status===0?logs.stdout+logs.stderr:'';for(const password of Object.values(s.passwords||{}))text=text.replaceAll(password,'[REDACTED]');
+const data={status,container:info?.State??null,logs:text,installer_tail:installer.status===0?installer.stdout.slice(-1800):'not present'};
+fs.writeFileSync(dir+'/observation.json',JSON.stringify(data,null,2));console.log({status,container:data.container,native_ready:text.includes("[Session] 'HostOnline' (up)!"),logs:text.slice(-1800),installer_tail:data.installer_tail});

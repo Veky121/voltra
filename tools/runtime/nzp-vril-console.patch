@@ -1,0 +1,181 @@
+diff --git a/source/platform/sdl/sys_sdl.c b/source/platform/sdl/sys_sdl.c
+index 0d0f617..685d1cd 100644
+--- a/source/platform/sdl/sys_sdl.c
++++ b/source/platform/sdl/sys_sdl.c
+@@ -8,6 +8,9 @@
+ #endif
+ #include <sys/stat.h>
+ #include <unistd.h>
++#if !defined(_WIN32)
++#include "voltra_dedicated_console.h"
++#endif
+ 
+ #define MAX_HANDLES 32
+ #define DEFAULT_MEMORY_MB 128
+@@ -96,7 +99,12 @@ void Sys_Printf(char *fmt, ...) { va_list args; va_start(args, fmt); vfprintf(st
+ void Sys_SystemError(char *error) { fprintf(stderr, "Vril Engine: %s\n", error); if (SDL_WasInit(SDL_INIT_VIDEO)) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Vril Engine", error, sdl_window); SDL_Quit(); exit(1); }
+ void Sys_Quit(void) { sdl_running = false; }
+ double Sys_FloatTime(void) { static Uint64 start; Uint64 now = SDL_GetPerformanceCounter(); if (!start) start = now; return (double)(now - start) / SDL_GetPerformanceFrequency(); }
+-char *Sys_ConsoleInput(void) { return NULL; }
++char *Sys_ConsoleInput(void) {
++#if !defined(_WIN32)
++    if (cls.state == ca_dedicated) return Voltra_ConsoleInput();
++#endif
++    return NULL;
++}
+ void Sys_Sleep(void) { SDL_Delay(1); }
+ void Sys_HighFPPrecision(void) {}
+ void Sys_LowFPPrecision(void) {}
+@@ -379,8 +387,14 @@ int main(int argc, char **argv)
+ 	parms.argc = com_argc;
+ 	parms.argv = com_argv;
+ 	Host_Init(&parms);
++#if !defined(_WIN32)
++	if (cls.state == ca_dedicated) { signal(SIGINT, Voltra_Terminate); signal(SIGTERM, Voltra_Terminate); }
++#endif
+ 	oldtime = Sys_FloatTime();
+ 	while (sdl_running) {
++#if !defined(_WIN32)
++		if (voltra_termination_requested) { voltra_termination_requested = 0; Cbuf_AddText("quit\n"); }
++#endif
+ 		double now = Sys_FloatTime();
+ 		Host_Frame(now - oldtime);
+ 		music_update();
+diff --git a/internal/panel/game_library/scripts/nzp-vril-console.h b/source/platform/sdl/voltra_dedicated_console.h
+new file mode 100644
+index 0000000..a482e61
+--- /dev/null
++++ b/source/platform/sdl/voltra_dedicated_console.h
+@@ -0,0 +1,42 @@
++/* MIT. Bounded Linux dedicated-console adapter for NZ:P Vril. */
++#ifndef VOLTRA_VRIL_CONSOLE_H
++#define VOLTRA_VRIL_CONSOLE_H
++#include <errno.h>
++#include <signal.h>
++#include <stddef.h>
++#include <sys/select.h>
++#include <unistd.h>
++
++static volatile sig_atomic_t voltra_termination_requested;
++static void Voltra_Terminate(int number) { (void)number; voltra_termination_requested = 1; }
++
++static char *Voltra_ConsoleInput(void)
++{
++    static char line[4096];
++    static size_t used;
++    static int dropping;
++    unsigned int budget;
++    for (budget = 0; budget < sizeof(line); ++budget) {
++        fd_set readable;
++        struct timeval timeout = {0, 0};
++        unsigned char byte;
++        FD_ZERO(&readable);
++        FD_SET(STDIN_FILENO, &readable);
++        if (select(STDIN_FILENO + 1, &readable, NULL, NULL, &timeout) <= 0)
++            return NULL;
++        if (read(STDIN_FILENO, &byte, 1) != 1)
++            return NULL;
++        if (byte == '\r' || byte == '\n') {
++            if (dropping) { dropping = 0; used = 0; continue; }
++            if (!used) continue;
++            line[used++] = '\n';
++            line[used] = 0;
++            used = 0;
++            return line;
++        }
++        if (!byte || used >= sizeof(line) - 2) { dropping = 1; used = 0; }
++        else if (!dropping) line[used++] = (char)byte;
++    }
++    return NULL;
++}
++#endif
+diff --git a/source/platform/sdl/net_dgrm.c b/source/platform/sdl/net_dgrm.c
+index 118badf..22de075 100644
+--- a/source/platform/sdl/net_dgrm.c
++++ b/source/platform/sdl/net_dgrm.c
+@@ -33,6 +33,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ #endif	// BAN_TEST
+ 
+ #include "../../nzportable_def.h"
++#if !defined(_WIN32)
++#include "voltra_client_ports.h"
++#endif
+ #include "net_dgrm.h"
+ 
+ // these two macros are to make the code more readable
+@@ -325,6 +328,17 @@ int	Datagram_GetMessage (qsocket_t *sock)
+ 			return -1;
+ 		}
+ 
++#if !defined(_WIN32)
++        if (Voltra_LearnInitialPeer(cls.state == ca_dedicated,
++            sfunc.AddrCompare(&readaddr, &sock->addr), net_time - sock->connecttime,
++            sock->receiveSequence, sock->unreliableReceiveSequence, length,
++            length == 9 ? (unsigned)BigLong(packetBuffer.length) : 0,
++            length == 9 ? (unsigned)BigLong(packetBuffer.sequence) : 1,
++            length == 9 ? packetBuffer.data[0] : 0)) {
++            sock->addr = readaddr;
++            Q_strcpy(sock->address, sfunc.AddrToString(&readaddr));
++        }
++#endif
+ 		if (sfunc.AddrCompare(&readaddr, &sock->addr) != 0)
+ 		{
+ #ifdef DEBUG
+@@ -974,7 +988,11 @@ static qsocket_t *_Datagram_CheckNewConnections (void)
+ 		if (s->driver != net_driverlevel)
+ 			continue;
+ 		ret = dfunc.AddrCompare(&clientaddr, &s->addr);
++#if !defined(_WIN32)
++		if (Voltra_SameConnection(ret))
++#else
+ 		if (ret >= 0)
++#endif
+ 		{
+ 			// is this a duplicate connection reqeust?
+ 			if (ret == 0 && net_time - s->connecttime < 2.0)
+@@ -1014,8 +1032,12 @@ static qsocket_t *_Datagram_CheckNewConnections (void)
+ 		return NULL;
+ 	}
+ 
+-	// allocate a network socket
++	// Bind client sockets only to the published allocation ports.
++#if !defined(_WIN32)
++	newsock = Voltra_OpenClientSocket(net_hostport, svs.maxclients, dfunc.OpenSocket);
++#else
+ 	newsock = dfunc.OpenSocket(0);
++#endif
+ 	if (newsock == -1)
+ 	{
+ 		NET_FreeQSocket(sock);
+diff --git a/internal/panel/game_library/scripts/nzp-vril-client-ports.h b/source/platform/sdl/voltra_client_ports.h
+new file mode 100644
+index 0000000..5dc8251
+--- /dev/null
++++ b/source/platform/sdl/voltra_client_ports.h
+@@ -0,0 +1,26 @@
++/* MIT. Keep NetQuake client sockets inside allocated UDP ports. */
++#ifndef VOLTRA_VRIL_CLIENT_PORTS_H
++#define VOLTRA_VRIL_CLIENT_PORTS_H
++/* Learn a destination-specific NAT source port only from the first exact NOP.
++ * AddrCompare: 0 exact, 1 same IP/different port, -1 different IP. */
++static int Voltra_LearnInitialPeer(int dedicated, int comparison, double age,
++    unsigned received, unsigned unreliable_received, int size,
++    unsigned header, unsigned sequence, unsigned first_byte)
++{
++    return dedicated && comparison == 1 && age >= 0 && age <= 10 &&
++        received == 0 && unreliable_received == 0 && size == 9 &&
++        (header == 0x00100009u || header == 0x00090009u) &&
++        sequence == 0 && first_byte == 1;
++}
++static int Voltra_SameConnection(int comparison) { return comparison == 0; }
++static int Voltra_OpenClientSocket(int primary, int count, int (*open_socket)(int))
++{
++    int port, socket;
++    if (count < 1 || count > 16 || primary < 1 || primary > 65535 - count) return -1;
++    for (port = primary + 1; port <= primary + count; ++port) {
++        socket = open_socket(port);
++        if (socket != -1) return socket;
++    }
++    return -1;
++}
++#endif

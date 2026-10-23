@@ -1,0 +1,10 @@
+import {spawnSync} from 'node:child_process';
+import path from 'node:path';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const staged=spawnSync(process.execPath,['tools/runtime/stage-foundry-profile.mjs'],{windowsHide:true,stdio:'inherit'});if(staged.status!==0)process.exit(staged.status??1);
+const p=JSON.parse(fs.readFileSync('.local/foundry-vtt/profiles.json'))['foundry_vtt/egg-FoundryVTT.json'];
+const original=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')).entries.find(e=>e.path==='foundry_vtt/egg-FoundryVTT.json').egg;
+for(const v of original.variables)assert.deepEqual(p.egg.variables.find(x=>x.env_variable===v.env_variable),v);
+assert.equal(p.verification,'not_verified');assert.match(p.egg.docker_images[Object.keys(p.egg.docker_images)[0]],/@sha256:[a-f0-9]{64}$/);
+const result=spawnSync('docker',['run','--rm','--pull','never','--network','none','--memory','256m','--cpus','1','--mount',`type=bind,source=${path.resolve('.')},target=/workspace,readonly`,'-w','/workspace','python:3.13-slim','python3','-B','tools/runtime/test-foundry-native.py'],{windowsHide:true,stdio:'inherit'});process.exitCode=result.status??1;

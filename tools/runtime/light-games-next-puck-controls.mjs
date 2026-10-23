@@ -1,0 +1,8 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';import {api} from './openttd-compat-node.mjs';
+const dir='.local/light-games-next/puck',s=JSON.parse(fs.readFileSync(dir+'/private.json')),server=(await api('/api/application/servers/'+s.internal_id)).attributes;assert.equal(server.uuid,s.uuid);assert.equal(server.node,202);
+const out=spawnSync('docker',['logs',s.uuid],{encoding:'utf8',windowsHide:true});if(out.status)throw Error('Owned console observation failed');
+let text=out.stdout+out.stderr;for(const secret of s.passwords||[])text=text.replaceAll(secret,'[REDACTED]');text=text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
+const lines=text.split('\n').filter(line=>line.includes('[VoltraLegacyControls] Native proof '));assert(lines.length);const proof=JSON.parse(lines.at(-1).split('[VoltraLegacyControls] Native proof ')[1]);
+assert.equal(proof.failure,null);assert.equal(proof.nativeQueryListening,true);assert(text.includes('Voltra Puck compatibility ready'));assert(text.includes('is ready to accept clients on'));
+const state=(await api('/api/client/servers/'+s.identifier+'/resources')).attributes;assert.equal(state.current_state,'running');
+const result={uuid:s.uuid,proof,dashboard_state:state.current_state,memory_bytes:state.resources.memory_bytes,private_compiler:'Pinned SDK image .NET10/Roslyn, private unprivileged runtime copy; csc version5.9.0-1.26505.111',publisher_ready:true,compatibility_ready:true,at:new Date().toISOString()};fs.writeFileSync(dir+'/native-controls.json',JSON.stringify(result,null,2)+'\n');console.log(result);

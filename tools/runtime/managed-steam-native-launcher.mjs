@@ -1,0 +1,16 @@
+﻿// Explicit source-only launcher correction for the receipt-owned stopped fixture.
+import fs from 'node:fs';import {resolve,join} from 'node:path';import {spawnSync} from 'node:child_process';
+import {managedNativeLease} from './managed-steam-acceptance-lease.mjs';
+const base=resolve('.local/managed-steam-native'),r=JSON.parse(fs.readFileSync(join(base,'current.json')));
+const label=process.argv[2];if(!/^[a-zA-Z0-9_-]{1,64}$/.test(label??''))throw Error('Evidence label required');
+if(!/^[a-f0-9-]{36}$/.test(r.run_id)||r.root!=='/var/lib/voltra-batch-20261023/managed-bridge/'+r.run_id||resolve(r.directory)!==join(base,r.run_id)||r.game!=='7days'||r.panel_url!=='http://127.0.0.1:18098')throw Error('Unexpected owned fixture');
+managedNativeLease(JSON.parse(fs.readFileSync('.local/game-batch/queue.json')),r.lease_id,r.game);
+const s=JSON.parse(fs.readFileSync(join(r.directory,'private/game.json')));
+if(!/^[a-f0-9-]{36}$/.test(s.uuid)||!s.uuid.startsWith(s.identifier+'-')||s.environment.TELNET_PORT!=='9087')throw Error('Unexpected fixture game');
+const docker=args=>{const o=spawnSync('docker',args,{windowsHide:true,encoding:'utf8',timeout:30000});if(o.status)throw Error('Scoped launcher operation failed');return o.stdout;};
+const info=JSON.parse(docker(['inspect',s.uuid]))[0],volume=r.root+'/volumes/'+s.uuid;
+if(info.State.Running||info.Name!=='/'+s.uuid||!info.Mounts.some(m=>m.Source===volume&&m.Destination==='/home/container'))throw Error('Owned stopped container required');
+const status=await fetch(r.panel_url+'/api/client/servers/'+s.identifier+'/steam');if(!status.ok||(await status.json()).attributes.current_job)throw Error('No active Steam maintenance required');
+const program=`from pathlib import Path\nimport hashlib,os,stat,json\np=Path('/game/.voltra/sevendays-start.sh');st=p.lstat()\nassert stat.S_ISREG(st.st_mode),'regular launcher required'\nold=Path('/review/console-launcher-original.sh').read_bytes();new=Path('/review/console-launcher-current.sh').read_bytes()\nassert p.read_bytes()==old,'original source hash precondition failed'\nassert new.count(b'rcon -t telnet -c ')==2,'reviewed protocol sites required'\nq=p.with_name('.sevendays-reviewed.tmp');fd=os.open(q,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\nwith os.fdopen(fd,'wb') as f:f.write(new);f.flush();os.fsync(f.fileno())\nos.chmod(q,stat.S_IMODE(st.st_mode));os.chown(q,st.st_uid,st.st_gid);os.replace(q,p)\nassert p.read_bytes()==new,'renderer mismatch'\nprint(json.dumps({'original_sha256':hashlib.sha256(old).hexdigest(),'current_sha256':hashlib.sha256(new).hexdigest(),'mode':stat.S_IMODE(st.st_mode),'uid':st.st_uid,'gid':st.st_gid}))`;
+const result=JSON.parse(docker(['run','--rm','--pull','never','--network','none','--memory','128m','--cpus','1','--mount',`type=bind,source=${volume},target=/game`,...['console-launcher-original.sh','console-launcher-current.sh'].flatMap(name=>['--mount',`type=bind,source=${join(r.directory,name)},target=/review/${name},readonly`]),'python:3.13-slim','python3','-B','-c',program]));
+const report={observed_at:new Date().toISOString(),uuid:s.uuid,scope:'source-only explicit telnet launcher correction; isolated backend unchanged',...result};fs.writeFileSync(join(r.directory,label+'.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));

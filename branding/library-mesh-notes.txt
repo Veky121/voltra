@@ -1,0 +1,24 @@
+Game Library mesh background, generated 2026-10-23
+
+Tool: built-in image_gen, not the CLI/API fallback.
+Master: branding/library-mesh-master.png
+Web/desktop asset: web/public/backgrounds/library-mesh.jpg
+The JPEG is a quality-88 format conversion of the selected generated master.
+No generation API key is needed at runtime. No animation or external request.
+Scoped to Game Library with a dark overlay and a fade into the page canvas.
+
+Final generation prompt:
+Create a premium restrained abstract mesh background texture for Voltra, a dark
+game-server management app's Game Library. Wide landscape composition,
+approximately 16:9, high resolution. Near-black charcoal base #111214 and
+#15171b. A smooth flowing 3D wire mesh / fine woven geometric surface with broad
+soft undulations, subtle moire-free thin grid threads, gentle depth. Muted
+steel-blue and desaturated indigo-violet lighting only along the upper left and
+far right contours. Dark open central area suitable behind white headings and
+game cards. Make it sophisticated, ambient, low contrast, with interesting mesh
+detail mostly near the outer edges. The bottom third fades naturally into
+uniform charcoal. Full bleed, no frame. No text, no letters, no logos, no UI,
+no characters, no controllers, no game art, no stars, no particles, no bright
+neon, no bright white highlights. A calm technical fabric-like mesh landscape,
+not a rainbow gradient wallpaper. Final asset must work as a subtle page
+backdrop while keeping the foreground readable.

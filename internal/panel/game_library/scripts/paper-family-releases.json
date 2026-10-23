@@ -1,0 +1,38 @@
+{
+  "paper": {
+    "project": "paper",
+    "version": "26.3",
+    "build": "214",
+    "url": "https://fill-data.papermc.io/v1/objects/a9dad541bf083d5a5f0b65b6a6a98263c55344f22f254c31628b528cf22b9423/paper-26.3-214.jar",
+    "algorithm": "sha256",
+    "hash": "a9dad541bf083d5a5f0b65b6a6a98263c55344f22f254c31628b528cf22b9423",
+    "channel": "STABLE",
+    "java": 25,
+    "sha256": "a9dad541bf083d5a5f0b65b6a6a98263c55344f22f254c31628b528cf22b9423",
+    "bytes": 55247307
+  },
+  "folia": {
+    "project": "folia",
+    "version": "1.21.11",
+    "build": "14",
+    "url": "https://fill-data.papermc.io/v1/objects/f52c408490a0225611e67907a3ca19f7e6da2c6bc899e715d5f46844e7103c39/folia-1.21.11-14.jar",
+    "algorithm": "sha256",
+    "hash": "f52c408490a0225611e67907a3ca19f7e6da2c6bc899e715d5f46844e7103c39",
+    "channel": "STABLE",
+    "java": 21,
+    "sha256": "f52c408490a0225611e67907a3ca19f7e6da2c6bc899e715d5f46844e7103c39",
+    "bytes": 55082693
+  },
+  "purpur": {
+    "project": "purpur",
+    "version": "26.3",
+    "build": "2654",
+    "url": "https://api.purpurmc.org/v2/purpur/26.3/2654/download",
+    "algorithm": "md5",
+    "hash": "5cd522f99592a3545913a30e44665de1",
+    "channel": "SUCCESS",
+    "java": 25,
+    "sha256": "a22d86bb993491a2d4fe77eca77c247541f1720ce19f68c7af0881c443b9878e",
+    "bytes": 58123798
+  }
+}

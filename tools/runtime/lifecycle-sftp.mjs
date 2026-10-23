@@ -1,0 +1,7 @@
+import {readFile,writeFile} from 'node:fs/promises';import {execFileSync} from 'node:child_process';
+const base='http://127.0.0.1:8088';const s=JSON.parse(await readFile('.local/lifecycle-server.json','utf8'));const public_key=(await readFile('.local/lifecycle-sftp-key.pub','utf8')).trim();
+const response=await fetch(base+'/api/client/account/ssh-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Lifecycle real OpenSSH SFTP',public_key})});if(!response.ok&&response.status!==409)throw Error(await response.text());
+await writeFile('.local/lifecycle-sftp-batch.txt','get lifecycle-persistent.txt .local/lifecycle-sftp-downloaded.txt\nquit\n');
+execFileSync('sftp',['-b','.local/lifecycle-sftp-batch.txt','-P','12024','-i','.local/lifecycle-sftp-key','-o','BatchMode=yes','-o','StrictHostKeyChecking=no','-o','UserKnownHostsFile=NUL',`admin.${s.identifier}@127.0.0.1`],{stdio:'pipe',timeout:15000});
+if((await readFile('.local/lifecycle-sftp-downloaded.txt','utf8'))!=='lifecycle survives transfer and restart')throw Error('SFTP downloaded wrong content');
+const artifact=JSON.parse(await readFile('artifacts/runtime-lifecycle.json','utf8'));artifact.results.push({name:'real_openssh_public_key_sftp_download',passed:true});await writeFile('artifacts/runtime-lifecycle.json',JSON.stringify(artifact,null,2));console.log('PASS real_openssh_public_key_sftp_download');

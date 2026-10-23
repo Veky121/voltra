@@ -1,0 +1,2281 @@
+[
+  {
+    "id": "server",
+    "name": "Server",
+    "src": "/artwork/server.svg",
+    "aliases": [],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "fallback"
+  },
+  {
+    "id": "software",
+    "name": "Application",
+    "src": "/artwork/software.svg",
+    "aliases": [],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "fallback"
+  },
+  {
+    "id": "hardware",
+    "name": "Service",
+    "src": "/artwork/hardware.svg",
+    "aliases": [],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "fallback"
+  },
+  {
+    "id": "discord",
+    "name": "Discord bot",
+    "src": "/artwork/discord.svg",
+    "aliases": [
+      "discord",
+      "discord js",
+      "discord py",
+      "discord bot",
+      "jmusicbot",
+      "redbot",
+      "red discordbot"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "software"
+  },
+  {
+    "id": "minecraft",
+    "name": "Minecraft",
+    "src": "/artwork/minecraft.svg",
+    "aliases": [
+      "minecraft",
+      "paper",
+      "purpur",
+      "spigot",
+      "bukkit",
+      "bedrock",
+      "fabric",
+      "forge",
+      "neoforge",
+      "bungeecord",
+      "waterfall",
+      "velocity",
+      "minecraft bedrock"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game"
+  },
+  {
+    "id": "7-days-to-die",
+    "name": "7 Days to Die",
+    "src": "/artwork/7-days-to-die.svg",
+    "aliases": [
+      "7 days to die"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      251570,
+      294420
+    ]
+  },
+  {
+    "id": "abiotic-factor",
+    "name": "Abiotic Factor",
+    "src": "/artwork/abiotic-factor.svg",
+    "aliases": [
+      "abiotic factor"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      427410,
+      2857200
+    ]
+  },
+  {
+    "id": "aloft",
+    "name": "Aloft",
+    "src": "/artwork/aloft.svg",
+    "aliases": [
+      "aloft"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1660080
+    ]
+  },
+  {
+    "id": "among-us",
+    "name": "BetterCrewlink Server",
+    "src": "/artwork/among-us.svg",
+    "aliases": [
+      "among us",
+      "bettercrewlink server",
+      "among us impostor server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      945360
+    ]
+  },
+  {
+    "id": "archean",
+    "name": "Archean",
+    "src": "/artwork/archean.svg",
+    "aliases": [
+      "archean"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2941660,
+      3557220
+    ]
+  },
+  {
+    "id": "ark-survival-ascended",
+    "name": "ARK: Survival Ascended",
+    "src": "/artwork/ark-survival-ascended.svg",
+    "aliases": [
+      "ark survival ascended"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2399830,
+      2430930
+    ]
+  },
+  {
+    "id": "arma",
+    "name": "Arma 3",
+    "src": "/artwork/arma.svg",
+    "aliases": [
+      "arma",
+      "arma reforger",
+      "arma 3"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      107410,
+      1874900,
+      233780
+    ]
+  },
+  {
+    "id": "ark-survival-evolved",
+    "name": "Ark: Survival Evolved",
+    "src": "/artwork/ark-survival-evolved.svg",
+    "aliases": [
+      "ark survival evolved"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      346110,
+      376030
+    ]
+  },
+  {
+    "id": "aska",
+    "name": "ASKA",
+    "src": "/artwork/aska.svg",
+    "aliases": [
+      "aska"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1898300,
+      3246670
+    ]
+  },
+  {
+    "id": "astro-colony",
+    "name": "Astro Colony",
+    "src": "/artwork/astro-colony.svg",
+    "aliases": [
+      "astro colony"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1614550,
+      2934900
+    ]
+  },
+  {
+    "id": "assetto-corsa",
+    "name": "Assetto Corsa",
+    "src": "/artwork/assetto-corsa.svg",
+    "aliases": [
+      "assetto corsa",
+      "assetto corsa freeroam ai"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      244210,
+      302550
+    ]
+  },
+  {
+    "id": "astroneer",
+    "name": "ASTRONEER",
+    "src": "/artwork/astroneer.svg",
+    "aliases": [
+      "astroneer",
+      "astroneer dedicated server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      361420,
+      728470
+    ]
+  },
+  {
+    "id": "automobilista2",
+    "name": "Automobilista 2",
+    "src": "/artwork/automobilista2.svg",
+    "aliases": [
+      "automobilista2",
+      "automobilista 2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1066890,
+      1338040
+    ]
+  },
+  {
+    "id": "avorion",
+    "name": "Avorion",
+    "src": "/artwork/avorion.svg",
+    "aliases": [
+      "avorion"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      445220,
+      565060
+    ]
+  },
+  {
+    "id": "banana-shooter",
+    "name": "Banana Shooter",
+    "src": "/artwork/banana-shooter.svg",
+    "aliases": [
+      "banana shooter"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1949740,
+      2406780
+    ]
+  },
+  {
+    "id": "barotrauma",
+    "name": "Barotrauma",
+    "src": "/artwork/barotrauma.svg",
+    "aliases": [
+      "barotrauma"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      602960,
+      1026340
+    ]
+  },
+  {
+    "id": "battalion-legacy",
+    "name": "BATTALION: Legacy",
+    "src": "/artwork/battalion-legacy.svg",
+    "aliases": [
+      "battalion legacy"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      489940,
+      805140
+    ]
+  },
+  {
+    "id": "black-mesa",
+    "name": "Black Mesa",
+    "src": "/artwork/black-mesa.svg",
+    "aliases": [
+      "black mesa"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      362890,
+      346680
+    ]
+  },
+  {
+    "id": "brickadia",
+    "name": "Brickadia",
+    "src": "/artwork/brickadia.svg",
+    "aliases": [
+      "brickadia"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2199420,
+      3017590
+    ]
+  },
+  {
+    "id": "beamng",
+    "name": "BeamNG.drive",
+    "src": "/artwork/beamng.svg",
+    "aliases": [
+      "beamng",
+      "beammp servers",
+      "kissmp server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      284160
+    ]
+  },
+  {
+    "id": "carrier-command-2",
+    "name": "Carrier Command 2",
+    "src": "/artwork/carrier-command-2.svg",
+    "aliases": [
+      "carrier command 2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1489630
+    ]
+  },
+  {
+    "id": "citadel",
+    "name": "Beyond Citadel",
+    "src": "/artwork/citadel.svg",
+    "aliases": [
+      "citadel",
+      "citadel forged with fire"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      3371240,
+      489650
+    ]
+  },
+  {
+    "id": "colony-survival",
+    "name": "Colony Survival",
+    "src": "/artwork/colony-survival.svg",
+    "aliases": [
+      "colony survival"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      366090,
+      748090
+    ]
+  },
+  {
+    "id": "conan-exiles",
+    "name": "Conan Exiles Enhanced",
+    "src": "/artwork/conan-exiles.svg",
+    "aliases": [
+      "conan exiles",
+      "conan exiles enhanced"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      440900,
+      443030
+    ]
+  },
+  {
+    "id": "contagion",
+    "name": "Deadly Contagion",
+    "src": "/artwork/contagion.svg",
+    "aliases": [
+      "contagion"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2570740,
+      293030
+    ]
+  },
+  {
+    "id": "core-keeper",
+    "name": "Core Keeper",
+    "src": "/artwork/core-keeper.svg",
+    "aliases": [
+      "core keeper"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1621690,
+      1963720
+    ]
+  },
+  {
+    "id": "counter-strike",
+    "name": "Counter-Strike 2",
+    "src": "/artwork/counter-strike.svg",
+    "aliases": [
+      "counter strike",
+      "counter strike 1 6 rehlds",
+      "counter strike 1 6 vanilla",
+      "counter strike 2",
+      "counter strike source"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      730,
+      90,
+      232330
+    ]
+  },
+  {
+    "id": "cryofall",
+    "name": "CryoFall",
+    "src": "/artwork/cryofall.svg",
+    "aliases": [
+      "cryofall"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      829590,
+      1061710
+    ]
+  },
+  {
+    "id": "craftopia",
+    "name": "Craftopia",
+    "src": "/artwork/craftopia.svg",
+    "aliases": [
+      "craftopia"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1307550,
+      1670340
+    ]
+  },
+  {
+    "id": "cs2d",
+    "name": "CS2D",
+    "src": "/artwork/cs2d.svg",
+    "aliases": [
+      "cs2d"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      666220
+    ]
+  },
+  {
+    "id": "dayz",
+    "name": "DayZ",
+    "src": "/artwork/dayz.svg",
+    "aliases": [
+      "dayz"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      221100,
+      223350
+    ]
+  },
+  {
+    "id": "cubic-odyssey",
+    "name": "Cubic Odyssey",
+    "src": "/artwork/cubic-odyssey.svg",
+    "aliases": [
+      "cubic odyssey"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      3400000,
+      3858450
+    ]
+  },
+  {
+    "id": "ddnet",
+    "name": "DDNet",
+    "src": "/artwork/ddnet.svg",
+    "aliases": [
+      "ddnet"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      412220
+    ]
+  },
+  {
+    "id": "ddracenetwork",
+    "name": "DDNet",
+    "src": "/artwork/ddracenetwork.svg",
+    "aliases": [
+      "ddracenetwork"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      412220
+    ]
+  },
+  {
+    "id": "dead-matter",
+    "name": "Dead Matter",
+    "src": "/artwork/dead-matter.svg",
+    "aliases": [
+      "dead matter"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2184150,
+      2584780
+    ]
+  },
+  {
+    "id": "dont-starve",
+    "name": "Don't Starve Together",
+    "src": "/artwork/dont-starve.svg",
+    "aliases": [
+      "dont starve",
+      "don t starve together"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      322330,
+      343050
+    ]
+  },
+  {
+    "id": "doom",
+    "name": "DOOM: The Dark Ages",
+    "src": "/artwork/doom.svg",
+    "aliases": [
+      "doom",
+      "zandronum"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      3017860
+    ]
+  },
+  {
+    "id": "eco",
+    "name": "The Sims™ 4 Eco Lifestyle",
+    "src": "/artwork/eco.svg",
+    "aliases": [
+      "eco"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1301020,
+      739590
+    ]
+  },
+  {
+    "id": "empyrion",
+    "name": "Empyrion - Galactic Survival",
+    "src": "/artwork/empyrion.svg",
+    "aliases": [
+      "empyrion",
+      "empyrion galactic survival"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      383120,
+      530870
+    ]
+  },
+  {
+    "id": "enshrouded",
+    "name": "Enshrouded",
+    "src": "/artwork/enshrouded.svg",
+    "aliases": [
+      "enshrouded"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1203620,
+      2278520
+    ]
+  },
+  {
+    "id": "factorio",
+    "name": "Factorio",
+    "src": "/artwork/factorio.svg",
+    "aliases": [
+      "factorio",
+      "clusterio",
+      "factorio modupdate",
+      "factorio arm64"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      427520
+    ]
+  },
+  {
+    "id": "fof",
+    "name": "Fistful of Frags",
+    "src": "/artwork/fof.svg",
+    "aliases": [
+      "fof"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      265630,
+      295230
+    ]
+  },
+  {
+    "id": "fortresscraft-evolved",
+    "name": "FortressCraft Evolved!",
+    "src": "/artwork/fortresscraft-evolved.svg",
+    "aliases": [
+      "fortresscraft evolved"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      254200,
+      443600
+    ]
+  },
+  {
+    "id": "foundry",
+    "name": "FOUNDRY",
+    "src": "/artwork/foundry.svg",
+    "aliases": [
+      "foundry"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      983870,
+      2915550
+    ]
+  },
+  {
+    "id": "frozen-flame",
+    "name": "Frozen Flame",
+    "src": "/artwork/frozen-flame.svg",
+    "aliases": [
+      "frozen flame"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      715400,
+      1348640
+    ]
+  },
+  {
+    "id": "gmod",
+    "name": "Garry's Mod",
+    "src": "/artwork/gmod.svg",
+    "aliases": [
+      "gmod",
+      "garrys mod",
+      "garrysmod"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      4000,
+      4020
+    ]
+  },
+  {
+    "id": "ground-branch",
+    "name": "GROUND BRANCH",
+    "src": "/artwork/ground-branch.svg",
+    "aliases": [
+      "ground branch"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      16900,
+      476400
+    ]
+  },
+  {
+    "id": "gta",
+    "name": "Grand Theft Auto V Enhanced",
+    "src": "/artwork/gta.svg",
+    "aliases": [
+      "gta",
+      "alt v",
+      "fivem",
+      "grand theft auto connected",
+      "multi theft auto",
+      "openmp",
+      "ragecoop",
+      "rage mp",
+      "sa mp",
+      "ragemp",
+      "altv"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      3240220
+    ]
+  },
+  {
+    "id": "half-life-2-deathmatch",
+    "name": "Half-Life 2: Deathmatch",
+    "src": "/artwork/half-life-2-deathmatch.svg",
+    "aliases": [
+      "half life 2 deathmatch",
+      "hl2dm",
+      "hl2mp"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      320,
+      232370
+    ]
+  },
+  {
+    "id": "hlds-server",
+    "name": "Half-Life",
+    "src": "/artwork/hlds-server.svg",
+    "aliases": [
+      "hlds server",
+      "custom rehlds engine game",
+      "custom hlds engine game"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      70,
+      90
+    ]
+  },
+  {
+    "id": "holdfast",
+    "name": "Holdfast: Nations At War",
+    "src": "/artwork/holdfast.svg",
+    "aliases": [
+      "holdfast",
+      "holdfast naw"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      589290,
+      1424230
+    ]
+  },
+  {
+    "id": "humanitz",
+    "name": "HumanitZ",
+    "src": "/artwork/humanitz.svg",
+    "aliases": [
+      "humanitz"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1766060,
+      2728330
+    ]
+  },
+  {
+    "id": "hurtworld",
+    "name": "Hurtworld",
+    "src": "/artwork/hurtworld.svg",
+    "aliases": [
+      "hurtworld"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      393420,
+      405100
+    ]
+  },
+  {
+    "id": "hytale",
+    "name": "Hytale",
+    "src": "/artwork/hytale.svg",
+    "aliases": [
+      "hytale"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game"
+  },
+  {
+    "id": "icarus",
+    "name": "Icarus-Dedicated",
+    "src": "/artwork/icarus.svg",
+    "aliases": [
+      "icarus",
+      "icarus dedicated"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1149460,
+      2089300
+    ]
+  },
+  {
+    "id": "insurgency-sandstorm",
+    "name": "Insurgency: Sandstorm",
+    "src": "/artwork/insurgency-sandstorm.svg",
+    "aliases": [
+      "insurgency sandstorm"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      581320,
+      581330
+    ]
+  },
+  {
+    "id": "iosoccer",
+    "name": "IOSoccer",
+    "src": "/artwork/iosoccer.svg",
+    "aliases": [
+      "iosoccer",
+      "iosoccer server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      673560,
+      673990
+    ]
+  },
+  {
+    "id": "just-cause",
+    "name": "Just Cause™ 3",
+    "src": "/artwork/just-cause.svg",
+    "aliases": [
+      "just cause",
+      "just cause 3 multiplayer"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      225540
+    ]
+  },
+  {
+    "id": "killing-floor-2",
+    "name": "Killing Floor 2",
+    "src": "/artwork/killing-floor-2.svg",
+    "aliases": [
+      "killing floor 2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      232090,
+      232130
+    ]
+  },
+  {
+    "id": "ksp",
+    "name": "Kerbal Space Program",
+    "src": "/artwork/ksp.svg",
+    "aliases": [
+      "ksp",
+      "ksp dmp",
+      "ksp lmp"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      220200
+    ]
+  },
+  {
+    "id": "left4dead-2",
+    "name": "Left 4 Dead 2",
+    "src": "/artwork/left4dead-2.svg",
+    "aliases": [
+      "left4dead 2",
+      "left 4 dead 2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      550,
+      222860
+    ]
+  },
+  {
+    "id": "left4dead",
+    "name": "Left 4 Dead",
+    "src": "/artwork/left4dead.svg",
+    "aliases": [
+      "left4dead",
+      "left 4 dead"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      500,
+      222840
+    ]
+  },
+  {
+    "id": "longvinter",
+    "name": "Longvinter Soundtrack - Volume 1",
+    "src": "/artwork/longvinter.svg",
+    "aliases": [
+      "longvinter"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1642210,
+      1007
+    ]
+  },
+  {
+    "id": "midnight-ghost-hunt",
+    "name": "Midnight Ghost Hunt",
+    "src": "/artwork/midnight-ghost-hunt.svg",
+    "aliases": [
+      "midnight ghost hunt"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      915810,
+      1118810
+    ]
+  },
+  {
+    "id": "mindustry",
+    "name": "Mindustry",
+    "src": "/artwork/mindustry.svg",
+    "aliases": [
+      "mindustry"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1127400
+    ]
+  },
+  {
+    "id": "modiverse",
+    "name": "Modiverse",
+    "src": "/artwork/modiverse.svg",
+    "aliases": [
+      "modiverse"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1281150,
+      1549820
+    ]
+  },
+  {
+    "id": "mordhau",
+    "name": "MORDHAU",
+    "src": "/artwork/mordhau.svg",
+    "aliases": [
+      "mordhau",
+      "mordhau wine"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      629760,
+      629800
+    ]
+  },
+  {
+    "id": "mount-blade-ii-bannerlord",
+    "name": "Mount & Blade II: Bannerlord",
+    "src": "/artwork/mount-blade-ii-bannerlord.svg",
+    "aliases": [
+      "mount blade ii bannerlord"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      261550,
+      1863440
+    ]
+  },
+  {
+    "id": "myth-of-empires",
+    "name": "Myth of Empires",
+    "src": "/artwork/myth-of-empires.svg",
+    "aliases": [
+      "myth of empires"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1371580,
+      1794810
+    ]
+  },
+  {
+    "id": "necesse",
+    "name": "Necesse",
+    "src": "/artwork/necesse.svg",
+    "aliases": [
+      "necesse"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1169040,
+      1169370
+    ]
+  },
+  {
+    "id": "neverwinter-nights-ee",
+    "name": "Neverwinter Nights: Enhanced Edition",
+    "src": "/artwork/neverwinter-nights-ee.svg",
+    "aliases": [
+      "neverwinter nights ee",
+      "neverwinter nights enhanced edition"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      704450
+    ]
+  },
+  {
+    "id": "night-of-the-dead",
+    "name": "Night of the Dead",
+    "src": "/artwork/night-of-the-dead.svg",
+    "aliases": [
+      "night of the dead"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1377380,
+      1420710
+    ]
+  },
+  {
+    "id": "nightingale",
+    "name": "Nightingale",
+    "src": "/artwork/nightingale.svg",
+    "aliases": [
+      "nightingale"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1928980,
+      3796810
+    ]
+  },
+  {
+    "id": "nmrih",
+    "name": "No More Room in Hell 2",
+    "src": "/artwork/nmrih.svg",
+    "aliases": [
+      "nmrih"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      292000,
+      317670
+    ]
+  },
+  {
+    "id": "no-love-lost",
+    "name": "No Love Lost",
+    "src": "/artwork/no-love-lost.svg",
+    "aliases": [
+      "no love lost"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1873120,
+      2833050
+    ]
+  },
+  {
+    "id": "no-one-survived",
+    "name": "No One Survived",
+    "src": "/artwork/no-one-survived.svg",
+    "aliases": [
+      "no one survived"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1963370,
+      2329680
+    ]
+  },
+  {
+    "id": "nuclear-option",
+    "name": "Nuclear Option",
+    "src": "/artwork/nuclear-option.svg",
+    "aliases": [
+      "nuclear option"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2168680,
+      3930080
+    ]
+  },
+  {
+    "id": "onset",
+    "name": "Onset",
+    "src": "/artwork/onset.svg",
+    "aliases": [
+      "onset"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1105810,
+      1204170
+    ]
+  },
+  {
+    "id": "openttd",
+    "name": "OpenTTD",
+    "src": "/artwork/openttd.svg",
+    "aliases": [
+      "openttd",
+      "openttd server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1536610
+    ]
+  },
+  {
+    "id": "operation-harsh-doorstop",
+    "name": "Operation: Harsh Doorstop",
+    "src": "/artwork/operation-harsh-doorstop.svg",
+    "aliases": [
+      "operation harsh doorstop"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      736590,
+      950900
+    ]
+  },
+  {
+    "id": "palworld",
+    "name": "Palworld",
+    "src": "/artwork/palworld.svg",
+    "aliases": [
+      "palworld",
+      "palworld proton"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1623730,
+      2394010
+    ]
+  },
+  {
+    "id": "pavlov-vr",
+    "name": "Pavlov",
+    "src": "/artwork/pavlov-vr.svg",
+    "aliases": [
+      "pavlov vr"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      555160,
+      622970
+    ]
+  },
+  {
+    "id": "pixark",
+    "name": "PixARK",
+    "src": "/artwork/pixark.svg",
+    "aliases": [
+      "pixark"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      593600,
+      824360
+    ]
+  },
+  {
+    "id": "plains-of-pain",
+    "name": "Plains of Pain",
+    "src": "/artwork/plains-of-pain.svg",
+    "aliases": [
+      "plains of pain"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2218970,
+      2227360
+    ]
+  },
+  {
+    "id": "portal-knights",
+    "name": "Portal Knights",
+    "src": "/artwork/portal-knights.svg",
+    "aliases": [
+      "portal knights"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      374040
+    ]
+  },
+  {
+    "id": "post-scriptum",
+    "name": "Post Scriptum CTG: Collectible Token Game",
+    "src": "/artwork/post-scriptum.svg",
+    "aliases": [
+      "post scriptum"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1189650,
+      746200
+    ]
+  },
+  {
+    "id": "project-zomboid",
+    "name": "Project Zomboid",
+    "src": "/artwork/project-zomboid.svg",
+    "aliases": [
+      "project zomboid"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      108600,
+      380870
+    ]
+  },
+  {
+    "id": "puck",
+    "name": "Puck Bash",
+    "src": "/artwork/puck.svg",
+    "aliases": [
+      "puck"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1862230,
+      3481440
+    ]
+  },
+  {
+    "id": "quake-live",
+    "name": "Quake Live",
+    "src": "/artwork/quake-live.svg",
+    "aliases": [
+      "quake live"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      282440,
+      349090
+    ]
+  },
+  {
+    "id": "r5reloaded",
+    "name": "Apex Legends™",
+    "src": "/artwork/r5reloaded.svg",
+    "aliases": [
+      "r5reloaded"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1172470
+    ]
+  },
+  {
+    "id": "rdr",
+    "name": "Red Dead Redemption 2",
+    "src": "/artwork/rdr.svg",
+    "aliases": [
+      "rdr",
+      "redm"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1174180
+    ]
+  },
+  {
+    "id": "renown",
+    "name": "Renown",
+    "src": "/artwork/renown.svg",
+    "aliases": [
+      "renown"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1488310,
+      1512690
+    ]
+  },
+  {
+    "id": "resonite",
+    "name": "Resonite",
+    "src": "/artwork/resonite.svg",
+    "aliases": [
+      "resonite"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2519830
+    ]
+  },
+  {
+    "id": "return-to-moria",
+    "name": "The Lord of the Rings: Return to Moria™",
+    "src": "/artwork/return-to-moria.svg",
+    "aliases": [
+      "return to moria",
+      "the lord of the rings return to moria"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2933130,
+      3349480
+    ]
+  },
+  {
+    "id": "rimworld",
+    "name": "RimWorld",
+    "src": "/artwork/rimworld.svg",
+    "aliases": [
+      "rimworld",
+      "rimworld open world",
+      "rimworld together"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      294100
+    ]
+  },
+  {
+    "id": "rising-world",
+    "name": "Rising World",
+    "src": "/artwork/rising-world.svg",
+    "aliases": [
+      "rising world",
+      "rising world java legacy",
+      "rising world unity"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      324080,
+      339010
+    ]
+  },
+  {
+    "id": "risk-of-rain-2",
+    "name": "Risk of Rain 2",
+    "src": "/artwork/risk-of-rain-2.svg",
+    "aliases": [
+      "risk of rain 2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      632360,
+      1180760
+    ]
+  },
+  {
+    "id": "romestead",
+    "name": "Romestead",
+    "src": "/artwork/romestead.svg",
+    "aliases": [
+      "romestead"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1805320,
+      4763510
+    ]
+  },
+  {
+    "id": "rust",
+    "name": "Rust",
+    "src": "/artwork/rust.svg",
+    "aliases": [
+      "rust",
+      "rust autowipe",
+      "rust staging"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      252490,
+      258550
+    ]
+  },
+  {
+    "id": "satisfactory",
+    "name": "Satisfactory",
+    "src": "/artwork/satisfactory.svg",
+    "aliases": [
+      "satisfactory"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      526870,
+      1690800
+    ]
+  },
+  {
+    "id": "scpsl",
+    "name": "SCP: Secret Laboratory",
+    "src": "/artwork/scpsl.svg",
+    "aliases": [
+      "scpsl",
+      "scp sl",
+      "scp sl exiled"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      700330,
+      996560
+    ]
+  },
+  {
+    "id": "scum",
+    "name": "SCUM",
+    "src": "/artwork/scum.svg",
+    "aliases": [
+      "scum"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      513710,
+      3792580
+    ]
+  },
+  {
+    "id": "smalland-survive-the-wilds",
+    "name": "Smalland: Survive the Wilds",
+    "src": "/artwork/smalland-survive-the-wilds.svg",
+    "aliases": [
+      "smalland survive the wilds"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      768200,
+      808040
+    ]
+  },
+  {
+    "id": "solace-crafting",
+    "name": "Solace Crafting",
+    "src": "/artwork/solace-crafting.svg",
+    "aliases": [
+      "solace crafting"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      670260,
+      1086950
+    ]
+  },
+  {
+    "id": "soldat-2",
+    "name": "Soldat 2",
+    "src": "/artwork/soldat-2.svg",
+    "aliases": [
+      "soldat 2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      474220
+    ]
+  },
+  {
+    "id": "soldat",
+    "name": "Soldat 2",
+    "src": "/artwork/soldat.svg",
+    "aliases": [
+      "soldat"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      474220,
+      638500
+    ]
+  },
+  {
+    "id": "sonsoftheforest",
+    "name": "Sons Of The Forest",
+    "src": "/artwork/sonsoftheforest.svg",
+    "aliases": [
+      "sonsoftheforest",
+      "sons of the forest"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1326470,
+      2465200
+    ]
+  },
+  {
+    "id": "soulmask",
+    "name": "Soulmask",
+    "src": "/artwork/soulmask.svg",
+    "aliases": [
+      "soulmask"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2646460,
+      3017300
+    ]
+  },
+  {
+    "id": "space-engineers",
+    "name": "Space Engineers",
+    "src": "/artwork/space-engineers.svg",
+    "aliases": [
+      "space engineers",
+      "space engineers torch server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      244850,
+      298740
+    ]
+  },
+  {
+    "id": "spacestation-14",
+    "name": "Space Station 14",
+    "src": "/artwork/spacestation-14.svg",
+    "aliases": [
+      "spacestation 14"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1255460
+    ]
+  },
+  {
+    "id": "squad",
+    "name": "Squad",
+    "src": "/artwork/squad.svg",
+    "aliases": [
+      "squad"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      393380,
+      403240
+    ]
+  },
+  {
+    "id": "starmade",
+    "name": "StarMade",
+    "src": "/artwork/starmade.svg",
+    "aliases": [
+      "starmade"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      244770
+    ]
+  },
+  {
+    "id": "starbound",
+    "name": "Starbound",
+    "src": "/artwork/starbound.svg",
+    "aliases": [
+      "starbound"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      211820
+    ]
+  },
+  {
+    "id": "starrupture",
+    "name": "StarRupture",
+    "src": "/artwork/starrupture.svg",
+    "aliases": [
+      "starrupture",
+      "starrupture wine"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1631270,
+      3809400
+    ]
+  },
+  {
+    "id": "stationeers",
+    "name": "Stationeers (BepInEx)",
+    "src": "/artwork/stationeers.svg",
+    "aliases": [
+      "stationeers",
+      "stationeers bepinex"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      544550,
+      600760
+    ]
+  },
+  {
+    "id": "stormworks",
+    "name": "Stormworks: Build and Rescue",
+    "src": "/artwork/stormworks.svg",
+    "aliases": [
+      "stormworks",
+      "stormworks build and rescue"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      573090
+    ]
+  },
+  {
+    "id": "subnautica-nitrox-mod",
+    "name": "Subnautica 2",
+    "src": "/artwork/subnautica-nitrox-mod.svg",
+    "aliases": [
+      "subnautica nitrox mod",
+      "subnautica"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1962700,
+      264710
+    ]
+  },
+  {
+    "id": "sunkenland",
+    "name": "Sunkenland",
+    "src": "/artwork/sunkenland.svg",
+    "aliases": [
+      "sunkenland"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2080690,
+      2667530
+    ]
+  },
+  {
+    "id": "svencoop",
+    "name": "Sven Co-op",
+    "src": "/artwork/svencoop.svg",
+    "aliases": [
+      "svencoop",
+      "sven co op"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      225840,
+      276060
+    ]
+  },
+  {
+    "id": "swords-n-magic-and-stuff",
+    "name": "Swords 'n Magic and Stuff",
+    "src": "/artwork/swords-n-magic-and-stuff.svg",
+    "aliases": [
+      "swords n magic and stuff"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      810040,
+      2058450
+    ]
+  },
+  {
+    "id": "teeworlds",
+    "name": "Teeworlds",
+    "src": "/artwork/teeworlds.svg",
+    "aliases": [
+      "teeworlds"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      380840
+    ]
+  },
+  {
+    "id": "team-fortress-2",
+    "name": "Team Fortress 2",
+    "src": "/artwork/team-fortress-2.svg",
+    "aliases": [
+      "team fortress 2",
+      "tf2"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      440,
+      232250
+    ]
+  },
+  {
+    "id": "terraria",
+    "name": "Terraria",
+    "src": "/artwork/terraria.svg",
+    "aliases": [
+      "terraria",
+      "tmodloader",
+      "tshock legacy",
+      "tshock",
+      "terraria vanilla"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      105600
+    ]
+  },
+  {
+    "id": "terratech-worlds",
+    "name": "TerraTech Worlds",
+    "src": "/artwork/terratech-worlds.svg",
+    "aliases": [
+      "terratech worlds"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2313330,
+      2533070
+    ]
+  },
+  {
+    "id": "the-forest",
+    "name": "The Forest",
+    "src": "/artwork/the-forest.svg",
+    "aliases": [
+      "the forest"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      242760,
+      556450
+    ]
+  },
+  {
+    "id": "the-isle",
+    "name": "The Isle",
+    "src": "/artwork/the-isle.svg",
+    "aliases": [
+      "the isle"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      376210,
+      412680
+    ]
+  },
+  {
+    "id": "thefront",
+    "name": "The Front",
+    "src": "/artwork/thefront.svg",
+    "aliases": [
+      "thefront",
+      "the front"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2285150,
+      2334200
+    ]
+  },
+  {
+    "id": "tower-unite",
+    "name": "Tower Unite",
+    "src": "/artwork/tower-unite.svg",
+    "aliases": [
+      "tower unite"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      394690,
+      439660
+    ]
+  },
+  {
+    "id": "trackmania",
+    "name": "Trackmania",
+    "src": "/artwork/trackmania.svg",
+    "aliases": [
+      "trackmania"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2225070
+    ]
+  },
+  {
+    "id": "truck-simulator",
+    "name": "American Truck Simulator",
+    "src": "/artwork/truck-simulator.svg",
+    "aliases": [
+      "truck simulator",
+      "american truck simulator dedicated server",
+      "euro truck simulator 2 dedicated server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      270880,
+      2239530,
+      1948160
+    ]
+  },
+  {
+    "id": "urbanterror",
+    "name": "Urban Terror",
+    "src": "/artwork/urbanterror.svg",
+    "aliases": [
+      "urbanterror",
+      "urban terror"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game"
+  },
+  {
+    "id": "v-rising",
+    "name": "V Rising BepInEx",
+    "src": "/artwork/v-rising.svg",
+    "aliases": [
+      "v rising",
+      "v rising bepinex"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1604030,
+      1829350
+    ]
+  },
+  {
+    "id": "unturned",
+    "name": "Unturned",
+    "src": "/artwork/unturned.svg",
+    "aliases": [
+      "unturned"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      304930,
+      1110390
+    ]
+  },
+  {
+    "id": "valheim",
+    "name": "Valheim",
+    "src": "/artwork/valheim.svg",
+    "aliases": [
+      "valheim",
+      "valheim bepinex",
+      "valheim plus mod"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      892970,
+      896660
+    ]
+  },
+  {
+    "id": "vein",
+    "name": "VEIN",
+    "src": "/artwork/vein.svg",
+    "aliases": [
+      "vein"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1857950,
+      2131400
+    ]
+  },
+  {
+    "id": "voyagers-of-nera",
+    "name": "Voyagers of Nera",
+    "src": "/artwork/voyagers-of-nera.svg",
+    "aliases": [
+      "voyagers of nera"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2686630,
+      3937860
+    ]
+  },
+  {
+    "id": "wolfenstein-enemy-territory",
+    "name": "Wolfenstein: Enemy Territory",
+    "src": "/artwork/wolfenstein-enemy-territory.svg",
+    "aliases": [
+      "wolfenstein enemy territory",
+      "et legacy"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1873030
+    ]
+  },
+  {
+    "id": "wurm-unlimited",
+    "name": "Wurm Unlimited",
+    "src": "/artwork/wurm-unlimited.svg",
+    "aliases": [
+      "wurm unlimited"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      366220,
+      402370
+    ]
+  },
+  {
+    "id": "counter-strike-source",
+    "name": "Counter-Strike: Source",
+    "src": "/artwork/counter-strike-source.svg",
+    "aliases": [
+      "counter strike source",
+      "css",
+      "source css"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      240
+    ]
+  },
+  {
+    "id": "counter-strike-16",
+    "name": "Counter-Strike 1.6",
+    "src": "/artwork/counter-strike-16.svg",
+    "aliases": [
+      "counter strike 1 6",
+      "cs 1 6",
+      "cs16",
+      "cstrike"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      10
+    ]
+  },
+  {
+    "id": "arma-reforger",
+    "name": "Arma Reforger",
+    "src": "/artwork/arma-reforger.svg",
+    "aliases": [
+      "arma reforger"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      1874880
+    ]
+  },
+  {
+    "id": "quake",
+    "name": "Quake",
+    "src": "/artwork/quake.svg",
+    "aliases": [
+      "quake",
+      "quake server"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2310
+    ]
+  },
+  {
+    "id": "luanti",
+    "name": "Luanti / Minetest",
+    "src": "/artwork/luanti.svg",
+    "aliases": [
+      "luanti",
+      "minetest"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game"
+  },
+  {
+    "id": "urbanterror",
+    "name": "Urban Terror",
+    "src": "/artwork/urbanterror.svg",
+    "aliases": [
+      "urbanterror",
+      "urban terror"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game"
+  },
+  {
+    "id": "hytale",
+    "name": "Hytale",
+    "src": "/artwork/hytale.svg",
+    "aliases": [
+      "hytale"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game"
+  }
+]

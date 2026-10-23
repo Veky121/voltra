@@ -1,0 +1,44 @@
+{
+  "upstream_revision": "c637a6d1e0449b167efeff81bb9a0177aa3df6c2",
+  "wine_runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+  "nitrox_runtime": "ghcr.io/ptero-eggs/yolks@sha256:bae826709d63e6271a3d6114f0c6451da0411cb0ac7f423778f05a164e5d130a",
+  "torch": {
+    "version": "347",
+    "commit": "17113701b141ab7151d12fc814c66ffd3b63082e",
+    "url": "https://build.torchapi.com/job/Torch/job/master/347/artifact/bin/torch-server.zip",
+    "bytes": 4705001,
+    "sha256": "b298f781e8d82cef366ad00285643a1684a2c7558418bca4a54e18a6f6fbba31",
+    "license": "Apache-2.0",
+    "source": "https://github.com/TorchAPI/Torch"
+  },
+  "world": {
+    "version": "upstream-c637a6d1",
+    "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/space_engineers/default/World.zip",
+    "bytes": 2139591,
+    "sha256": "b2a982b36fd699dc2b220963b08ca35edce682ad581c914e94fffdb60b01b398",
+    "license": "Upstream game-eggs MIT; no new publisher game license granted"
+  },
+  "nitrox": {
+    "version": "1.8.1.0",
+    "url": "https://github.com/SubnauticaNitrox/Nitrox/releases/download/1.8.1.0/Nitrox_1.8.1.0_linux_x64.zip",
+    "bytes": 23231723,
+    "sha256": "12411e27754831564cd1fc01ced830b4a15bce1a1c3963ffee391050af62113c",
+    "license": "GPL-3.0",
+    "source": "https://github.com/SubnauticaNitrox/Nitrox/releases/tag/1.8.1.0",
+    "digest_provenance": "Publisher GitHub release asset digest; not downloaded locally"
+  },
+  "mono": {
+    "version": "9.1.0",
+    "url": "https://dl.winehq.org/wine/wine-mono/9.1.0/wine-mono-9.1.0-x86.msi",
+    "bytes": 84623872,
+    "sha256": "8a0a1e6837b494df49927e5d759b1c6908e89b8a2f8e3ad025e1c2881882476e",
+    "digest_provenance": "https://github.com/wine-mirror/wine/blob/wine-9.8/dlls/appwiz.cpl/addons.c",
+    "license": "Wine Mono and bundled components retain respective upstream licenses"
+  },
+  "references": [
+    "https://www.spaceengineersgame.com/dedicated-servers/",
+    "https://github.com/TorchAPI/Torch",
+    "https://github.com/SubnauticaNitrox/Nitrox/releases/tag/1.8.1.0",
+    "https://github.com/ptero-eggs/yolks/blob/master/wine/entrypoint.sh"
+  ]
+}

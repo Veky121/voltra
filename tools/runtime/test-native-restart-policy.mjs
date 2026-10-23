@@ -1,0 +1,3 @@
+import path from 'node:path';import {spawnSync} from 'node:child_process';
+const image=spawnSync('docker',['image','inspect','python:3.13-slim','--format','{{.Id}}'],{encoding:'utf8',windowsHide:true});if(image.status)throw Error('Existing offline Python image required');
+const result=spawnSync('docker',['run','--rm','--network','none','--memory','256m','--mount',`type=bind,source=${path.resolve('.')},target=/workspace,readonly`,'-w','/workspace',image.stdout.trim(),'python3','-B','tools/runtime/test-native-restart-policy.py'],{encoding:'utf8',windowsHide:true});console.log(result.stdout+result.stderr);if(result.status)process.exit(result.status);

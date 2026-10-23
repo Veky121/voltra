@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "variant": "repaired-source-v1",
+  "version": "a9eff54633-voltra-data-cb27856f",
+  "minecraft": "1.19.3",
+  "java": 17,
+  "platform": "linux/amd64",
+  "sources": {
+    "krypton": {
+      "repository": "KryptonMC/Krypton",
+      "commit": "a9eff5463328f34072cdaf37aae3e77b14fcac93",
+      "url": "https://codeload.github.com/KryptonMC/Krypton/zip/a9eff5463328f34072cdaf37aae3e77b14fcac93",
+      "sha256": "03d9729474d420fe4f4655ebbb21a511b3de410540c823720998cbc56235f067",
+      "bytes": 2345348,
+      "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "task": "shadowJar",
+      "folder": "krypton"
+    },
+    "nbt": {
+      "repository": "KryptonMC/nbt",
+      "commit": "0e4a7288dda76f29f70b5912fe9a8eb71bb29f0e",
+      "branch": "master",
+      "url": "https://codeload.github.com/KryptonMC/nbt/zip/0e4a7288dda76f29f70b5912fe9a8eb71bb29f0e",
+      "sha256": "446a1f879ef18b3acee4b2c51c651da8f14d1350e78bafaf86248ffb3043771b",
+      "bytes": 167118,
+      "folder": "nbt-src"
+    },
+    "serialization": {
+      "repository": "KryptonMC/serialization",
+      "commit": "dfdde12210096d3f995f04bfb4368dc3966dd9b4",
+      "branch": "master",
+      "url": "https://codeload.github.com/KryptonMC/serialization/zip/dfdde12210096d3f995f04bfb4368dc3966dd9b4",
+      "sha256": "c51bc8764f7fe3e7c0f7b3e100da486b79495db91a0d9453b3d5e4bb93a2cd63",
+      "bytes": 191918,
+      "folder": "serialization-src"
+    },
+    "brigadier": {
+      "repository": "KryptonMC/brigadier",
+      "commit": "27a95dc45d0256968699d6a959218502681cd357",
+      "branch": "krypton-changes",
+      "url": "https://codeload.github.com/KryptonMC/brigadier/zip/27a95dc45d0256968699d6a959218502681cd357",
+      "sha256": "75c9d6016037d8d2e2f9c4b20696b0618ad80fb530f16e8d28907dfbc792d89a",
+      "bytes": 148018,
+      "folder": "brigadier-src"
+    },
+    "dataconverter": {
+      "repository": "KryptonMC/DataConverter",
+      "commit": "11a880823e61ef5537f65048c32d872d6e2b3eb3",
+      "branch": "master",
+      "url": "https://codeload.github.com/KryptonMC/DataConverter/zip/11a880823e61ef5537f65048c32d872d6e2b3eb3",
+      "sha256": "eff448b31ea44b8a2c4baac041b6947b4ea6e83f2a24b9ae464f6df0dd1813f5",
+      "bytes": 408265,
+      "folder": "DataConverter-src"
+    },
+    "articdata": {
+      "repository": "Articdive/ArticData",
+      "commit": "95ba18ac9429dde26aa828732a179f81346e0166",
+      "url": "https://codeload.github.com/Articdive/ArticData/zip/95ba18ac9429dde26aa828732a179f81346e0166",
+      "sha256": "f89a71083dac8eb46590f04eafd3f0aa8ede98eb6b26df2a78a817da8256accf",
+      "bytes": 1110560,
+      "folder": "articdata-src"
+    }
+  },
+  "build_files": {
+    "krypton/build.gradle.kts": {
+      "original_sha256": "6924f603f9f61304e476122cbb2cdd041330a132725a412720cc2e089c2ea464",
+      "text": "plugins {\n    id(\"krypton.base-conventions\")\n}\n\nallprojects {\n    group = \"org.kryptonmc\"\n    version = \"a9eff54633-voltra-data-cb27856f\"\n    description = \"Free and open-source Minecraft server software, written from the ground up.\"\n}\n"
+    },
+    "krypton/settings.gradle.kts": {
+      "original_sha256": "dfc7d7ec54a3c6f9becc7f085cedbdb7de5b79ccfc82577afa73dd888161a141",
+      "text": "enableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\n\ndependencyResolutionManagement {\n    repositories {\n        mavenCentral()\n        maven(\"https://repo.kryptonmc.org/releases\")\n        maven(\"https://oss.sonatype.org/content/groups/public/\")\n        maven(\"https://repo.kryptonmc.org/snapshots\")\n        maven(\"https://s01.oss.sonatype.org/content/repositories/snapshots/\")\n        maven(\"https://jitpack.io\")\n    }\n    versionCatalogs {\n        create(\"global\") {\n            from(files(\"gradle/global.versions.toml\"))\n        }\n    }\n}\n\npluginManagement {\n    includeBuild(\"build-logic\")\n    repositories {\n        maven(\"https://repo.spongepowered.org/repository/maven-public/\")\n        gradlePluginPortal()\n    }\n}\n\nplugins {\n    id(\"org.gradle.toolchains.foojay-resolver-convention\") version \"0.4.0\"\n}\n\nrootProject.name = \"krypton\"\n\ninclude(\"api\")\ninclude(\"server\")\n// Source archive contains generated API files; standalone developer generator excluded from server packaging.\ninclude(\"annotation-processor\")\ninclude(\"jar\")\n\ninternalProject(\"annotations\")\ninternalProject(\"ap\")\n\npluginProject(\"bans\")\npluginProject(\"whitelist\")\n\nfun internalProject(name: String) {\n    include(\"internal-$name\")\n    project(\":internal-$name\").projectDir = file(\"internal/$name\")\n}\n\nfun pluginProject(name: String) {\n    include(\"$name-plugin\")\n    project(\":$name-plugin\").projectDir = file(\"plugins/$name\")\n}\n\n// BEGIN VOLTRA PINNED PUBLISHER SOURCE COMPOSITE\nincludeBuild(\"../nbt-src\") {\n    dependencySubstitution {\n        substitute(module(\"org.kryptonmc:nbt-common\")).using(project(\":common\"))\n        substitute(module(\"org.kryptonmc:nbt-extra-kotlin\")).using(project(\":extra-kotlin\"))\n    }\n}\nincludeBuild(\"../serialization-src\") {\n    dependencySubstitution {\n        substitute(module(\"org.kryptonmc:serialization-core\")).using(project(\":serialization-core\"))\n        substitute(module(\"org.kryptonmc:serialization-gson\")).using(project(\":serialization-gson\"))\n        substitute(module(\"org.kryptonmc:serialization-nbt\")).using(project(\":serialization-nbt\"))\n    }\n}\nincludeBuild(\"../brigadier-src\") {\n    dependencySubstitution {\n        substitute(module(\"org.kryptonmc:krypton-brigadier\")).using(project(\":\"))\n    }\n}\nincludeBuild(\"../DataConverter-src\") {\n    dependencySubstitution {\n        substitute(module(\"ca.spottedleaf:dataconverter\")).using(project(\":\"))\n    }\n}\n"
+    },
+    "krypton/server/build.gradle.kts": {
+      "original_sha256": "b277dc9c494eb2f8a6bbd69a97dd7a6013f469225017e67308decdc67227832b",
+      "text": "import org.apache.tools.ant.filters.ReplaceTokens\n\nplugins {\n    id(\"krypton.api-conventions\")\n    id(\"io.gitlab.arturbosch.detekt\")\n    id(\"com.google.devtools.ksp\")\n    jacoco\n}\n\ndependencies {\n    api(projects.api)\n    implementation(projects.annotationProcessor)\n\n    // Logging and console\n    runtimeOnly(libs.log4j.core)\n    implementation(libs.tca)\n    runtimeOnly(libs.jline.jansi)\n\n    // Data\n    api(libs.dataConverter)\n    api(libs.nbt)\n    api(libs.nbt.kotlin)\n    api(libs.serialization)\n    api(libs.serialization.gson)\n    api(libs.serialization.nbt)\n    implementation(files(rootProject.file(\"../articdata-data.jar\"))) // Explicit same-Minecraft publisher-data restoration; original artifact unavailable.\n\n    // Collections and caching\n    implementation(libs.fastutil)\n    implementation(libs.flare.fastutil)\n    implementation(libs.caffeine)\n    implementation(libs.jctools)\n\n    // Miscellaneous\n    implementation(libs.clikt)\n    implementation(libs.bstats)\n    implementation(libs.kotlinx.collections.immutable)\n    compileOnly(projects.internalAnnotations)\n    ksp(projects.internalAp)\n    implementation(libs.reflections)\n    implementation(libs.hydrazine)\n\n    testImplementation(libs.junit.api)\n    testImplementation(libs.junit.engine)\n    testImplementation(libs.kotlin.test.junit)\n    testImplementation(libs.junit.platform.runner)\n    testImplementation(libs.mockk)\n    testImplementation(libs.jimfs)\n    testRuntimeOnly(libs.bytebuddy)\n    testImplementation(projects.internalAnnotations)\n    testImplementation(libs.equalsVerifier)\n    testImplementation(libs.jsonassert)\n}\n\nlicense {\n    exclude(\n        \"**/*.properties\",\n        \"**/*.conf\",\n        \"**/*.json\",\n        // Velocity derivatives, with a special header\n        \"**/plugin/KryptonPluginManager.kt\",\n        \"**/plugin/PluginClassLoader.kt\",\n        \"**/plugin/PluginDependencies.kt\",\n        // Sponge derivatives, with a special header\n        \"**/console/BrigadierCompleter.kt\",\n        \"**/console/BrigadierHighlighter.kt\"\n    )\n}\n\ntasks {\n    withType<ProcessResources> {\n        filesMatching(\"**/versions.properties\") {\n            val minecraftVersion = global.versions.minecraft.get()\n            filter<ReplaceTokens>(\"tokens\" to mapOf(\n                \"krypton\" to project.version.toString(),\n                \"minecraft\" to minecraftVersion,\n                \"data\" to minecraftVersion.replace('.', '_')\n            ))\n        }\n    }\n    jacocoTestReport {\n        dependsOn(test)\n        reports {\n            html.required.set(true)\n            xml.required.set(true)\n        }\n    }\n    build {\n        dependsOn(test)\n    }\n    compileKotlin {\n        compilerOptions.freeCompilerArgs.add(\"-Xjvm-default=all\")\n    }\n    withType<Test> {\n        useJUnitPlatform()\n    }\n}\n\nsetupDetekt()\n"
+    },
+    "krypton/gradle/wrapper/gradle-wrapper.properties": {
+      "original_sha256": "f7655982527c85a356162648c9364ff7b75f87058501812244d80071ef342280",
+      "text": "distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.0.2-bin.zip\nnetworkTimeout=10000\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n\ndistributionSha256Sum=ff7bf6a86f09b9b2c40bb8f48b25fc19cf2b2664fd1d220cd7ab833ec758d0d7\n"
+    },
+    "brigadier-src/build.gradle": {
+      "original_sha256": "6a3ce5fe0928476d1b1684c487c959e4e4c3d89303c6280ef92f7b449e0a288b",
+      "text": "apply plugin: 'java-library'\napply plugin: 'maven-publish'\n\ngroup = 'org.kryptonmc'\nversion = project.hasProperty('buildNumber') ? \"${project.majorMinor}.${project.buildNumber}\" : \"${project.majorMinor}.0-SNAPSHOT\"\n\nbuildscript {\n    repositories {\n        mavenCentral()\n        maven {\n            url \"https://libraries.minecraft.net\"\n        }\n    }\n}\n\nrepositories {\n    maven {\n        url \"https://libraries.minecraft.net\"\n    }\n    mavenCentral()\n}\n\ndependencies {\n    testImplementation 'com.google.guava:guava:26.0-jre'\n    testImplementation 'junit:junit-dep:4.11'\n    testImplementation 'org.hamcrest:hamcrest-library:1.3'\n    testImplementation 'org.mockito:mockito-core:1.10.19'\n    testImplementation 'com.google.guava:guava-testlib:26.0-jre'\n    testImplementation 'org.openjdk.jmh:jmh-core:1.21'\n    annotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.21'\n}\n\ntask sourcesJar(type: Jar) {\n    archiveClassifier.set('sources')\n    from sourceSets.main.allSource\n}\n\nsourceSets {\n    main {\n        java {\n            srcDirs = ['src/main/java']\n        }\n        resources {\n            srcDirs = ['src/main/resources']\n        }\n    }\n    test {\n        java {\n            srcDirs = ['src/test/java']\n        }\n        resources {\n            srcDirs = ['src/test/resources']\n        }\n    }\n}\n\nartifacts {\n    archives jar\n    archives sourcesJar\n}\n\ntest {\n    testLogging {\n        events \"failed\", \"skipped\"\n        showStandardStreams = true\n        showExceptions true\n    }\n}\n\npublishing {\n    publications {\n        mavenJava(MavenPublication) {\n            from components.java\n            artifact sourcesJar\n        }\n    }\n}\n\ntask report {\n    doLast {\n        println \"##teamcity[buildNumber '${project.version}']\"\n    }\n}\n\npublishing {\n    repositories {\n        maven {\n            credentials {\n                username System.getenv(\"NEXUS_USERNAME\")\n                password System.getenv(\"NEXUS_PASSWORD\")\n            }\n\n            name = 'krypton'\n            def base = 'https://repo.kryptonmc.org'\n            def releasesRepoUrl = \"$base/releases\"\n            def snapshotsRepoUrl = \"$base/snapshots\"\n            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl\n        }\n    }\n}"
+    },
+    "brigadier-src/settings.gradle": {
+      "original_sha256": "6dfb6b4231ba4f44a6d976dfc0b6bfd2094fbbc06a8a9df14f4f955f46a36c62",
+      "text": "rootProject.name = 'krypton-brigadier'\n// Obsolete feature preview removed for Gradle8 source packaging.\n"
+    },
+    "serialization-src/gradle/libs.versions.toml": {
+      "original_sha256": "da5afbd2bfc3d3473bf4d15bd7be7da2dd96f73f22e9328e70f0acdb47ccf642",
+      "text": "metadata.format.version = \"1.1\"\n\n[versions]\n# Module dependency versions\nannotations = \"23.0.0\"\ngson = \"2.9.1\"\nguava = \"31.1-jre\"\nnbt = \"4.3.2\"\n\n# Plugin dependency versions\ncontractValidator = \"1.0.1\"\nerrorprone = \"2.14.0\"\nstylecheck = \"0.1\"\ncheckstyle = \"9.3\"\n\n# Plugin versions\nerrorpronePlugin = \"3.1.0\"\nindra = \"2.1.1\"\nlicenser = \"0.6.1\"\n\n[libraries]\n# Module dependencies\nannotations = { group = \"org.jetbrains\", name = \"annotations\", version.ref = \"annotations\" }\ngson = { group = \"com.google.code.gson\", name = \"gson\", version.ref = \"gson\" }\nguava = { group = \"com.google.guava\", name = \"guava\", version.ref = \"guava\" }\nnbt = { group = \"org.kryptonmc\", name = \"nbt-common\", version.ref = \"nbt\" }\n\n# Plugin dependencies\ncontractValidator = { group = \"ca.stellardrift\", name = \"contract-validator\", version.ref = \"contractValidator\" }\nerrorprone = { group = \"com.google.errorprone\", name = \"error_prone_core\", version.ref = \"errorprone\" }\nstylecheck = { group = \"ca.stellardrift\", name = \"stylecheck\", version.ref = \"stylecheck\" }\n\n# Plugins\nplugin-errorprone = { group = \"net.ltgt.gradle\", name = \"gradle-errorprone-plugin\", version.ref = \"errorpronePlugin\" }\nplugin-indra = { group = \"net.kyori\", name = \"indra-common\", version.ref = \"indra\" }\nplugin-licenser = { group = \"gradle.plugin.org.cadixdev.gradle\", name = \"licenser\", version.ref = \"licenser\" }\n"
+    }
+  },
+  "gradle": {
+    "url": "https://services.gradle.org/distributions/gradle-8.0.2-bin.zip",
+    "sha256": "ff7bf6a86f09b9b2c40bb8f48b25fc19cf2b2664fd1d220cd7ab833ec758d0d7"
+  },
+  "jdk": {
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.21_9.tar.gz",
+    "sha256": "8b9b611d917e3dfd8419d3566b5949226f69b052fed7e109c1368add1dfe8711",
+    "bytes": 193594705,
+    "version": "17.0.21+9"
+  },
+  "verification_sha256": "5989fde521f6d015ea1ff8d6ae2043ea3eb43c3d3b0469813f4c6b26b8073ec8",
+  "verification_components": 369,
+  "articdata_original_unavailable": "1.19.3-21bc926b",
+  "articdata_restored": "1.19.3-cb27856f",
+  "engine_code_changed": false
+}

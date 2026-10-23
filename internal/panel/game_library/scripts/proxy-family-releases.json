@@ -1,0 +1,176 @@
+{
+  "velocity": {
+    "version": "4.3.0",
+    "build": "44",
+    "url": "https://fill-data.papermc.io/v1/objects/85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f/velocity-4.3.0-44.jar",
+    "sha256": "85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f",
+    "modules": {
+      "server:default": {
+        "name": "velocity-4.3.0-44.jar",
+        "checksums": {
+          "sha256": "85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f"
+        },
+        "size": 42342509,
+        "url": "https://fill-data.papermc.io/v1/objects/85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f/velocity-4.3.0-44.jar"
+      }
+    },
+    "commit": "4d93ece85bb38b80d82aaf5b03bb33c1355bd6b4",
+    "bytes": 42342509
+  },
+  "waterfall": {
+    "version": "1.21",
+    "build": "615",
+    "url": "https://fill-data.papermc.io/v1/objects/5eda8bfd0691e5088701f87020c68964299586df0faba289a634122d282d598c/waterfall-1.21-615.jar",
+    "sha256": "5eda8bfd0691e5088701f87020c68964299586df0faba289a634122d282d598c",
+    "modules": {
+      "module:cmd_kick": {
+        "name": "cmd_kick-1.21-615.jar",
+        "checksums": {
+          "sha256": "6e0ba818976760dfab1ca94d1189db437dd9bb9def12a2a503f395572b057484"
+        },
+        "size": 4858,
+        "url": "https://fill-data.papermc.io/v1/objects/6e0ba818976760dfab1ca94d1189db437dd9bb9def12a2a503f395572b057484/cmd_kick-1.21-615.jar"
+      },
+      "module:cmd_server": {
+        "name": "cmd_server-1.21-615.jar",
+        "checksums": {
+          "sha256": "d1c68f7c0469e61c83939a37abae08f8ad231fc5bb4c7f455065af42f7950710"
+        },
+        "size": 6192,
+        "url": "https://fill-data.papermc.io/v1/objects/d1c68f7c0469e61c83939a37abae08f8ad231fc5bb4c7f455065af42f7950710/cmd_server-1.21-615.jar"
+      },
+      "module:cmd_alert": {
+        "name": "cmd_alert-1.21-615.jar",
+        "checksums": {
+          "sha256": "17d013baf57a10001ef72b2806cdefc1e151da1ab98ffd5ed395f1eabdb0582e"
+        },
+        "size": 5891,
+        "url": "https://fill-data.papermc.io/v1/objects/17d013baf57a10001ef72b2806cdefc1e151da1ab98ffd5ed395f1eabdb0582e/cmd_alert-1.21-615.jar"
+      },
+      "module:cmd_send": {
+        "name": "cmd_send-1.21-615.jar",
+        "checksums": {
+          "sha256": "f5e0a10d6028f4835969e7731889c98f3b82e9c9d2f2981ffdb6c200d978d7df"
+        },
+        "size": 9506,
+        "url": "https://fill-data.papermc.io/v1/objects/f5e0a10d6028f4835969e7731889c98f3b82e9c9d2f2981ffdb6c200d978d7df/cmd_send-1.21-615.jar"
+      },
+      "module:cmd_list": {
+        "name": "cmd_list-1.21-615.jar",
+        "checksums": {
+          "sha256": "995dea7f1821618059b02c4cc97e827790e028b1324add362f418a2be4897172"
+        },
+        "size": 5784,
+        "url": "https://fill-data.papermc.io/v1/objects/995dea7f1821618059b02c4cc97e827790e028b1324add362f418a2be4897172/cmd_list-1.21-615.jar"
+      },
+      "module:cmd_find": {
+        "name": "cmd_find-1.21-615.jar",
+        "checksums": {
+          "sha256": "7cf964eaa2f2365e09751c81d11c57ca3fb6927b67d4c61f96f8a2ba58a664d6"
+        },
+        "size": 5034,
+        "url": "https://fill-data.papermc.io/v1/objects/7cf964eaa2f2365e09751c81d11c57ca3fb6927b67d4c61f96f8a2ba58a664d6/cmd_find-1.21-615.jar"
+      },
+      "module:reconnect_yaml": {
+        "name": "reconnect_yaml-1.21-615.jar",
+        "checksums": {
+          "sha256": "5c952eac34a69e19d7667cb6ddb0c9525809e7c072ed044f8bb9ee6a76722826"
+        },
+        "size": 6161,
+        "url": "https://fill-data.papermc.io/v1/objects/5c952eac34a69e19d7667cb6ddb0c9525809e7c072ed044f8bb9ee6a76722826/reconnect_yaml-1.21-615.jar"
+      },
+      "server:default": {
+        "name": "waterfall-1.21-615.jar",
+        "checksums": {
+          "sha256": "5eda8bfd0691e5088701f87020c68964299586df0faba289a634122d282d598c"
+        },
+        "size": 27658469,
+        "url": "https://fill-data.papermc.io/v1/objects/5eda8bfd0691e5088701f87020c68964299586df0faba289a634122d282d598c/waterfall-1.21-615.jar"
+      }
+    },
+    "commit": "150a00263470515eef6b29c1415a0eb3d6e10516",
+    "bytes": 27658469
+  },
+  "travertine": {
+    "version": "1.16",
+    "build": "191",
+    "url": "https://fill-data.papermc.io/v1/objects/e2d76d6daa9fb237602d2ac9a70b25f02c46abc005cb8adf78fa9881f6bf9763/travertine-1.16-191.jar",
+    "sha256": "e2d76d6daa9fb237602d2ac9a70b25f02c46abc005cb8adf78fa9881f6bf9763",
+    "modules": {
+      "module:cmd_server": {
+        "name": "cmd_server-1.16-191.jar",
+        "checksums": {
+          "sha256": "8e09309611b704938a1b7a710d28e561c3d87e01ee2da3cad2caa6dff7928f7e"
+        },
+        "size": 7595,
+        "url": "https://fill-data.papermc.io/v1/objects/8e09309611b704938a1b7a710d28e561c3d87e01ee2da3cad2caa6dff7928f7e/cmd_server-1.16-191.jar"
+      },
+      "application": {
+        "name": "travertine-1.16-191.jar",
+        "checksums": {
+          "sha256": "e2d76d6daa9fb237602d2ac9a70b25f02c46abc005cb8adf78fa9881f6bf9763"
+        },
+        "size": 18861872,
+        "url": "https://fill-data.papermc.io/v1/objects/e2d76d6daa9fb237602d2ac9a70b25f02c46abc005cb8adf78fa9881f6bf9763/travertine-1.16-191.jar"
+      },
+      "module:cmd_alert": {
+        "name": "cmd_alert-1.16-191.jar",
+        "checksums": {
+          "sha256": "866b5b3ddf6d65f2d05d3c2bb668202de892568a5e2523c2ecc0702e2899ee5b"
+        },
+        "size": 5871,
+        "url": "https://fill-data.papermc.io/v1/objects/866b5b3ddf6d65f2d05d3c2bb668202de892568a5e2523c2ecc0702e2899ee5b/cmd_alert-1.16-191.jar"
+      },
+      "module:cmd_send": {
+        "name": "cmd_send-1.16-191.jar",
+        "checksums": {
+          "sha256": "338c393e8f543c746b1f9c62234733c4ec06d7dfb266c890ff60d524de381a41"
+        },
+        "size": 9299,
+        "url": "https://fill-data.papermc.io/v1/objects/338c393e8f543c746b1f9c62234733c4ec06d7dfb266c890ff60d524de381a41/cmd_send-1.16-191.jar"
+      },
+      "module:cmd_list": {
+        "name": "cmd_list-1.16-191.jar",
+        "checksums": {
+          "sha256": "dd08e84fbde175e02e045c5178aa6dd7eda10ae17586ded0bfa1efac45c7f635"
+        },
+        "size": 4773,
+        "url": "https://fill-data.papermc.io/v1/objects/dd08e84fbde175e02e045c5178aa6dd7eda10ae17586ded0bfa1efac45c7f635/cmd_list-1.16-191.jar"
+      },
+      "module:cmd_find": {
+        "name": "cmd_find-1.16-191.jar",
+        "checksums": {
+          "sha256": "0cd7d2673c43d5f5ddd5608179669b3ca07f56af311d31e7a2868b3a5f3a9d74"
+        },
+        "size": 4154,
+        "url": "https://fill-data.papermc.io/v1/objects/0cd7d2673c43d5f5ddd5608179669b3ca07f56af311d31e7a2868b3a5f3a9d74/cmd_find-1.16-191.jar"
+      },
+      "module:reconnect_yaml": {
+        "name": "reconnect_yaml-1.16-191.jar",
+        "checksums": {
+          "sha256": "8385ceb2820113f36db54dd3597634366fadccd3088055d96ce8af1a246e79ac"
+        },
+        "size": 6143,
+        "url": "https://fill-data.papermc.io/v1/objects/8385ceb2820113f36db54dd3597634366fadccd3088055d96ce8af1a246e79ac/reconnect_yaml-1.16-191.jar"
+      }
+    },
+    "commit": "64bc9df72da8859ebc57f60921124b8dceec9d3c",
+    "bytes": 18861872
+  },
+  "viaaas": {
+    "version": "v0.5.2",
+    "build": "v0.5.2",
+    "url": "https://github.com/ViaVersion/VIAaaS/releases/download/v0.5.2/VIAaaS-0.5.2%2B022e465-all.jar",
+    "sha256": "1e91a4c28f546c87e12852654cc6c694f6e06db890206e0e75606c43155be066",
+    "release_id": 270453710,
+    "bytes": 40791943
+  },
+  "waterdog": {
+    "version": "latest",
+    "build": "421109268",
+    "url": "https://github.com/WaterdogPE/WaterdogPE/releases/download/latest/Waterdog.jar",
+    "sha256": "f64fcaf2850851fadc55866efebe573dbc77c546656a03edf33edefe656ad98b",
+    "release_id": 421109268,
+    "bytes": 73803919
+  }
+}

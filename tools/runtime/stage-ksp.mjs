@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+const scripts='internal/panel/game_library/scripts/',catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),existing=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),profiles={};
+const image='ghcr.io/ptero-eggs/yolks@sha256:96cd911dea0928d09d4342291b9e676e68e8515d08c86d768caae574a3a96fba';
+const installer='mcr.microsoft.com/dotnet/sdk@sha256:8dd1a57fe6b7b8b1b357635db67e272c2f9e9d76d1dd0a32711c4c33c57d7b43';
+for(const [game,path] of [['dmp','ksp/DMP/egg-k-s-p-d-m-p.json'],['lmp','ksp/LMP/egg-k-s-p--l-m-p.json']]){
+ if(game==='dmp'&&existing[path]?.verification==='runtime_verified'){profiles[path]=structuredClone(existing[path]);continue;}
+ const entry=catalog.entries.find(row=>row.path===path);if(!entry)throw Error('Pinned KSP recipe absent');const egg=structuredClone(entry.egg);
+ egg.docker_images={'Pinned .NET10 supported runtime and source-build SDK':image};egg.startup='exec python3 .voltra/ksp_runtime.py '+game;
+ egg.config={files:'{}',startup:JSON.stringify({done:game==='dmp'?'Ready!':'All systems up and running'}),logs:'{}',stop:game==='dmp'?'/exit':'^C'};
+ if(game==='dmp')egg.variables.push({name:'Maximum players',env_variable:'MAX_PLAYERS',default_value:'20',rules:'required|integer|between:1,1000',user_viewable:true,user_editable:true});
+ else{
+  egg.variables.find(row=>row.env_variable==='MaxPlayers').rules='required|integer|between:1,1000';
+  egg.variables.find(row=>row.env_variable==='LMP_VERSION').description='Blank uses pinned0.29.2. Exact official release tags build from their source with an explicit .NET10 compatibility patch; unsupported older source layouts fail explicitly.';
+  egg.variables.find(row=>row.env_variable==='GameDifficulty').description='Changing a preset archives the prior GameplaySettings.xml and lets native defaults regenerate. Choose Custom to keep detailed gameplay values.';
+  egg.variables.push({name:'Public master listing',env_variable:'PUBLIC_LISTING',default_value:'0',rules:'required|boolean',user_viewable:true,user_editable:true,description:'LAN/private by default. Enable only when clients should find this server through the public master list.'});
+ }
+ egg.variables.push({name:'HTTP status port',env_variable:'STATUS_PORT',default_value:'',rules:'nullable|integer|between:1,65535',user_viewable:true,user_editable:true,description:game==='dmp'?'Blank disables status. An explicit HTTP port needs a second selected allocation because DMP uses TCP gameplay.':'Blank uses the primary allocation for TCP status alongside UDP gameplay. An explicit port must also be allocated.'});
+ let script='#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\napt-get update\napt-get install -y --no-install-recommends python3 git ca-certificates\ncd /mnt/server\nmkdir -p .voltra\n';
+ for(const name of ['steam-template.py','native-config.py','native-console.py','ksp-install.py','ksp-runtime.py'])script+=`cat > .voltra/${name.replaceAll('-','_')} <<'VOLTRA_SOURCE'\n${fs.readFileSync(scripts+name,'utf8')}\nVOLTRA_SOURCE\n`;
+ script+='python3 .voltra/ksp_install.py '+game+'\n';egg.scripts.installation={container:installer,entrypoint:'bash',script};
+ const profile={revision:'ksp-'+game+'-native-v4',upstream_sha256:entry.sha256,platforms:['linux/amd64'],required_ports:1,defaults:{memory:game==='dmp'?2048:1024,disk:game==='dmp'?2048:4096},verification:'not_verified',detail:'Original controls retained in the shared template form. Supported .NET10 runtime adaptation prepared; native acceptance pending.',egg,setup_steps:game==='dmp'?['Choose a Linux x64 node and one gameplay allocation. HTTP status is optional and needs a separate selected allocation.','Original modpack, warp, game mode, difficulty, whitelist and name controls map to native Config/Settings.txt. Keep Config/ and Universe/ for persistence.','Pinned DMP0.3.8.5 source is adapted to .NET10 with IPv6 socket and console shutdown fixes; this is a modified build. Its upstream1GiB compression buffer requires at least2GiB RAM. Native console remains available; Stop uses /exit.']:['Choose a Linux x64 node. UDP gameplay and TCP status share the primary allocation by default. Master listing and UPnP are off for private setup.','All original controls remain. Difficulty preset changes archive prior gameplay settings; Custom preserves detailed values. Keep LMPServer/Config and Universe.','This is a clearly identified .NET10 source adaptation of pinned official LMP0.29.2, not an unchanged upstream binary. Exact older release layouts may need separate compatibility review. Source, patch and build provenance remain in .voltra/ksp.']};
+ if(existing[path]?.revision===profile.revision){profile.verification=existing[path].verification;profile.detail=existing[path].detail;}
+ profiles[path]=profile;
+}
+fs.mkdirSync('.local/ksp-games',{recursive:true});fs.writeFileSync('.local/ksp-games/profiles.json',JSON.stringify(profiles,null,2)+'\n');console.log('Staged both KSP profiles; no shared overrides changed.');

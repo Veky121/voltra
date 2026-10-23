@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#fbfdff"/>
+      <stop offset=".5" stop-color="#eef2f6"/>
+      <stop offset="1" stop-color="#dce3ec"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2=".8" y2="1">
+      <stop stop-color="#303945"/>
+      <stop offset="1" stop-color="#0d121a"/>
+    </linearGradient>
+    <clipPath id="tileClip"><rect x="48" y="48" width="928" height="928" rx="232"/></clipPath>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="232" fill="url(#tile)"/>
+  <g clip-path="url(#tileClip)">
+    <path d="M48 420 420 48H650L48 650Z" fill="#fff" opacity=".28"/>
+    <path d="M48 710 710 48H976V210L210 976H48Z" fill="#fff" opacity=".23"/>
+    <path d="M365 976 976 365V650L650 976Z" fill="#fff" opacity=".19"/>
+  </g>
+  <path d="M250 288H370Q395 288 408 312L512 502 616 312Q629 288 654 288H774Q799 288 787 312L558 735Q544 760 517 760H507Q480 760 466 735L237 312Q225 288 250 288Z" fill="url(#ink)"/>
+  <path d="M250 288H370Q395 288 408 312L512 502 482 557Z" fill="#66717f" opacity=".16"/>
+</svg>

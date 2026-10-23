@@ -1,0 +1,9 @@
+name = "Voltra acceptance fixture"
+description = "Native persistent component used only by disposable acceptance servers."
+author = "Voltra"
+version = "1"
+api_version = 10
+dst_compatible = true
+all_clients_require_mod = false
+client_only_mod = false
+server_only_mod = true
