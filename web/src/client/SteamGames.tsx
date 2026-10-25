@@ -1,3 +1,5 @@
+import {GameSwitch} from './GameSwitch';
+import './games-ui.css';
 import {useRef, useState, type FormEvent} from 'react';
 import {Link, useNavigate, useParams} from 'react-router-dom';
 import {api, Button, Card, ErrorBox, Field, Input, Select, unwrap} from '../lib';
@@ -7,6 +9,7 @@ import {memoryMiB, gameInitialNode, gameMemoryBudget, steamMemoryWarning, steamA
 import {useGameRequest} from './useGameRequest';
 import {GameNameField, GameMemoryField, GameNodeField} from './GameSetupFields';
 import './steamGames.css';
+import {GamePorts, useGamePortPlan, rememberInstallationPorts} from './GamePorts';
 
 export function GameHelpLinks({help}: {help: GameHelp[]}) {
   return <div className="game-help">{help.map((item, index) => <div key={`${item.label}-${index}`}><strong>{item.url && /^https?:\/\//.test(item.url) ? <a href={item.url} target="_blank" rel="noreferrer">{item.label} ↗</a> : item.label}</strong>{item.text && <p>{item.text}</p>}</div>)}</div>;
@@ -20,7 +23,7 @@ export function SteamGameTiles() {
 export default function SteamGames() {
   const {game} = useParams();
   const request = useGameRequest<SteamOptions>(game && /^[a-z0-9-]+$/.test(game) ? `/api/client/game-library/steam/${encodeURIComponent(game)}` : null);
-  return <div className="page steam-setup-page">
+  return <div className="page steam-setup-page games-ui">
     <header className="page-header"><div><Link className="steam-back" to="/game-library">← Game Library</Link><h1>{request.data?.name || 'Game'} easy setup</h1><p className="muted">Create a dedicated server with Steam updates managed by the panel.</p></div></header>
     {!game ? <ErrorBox>This game does not have Steam easy setup.</ErrorBox> : <>
       <ErrorBox>{request.error}</ErrorBox>{request.error && <Button variant="secondary" onClick={request.reload}>Retry game options</Button>}
@@ -40,6 +43,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const [players, setPlayers] = useState(String(options.defaults.max_players));
   const [password, setPassword] = useState('');
   const [preset, setPreset] = useState(options.presets[0]?.value ?? '');
+  const [startAfterInstall, setStartAfterInstall] = useState(true);
   const advancedFields = options.advanced_fields ?? [];
   const [advanced, setAdvanced] = useState<Record<string, string | boolean>>(() => Object.fromEntries(advancedFields.map(field => [field.key, field.type === 'boolean' ? field.default === '1' : field.default])));
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -47,6 +51,8 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const submission = useRef<{payload: string; id: string} | null>(null);
   const memoryValue = memoryMiB(memory);
   const selectedNode=options.nodes.find(item=>String(item.id)===node);
+  const portEnvironment = Object.fromEntries(advancedFields.filter(field => !field.secret && /PORT/i.test(field.key)).map(field => [field.key, advanced[field.key] ?? field.default]));
+  const ports = useGamePortPlan(`/api/client/game-library/steam/${encodeURIComponent(game)}/ports`, node, portEnvironment);
   const memoryMaximum=gameMemoryBudget(options.maximum_memory,selectedNode);
   const memoryWarning = steamMemoryWarning(options, memoryValue);
   const passwordRules = options.password ?? {enabled: game === 'palworld', required: false, min_length: 0, max_length: 128};
@@ -54,21 +60,22 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const valid = passwordValid && !!name.trim() && options.nodes.some(item => String(item.id) === node && item.setup_available !== false) && memoryValue !== null && memoryValue >= options.minimum_memory && memoryValue <= memoryMaximum && Number.isInteger(Number(players)) && Number(players) >= options.minimum_players && Number(players) <= options.maximum_players && (!options.presets.length || options.presets.some(item => item.value === preset));
   async function install(event: FormEvent) {
     event.preventDefault();
-    if (!valid || !options.can_install || submitting.current) return;
+    if (!valid || !ports.data || ports.loading || ports.error || !options.can_install || submitting.current) return;
     let environment: Record<string, string | boolean>;
     try {environment = steamAdvancedEnvironment(advancedFields, advanced);} catch (error) {setError(error instanceof Error ? error.message : String(error)); return;}
-    const body = {name: name.trim(), node_id: Number(node), memory: memoryValue, max_players: Number(players), ...(password ? {server_password: password} : {}), ...(preset ? {preset} : {}), ...(advancedFields.length ? {environment} : {})};
+    const body = {name: name.trim(), node_id: Number(node), memory: memoryValue, max_players: Number(players), ...(password ? {server_password: password} : {}), ...(preset ? {preset} : {}), ...(advancedFields.length ? {environment} : {}), ...(options.supports_install_only === true ? {start_on_completion: startAfterInstall} : {})};
     const payload = JSON.stringify(body);
     if (submission.current?.payload !== payload) submission.current = {payload, id: crypto.randomUUID()};
     submitting.current = true; setBusy(true); setError('');
     try {
       const result = unwrap(await api(`/api/client/game-library/steam/${game}/install`, json('POST', {...body, request_id: submission.current.id})));
       if (!result?.identifier) throw new Error('The install response did not include a server. Check Overview before retrying.');
+      rememberInstallationPorts(result.identifier, result.ports);
       navigate(`/server/${encodeURIComponent(result.identifier)}/steam`);
     } catch (error) {setError(error instanceof Error ? error.message : String(error));}
     finally {submitting.current = false; setBusy(false);}
   }
-  return <div className="steam-setup-layout"><Card><form onSubmit={install}>
+  return <div className="steam-setup-layout games-ui"><Card><form onSubmit={install}>
     <fieldset className="steam-fields" disabled={busy}>
       <GameNameField value={name} onChange={setName}/>
       <div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={options.minimum_memory} maximum={Math.max(options.minimum_memory,memoryMaximum)} describedBy={memoryWarning ? "steam-memory-warning" : undefined}/></div>
@@ -76,20 +83,23 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
       {selectedNode?.unavailable_reason && <p className="game-stop-note" role="status">{selectedNode.unavailable_reason}</p>}
       {memoryValue !== null && memoryValue > memoryMaximum && <p className="game-stop-note" role="status">This node has {memoryMaximum / 1024} GiB available for allocation. Lower the limit or choose another node.</p>}
       {memoryWarning && <p id="steam-memory-warning" className="game-stop-note" role="status">{memoryWarning}</p>}
+      <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/>
       {passwordRules.enabled && <Field label="Server password" hint={passwordRules.required ? `Required, ${passwordRules.min_length} to ${passwordRules.max_length} characters.` : 'Optional. Players use this when joining.'}><Input type="password" autoComplete="new-password" required={passwordRules.required} minLength={passwordRules.min_length} maxLength={passwordRules.max_length} value={password} onChange={event => setPassword(event.target.value)}/></Field>}
       <details className="steam-advanced"><summary>Advanced settings</summary><div className="steam-form-grid">
         <Field label="Maximum players" hint={options.minimum_players === options.maximum_players ? "This game uses a fixed player limit." : undefined}><Input type="number" disabled={options.minimum_players === options.maximum_players} required min={options.minimum_players} max={options.maximum_players} step={1} value={players} onChange={event => setPlayers(event.target.value)}/></Field>
         {options.presets.length > 0 && <Field label="Preset"><Select value={preset} onChange={event => setPreset(event.target.value)}>{options.presets.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field>}
         <SteamAdvancedControls fields={advancedFields} values={advanced} onChange={(key, value) => setAdvanced(previous => ({...previous, [key]: value}))}/>
+        {options.supports_install_only === true && <label className="game-boolean"><GameSwitch checked={startAfterInstall} onCheckedChange={checked => setStartAfterInstall(checked)}/><span>Start server after installation</span></label>}
         
       </div></details>
       {!options.can_install && <p className="muted">You do not have permission to create this server.</p>}
       {!options.nodes.length && <p className="muted">No connected compatible Steam node is available. Ask an administrator to connect or upgrade a Linux amd64 node.</p>}
-      <ErrorBox>{error}</ErrorBox><div className="steam-submit"><Button type="submit" disabled={!valid || !options.can_install || busy} aria-busy={busy}>{busy ? 'Creating server...' : 'Create server'}</Button><span className="muted">Steam installs the game, then starts the server.</span></div>
+      <ErrorBox>{error}</ErrorBox><div className="steam-submit"><Button type="submit" disabled={!valid || !ports.data || ports.loading || !!ports.error || !options.can_install || busy} aria-busy={busy}>{busy ? 'Creating server...' : 'Create server'}</Button><span className="muted">{options.supports_install_only === true && !startAfterInstall ? 'Steam installs the game and leaves the server stopped.' : 'Steam installs the game, then starts the server.'}</span></div>
     </fieldset>
   </form></Card><aside className="steam-next"><h2>After setup</h2><p>{options.after_setup}</p><GameHelpLinks help={options.help ?? []}/></aside></div>;
 }
 
 export function SteamAdvancedControls({fields, values, onChange}: {fields: SteamAdvancedField[]; values: Record<string, string | boolean>; onChange: (key: string, value: string | boolean) => void}) {
-  return <>{fields.map(field => field.type === 'boolean' ? <label className="game-boolean" key={field.key}><input type="checkbox" checked={values[field.key] === true} onChange={event => onChange(field.key, event.target.checked)}/><span>{field.label}</span></label> : <Field key={field.key} label={field.label} hint={field.description}><Input type={field.secret ? 'password' : field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={String(values[field.key] ?? '')} min={field.min} max={field.max} step={field.type === 'integer' ? 1 : 'any'} required={field.type === 'integer' || field.type === 'number'} onChange={event => onChange(field.key, event.target.value)}/></Field>)}</>;
+  return <>{fields.map(field => field.type === 'boolean' ? <label className="game-boolean" key={field.key}><GameSwitch checked={values[field.key] === true} onCheckedChange={checked => onChange(field.key, checked)}/><span>{field.label}</span></label> : <Field key={field.key} label={field.label} hint={field.description}>{field.type === 'select' ? <Select value={String(values[field.key] ?? field.default)} onChange={event => onChange(field.key, event.target.value)}>{field.options?.map(option => <option key={option} value={option}>{option}</option>)}</Select> : <Input type={field.secret ? 'password' : field.type === 'number' || field.type === 'integer' ? 'number' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={String(values[field.key] ?? '')} min={field.min} max={field.max} step={field.type === 'integer' ? 1 : 'any'} maxLength={field.max_length} required={field.required || field.type === 'integer' || field.type === 'number'} onChange={event => onChange(field.key, event.target.value)}/>}</Field>)}</>;
 }
+

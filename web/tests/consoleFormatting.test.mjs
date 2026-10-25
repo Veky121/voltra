@@ -41,3 +41,9 @@ test('keeps color for rendering and removes control sequences from copied logs',
   assert.equal(stripConsoleControls(output),'[Voltra] Starting');
   assert.equal(consoleOutput('\x1b[32mVOLTRA_READY\x1b[0m','console output',true),'');
 });
+
+
+test('container launch commands have a separate color', () => {
+  assert.equal(detectConsoleLevel('container@voltra~ java -version'), 'command');
+  assert.equal(detectConsoleLevel('Chat: container@voltra~ java -version'), 'normal');
+});

@@ -14,7 +14,7 @@ func TestTModLoaderReviewedProfile(t *testing.T) {
 			break
 		}
 	}
-	if entry.Profile != "tmodloader-2026.08.3.0-v1" {
+	if entry.Profile != "tmodloader-2026.08.3.0-v1-exact-release-v1" {
 		t.Fatal("reviewed tModLoader missing")
 	}
 	_, variables, err := parseEggDocument(entry.Egg)
@@ -29,11 +29,17 @@ func TestTModLoaderReviewedProfile(t *testing.T) {
 			t.Fatalf("%s default: %v", key, err)
 		}
 	}
-	for _, sample := range []struct{ key, value string }{{"VERSION", "latest"}, {"VERSION", "v2026.09.0.0"}, {"WORLD_NAME", "../world"}, {"WORLD_NAME", "world;echo bad"}, {"SERVER_PASSWORD", "pass\nport=1"}, {"MOTD", "line\rnext"}, {"MAX_PLAYERS", "0"}, {"MAX_PLAYERS", "256"}, {"LANGUAGE", "1;echo bad"}} {
+	for _, sample := range []struct{ key, value string }{{"VERSION", "vlatest"}, {"VERSION", "v2026.09.0.0\n"}, {"WORLD_NAME", "../world"}, {"WORLD_NAME", "world;echo bad"}, {"SERVER_PASSWORD", "pass\nport=1"}, {"MOTD", "line\rnext"}, {"MAX_PLAYERS", "0"}, {"MAX_PLAYERS", "256"}, {"LANGUAGE", "1;echo bad"}} {
 		if validateEggValue(sample.value, true, rules[sample.key], M{}) == nil {
 			t.Fatalf("accepted invalid %s", sample.key)
 		}
 	}
+	for _, version := range []string{"latest", "v2026.09.0.0", "2026.08.3.0", "v2023.06.25.36", "v0.11.8.9"} {
+		if validateEggValue(version, true, rules["VERSION"], M{}) != nil {
+			t.Fatal("exact release syntax rejected", version)
+		}
+	}
+	assertTerrariaReleaseInstaller(t, entry, "tmodloader", "VERSION", "v2026.08.3.0", "61e865f3702b12ce4a26c5a90b9de99a12c65ffc228455eb3390ce54af1eab15")
 	if str(asMap(entry.Egg["docker_images"])[".NET 8"]) != "ghcr.io/ptero-eggs/yolks:dotnet_8" {
 		t.Fatal("stable tModLoader requires .NET 8")
 	}
@@ -43,7 +49,11 @@ func TestTModLoaderReviewedProfile(t *testing.T) {
 		}
 	}
 	startup := str(entry.Egg["startup"])
-	if strings.Contains(startup, "{{SERVER_PASSWORD}}") || strings.Contains(startup, "{{MOTD}}") || !strings.Contains(startup, "-modpath /home/container/mods") || !strings.Contains(startup, "-tmlsavedirectory /home/container/saves") {
+	if startup != "exec python3 .voltra/tmodloader_runtime.py" {
+		t.Fatal("startup must select the verified publisher runtime family")
+	}
+	installer := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
+	if strings.Contains(startup, "{{SERVER_PASSWORD}}") || strings.Contains(startup, "{{MOTD}}") || !strings.Contains(installer, "'-modpath', '/home/container/mods'") || !strings.Contains(installer, "'-tmlsavedirectory', '/home/container/saves'") {
 		t.Fatal("startup must use literal configuration and persistent mod/save paths")
 	}
 	var files M

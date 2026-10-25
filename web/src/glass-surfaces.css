@@ -1,0 +1,27 @@
+/* User-selected surfaces shared by client, admin, and lazy-loaded pages.
+   Keep blur on outer panels, not rows or nested card content. */
+:root[data-voltra-theme]{--ui-surface:var(--theme-card-surface,#181c25);--surface:var(--ui-surface);--card:var(--ui-surface);--ui-input:#1b1e26;--ui-border:#dce4ff1a;--ui-divider:#dce4ff0a}
+[data-voltra-theme] .voltra-shadcn-content{background:radial-gradient(ellipse at 5% 0,color-mix(in srgb,var(--theme-accent-a) 9%,transparent),transparent 55%),radial-gradient(ellipse at 95% 30%,color-mix(in srgb,var(--theme-accent-b) 7%,transparent),transparent 60%),var(--scn-background)}
+:root[data-voltra-theme] :is(.card,[data-slot=card],.metric-card,.settings-group,.server-topbar,.console-terminal,.fm-browser,.file-explorer,.file-transfers,.appearance-preview-metric,.files-ui-state,.files-path,.files-table-wrap,.file-selection-bar,.library-card,.game-family-option,.mc-choice,.mc-pack-card,.mc-catalog-filters,.operations-record,.operations-filters,.operations-table,.overview-skeleton){
+ background:var(--theme-card-sheen),var(--ui-surface);
+ border-color:var(--ui-border);
+ border-top-color:#e1e6ff2b;
+ box-shadow:inset 0 1px 0 #ffffff04,0 5px 18px #04081016;
+ -webkit-backdrop-filter:blur(var(--theme-card-blur,0px)) saturate(120%);
+ backdrop-filter:blur(var(--theme-card-blur,0px)) saturate(120%);
+}
+/* Nested panels retain their structure without stacking several blur layers. */
+:root[data-voltra-theme] :is(.card,[data-slot=card],.settings-group,.console-terminal,.fm-browser) :is(.card,[data-slot=card],.settings-group,.file-explorer){-webkit-backdrop-filter:none;backdrop-filter:none}
+:root[data-voltra-theme] .console-view .console-terminal{background:var(--theme-console-surface,#0f1218)}
+:root[data-voltra-theme] .console-view :is(.console-terminal-body,.console-output){background:transparent}
+:root[data-voltra-theme] .console-view .console-command-bar{background:#ffffff03}
+/* Menus, dialogs, and editing buffers need an opaque reading surface. */
+:root[data-voltra-theme] :is(.modal,.mc-dialog,.fm-document-pane,.file-options-menu,.editor-language-menu,.console-tools-menu,.console-history-list){--ui-surface:#181c25;background:#181c25}
+[data-voltra-theme] .fm-browser>.wx-willow-dark-theme{--wx-background:transparent;--wx-fm-background:transparent}
+.appearance-opacity{display:flex;align-items:center;gap:12px;width:100%;max-width:280px}
+.appearance-opacity input[type=range]{width:100%;min-width:0;min-height:32px;accent-color:var(--accent);cursor:pointer}
+.appearance-opacity input[type=range]:disabled{cursor:default;opacity:.45}
+.appearance-opacity output{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text);font-size:calc(12px * var(--ui-font-scale,1))}
+/* Remain readable on engines or accessibility modes without transparency. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root[data-voltra-theme],.appearance-live-preview{--theme-card-surface:#181c25!important;--theme-console-surface:#0f1218!important}}
+@media(prefers-reduced-transparency:reduce){:root[data-voltra-theme],.appearance-live-preview{--theme-card-surface:#181c25!important;--theme-console-surface:#0f1218!important;--theme-card-blur:0px!important}}

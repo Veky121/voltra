@@ -28,7 +28,7 @@ export type VariableIntent = 'save' | 'clear' | 'reset';
 export function secretVariable(variable: StartupVariable): boolean {
   // Metadata owns classification. Keep older password/token fields masked too.
   if (typeof variable.secret === 'boolean') return variable.secret;
-  return /password|passwd|passphrase|token|secret|api[_ -]?key|private[_ -]?key|credential/i.test(`${variable.env_variable} ${variable.name || ''}`);
+  return /password|passwd|passphrase|token|secret|api[_ -]?key|private[_ -]?key|credential|GAME_SERIAL|DLC_PRODUCT_KEY/i.test(`${variable.env_variable} ${variable.name || ''}`);
 }
 
 export function variableValue(variable: StartupVariable): string {
@@ -88,7 +88,7 @@ export function variableControl(variable: StartupVariable) {
   return {
     type: secret ? 'password' : numeric ? 'number' : has('email') ? 'email' : 'text',
     options,
-    boolean: has('boolean') && choices === undefined,
+    boolean: !secret && (has('boolean') || !!options && options.length === 2 && (options.includes('0') && options.includes('1') || options.includes('true') && options.includes('false'))),
     required: has('required'),
     integer,
     numeric,
@@ -156,3 +156,4 @@ export function commandPreview(meta: StartupMeta, variables: StartupVariable[]):
   for (const value of values) command = command.split(value).join('[hidden]');
   return command || 'No command preview is available.';
 }
+

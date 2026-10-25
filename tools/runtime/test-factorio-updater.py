@@ -12,12 +12,16 @@ import sys
 import tempfile
 import unittest
 
-UPDATER = globals().get('UPDATER', Path(sys.argv.pop(1)).read_text() if len(sys.argv) > 1 else '')
+if 'UPDATER' not in globals():
+    if len(sys.argv) < 2:
+        raise SystemExit('Usage: python test-factorio-updater.py path/to/factorio-update-mods.sh')
+    UPDATER = Path(sys.argv.pop(1)).read_text()
 
 FAKE_CURL = '''#!/usr/bin/env python3
 import json,os,sys
 from pathlib import Path
 args=sys.argv[1:];root=Path(os.environ['FIXTURE_ROOT'])
+with open(root/'http-calls.txt','a') as log:log.write(('download' if '--config' in args else args[-1])+'\\n')
 if '--config' in args:
  config=sys.stdin.read()
  assert 'privateFixtureToken' not in ' '.join(args)
@@ -67,7 +71,52 @@ class UpdaterTests(unittest.TestCase):
         return {p.name:p.read_bytes() for p in self.mods.iterdir() if p.is_file()}
 
     def run_update(self):
-        return subprocess.run(['bash',str(self.script),'2.0.77',str(self.mods)],env=self.env,capture_output=True,text=True,timeout=20)
+        return subprocess.run(['bash',str(self.script),getattr(self,'game_version','2.0.77'),str(self.mods)],env=self.env,capture_output=True,text=True,timeout=20)
+
+    def recycler_builtin(self, version='2.1.23'):
+        self.game_version=version
+        target=self.root/'data/recycler/info.json'
+        target.parent.mkdir(parents=True)
+        target.write_text(json.dumps({'name':'recycler','version':version,'factorio_version':'.'.join(version.split('.')[:2])}))
+
+    def test_recycler_enabled_builtin_no_credentials_or_http(self):
+        self.recycler_builtin()
+        self.list(['base','recycler'])
+        self.env['SERVER_USERNAME']='';self.env['SERVER_TOKEN']=''
+        before=self.snapshot();result=self.run_update()
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(before,self.snapshot())
+        self.assertFalse((self.root/'http-calls.txt').exists())
+
+    def test_recycler_required_builtin_dependency(self):
+        self.recycler_builtin()
+        self.release('sample',branch='2.1',deps=['base >= 2.1.0','recycler >= 2.1.0'])
+        result=self.run_update()
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn({'name':'recycler','enabled':True},json.loads((self.mods/'mod-list.json').read_text())['mods'])
+        self.assertNotIn('/api/mods/recycler', (self.root/'http-calls.txt').read_text())
+
+    def test_recycler_missing_2_0_or_mismatched_builtin_denied(self):
+        for version, metadata in [('2.0.77',None),('2.0.77','2.0.77'),('2.1.23',None),('2.1.23','2.1.22')]:
+            with self.subTest(version=version,metadata=metadata):
+                self.game_version=version
+                self.list(['base','recycler'])
+                info=self.root/'data/recycler/info.json'
+                if info.exists():info.unlink()
+                if metadata:
+                    info.parent.mkdir(parents=True,exist_ok=True)
+                    info.write_text(json.dumps({'name':'recycler','version':metadata,'factorio_version':'.'.join(metadata.split('.')[:2])}))
+                before=self.snapshot();result=self.run_update()
+                self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(before,self.snapshot())
+                self.assertFalse((self.root/'http-calls.txt').exists())
+
+    def test_recycler_requirement_and_branch_mismatch_preserve_mods(self):
+        self.recycler_builtin()
+        for branch, dependency in [('2.1','recycler >= 2.2.0'),('2.0','recycler >= 2.1.0')]:
+            with self.subTest(branch=branch,dependency=dependency):
+                self.release('sample',branch=branch,deps=[dependency])
+                self.assert_preserved_failure()
 
     def assert_preserved_failure(self):
         before=self.snapshot()

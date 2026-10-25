@@ -17,15 +17,17 @@ import (
 
 	"github.com/gorilla/websocket"
 	"voltra/internal/nodetunnel"
+	"voltra/internal/steamapi"
 	"voltra/internal/steamexec"
 )
 
 // Config contains credentials loaded from the private connector configuration.
 // WingsAddress is fixed locally and is never accepted from a control message.
 type Config struct {
-	PanelURL     string `json:"panel_url"`
-	Token        string `json:"token"`
-	WingsAddress string `json:"wings_address"`
+	PanelURL     string                       `json:"panel_url"`
+	Token        string                       `json:"token"`
+	WingsAddress string                       `json:"wings_address"`
+	PrivateSteam *PrivateSteamConnectorConfig `json:"-"`
 }
 
 const maxStreams = 64
@@ -168,11 +170,14 @@ func sessionWithSteam(ctx context.Context, base *url.URL, c Config, steam steamR
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer ws.Close()
+	private := NewPrivateSteamConnector(ctx, c.PrivateSteam)
+	defer private.Close()
 	_ = ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	if err := ws.WriteJSON(struct {
 		Type         string   `json:"type"`
 		Capabilities []string `json:"capabilities"`
-	}{Type: "hello", Capabilities: steamCapabilities()}); err != nil {
+		PanelOrigin  string   `json:"panel_origin"`
+	}{Type: "hello", Capabilities: append(append(steamCapabilities(), NetworkCapability), private.Capabilities()...), PanelOrigin: strings.TrimRight(c.PanelURL, "/")}); err != nil {
 		return errors.New("connector capability advertisement failed")
 	}
 	_ = ws.SetWriteDeadline(time.Time{})
@@ -184,17 +189,18 @@ func sessionWithSteam(ctx context.Context, base *url.URL, c Config, steam steamR
 	var workers sync.WaitGroup
 	var mu sync.Mutex
 	active := make(map[string]bool)
-	defer func() { cancel(); _ = ws.Close(); workers.Wait(); <-heartbeatDone }()
+	defer func() { cancel(); _ = ws.Close(); private.Close(); workers.Wait(); <-heartbeatDone }()
 	for {
 		var msg struct {
-			Type    string `json:"type"`
-			ID      string `json:"id"`
-			Service string `json:"service"`
+			Type         string                       `json:"type"`
+			ID           string                       `json:"id"`
+			Service      string                       `json:"service"`
+			PrivateGrant *steamapi.PrivateStreamGrant `json:"private_grant,omitempty"`
 		}
 		if err := ws.ReadJSON(&msg); err != nil {
 			return errors.New("connector control connection closed")
 		}
-		if msg.Type != "open" || !streamID.MatchString(msg.ID) || (msg.Service != "" && msg.Service != "steam") {
+		if msg.Type != "open" || !streamID.MatchString(msg.ID) || (msg.Service != "" && msg.Service != "steam" && msg.Service != "network" && msg.Service != steamapi.PrivateStreamService) || msg.Service == steamapi.PrivateStreamService && (msg.PrivateGrant == nil || msg.PrivateGrant.Validate() != nil) || msg.Service != steamapi.PrivateStreamService && msg.PrivateGrant != nil {
 			return errors.New("invalid connector control message")
 		}
 		mu.Lock()
@@ -205,15 +211,19 @@ func sessionWithSteam(ctx context.Context, base *url.URL, c Config, steam steamR
 		active[msg.ID] = true
 		mu.Unlock()
 		workers.Add(1)
-		go func(id, service string) {
+		go func(id, service string, grant *steamapi.PrivateStreamGrant) {
 			defer workers.Done()
 			defer func() { mu.Lock(); delete(active, id); mu.Unlock() }()
-			if service == "steam" {
+			if service == steamapi.PrivateStreamService {
+				_ = private.bridge(ctx, base, c, id, *grant)
+			} else if service == "network" {
+				_ = bridgeNetwork(ctx, base, c, id)
+			} else if service == "steam" {
 				_ = bridgeSteam(ctx, base, c, id, steam)
 			} else {
 				_ = bridge(ctx, base, c, id)
 			}
-		}(msg.ID, msg.Service)
+		}(msg.ID, msg.Service, msg.PrivateGrant)
 	}
 }
 

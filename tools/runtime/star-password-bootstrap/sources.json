@@ -1,0 +1,166 @@
+{
+  "phase": "source_only",
+  "native_generation_verified": false,
+  "production_adapter_changed": false,
+  "sources": [
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "docs/guides/creating-a-lua-mod.md",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/docs/guides/creating-a-lua-mod.md",
+      "bytes": 7252,
+      "sha256": "d537d8ca866a805c0b0050691b1abcd13e8bec53986cb18376d001db5bb482c6",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__docs__guides__creating-a-lua-mod.md"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "docs/lua-api/classes/uobject.md",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/docs/lua-api/classes/uobject.md",
+      "bytes": 5997,
+      "sha256": "c89846955050f2acfdc71ba83e5a00069f489f4d2cca106d86e4df97b48a9f9c",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__docs__lua-api__classes__uobject.md"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "docs/lua-api/global-functions/executeingamethread.md",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/docs/lua-api/global-functions/executeingamethread.md",
+      "bytes": 417,
+      "sha256": "854e241821f909f9c38925b0bf5cc4b2e95658e65356b98d854c0b71346cf99a",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__docs__lua-api__global-functions__executeingamethread.md"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "docs/lua-api/global-functions/executewithdelay.md",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/docs/lua-api/global-functions/executewithdelay.md",
+      "bytes": 499,
+      "sha256": "f9a08dd4419d7345e2c17943ce3813b6b1fe1f58254354f70a5de28cbab6c070",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__docs__lua-api__global-functions__executewithdelay.md"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "docs/lua-api/global-functions/findallof.md",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/docs/lua-api/global-functions/findallof.md",
+      "bytes": 928,
+      "sha256": "f2030872255ae1008ec59250a08a96d8ee8dd274e6ddea88a5c0b0f385604743",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__docs__lua-api__global-functions__findallof.md"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/LICENSE",
+      "bytes": 1064,
+      "sha256": "ddc030e25d0ea87aca4ae84c0ed3f868d69273c00c0c12ea1e26f1c6130f5d2e",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__LICENSE"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "UE4SS/include/LuaType/LuaUObject.hpp",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/UE4SS/include/LuaType/LuaUObject.hpp",
+      "bytes": 34529,
+      "sha256": "2b83b1c26f65b1150eb6c10019281b0760ab79dc5a3e1b32ac122a477dcd2a46",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__UE4SS__include__LuaType__LuaUObject.hpp"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "UE4SS/src/LuaType/LuaUFunction.cpp",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/UE4SS/src/LuaType/LuaUFunction.cpp",
+      "bytes": 4008,
+      "sha256": "0b7ee21aaa7b7e3dcc50cea534aed9bc513b46c9f27e1eb4e9512a952985cb26",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__UE4SS__src__LuaType__LuaUFunction.cpp"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "UE4SS/src/LuaType/LuaUObject.cpp",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/UE4SS/src/LuaType/LuaUObject.cpp",
+      "bytes": 59317,
+      "sha256": "c2f4cb1bc68e529e67b24d999b847ffcc8c7bbb59b750585cbed8ef4256dfade",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__UE4SS__src__LuaType__LuaUObject.cpp"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "d935b5b23bac03b65c14ae38382b02007204cc2e",
+      "path": "UE4SS/src/Mod/LuaMod.cpp",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/d935b5b23bac03b65c14ae38382b02007204cc2e/UE4SS/src/Mod/LuaMod.cpp",
+      "bytes": 208936,
+      "sha256": "dc2571e32ee1617d430b15c5a2b22631d428b837e1a6f6513bdd162514d91136",
+      "archive": ".local/star-bootstrap-research/ue4ss/stable__UE4SS__src__Mod__LuaMod.cpp"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "commit": "97adba01e9fcb3c208376581e54edb9ef466f233",
+      "path": "LICENSE",
+      "url": "https://raw.githubusercontent.com/UE4SS-RE/RE-UE4SS/97adba01e9fcb3c208376581e54edb9ef466f233/LICENSE",
+      "bytes": 1064,
+      "sha256": "ddc030e25d0ea87aca4ae84c0ed3f868d69273c00c0c12ea1e26f1c6130f5d2e",
+      "archive": ".local/star-bootstrap-research/ue4ss/LICENSE"
+    }
+  ],
+  "lua_test_source": {
+    "url": "https://www.lua.org/ftp/lua-5.4.8.tar.gz",
+    "sha256": "4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae",
+    "bytes": 374332,
+    "license": "MIT"
+  },
+  "binding": {
+    "repo": "AlienXAXS/StarRupture-Plugin-ServerUtility",
+    "commit": "89cb8aa60304fe57edd385501b4ab568488ff25c",
+    "path": "src/hooks/set_password/set_password.h",
+    "license": "MIT",
+    "class_cpp": "UCrDedicatedServerSettingsComp",
+    "class_unreal_short_name": "CrDedicatedServerSettingsComp",
+    "methods": [
+      "SetPassword",
+      "SetPlayerPassword"
+    ],
+    "actual_reflected_existence_native_verified": false
+  },
+  "full_loader_source_build": {
+    "verified": false,
+    "unresolved": "Pinned UEPseudo submodule public repository and license returned404; no inaccessible SDK acquired"
+  },
+  "binary": {
+    "acquired_by_this_task": false,
+    "cached_official_archive_inspected": true,
+    "release": "v3.0.1",
+    "asset": "UE4SS_v3.0.1.zip",
+    "bytes": 5523402,
+    "sha256": "4b47d4bceddd2f561a4e395bfa00924ccfc945af576a2d0c613e6537846c57ec",
+    "binary_executed": false,
+    "native_compatibility_verified": false,
+    "inspection": "artifacts/star-password-bootstrap-loader-inspection.json"
+  },
+  "original_policy": {
+    "fields": [
+      "ADMIN_PASSWORD",
+      "PLAYER_PASSWORD"
+    ],
+    "rules": "string|nullable",
+    "defaults": [
+      "",
+      ""
+    ],
+    "original_permissions_preserved": true,
+    "bounded_utf8_bytes_per_value": 4194304,
+    "all_original_controls_preserved_except_embedded_nul_unsupported": true,
+    "nul_reason": "Pinned UE4SS FString c_str conversion truncates embedded NUL; reject explicitly"
+  },
+  "api_contract": {
+    "UObject_CallFunction": "UE4SS/include/LuaType/LuaUObject.hpp:515 and UE4SS/src/LuaType/LuaUObject.cpp:68-111",
+    "UFunction_type": "UE4SS/src/LuaType/LuaUFunction.cpp:96",
+    "IsValid": "UE4SS/include/LuaType/LuaUObject.hpp:178,610",
+    "FindAllOf": "UE4SS/src/Mod/LuaMod.cpp:978; docs/lua-api/global-functions/findallof.md",
+    "game_thread": "docs/lua-api/global-functions/executeingamethread.md",
+    "async_timer": "docs/lua-api/global-functions/executewithdelay.md",
+    "fstring_marshaling": "UE4SS/src/LuaType/LuaUObject.cpp:1091-1127"
+  },
+  "forbidden_actions_performed": [],
+  "native_gate_retained": true
+}

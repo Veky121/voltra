@@ -258,7 +258,6 @@ func TestLifecyclePostgresWingsContract(t *testing.T) {
 	defer func() {
 		c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = a.exec(c, "DELETE FROM notification_jobs WHERE user_id=$1 OR user_id=$2", user["id"], otherOwnerID)
 		_ = a.exec(c, "DELETE FROM servers WHERE node_id=$1 OR node_id=$2", node["id"], other["id"])
 		_ = a.exec(c, "DELETE FROM allocations WHERE node_id=$1 OR node_id=$2", node["id"], other["id"])
 		_ = a.exec(c, "DELETE FROM nodes WHERE id=$1 OR id=$2", node["id"], other["id"])
@@ -418,10 +417,6 @@ func TestLifecyclePostgresWingsContract(t *testing.T) {
 	if e != nil || str(afterRetry["installed_at"]) != str(installedAt) {
 		t.Fatal("duplicate installation callback changed cycle timestamp")
 	}
-	jobs, e := a.query(ctx, "SELECT event,payload FROM notification_jobs WHERE server_id=$1", s["id"])
-	if e != nil || len(jobs) != 1 || str(jobs[0]["event"]) != "server.installed" || str(asMap(jobs[0]["payload"])["recipient"]) != str(user["email"]) {
-		t.Fatalf("initial install notification not deduplicated for owner: %v %v", jobs, e)
-	}
 	concurrentCallbacks := make(chan int, 4)
 	for i := 0; i < 4; i++ {
 		go func() {
@@ -432,10 +427,6 @@ func TestLifecyclePostgresWingsContract(t *testing.T) {
 		if code := <-concurrentCallbacks; code != 204 {
 			t.Fatalf("concurrent install callback status %d", code)
 		}
-	}
-	jobs, e = a.query(ctx, "SELECT event FROM notification_jobs WHERE server_id=$1", s["id"])
-	if e != nil || len(jobs) != 1 {
-		t.Fatalf("concurrent callbacks duplicated install notifications: %v %v", jobs, e)
 	}
 	response = request("POST", "/api/remote/sftp/auth", "lifecycle.secret", `{"type":"password","username":"anything","password":"anything"}`)
 	if response.Code != 403 {
@@ -639,8 +630,5 @@ func TestLifecyclePostgresWingsContract(t *testing.T) {
 	if e != nil || str(reinstalled["status"]) != "suspended" || str(reinstalled["installed_at"]) == str(installedAt) || !strings.HasPrefix(str(reinstalled["installation_id"]), "complete:reinstall:") {
 		t.Fatalf("suspended reinstall cycle incorrect %v %v", reinstalled, e)
 	}
-	jobs, e = a.query(ctx, "SELECT event FROM notification_jobs WHERE server_id=$1 ORDER BY id", s["id"])
-	if e != nil || len(jobs) != 2 || str(jobs[1]["event"]) != "server.reinstalled" {
-		t.Fatalf("reinstall notification missing or duplicated %v %v", jobs, e)
-	}
+
 }

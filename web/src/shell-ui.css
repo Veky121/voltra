@@ -1,0 +1,55 @@
+/* Final shared shell layer. Page-specific styles remain with their owners. */
+h1{font-size:calc(25px * var(--ui-font-scale,1));line-height:1.3;letter-spacing:-.025em;font-weight:600}
+.page-header{margin-bottom:24px}
+.admin-summary-grid .card>a{display:block;color:var(--text);text-decoration:none}
+.admin-summary-grid .card>a:hover .muted{color:var(--accent)}
+.admin-summary-value{display:block;margin-top:12px;font-size:calc(30px * var(--ui-font-scale,1));line-height:1.15;letter-spacing:-.03em;font-weight:550;font-variant-numeric:tabular-nums}
+.page-header>div>p,.page-header>p{font-size:calc(13px * var(--ui-font-scale,1));line-height:1.6}
+.card>h2:last-child,.card>h3:last-child{margin-bottom:0}
+.card .card{background:var(--surface-muted);border-color:var(--ui-divider)}
+.button:focus-visible,a.button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.button:active:not(:disabled){transform:translateY(1px)}
+.button:disabled{opacity:.5;box-shadow:none;filter:none}
+.error{border-radius:10px;padding:12px 14px;border-color:#ff797e26;background:#ff797e09;color:#ffb3ba;font-size:calc(13px * var(--ui-font-scale,1));line-height:1.6;overflow-wrap:anywhere}
+.modal>header button.button{width:28px;height:28px;min-height:28px;padding:0;border-color:transparent;background:transparent;color:var(--muted);font-size:calc(20px * var(--ui-font-scale,1));box-shadow:none}
+.modal>header button.button:hover{background:var(--ui-hover);color:var(--text);filter:none}
+.loading,.empty{font-size:calc(13px * var(--ui-font-scale,1));color:var(--muted)}
+.loading .spinner{width:17px;height:17px;border-width:2px}
+.skip-link{border-radius:8px;font-size:calc(13px * var(--ui-font-scale,1))}
+.sidebar-nav-error{border:1px solid #edc48224;border-radius:8px;background:#edc48208}
+[data-voltra-theme] .app-sidebar .sidebar-account-menu{background:#1c2027;border-color:var(--line-strong);box-shadow:0 12px 40px #0005}
+.sidebar-account-menu .account-menu-heading{font-size:calc(10px * var(--ui-font-scale,1));color:var(--muted)}
+.sidebar-account-menu a,.sidebar-account-menu button{min-height:36px;font-size:calc(13px * var(--ui-font-scale,1));border-radius:7px}
+.setup-screen{background:radial-gradient(ellipse at 16% 8%,color-mix(in srgb,var(--accent) 6%,transparent),transparent 55%),var(--canvas)}
+.setup-screen>.setup-card{border-radius:16px;border:1px solid var(--ui-border);padding:26px;background:var(--ui-surface);box-shadow:0 12px 60px #0002}
+.setup-card .setup-brand{font-size:calc(14px * var(--ui-font-scale,1));font-weight:550;margin-bottom:24px}
+.setup-card h1{font-size:calc(23px * var(--ui-font-scale,1));margin-bottom:20px}
+.setup-card h2{font-size:calc(14px * var(--ui-font-scale,1));font-weight:500;margin-bottom:18px;color:var(--text)}
+.setup-card .field{margin-bottom:17px}
+.setup-card .setup-choices{padding:3px;background:var(--surface-muted);border-color:var(--ui-border);border-radius:9px}
+.setup-card .setup-choices>button{border-radius:6px;font-size:calc(12px * var(--ui-font-scale,1))}
+.setup-card .setup-choices>button[aria-pressed=true]{background:#ffffff0b;color:var(--text);box-shadow:0 1px 3px #0002}
+.setup-checks{overflow:hidden;border:1px solid var(--ui-border);border-radius:10px;background:var(--surface-muted)}
+.setup-checks>li{padding:12px 14px;border-color:var(--ui-divider)}
+.setup-checks>li:first-child{border-top:0}
+.setup-checks>li p{font-size:calc(12px * var(--ui-font-scale,1))}
+.setup-entry{background:var(--ui-surface);border-color:var(--ui-border);color:var(--muted)}
+.desktop-connect{background:radial-gradient(ellipse at 15% 10%,color-mix(in srgb,var(--accent) 5%,transparent),transparent 55%),var(--canvas);padding-top:72px}
+.desktop-connect>.card{padding:28px;border-radius:16px;border-color:var(--ui-border);background:var(--ui-surface);box-shadow:0 12px 60px #0002}
+.desktop-connect h1{font-size:calc(24px * var(--ui-font-scale,1));margin:24px 0 12px}
+.desktop-connect p{font-size:calc(13px * var(--ui-font-scale,1));line-height:1.6}
+.desktop-connect form{gap:0;margin-top:24px}
+.desktop-connect form>.button{margin-top:4px}
+.desktop-connect form>.button+.button{margin-top:9px}
+.desktop-brand{font-size:calc(14px * var(--ui-font-scale,1));font-weight:550}
+.desktop-bar{background:#15171b;border-color:var(--ui-divider);font-family:var(--font-ui);font-weight:400}
+.desktop-bar .desktop-title{font-weight:500}
+.desktop-bar button.button,.desktop-bar a.button,[data-voltra-theme] .desktop-bar .button{min-height:26px;padding:3px 8px;border-color:transparent;border-radius:6px;background:transparent;color:var(--text);box-shadow:none;font-size:calc(11px * var(--ui-font-scale,1))}
+.desktop-bar button.button:hover,.desktop-bar a.button:hover{background:var(--ui-hover);filter:none}
+.desktop-bar .desktop-updates select{min-height:26px;height:26px;padding:2px 5px;border-color:transparent;background:transparent;font-size:calc(11px * var(--ui-font-scale,1))}
+.desktop-window-controls button{border-radius:0;background:transparent;box-shadow:none}
+.desktop-app-info{max-width:840px}
+.desktop-app-info .desktop-app-actions{gap:8px;margin:0;justify-content:flex-end}
+.desktop-app-info .settings-row-control>.desktop-app-panel{font-size:calc(12px * var(--ui-font-scale,1))}
+@media(max-width:760px){h1{font-size:calc(23px * var(--ui-font-scale,1))}.setup-screen>.setup-card,.desktop-connect>.card{padding:22px}.desktop-connect{padding:64px 16px 20px}.desktop-app-info .desktop-app-actions{justify-content:flex-start}}
+@media(prefers-reduced-motion:reduce){.button{transition:none}.button:active:not(:disabled){transform:none}}

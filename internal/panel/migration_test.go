@@ -103,7 +103,11 @@ func TestMigrationPostgresRoundtrip(t *testing.T) {
 	}
 	for _, table := range migrationTables {
 		got, err := a.one(ctx, "SELECT count(*) AS count FROM \""+table+"\"")
-		if err != nil || num(got["count"]) != int64(len(s.Tables[table])) {
+		expected := len(s.Tables[table])
+		if table == "settings" {
+			expected-- // Obsolete mail credential is discarded.
+		}
+		if err != nil || num(got["count"]) != int64(expected) {
 			t.Fatalf("%s count mismatch: %v", table, err)
 		}
 	}
@@ -127,12 +131,9 @@ func TestMigrationPostgresRoundtrip(t *testing.T) {
 			t.Fatalf("%s credential mismatch: %v", table, err)
 		}
 	}
-	mail, err := a.one(ctx, "SELECT value FROM settings WHERE key='mail:password'")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(str(mail["value"]), "enc:v1:") {
-		t.Fatal("mail credential not sealed")
+	var mailSettings int
+	if err := a.DB.QueryRow(ctx, "SELECT count(*) FROM settings WHERE key LIKE 'mail:%'").Scan(&mailSettings); err != nil || mailSettings != 0 {
+		t.Fatalf("legacy mail settings were imported: %d %v", mailSettings, err)
 	}
 	effective, err := a.effectiveEgg(ctx, 501)
 	if err != nil || str(effective["script_install"]) != "echo install" {
@@ -214,7 +215,6 @@ func TestMigrationPostgresRefusalRollback(t *testing.T) {
 		{"duplicate-user", func(s *LegacySnapshot) { s.Tables["users"][1]["email"] = s.Tables["users"][0]["email"] }, "constraint/type error 23505"},
 		{"in-flight-task", func(s *LegacySnapshot) { s.Tables["tasks"][0]["is_queued"] = true }, "in-flight"},
 		{"in-flight-schedule", func(s *LegacySnapshot) { s.Tables["schedules"][0]["is_processing"] = true }, "in-flight"},
-		{"in-flight-notification", func(s *LegacySnapshot) { s.Tables["notification_jobs"][0]["status"] = "sending" }, "in-flight"},
 		{"in-flight-revocation", func(s *LegacySnapshot) { s.Tables["daemon_revocations"][0]["lease_until"] = "2999-01-01T00:00:00Z" }, "in-flight"},
 		{"api-hash", func(s *LegacySnapshot) { s.Tables["api_keys"][0]["token_hash"] = "private-secret-value" }, "Unsupported API key"},
 		{"api-ip-restrictions", func(s *LegacySnapshot) { s.Tables["api_keys"][0]["allowed_ips"] = []any{"bad-address"} }, "Unsupported API IP restriction"},

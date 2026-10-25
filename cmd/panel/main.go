@@ -23,6 +23,7 @@ func main() {
 	defer stop()
 	id, _ := strconv.ParseInt(env("DEV_USER_ID", "1"), 10, 64)
 	cfg := panel.Config{ArtworkDirectory: os.Getenv("ARTWORK_DIRECTORY"), Listen: env("LISTEN", "127.0.0.1:8088"), DatabaseURL: os.Getenv("DATABASE_URL"), PublicURL: env("PUBLIC_URL", "http://127.0.0.1:8088"), DaemonURL: os.Getenv("DAEMON_URL"), WebDir: env("WEB_DIR", "web/dist"), LocalesDir: os.Getenv("LOCALES_DIR"), EncryptionKey: os.Getenv("ENCRYPTION_KEY"), Timezone: env("APP_TIMEZONE", "UTC"), DevMode: os.Getenv("DEV_MODE") == "true", DevUserID: id}
+	cfg.ConsoleHistoryLines, _ = strconv.Atoi(env("CONSOLE_HISTORY_LINES", "5000"))
 	if cfg.DatabaseURL == "" {
 		slog.Error("DATABASE_URL is required")
 		os.Exit(1)
@@ -52,7 +53,9 @@ func main() {
 		slog.Warn("Local development identity is enabled; loopback browser requests act as the selected development user.")
 	}
 	go app.RunScheduler(ctx)
-	go app.RunNotifications(ctx)
+	consoleLogsDone := make(chan struct{})
+	go func() { defer close(consoleLogsDone); app.RunConsoleLogs(ctx) }()
+	defer func() { stop(); <-consoleLogsDone }()
 	go app.RunRevocations(ctx)
 	go app.RunSteamJobs(ctx)
 	go func() {

@@ -1,0 +1,70 @@
+{
+  "app": 2058450,
+  "branch": "public",
+  "build_id": "22822160",
+  "depot": "2058451",
+  "manifest": "1842565876521966140",
+  "publisher_files": [
+    {
+      "name": "Dedicated-Server-CustomPorts.txt",
+      "bytes": 1046,
+      "sha1": "bbcc4796fcd0c180ca204facfb9471135d9f1f09",
+      "path": "SNM2020/Content/Docs/Dedicated-Server-CustomPorts.txt",
+      "sha256": "21db829d84723b930d8f95db3227db7aef4f079a8a1cb937bfa7d32e48b4c6a2"
+    },
+    {
+      "name": "Dedicated-Server-Engine.ini",
+      "bytes": 71,
+      "sha1": "f5ab15dde861c8c9f4fcd4908e91bfcefeaf5336",
+      "path": "SNM2020/Content/Docs/Dedicated-Server-Engine.ini",
+      "sha256": "369c5bc2f1a194afe5ef7d9bc36c2ba9345d0900f77b1dfe37fc1eee800aeebd"
+    },
+    {
+      "name": "Dedicated-Server-Game.ini",
+      "bytes": 316,
+      "sha1": "0cbf9b3bab555482f6aedf1f982f54a0abbf5afa",
+      "path": "SNM2020/Content/Docs/Dedicated-Server-Game.ini",
+      "sha256": "cad05f0f3a6ea421763bd2b048d06cc91668bb29c50a1c3c071ade8debf87d74"
+    },
+    {
+      "name": "Dedicated-Server-README.txt",
+      "bytes": 7830,
+      "sha1": "4ee011401069bc1e0150f472df86193be00c5281",
+      "path": "SNM2020/Content/Docs/Dedicated-Server-README.txt",
+      "sha256": "58922316cbd6852749879c23e37123aed8d2b0455b6f9eab8be828bcc08b7f81"
+    }
+  ],
+  "native_schema": {
+    "section": "/Game/Blueprints/GameModes/BP_GameInstance.BP_GameInstance_C",
+    "environment_to_native": {
+      "SNM_NAME": "DedSrv_Name",
+      "SNM_OWNER_STEAM_ID": "DedSrv_OwnerSteamID",
+      "SNM_PASSWORD": "DedSrv_Password",
+      "SNM_MAX_PLAYERS": "DedSrv_MaxPlayers",
+      "SNM_DAYS_UNTIL_RESET": "DedSrv_DaysUntilReset",
+      "SNM_RESET_TIME_OF_DAY": "DedSrv_ResetTimeOfDay"
+    },
+    "environment_precedence": "Publisher-native environment variables override Game.ini",
+    "blank_name": "Publisher selects a random name when DedSrv_Name is absent",
+    "reset_warning_array": [
+      "DedSrv_ResetWarningsInMinutes",
+      "+DedSrv_ResetWarningsInMinutes"
+    ],
+    "additional_native_environment": "SNM_RESET_WARNINGS_IN_MINUTES",
+    "ports": {
+      "cli": [
+        "-port=",
+        "-QueryPort="
+      ],
+      "engine_ini": {
+        "URL": "Port",
+        "OnlineSubsystemSteam": "GameServerQueryPort"
+      }
+    },
+    "publisher_log": "SNM2020/Saved/Logs/SnMDedSrv-<timestamp>.log"
+  },
+  "wine_runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+  "acquisition": "Actual4publishertextfiles9263bytes, anonymous entitlement andSteammanifestSHA1verified; nogameassets/executables/runtime",
+  "raw_doc_license": "No publisher redistribution license assumed; rawREADME/config remain private.local. Only functional schema facts/hashes recorded.",
+  "scope": "Actual source documentation evidence, not nativegame/runtime verification"
+}

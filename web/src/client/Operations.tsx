@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { JavaSettings } from "./JavaSettings";
 import { ProxyEndpoints } from "./ProxyEndpoints";
+import {SettingsRow,SettingsSection} from '../ui/Settings';
+import {Link} from 'react-router-dom';
 import {
   api,
   useAPI,
@@ -23,6 +25,7 @@ import {
   Notice,
   PageError,
   Pager,
+  ServerPageTitle,
   useAction,
   useServer,
   value,
@@ -56,12 +59,9 @@ export function Backups() {
       }
     );
   return (
-    <section>
+    <section className="operations-page backups-page">
       <div className="toolbar server-page-toolbar">
-        <h2>Backups</h2>
-        <p className="muted">
-          Limit: {server.feature_limits?.backups ?? "Unlimited"}
-        </p>
+        <ServerPageTitle title="Backups" limit={server.feature_limits?.backups}/>
         <Button variant="secondary" onClick={r.reload}>
           Refresh
         </Button>
@@ -74,10 +74,10 @@ export function Backups() {
       {r.loading && <p role="status">Loading backups...</p>}
       <div className="grid grid-2">
         {items(r.data).map((b) => (
-          <Card key={b.uuid}>
-            <div className="toolbar">
+          <Card key={b.uuid} className="operations-record">
+            <div className="toolbar operations-record-heading">
               <h3>{b.name}</h3>
-              <span className="badge">
+              <span className={`badge ${b.completed_at ? b.is_successful ? 'operations-status-success' : 'operations-status-error' : 'operations-status-pending'}`}>
                 {b.is_locked ? "Locked · " : ""}
                 {b.completed_at
                   ? b.is_successful
@@ -98,7 +98,7 @@ export function Backups() {
                 <code>{b.checksum}</code>
               </details>
             )}
-            <div className="actions">
+            <div className="actions operations-record-actions">
               {can(permissions, "backup.download") && b.is_successful && (
                 <Button
                   variant="secondary"
@@ -148,7 +148,7 @@ export function Backups() {
         ))}
       </div>
       {!r.loading && !items(r.data).length && (
-        <Card>No backups have been created.</Card>
+        <Card className="operations-empty">No backups have been created.</Card>
       )}
       <Pager data={r.data} page={page} setPage={setPage} />
       {open && (
@@ -201,7 +201,7 @@ export function Backups() {
           onClose={() => setRestore(null)}
         >
           <Notice action={a} />
-          <p>
+          <p className="operations-warning">
             The server will stop. Existing files may be overwritten by this
             backup.
           </p>
@@ -234,13 +234,10 @@ export function Network() {
       r.reload
     );
   return (
-    <section>
+    <section className="operations-page network-page">
       <ProxyEndpoints base={base} />
-      <div className="toolbar">
-        <h2>Network allocations</h2>
-        <p className="muted">
-          Limit: {server.feature_limits?.allocations ?? "Unlimited"}
-        </p>
+      <div className="toolbar server-page-toolbar">
+        <ServerPageTitle title="Network allocations" limit={server.feature_limits?.allocations}/>
         {can(permissions, "allocation.create") && (
           <Button disabled={a.busy} onClick={() => perform("")}>
             Assign allocation
@@ -252,12 +249,13 @@ export function Network() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
+      {r.loading && <p className="operations-loading" role="status">Loading allocations...</p>}
       <div className="grid grid-2">
         {items(r.data).map((n) => (
-          <Card key={n.id}>
+          <Card key={n.id} className="operations-record">
             <h3>
               {n.ip_alias || n.alias || n.ip}:{n.port}{" "}
-              {n.is_default && <span className="badge">Primary</span>}
+              {n.is_default && <span className="badge operations-status-accent">Primary</span>}
             </h3>
             {(n.ip_alias || n.alias) && (
               <p className="muted">
@@ -280,7 +278,7 @@ export function Network() {
                   }
                 />
               </Field>
-              <div className="actions">
+              <div className="actions operations-record-actions">
                 {can(permissions, "allocation.update") && (
                   <>
                     <Button type="submit" disabled={a.busy}>
@@ -316,6 +314,7 @@ export function Network() {
           </Card>
         ))}
       </div>
+      {!r.loading && !items(r.data).length && <Card className="operations-empty">No allocations assigned.</Card>}
     </section>
   );
 }
@@ -489,12 +488,10 @@ export function Settings() {
   const user = value(account.data) || {};
   const sftp = server.sftp_details || {};
   return (
-    <section>
-      <h2>Server settings</h2>
+    <section className="operations-page settings-page server-general-settings">
       <Notice action={a} />
-      <div className="grid grid-2">
-        <Card>
-          <h3>Server details</h3>
+      <div className="server-general-grid">
+        <SettingsSection title="Server details">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -511,70 +508,67 @@ export function Settings() {
               );
             }}
           >
-            <Field label="Name">
+            <SettingsRow label="Name" control={
               <Input
+                aria-label="Server name"
                 required
                 disabled={!can(permissions, "settings.rename")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-            </Field>
-            <Field label="Description">
+            }/>
+            <SettingsRow label="Description" control={
               <Textarea
+                aria-label="Server description"
                 disabled={!can(permissions, "settings.rename")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
-            </Field>
+            }/>
             {can(permissions, "settings.rename") && (
+              <div className="settings-actions">
               <Button type="submit" disabled={a.busy}>
-                Save details
+                Save
               </Button>
+              </div>
             )}
           </form>
-        </Card>
-        <Card>
-          <h3>SFTP connection</h3>
-          <Field label="Address">
+        </SettingsSection>
+        <SettingsSection title="SFTP">
+          <SettingsRow label="Address" control={
             <Input
+              aria-label="SFTP address"
               readOnly
               value={`sftp://${sftp.ip || server.node}:${sftp.port || 2022}`}
             />
-          </Field>
-          <Field label="Username">
+          }/>
+          <SettingsRow label="Username" control={
             <Input
+              aria-label="SFTP username"
               readOnly
-              value={`${user.username || ""}.${server.identifier || ""}`}
+              value={`${user.username || ""}.${server.__deprecated_uuid_short || server.uuid?.slice(0,8) || server.identifier || ""}`}
             />
-          </Field>
-          <p className="muted">
-            Add an SSH public key in your account to connect with an SFTP
-            client.
-          </p>
+          }/>
+          <div className="settings-actions settings-actions--split"><span className="settings-note"><Link to="/account/sftp">Password</Link> · <Link to="/account/ssh">SSH keys</Link></span>
           {can(permissions, "file.sftp") && (
             <a
               className="button secondary"
               href={`sftp://${encodeURIComponent(
-                `${user.username || ""}.${server.identifier || ""}`
+                `${user.username || ""}.${server.__deprecated_uuid_short || server.uuid?.slice(0,8) || server.identifier || ""}`
               )}@${sftp.ip || server.node}:${sftp.port || 2022}`}
             >
-              Launch SFTP client
+              Open client
             </a>
           )}
-          <h3>Server information</h3>
-          <p>Node: {server.node}</p>
-          <Field label="Server UUID">
-            <Input readOnly value={server.uuid || ""} />
-          </Field>
-        </Card>
+          </div>
+        </SettingsSection>
+        <SettingsSection title="Server information">
+          <SettingsRow label="Node" control={<span className="settings-value">{server.node}</span>}/>
+          <SettingsRow label="UUID" control={<Input aria-label="Server UUID" readOnly value={server.uuid || ""} />}/>
+        </SettingsSection>
         {can(permissions, "settings.reinstall") && (
-          <Card>
-            <h3 className="danger">Reinstall server</h3>
-            <p>
-              The server will stop and its installation script will run again.
-              Existing files may be overwritten. Create a backup before
-              continuing.
-            </p>
+          <SettingsSection title="Reinstall">
+            <SettingsRow label="Reinstall server" description="Stops the server and may overwrite files. Back up first." control={
             <Button
               variant="danger"
               disabled={a.busy}
@@ -595,7 +589,8 @@ export function Settings() {
             >
               Reinstall server
             </Button>
-          </Card>
+            }/>
+          </SettingsSection>
         )}
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SFTPPassword from '../client/SFTPPassword';
 import { Link, useParams } from "react-router-dom";
 import {
   Action,
@@ -47,10 +48,13 @@ export function User() {
       base="/admin/users"
       fields={userFields}
     >
-      {() => (
+      {() => (<>
+        <SFTPPassword key={id} userID={id}/>
         <Panel title="Owned servers">
           <ErrorMessage error={servers.error} />
           <DataTable
+            loading={servers.loading}
+            empty="This user has no owned servers."
             data={
               servers.data
                 ? rows(servers.data).filter(
@@ -68,7 +72,7 @@ export function User() {
               { label: "Status", render: (x) => x.status ?? "Ready" },
             ]}
           />
-        </Panel>
+        </Panel></>
       )}
     </ResourceEditor>
   );
@@ -77,7 +81,7 @@ export function ApplicationKeys() {
   const q = useAPI("/api/admin/api-keys");
   const [secret, setSecret] = useState("");
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading title="Application API keys" />
       <p className="muted">
         Application keys grant automation access to panel administration. Secret
@@ -85,8 +89,10 @@ export function ApplicationKeys() {
       </p>
       <ErrorMessage error={q.error} />
       {secret && (
-        <Panel title="New secret token">
-          <code style={{ overflowWrap: "anywhere" }}>{secret}</code>
+        <Panel title="New secret token" className="admin-secret-panel">
+          <p className="muted">Copy this token now. It will only be shown once.</p>
+          <code className="admin-secret">{secret}</code>
+          <div className="actions">
           <button
             className="secondary"
             onClick={() => navigator.clipboard.writeText(secret)}
@@ -96,10 +102,13 @@ export function ApplicationKeys() {
           <button className="secondary" onClick={() => setSecret("")}>
             Dismiss
           </button>
+          </div>
         </Panel>
       )}
       <Panel>
         <DataTable
+          loading={q.loading}
+          empty="No application keys yet."
           data={q.data ? rows(q.data) : []}
           columns={[
             { label: "Identifier", render: (x) => x.identifier },
@@ -154,6 +163,6 @@ export function ApplicationKeys() {
         }}
         submit="Create key"
       />
-    </>
+    </div>
   );
 }

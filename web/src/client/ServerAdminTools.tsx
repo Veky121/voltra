@@ -1,3 +1,4 @@
+import './gameSwitch.css';
 import { useEffect, useState } from "react";
 import { api, Button, Card, ErrorBox, Loading, unwrap, useAPI } from "../lib";
 import {
@@ -5,6 +6,7 @@ import {
   ServerSettingsTabs, Startup,
 } from "../admin/servers";
 import { useServer } from "./common";
+import {SettingsRow,SettingsSection,Switch} from '../ui/Settings';
 import "./serverAdminTools.css";
 
 const tabs = [
@@ -107,7 +109,7 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
   const discard = () => !configurationDirty || window.confirm("Discard unsaved installation and process changes?");
   const saved = () => { query.reload(); reload(); };
   return <section className="server-admin-tools" aria-label="Server admin tools">
-    <div className="toolbar">
+    <div className="toolbar server-page-toolbar">
       <div><h2>Server admin tools</h2><p className="muted">Manage {record?.name || "this server"}. Changes are limited to this server.</p></div>
       <Button variant="secondary" disabled={query.loading || configurationDirty} onClick={query.reload}>Refresh server details</Button>
     </div>
@@ -120,15 +122,15 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
     {query.loading && !record ? <Loading /> : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
       : record && <section role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
-        {active === "overview" && <Card><h3>Server information</h3>
-          <dl className="server-admin-summary">{[
+        {active === "overview" && <SettingsSection title="Server information">
+          <div className="server-admin-summary">{[
             ["Name", record.name], ["Internal ID", serverID], ["UUID", record.uuid],
             ["Status", record.status || "Ready"], ["Node", record.node ?? record.node_id],
             ["Owner", record.user ?? record.owner_id], ["Template", record.egg ?? record.egg_id],
             ["Installed", record.container?.installed ? "Yes" : "No"],
-          ].map(([label, value]) => <div key={String(label)}><dt>{label}</dt><dd>{String(value ?? "Unavailable")}</dd></div>)}</dl>
-          <p className="muted">Use Runtime for the next start, Installation &amp; process for server overrides, and Manage for explicit lifecycle actions.</p>
-        </Card>}
+          ].map(([label, value]) => <SettingsRow key={String(label)} label={String(label)} control={<span className="settings-value">{String(value ?? "Unavailable")}</span>}/>)}</div>
+          <div className="server-admin-note"><p className="settings-note">Use Runtime for the next start, Installation &amp; process for server overrides, and Manage for explicit lifecycle actions.</p></div>
+        </SettingsSection>}
         {active === "details" && <Details record={record} onSaved={saved} />}
         {active === "limits" && <Build record={record} onSaved={saved} />}
         {active === "runtime" && <Startup record={record} onSaved={saved} contextual />}
@@ -197,8 +199,8 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
       </div>
       <p id={`${id}-hint`} className="muted">{field.hint}</p>
       <div className="actions server-configuration-inheritance">
-        <label><input type="checkbox" checked={overridden} disabled={!editable || managed && !overridden}
-          onChange={event => change(field.key, event.target.checked ? fieldText(configuration.effective[field.key]) : undefined)} />Override for this server</label>
+        <label><Switch checked={overridden} disabled={!editable || managed && !overridden}
+          onCheckedChange={checked => change(field.key, checked ? fieldText(configuration.effective[field.key]) : undefined)} />Override for this server</label>
         {overridden && <Button variant="secondary" disabled={!editable} onClick={() => change(field.key)}>Reset {field.label.toLowerCase()} to template</Button>}
       </div>
       {field.kind === "text" ? <input id={id} value={text} disabled={!editable || managed || !overridden} aria-describedby={`${id}-hint`} onChange={event => change(field.key, event.target.value)} />
@@ -256,3 +258,4 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
     </div>
   </form>;
 }
+

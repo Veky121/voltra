@@ -450,8 +450,8 @@ func (a *App) proxyApply(ctx context.Context, tx pgx.Tx, route M) error {
 		}
 		return a.proxyCheckCollision(ctx, c, name)
 	}
-	var valid bool
-	if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM allocations al JOIN servers s ON s.id=al.server_id JOIN proxy_node_clients c ON c.node_id=al.node_id WHERE al.id=$1 AND s.id=$2 AND s.node_id=al.node_id AND al.ip=$3 AND al.port=$4 AND c.id=$5)`, num(route["allocation_id"]), num(route["server_id"]), str(route["local_ip"]), num(route["local_port"]), num(route["client_id"])).Scan(&valid); e != nil || !valid {
+	var bindIP, clientURL string
+	if e := tx.QueryRow(ctx, `SELECT al.ip,c.admin_url FROM allocations al JOIN servers s ON s.id=al.server_id JOIN proxy_node_clients c ON c.node_id=al.node_id WHERE al.id=$1 AND s.id=$2 AND s.node_id=al.node_id AND al.port=$3 AND c.id=$4 AND c.gateway_id=$5 FOR SHARE OF al,s,c`, num(route["allocation_id"]), num(route["server_id"]), num(route["local_port"]), num(route["client_id"]), num(route["gateway_id"])).Scan(&bindIP, &clientURL); e != nil || !gameFRPAllocationTargetMatches(bindIP, clientURL, str(route["local_ip"])) {
 		return fmt.Errorf("allocation target changed; remove route before retry")
 	}
 	proto := str(route["protocol"])

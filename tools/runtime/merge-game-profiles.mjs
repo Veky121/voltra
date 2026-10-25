@@ -26,6 +26,11 @@ for (const file of files) {
     const upstreamVars = new Set(entry.egg.variables.map(variable => variable.env_variable));
     const newVars = new Set(profile.egg.variables.map(variable => variable.env_variable));
     for (const name of upstreamVars) if (!newVars.has(name)) throw Error('Missing original variable ' + name + ': ' + key);
+    for (const name of upstreamVars) {
+      const originalCount = entry.egg.variables.filter(variable => variable.env_variable === name).length;
+      const stagedCount = profile.egg.variables.filter(variable => variable.env_variable === name).length;
+      if (stagedCount < originalCount) throw Error('Missing duplicate original variable ' + name + ': ' + key);
+    }
     // Verification promotion is a separate root review of native evidence.
     if (profile.verification === 'runtime_verified' && merged[key]?.verification !== 'runtime_verified') throw Error('Native evidence must be reviewed before verification promotion: ' + key);
     const previous = merged[key];

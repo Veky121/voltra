@@ -218,7 +218,7 @@ def install_zip(root, pin, target_name, key, executable=None, wrapper=False):
             raise
 
 
-def binary(path, linux=False):
+def binary(path, linux=False, machine=None):
     with path.open('rb') as stream:
         data = stream.read(4096)
     if linux:
@@ -226,7 +226,7 @@ def binary(path, linux=False):
             raise ValueError('Expected original x86-64 Linux binary')
     else:
         offset = struct.unpack_from('<I', data, 60)[0] if len(data) >= 64 else 0
-        if offset < 64 or offset + 24 > len(data) or data[:2] != b'MZ' or data[offset:offset+4] != b'PE\0\0' or struct.unpack_from('<H', data, offset+4)[0] not in (0x8664, 0x14c):
+        if offset < 64 or offset + 24 > len(data) or data[:2] != b'MZ' or data[offset:offset+4] != b'PE\0\0' or struct.unpack_from('<H', data, offset+4)[0] not in ((machine,) if machine else (0x8664, 0x14c)):
             raise ValueError('Expected Windows PE binary')
 
 
@@ -236,6 +236,7 @@ def operator_files(root, game, server=True):
         directories = ['subnautica/Subnautica_Data/StreamingAssets']
     else:
         names = ['DedicatedServer64/SpaceEngineersDedicated.exe', 'DedicatedServer64/Sandbox.Game.dll']
+        names += ['DedicatedServer64/' + name for name in ('steamclient.dll', 'steamclient64.dll', 'tier0_s.dll', 'tier0_s64.dll', 'vstdlib_s.dll', 'vstdlib_s64.dll')]
         if game == 'torch':
             names += ['Torch.Server.exe', 'Torch.dll', 'Torch.API.dll']
         directories = ['Content']
@@ -248,7 +249,8 @@ def operator_files(root, game, server=True):
         path = shared.confined(root, root / name)
         if not path.is_file():
             raise ValueError('Missing original operator binary')
-        binary(path, linux=game == 'nitrox' and name == 'nitrox/server')
+        machine = 0x8664 if name.endswith('.exe') or name.endswith('64.dll') else None
+        binary(path, linux=game == 'nitrox' and name == 'nitrox/server', machine=machine)
         hashes[name] = {'sha256': release.sha256(path), 'bytes': path.stat().st_size}
     native.private_write(shared.confined(root, root / '.voltra/engineering/operator-files.json'), json.dumps({'game': game, 'files': hashes, 'publisher_authenticity_verified': False, 'runtime_verified': False}, sort_keys=True) + '\n')
 
@@ -364,47 +366,9 @@ def install(root, game, env):
 
 
 def prepare_wine(root, game, env):
-    supplied = env.get('WINEPREFIX', str(root / '.wine'))
-    prefix = shared.confined(root, Path(supplied))
-    if not prefix.is_absolute():
-        raise ValueError('Wine prefix must be an absolute private path')
-    if env.get('WINEARCH', 'win64') != 'win64':
-        raise ValueError('Space Engineers requires win64')
-    registry = shared.confined(root, prefix / 'system.reg')
-    if registry.exists() and '#arch=win32' in registry.read_text(errors='replace')[:1024]:
-        raise ValueError('Existing win32 prefix preserved, requires win64')
-    original = env.get('VOLTRA_WINETRICKS_RUN', env.get('WINETRICKS_RUN', 'vcrun2022 corefonts dotnet48' if game == 'torch' else 'win11 vcrun2022 mono corefonts'))
-    verbs = original.split()
-    if not verbs or len(verbs) != len(set(verbs)) or any(v not in ('win11', 'vcrun2022', 'mono', 'corefonts', 'dotnet48') for v in verbs):
-        raise ValueError('Unsupported Wine prerequisite; no shell fragments accepted')
-    if env.get('ACCEPT_WINDOWS_RUNTIME_LICENSES', 'false') != 'true':
-        raise ValueError('Review and explicitly accept Microsoft/font runtime licenses before installing prerequisites')
-    environment = dict(os.environ)
-    for key in ('STEAM_USER', 'STEAM_PASS', 'STEAM_AUTH', 'STEAM_USERNAME', 'STEAM_PASSWORD', 'STEAM_GUARDCODE', 'PYTHONHOME', 'PYTHONPATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH'):
-        environment.pop(key, None)
-    environment.update(HOME=str(root), WINEPREFIX=str(prefix), WINEARCH='win64', WINEDEBUG=shared.text(env, 'WINEDEBUG', '-all', 32), WINEDLLOVERRIDES='mscoree,mshtml=')
-    winepath = Path(env.get('WINEPATH', str(root)))
-    shared.confined(root, winepath)
-    environment['WINEPATH'] = str(winepath)
-    marker = shared.confined(root, prefix / '.voltra-prerequisites.json')
-    identity = {'verbs': verbs, 'mono_sha256': PINS['mono']['sha256'], 'runtime_image': PINS['wine_runtime']}
-    if marker.exists() and json.loads(marker.read_text()) == identity:
-        environment['WINEDLLOVERRIDES'] = 'mscoree=n,b;mshtml=n,b'
-        return environment
-    prefix.mkdir(parents=True, exist_ok=True)
-    subprocess.run(['xvfb-run', '-a', 'wineboot', '-u'], env=environment, cwd=root, check=True, timeout=300)
-    for verb in verbs:
-        if verb == 'mono':
-            state = shared.confined(root, root / '.voltra/engineering/runtime-downloads'); state.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(prefix='mono-', dir=state) as folder:
-                msi = Path(folder) / 'mono.msi'
-                release.download(PINS['mono'], msi)
-                subprocess.run(['xvfb-run', '-a', 'wine', 'msiexec', '/i', str(msi), '/qn', '/norestart'], env=environment, cwd=root, check=True, timeout=600)
-        else:
-            subprocess.run(['xvfb-run', '-a', 'winetricks', '-q', verb], env=environment, cwd=root, check=True, timeout=1800)
-    native.private_write(marker, json.dumps(identity, sort_keys=True) + '\n')
-    environment['WINEDLLOVERRIDES'] = 'mscoree=n,b;mshtml=n,b'
-    return environment
+    prerequisites = helper('private-wine-prerequisites')
+    defaults = 'vcrun2022 corefonts dotnet48' if game == 'torch' else 'win11 vcrun2022 mono corefonts'
+    return prerequisites.prepare(root, env, defaults, PINS, ('win11', 'vcrun2022', 'mono', 'corefonts', 'dotnet48'))
 
 
 def run(root, game, env):
@@ -415,7 +379,9 @@ def run(root, game, env):
             raise ValueError('Private Steam acquisition unsupported; use licensed operator files')
         operator_files(root, game)
         environment = dict(os.environ)
-        environment.update(SUBNAUTICA_INSTALLATION_PATH=str(root / 'subnautica'), XDG_CONFIG_HOME=str(root / '.config'))
+        # Pinned yolk installs dotnet-install.sh with -i /usr/share (not the
+        # apphost's conventional /usr/share/dotnet directory).
+        environment.update(SUBNAUTICA_INSTALLATION_PATH=str(root / 'subnautica'), XDG_CONFIG_HOME=str(root / '.config'), DOTNET_ROOT='/usr/share')
     else:
         automatic = choice(env, 'VOLTRA_STEAM_AUTO_UPDATE', env.get('AUTO_UPDATE', '1'), ('0', '1'))
         if mode == 'operator_files' or automatic == '1':

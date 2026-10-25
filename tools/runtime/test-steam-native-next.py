@@ -9,6 +9,15 @@ import zipfile
 
 spec=importlib.util.spec_from_file_location('next_games',Path('internal/panel/game_library/scripts/steam-native-next.py'));m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class Native(unittest.TestCase):
+ def test_native_console_terminal_input_and_exit_are_preserved(self):
+  from unittest.mock import Mock
+  for game in ('colony','hurtworld','holdfast','rising'):
+   console=Mock();console.run.return_value=-2
+   with tempfile.TemporaryDirectory() as tmp,patch.object(m,'configure',return_value=(['native'],[])),patch.object(m,'helper',return_value=console) as lookup:
+    self.assertEqual(m.run(Path(tmp),game,{}),130)
+    lookup.assert_called_once_with('native-console')
+    self.assertEqual(console.run.call_args.args[3],'\x03')
+    self.assertEqual(console.run.call_args.kwargs,{'terminal_input':True})
  def test_colony_preserves_native_world_mode_seed_mods_and_listing(self):
   for mode in ('NewOptions','LoadOptions'):
    with tempfile.TemporaryDirectory() as tmp:

@@ -427,13 +427,28 @@ def dependency_files(root):
     native.private_write(directory / 'runtime.json', json.dumps({'files': files, 'pins': pins}, indent=2))
 
 
+def agreement(game, env):
+    if game != 'reforger':
+        return
+    terms = json.loads(Path(__file__).with_name('arma-releases.json').read_text())['reforger_agreement']
+    app = integer(env, 'SRCDS_APPID', 1874900, 1, 2147483647)
+    if app not in terms['approved_appids']:
+        raise ValueError('Selected Reforger app requires separate publisher agreement review; no app substitution is performed')
+    if env.get(terms['environment'], '0') != terms['accept_value']:
+        raise ValueError('Read the current Arma Reforger Server EULA and explicitly agree before installation or launch')
+    secondary = json.loads(Path(__file__).with_name('arma-releases.json').read_text())['reforger_battleye_agreement']
+    if env.get(secondary['environment'], '0') != secondary['accept_value']:
+        raise ValueError('Read the bundled BattlEye EULA and explicitly agree before installation or launch')
+
+
 def update_reforger(root, env, installing=False):
+    agreement('reforger', env)
     app = integer(env, 'SRCDS_APPID', 1874900, 1, 2147483647)
     if app not in (1874900, 1890870):
         raise ValueError('This adapter supports only official Reforger stable/experimental tools')
     # Steam may ship a new sample at config.json; restore exact operator bytes and metadata.
     config = confined(root, 'config.json')
-    with tempfile.TemporaryDirectory(prefix='voltra-arma-config-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='voltra-arma-config-', dir=confined(root, '.')) as temporary:
         backup = Path(temporary) / 'config.json'
         if config.exists():
             shutil.copy2(config, backup)
@@ -445,6 +460,7 @@ def update_reforger(root, env, installing=False):
 
 
 def install(root, game, env):
+    agreement(game, env)
     if game == 'arma3':
         private_gate(env)
         binary = text(env, 'SERVER_BINARY', 'arma3server_x64', 40)
@@ -459,6 +475,7 @@ def install(root, game, env):
 
 
 def configure(root, game, env):
+    agreement(game, env)
     if game == 'reforger':
         path = confined(root, 'config.json')
         previous = json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else {}
@@ -516,6 +533,8 @@ def child_environment(root, game, env):
 def supervise(root, main, clients, env, hidden=False):
     processes = []
     readers = []
+    console_finished = threading.Event()
+    console_reader = None
     lock = threading.RLock()
     stopping = threading.Event()
     secrets = [value for key, value in os.environ.items() if any(word in key for word in ('PASS', 'AUTH', 'TOKEN')) and value]
@@ -560,15 +579,33 @@ def supervise(root, main, clients, env, hidden=False):
             return 130
 
         def console():
+            import select
+            pending = b''
+            def forward(line):
+                remaining = memoryview(line)
+                while remaining and processes[0].poll() is None:
+                    remaining = remaining[os.write(processes[0].stdin.fileno(), remaining):]
             try:
-                for line in sys.stdin.buffer:
-                    if processes[0].poll() is not None:
+                # Wings may retain its console pipe after the child exits.
+                # Never leave a daemon holding Python's BufferedReader lock
+                # during interpreter shutdown; poll raw descriptors instead.
+                descriptor = sys.stdin.fileno()
+                while not console_finished.is_set():
+                    if not select.select([descriptor], [], [], .1)[0]:
+                        continue
+                    block = os.read(descriptor, 65536)
+                    if not block:
+                        if pending:
+                            forward(pending)
                         break
-                    processes[0].stdin.write(line)
-                    processes[0].stdin.flush()
+                    pending += block
+                    while b'\n' in pending:
+                        line, pending = pending.split(b'\n', 1)
+                        forward(line + b'\n')
             except (BrokenPipeError, OSError):
                 pass
-        threading.Thread(target=console, daemon=True).start()
+        console_reader = threading.Thread(target=console, name='arma-console-input', daemon=True)
+        console_reader.start()
         deadline = None
         while processes[0].poll() is None:
             if stopping.is_set():
@@ -585,6 +622,7 @@ def supervise(root, main, clients, env, hidden=False):
         code = processes[0].wait()
         return 128 - code if code < 0 else code
     finally:
+        console_finished.set()
         send(signal.SIGINT)
         for process in processes:
             try:
@@ -592,6 +630,8 @@ def supervise(root, main, clients, env, hidden=False):
             except subprocess.TimeoutExpired:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.wait()
+        if console_reader:
+            console_reader.join(timeout=2)
         for reader in readers:
             reader.join(timeout=2)
         for process in processes:
@@ -609,6 +649,7 @@ def main():
         raise ValueError('Unknown Arma action')
     root = Path.cwd().resolve()
     env = dict(os.environ)
+    agreement(game, env)
     if action == 'install':
         install(root, game, env)
         return 0

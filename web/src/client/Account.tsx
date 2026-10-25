@@ -1,8 +1,14 @@
+import {SectionTabs} from "../ui/SectionTabs";
 import {DesktopAppInfo} from '../desktop';
 import {NavIcon} from "../Icons";
 import DesktopApps from "./DesktopApps";
+import SFTPPassword from './SFTPPassword';
+import Appearance from './Appearance';
+import {SettingsRow,SettingsSection} from '../ui/Settings';
+import {accountNickname} from './accountProfile';
+import './accountProfile.css';
 import { useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import {
   api,
   useAPI,
@@ -10,7 +16,6 @@ import {
   Button,
   Input,
   Textarea,
-  Field,
   Card,
 } from "../lib";
 import {
@@ -35,14 +40,14 @@ export function Activity({ path }: { path: string }) {
     )}&filter[ip]=${encodeURIComponent(ip)}`
   );
   return (
-    <section>
+    <section className="operations-page activity-page">
       <div className="toolbar server-page-toolbar">
         <h2>Activity</h2>
         <Button variant="secondary" onClick={r.reload}>
           Refresh
         </Button>
       </div>
-      <div className="toolbar">
+      <div className="toolbar operations-filters">
         <Input
           aria-label="Filter events"
           value={event}
@@ -64,7 +69,7 @@ export function Activity({ path }: { path: string }) {
       </div>
       <PageError error={r.error} />
       {r.loading && <p role="status">Loading activity...</p>}
-      <div className="table-wrap">
+      <div className="table-wrap operations-table">
         <table className="table">
           <thead>
             <tr>
@@ -110,7 +115,7 @@ export function Activity({ path }: { path: string }) {
         </table>
       </div>
       {!r.loading && !items(r.data).length && (
-        <p className="muted">No activity found.</p>
+        <p className="operations-empty">No activity found.</p>
       )}
       <Pager data={r.data} page={page} setPage={setPage} />
     </section>
@@ -120,24 +125,13 @@ function Profile() {
   const r = useAPI("/api/client/account");
   const user = value(r.data) || {};
   const a = useAction();
-  const [fields, setFields] = useState<Record<string, string>>({});
+  const [nickname, setNickname] = useState<string|null>(null);
+  const currentNickname = nickname ?? accountNickname(user);
   return (
-    <Card>
-      <h2>Account</h2>
+    <section className="settings-page">
       <PageError error={r.error} />
       <Notice action={a} />
-      <dl>
-        <dt>Username</dt>
-        <dd>{user.username}</dd>
-        <dt>Email</dt>
-        <dd>{user.email}</dd>
-        <dt>Access</dt>
-        <dd>{user.admin || user.root_admin ? "Administrator" : "User"}</dd>
-        <dt>ID</dt>
-        <dd>
-          {user.id} · {user.uuid}
-        </dd>
-      </dl>
+      <SettingsSection title="Profile" action={user.id&&<span className="account-profile-role">{user.admin || user.root_admin ? "Administrator" : "User"}</span>}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -146,39 +140,28 @@ function Profile() {
               api(
                 "/api/client/account",
                 json("PATCH", {
-                  first_name: fields.first_name ?? user.first_name ?? "",
-                  last_name: fields.last_name ?? user.last_name ?? "",
-                  language: fields.language ?? user.language ?? "en",
+                  nickname: currentNickname.trim(),
                 })
               ),
             () => {
               r.reload();
-              a.setSuccess("Account updated.");
+              window.dispatchEvent(new Event('account-profile-updated'));
+              a.setSuccess("Nickname saved.");
             }
           );
         }}
       >
-        <div className="form-grid">
-          {[
-            ["first_name", "First name"],
-            ["last_name", "Last name"],
-            ["language", "Language code"],
-          ].map(([key, label]) => (
-            <Field key={key} label={label}>
-              <Input
-                value={fields[key] ?? user[key] ?? ""}
-                onChange={(e) =>
-                  setFields((old) => ({ ...old, [key]: e.target.value }))
-                }
-              />
-            </Field>
-          ))}
-        </div>
-        <Button type="submit" disabled={a.busy}>
-          Save profile
+        <SettingsRow label="Email" control={<span className="settings-value">{user.email||'—'}</span>}/>
+        <SettingsRow label="Username" control={<span className="settings-value">{user.username||'—'}</span>}/>
+        <SettingsRow label="Nickname" control={<Input aria-label="Nickname" name="nickname" autoComplete="nickname" required maxLength={64} value={currentNickname} onChange={event=>setNickname(event.target.value)} disabled={r.loading||a.busy}/>}/>
+        <div className="settings-actions">
+        <Button type="submit" disabled={r.loading||a.busy||!currentNickname.trim()||currentNickname.trim()===accountNickname(user)}>
+          {a.busy?'Saving…':'Save'}
         </Button>
+        </div>
       </form>
-    </Card>
+      </SettingsSection>
+    </section>
   );
 }
 function APIKeys() {
@@ -188,20 +171,20 @@ function APIKeys() {
     [ips, setIPs] = useState(""),
     [secret, setSecret] = useState("");
   return (
-    <section>
-      <h2>API keys</h2>
+    <section className="operations-page account-credentials">
+      <div className="operations-heading"><h2>API keys</h2><p>Create keys for apps that use your account's API access.</p></div>
       <Notice action={a} />
       <PageError error={r.error} />
       {secret && (
-        <Card>
-          <h3>Copy your new API key</h3>
-          <p>This secret is only shown once.</p>
+        <SettingsSection title="New API key" className="account-secret">
+          <SettingsRow label="Copy your key" description="This secret is only shown once." control={
           <Input
             aria-label="New API key"
             readOnly
             value={secret}
             onFocus={(e) => e.target.select()}
-          />
+          />}/>
+          <div className="settings-actions">
           <Button
             variant="secondary"
             onClick={() =>
@@ -216,11 +199,11 @@ function APIKeys() {
           <Button variant="secondary" onClick={() => setSecret("")}>
             Dismiss
           </Button>
-        </Card>
+          </div>
+        </SettingsSection>
       )}
       <div className="grid grid-2">
-        <Card>
-          <h3>Create API key</h3>
+        <SettingsSection title="Create API key">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -249,34 +232,36 @@ function APIKeys() {
               );
             }}
           >
-            <Field label="Description">
+            <SettingsRow label="Description" control={
               <Input
+                aria-label="API key description"
                 required
                 maxLength={500}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-              />
-            </Field>
-            <Field
+              />}/>
+            <SettingsRow
               label="Allowed IP addresses"
-              hint="One IP or CIDR per line. Leave empty to allow any source."
-            >
-              <Textarea value={ips} onChange={(e) => setIPs(e.target.value)} />
-            </Field>
+              description="One IP or CIDR per line. Leave empty to allow any source."
+              control={<Textarea aria-label="Allowed IP addresses" value={ips} onChange={(e) => setIPs(e.target.value)} />}
+            />
+            <div className="settings-actions">
             <Button type="submit" disabled={a.busy}>
               Create key
             </Button>
+            </div>
           </form>
-        </Card>
-        <div>
+        </SettingsSection>
+        <SettingsSection title="Your API keys" plain>
           {items(r.data).map((k) => (
-            <Card key={k.identifier}>
+            <Card key={k.identifier} className="operations-record">
               <h3>{k.description || k.memo}</h3>
               <code>{k.identifier}</code>
               <p className="muted">
                 Created {date(k.created_at)} · Last used {date(k.last_used_at)}
               </p>
-              <p>{(k.allowed_ips || []).join(", ") || "Any IP address"}</p>
+              <p className="operations-value">{(k.allowed_ips || []).join(", ") || "Any IP address"}</p>
+              <div className="actions operations-record-actions">
               <Button
                 variant="danger"
                 disabled={a.busy}
@@ -294,10 +279,12 @@ function APIKeys() {
               >
                 Revoke
               </Button>
+              </div>
             </Card>
           ))}
-          {!r.loading && !items(r.data).length && <Card>No API keys yet.</Card>}
-        </div>
+          {r.loading && <p className="operations-empty" role="status">Loading API keys...</p>}
+          {!r.loading && !items(r.data).length && <Card className="operations-empty">No API keys yet.</Card>}
+        </SettingsSection>
       </div>
     </section>
   );
@@ -308,15 +295,15 @@ function SSHKeys() {
   const [name, setName] = useState(""),
     [key, setKey] = useState("");
   return (
-    <section>
-      <h2>SSH keys</h2>
-      <p className="muted">
+    <section className="operations-page account-credentials">
+      <div className="operations-heading"><h2>SSH keys</h2>
+      <p>
         Use public keys for SFTP access. Keep your private key on your device.
-      </p>
+      </p></div>
       <Notice action={a} />
       <PageError error={r.error} />
       <div className="grid grid-2">
-        <Card>
+        <SettingsSection title="Add SSH key">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -334,30 +321,32 @@ function SSHKeys() {
               );
             }}
           >
-            <Field label="Name">
+            <SettingsRow label="Name" control={
               <Input
+                aria-label="SSH key name"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-              />
-            </Field>
-            <Field label="Public key">
+              />}/>
+            <SettingsRow label="Public key" control={
               <Textarea
+                aria-label="SSH public key"
                 required
                 rows={6}
                 placeholder="ssh-ed25519 AAAA..."
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-              />
-            </Field>
+              />}/>
+            <div className="settings-actions">
             <Button type="submit" disabled={a.busy}>
               Add SSH key
             </Button>
+            </div>
           </form>
-        </Card>
-        <div>
+        </SettingsSection>
+        <SettingsSection title="Your SSH keys" plain>
           {items(r.data).map((k) => (
-            <Card key={k.fingerprint}>
+            <Card key={k.fingerprint} className="operations-record">
               <h3>{k.name}</h3>
               <p>
                 <code>{k.fingerprint}</code>
@@ -367,7 +356,7 @@ function SSHKeys() {
                 <pre>{k.public_key}</pre>
               </details>
               <p className="muted">Created {date(k.created_at)}</p>
-              <Button
+              <div className="actions operations-record-actions"><Button
                 variant="danger"
                 disabled={a.busy}
                 onClick={() => {
@@ -384,9 +373,12 @@ function SSHKeys() {
               >
                 Remove
               </Button>
+              </div>
             </Card>
           ))}
-        </div>
+          {r.loading && <p className="operations-empty" role="status">Loading SSH keys...</p>}
+          {!r.loading && !items(r.data).length && <Card className="operations-empty">No SSH keys yet.</Card>}
+        </SettingsSection>
       </div>
     </section>
   );
@@ -395,20 +387,22 @@ export function Account() {
   return (
     <div className="page account-page">
       <h1>Your account</h1>
-      <nav className="tabs account-tabs" aria-label="Account settings">
-        <NavLink end to="/account">
-          <NavIcon name="users"/><span>Profile</span>
-        </NavLink>
-        <NavLink to="/account/api"><NavIcon name="key"/><span>API keys</span></NavLink>
-        <NavLink to="/account/ssh"><NavIcon name="console"/><span>SSH keys</span></NavLink>
-        <NavLink to="/account/desktop"><NavIcon name="console"/><span>Desktop apps</span></NavLink>
-        {import.meta.env.VITE_DESKTOP==='true'&&<NavLink to="/account/app"><NavIcon name="settings"/><span>App &amp; updates</span></NavLink>}
-        <NavLink to="/account/activity"><NavIcon name="activity"/><span>Activity</span></NavLink>
-      </nav>
+      <SectionTabs label="Account settings" items={[
+        {id:'profile',label:<><NavIcon name="users"/><span>Profile</span></>,to:'/account',end:true},
+        {id:'appearance',label:<><NavIcon name="settings"/><span>Appearance</span></>,to:'/account/appearance'},
+        {id:'api',label:<><NavIcon name="key"/><span>API keys</span></>,to:'/account/api'},
+        {id:'ssh',label:<><NavIcon name="console"/><span>SSH keys</span></>,to:'/account/ssh'},
+        {id:'sftp',label:<><NavIcon name="key"/><span>SFTP password</span></>,to:'/account/sftp'},
+        {id:'desktop',label:<><NavIcon name="console"/><span>Desktop apps</span></>,to:'/account/desktop'},
+        ...(import.meta.env.VITE_DESKTOP==='true'?[{id:'app',label:<><NavIcon name="settings"/><span>App &amp; updates</span></>,to:'/account/app'}]:[]),
+        {id:'activity',label:<><NavIcon name="activity"/><span>Activity</span></>,to:'/account/activity'},
+      ]}/>
       <Routes>
         <Route index element={<Profile />} />
+        <Route path="appearance" element={<Appearance />} />
         <Route path="api" element={<APIKeys />} />
         <Route path="ssh" element={<SSHKeys />} />
+        <Route path="sftp" element={<SFTPPassword />} />
         <Route path="desktop" element={<DesktopApps />} />
         {import.meta.env.VITE_DESKTOP==='true'&&<Route path="app" element={<DesktopAppInfo />} />}
         <Route

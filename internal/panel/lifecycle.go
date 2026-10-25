@@ -239,6 +239,11 @@ func (a *App) daemon(ctx context.Context, node M, method, path string, body any)
 }
 
 func (a *App) daemonServer(ctx context.Context, server M, method, pathSuffix string, body any) (*http.Response, error) {
+	if method == http.MethodPost && pathSuffix == "/reinstall" {
+		if err := blockPublicSteamOwnership(ctx, a.DB, num(server["id"])); err != nil {
+			return nil, err
+		}
+	}
 	if method == http.MethodPost && pathSuffix == "/power" {
 		return a.managedServerPower(ctx, server, str(asMap(body)["action"]))
 	}
@@ -1059,6 +1064,17 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 	for k, v := range (M{"oom_disabled": true, "allocation_limit": 0, "database_limit": 0, "backup_limit": 0, "description": "", "skip_scripts": false}) {
 		if _, ok := d[k]; !ok || d[k] == nil {
 			d[k] = v
+		}
+	}
+	// FS25 licence and password overrides use the existing encrypted snapshot
+	// storage, just like values supplied by Admin integrations.
+	for _, feature := range asSlice(egg["features"]) {
+		if str(feature) == "voltra_fs25" {
+			for key, value := range env {
+				if fs25Secret(key) && str(value) != "" {
+					bound[key] = value
+				}
+			}
 		}
 	}
 	tx, err := a.DB.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
@@ -2102,22 +2118,6 @@ func (a *App) remoteInstall(w http.ResponseWriter, r *http.Request) {
 	s["status"] = status
 	s["installed_at"] = installedAt
 	s["installation_id"] = installationID
-	s["_notification_key"] = strings.TrimPrefix(installationID, "complete:")
-	if success {
-		owner, err := a.one(r.Context(), "SELECT * FROM users WHERE id=$1", s["owner_id"])
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		event := "server.installed"
-		if strings.HasPrefix(installationID, "complete:reinstall:") || boolean(d["reinstall"]) {
-			event = "server.reinstalled"
-		}
-		if err = a.queueNotificationTx(r.Context(), tx, owner, s, event); err != nil {
-			fail(w, err)
-			return
-		}
-	}
 	if e = tx.Commit(r.Context()); e != nil {
 		fail(w, e)
 		return
@@ -2136,7 +2136,7 @@ func (a *App) remoteSFTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	if str(d["type"]) != "public_key" {
+	if str(d["type"]) != "public_key" && str(d["type"]) != "password" {
 		fail(w, forbidden())
 		return
 	}
@@ -2165,26 +2165,17 @@ func (a *App) remoteSFTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, forbidden())
 		return
 	}
-	key, _, _, _, e := ssh.ParseAuthorizedKey([]byte(str(d["password"])))
-	if e != nil {
-		fail(w, forbidden())
-		return
-	}
-	keys, e := a.query(r.Context(), "SELECT public_key FROM ssh_keys WHERE user_id=$1", user["id"])
-	if e != nil {
-		fail(w, e)
-		return
-	}
-	valid := false
-	for _, k := range keys {
-		stored, _, _, _, err := ssh.ParseAuthorizedKey([]byte(str(k["public_key"])))
-		if err == nil && bytes.Equal(stored.Marshal(), key.Marshal()) {
-			valid = true
-			break
+	if str(d["type"]) == "password" {
+		if e = a.sftpPasswordAttempt(r.Context(), "auth:"+str(user["id"])); e != nil {
+			fail(w, e)
+			return
 		}
-	}
-	if !valid {
-		fail(w, forbidden())
+		if !validSFTPPassword(str(user["sftp_password_hash"]), str(d["password"])) {
+			fail(w, forbidden())
+			return
+		}
+	} else if e = a.sftpPublicKey(r.Context(), user, str(d["password"])); e != nil {
+		fail(w, e)
 		return
 	}
 	permissions := []string{"*"}
@@ -2200,6 +2191,24 @@ func (a *App) remoteSFTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, M{"user": user["uuid"], "server": s["uuid"], "permissions": permissions})
+}
+
+func (a *App) sftpPublicKey(ctx context.Context, user M, password string) error {
+	key, _, _, _, e := ssh.ParseAuthorizedKey([]byte(password))
+	if e != nil {
+		return forbidden()
+	}
+	keys, e := a.query(ctx, "SELECT public_key FROM ssh_keys WHERE user_id=$1", user["id"])
+	if e != nil {
+		return e
+	}
+	for _, k := range keys {
+		stored, _, _, _, err := ssh.ParseAuthorizedKey([]byte(str(k["public_key"])))
+		if err == nil && bytes.Equal(stored.Marshal(), key.Marshal()) {
+			return nil
+		}
+	}
+	return forbidden()
 }
 func (a *App) remoteActivity(w http.ResponseWriter, r *http.Request) {
 	node, e := a.remoteNode(r)

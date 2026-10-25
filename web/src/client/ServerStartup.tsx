@@ -1,3 +1,4 @@
+import {GameSwitch} from './GameSwitch';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, Button, Card, Input, Select, useAPI } from '../lib';
@@ -74,7 +75,7 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
     </div>
     {variable.description && <p className="muted startup-description" id={`${id}-description`}>{variable.description}</p>}
     <div className="startup-control-row">
-      {control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy} aria-describedby={`${id}-help`} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
+      {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy} aria-describedby={`${id}-help`} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
         {!control.options.includes(draft) && <option value={draft}>{draft || 'Choose a value'}</option>}
         {!control.required && draft !== '' && <option value="">Empty</option>}
         {control.options.map(option => <option key={option} value={option}>{control.boolean ? option === '1' ? 'Enabled' : 'Disabled' : option}</option>)}
@@ -148,14 +149,14 @@ function StartupContent() {
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const onDirty = useRef((key: string, pending: boolean) => setDirty(current => current[key] === pending ? current : { ...current, [key]: pending })).current;
   useEffect(() => { setSaved({}); setSavedMeta(null); }, [query.data]);
-  if (!permitted) return <section className="startup-settings"><h2>Startup</h2><p>You do not have permission to view startup settings.</p></section>;
-  if (!query.data) return <section className="startup-settings"><h2>Startup</h2>{query.loading ? <p role="status">Loading startup settings...</p> : <><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry</Button></>}</section>;
+  if (!permitted) return <section className="startup-settings games-ui"><h2>Startup</h2><p>You do not have permission to view startup settings.</p></section>;
+  if (!query.data) return <section className="startup-settings games-ui"><h2>Startup</h2>{query.loading ? <p role="status">Loading startup settings...</p> : <><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry</Button></>}</section>;
   const variables = (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable);
   const meta: StartupMeta = { ...(query.data.meta || {}), ...savedMeta };
   const updateAllowed = can(permissions, 'startup.update');
   const imageAllowed = can(permissions, 'startup.docker-image');
   const pending = Object.values(dirty).filter(Boolean).length;
-  return <section className="startup-settings">
+  return <section className="startup-settings games-ui">
     <header className="startup-heading"><div><h2>Startup</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div>
       {!account.loading && !account.error && value(account.data)?.root_admin === true && <Link className="startup-admin-link" to="../admin-tools">Admin tools</Link>}
     </header>
@@ -163,7 +164,7 @@ function StartupContent() {
     <div className="startup-save-note" role="status">{pending ? `${pending} unsaved ${pending === 1 ? 'field' : 'fields'}. Save each field separately.` : 'Each field saves separately.'}{!updateAllowed && ' You have read-only access to variables.'}</div>
     <Card className="startup-variables"><h3>Server variables</h3>
       {!variables.length && <p className="muted">This template has no visible startup variables.</p>}
-      {variables.map(variable => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
+      <div className="startup-variable-grid">{variables.map(variable => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
         const response = await api(`${base}/startup/variable`, json('PUT', payload));
         const updated = value(response) as StartupVariable;
         if (!updated || updated.env_variable !== variable.env_variable) throw new Error('The server did not confirm the saved setting. Reload startup settings to verify it.');
@@ -171,7 +172,7 @@ function StartupContent() {
         if (response.meta) setSavedMeta(response.meta);
         query.reload();
         return updated;
-      }} />)}
+      }} />)}</div>
     </Card>
     <JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
     {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} onSaved={image => { setSavedImage(image); reload(); }} />}
@@ -183,3 +184,4 @@ export default function ServerStartup() {
   const { base } = useServer();
   return <StartupContent key={base} />;
 }
+

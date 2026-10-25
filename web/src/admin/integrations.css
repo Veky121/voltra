@@ -1,3 +1,22 @@
-.integrations-page{display:grid;gap:1rem;min-width:0}
-.integrations-header{display:grid;gap:20px;min-width:0}
-.integrations-header>.page-header,.integrations-header>.tabs,.integrations-header>p{margin:0}
+.integrations-page{display:grid;gap:20px;min-width:0}
+.integrations-header{display:grid;gap:16px;min-width:0}
+.integrations-header>.page-header,.integrations-header>.section-tabs,.integrations-header>p{margin:0}
+.integrations-header>p{font-size:calc(13px * var(--ui-font-scale,1));line-height:1.6;max-width:760px}
+.integrations-page>.card{margin-bottom:0}
+.integrations-form{max-width:none}
+.integrations-credential-note{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.65;color:var(--muted);padding:0 16px;margin:12px 0}
+.integrations-credential-note>p:last-child{margin-bottom:0}
+.integrations-credential+.integrations-credential{border-top:1px solid var(--ui-divider)}
+.integrations-credential>.settings-row+.settings-row{border-top:1px solid var(--ui-divider)}
+.integrations-credential .settings-row-description{overflow-wrap:anywhere}
+.integrations-clear{display:flex;align-items:center;gap:7px;font-size:calc(12px * var(--ui-font-scale,1));cursor:pointer}
+.integrations-clear>input[type=checkbox]{margin:0}
+.integrations-form>.card:last-child{border-color:color-mix(in srgb,var(--red) 18%,var(--ui-border))}
+.integrations-form>form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:24px;align-items:start}
+.integrations-form>form>.settings-section{min-width:0;margin:0}
+.integrations-form .settings-row-layout{grid-template-columns:minmax(0,1fr);gap:8px;align-items:start}
+.integrations-form .settings-row-control{justify-content:flex-start}
+.integrations-form .settings-plain>.settings-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.integrations-form .integrations-credential{min-width:0;border-top:0;border-bottom:1px solid var(--ui-divider)}
+.integrations-form .settings-plain>.settings-group>.settings-actions{grid-column:1/-1}
+.integrations-form>.admin-panel{margin-top:24px}

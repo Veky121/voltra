@@ -6,7 +6,7 @@
  */
 declare(strict_types=1);
 
-const PTERO_GO_SNAPSHOT_TABLES = ['users', 'api_keys', 'ssh_keys', 'locations', 'nodes', 'daemon_revocations', 'nests', 'eggs', 'egg_variables', 'servers', 'notification_jobs', 'allocations', 'server_variables', 'subusers', 'backups', 'schedules', 'tasks', 'schedule_runs', 'database_hosts', 'databases', 'mounts', 'mount_nodes', 'mount_eggs', 'mount_servers', 'activity_logs', 'settings', 'server_transfers'];
+const PTERO_GO_SNAPSHOT_TABLES = ['users', 'api_keys', 'ssh_keys', 'locations', 'nodes', 'daemon_revocations', 'nests', 'eggs', 'egg_variables', 'servers', 'allocations', 'server_variables', 'subusers', 'backups', 'schedules', 'tasks', 'schedule_runs', 'database_hosts', 'databases', 'mounts', 'mount_nodes', 'mount_eggs', 'mount_servers', 'activity_logs', 'settings', 'server_transfers'];
 
 function migration_notice(string $code, string $table, string $detail, int $count = 0, int $row = 0): array
 {
@@ -203,24 +203,26 @@ function migration_convert(array $source, callable $decrypt, array $config = [],
     }
 
     $settings = [];
-    $settingsAliases = ['mail:mailers:smtp:host' => 'mail:host', 'mail:mailers:smtp:port' => 'mail:port', 'mail:mailers:smtp:username' => 'mail:username', 'mail:mailers:smtp:password' => 'mail:password', 'mail:mailers:smtp:encryption' => 'mail:encryption'];
     foreach ($source['settings'] ?? [] as $original) {
         $key = preg_replace('/^settings::/', '', (string) $original['key']);
-        $target = $settingsAliases[$key] ?? $key;
-        $value = $original['value'];
-        if ($key === 'mail:mailers:smtp:password' && $value !== '') {
-            $value = $decrypt((string) $value);
+        if (str_starts_with($key, 'mail:') || str_starts_with($key, 'pterodactyl:email:')) {
+            continue;
         }
+        $target = $key;
+        $value = $original['value'];
         if (in_array(strtolower((string) $value), ['true', '(true)', 'false', '(false)'], true)) {
             $value = in_array(strtolower((string) $value), ['true', '(true)'], true);
         }
-        if (in_array($target, ['pterodactyl:guzzle:timeout', 'pterodactyl:guzzle:connect_timeout', 'pterodactyl:client_features:allocations:range_start', 'pterodactyl:client_features:allocations:range_end', 'mail:port'], true)) {
+        if (in_array($target, ['pterodactyl:guzzle:timeout', 'pterodactyl:guzzle:connect_timeout', 'pterodactyl:client_features:allocations:range_start', 'pterodactyl:client_features:allocations:range_end'], true)) {
             $value = (int) $value;
         }
         $settings[$target] = $value;
     }
     // Values stored only in .env are part of the running panel configuration.
     foreach ($config as $key => $value) {
+        if (str_starts_with($key, 'mail:') || str_starts_with($key, 'pterodactyl:email:')) {
+            continue;
+        }
         if (!array_key_exists($key, $settings)) {
             $settings[$key] = $value;
         }
@@ -242,7 +244,6 @@ function migration_convert(array $source, callable $decrypt, array $config = [],
     if (!empty($source['jobs'])) {
         $unsupported[] = migration_notice('pending_php_jobs', 'jobs', 'Drain Laravel jobs before exporting; serialized PHP jobs cannot execute in Go', count($source['jobs']));
     }
-    $notices[] = migration_notice('native_notification_queue_empty', 'notification_jobs', 'Legacy serialized PHP notification jobs are not portable; the native queue starts empty. Existing notification history is archived and pending PHP jobs block import');
     $notices[] = migration_notice('native_revocation_queue_empty', 'daemon_revocations', 'Legacy serialized RevokeSftpAccessJob jobs cannot become native durable revocations; the native queue starts empty. Drain all pending PHP jobs before export; any pending job blocks import');
     $handledTables = array_unique(array_merge(array_keys($fields), array_values($sourceNames), ['api_keys', 'activity_logs', 'activity_log_subjects', 'settings', 'audit_logs', 'api_logs', 'tasks_log', 'notifications', 'failed_jobs', 'jobs', 'users', 'sessions', 'password_resets', 'password_reset_tokens', 'recovery_tokens', 'migrations', 'cache', 'cache_locks']));
     foreach ($source as $table => $rows) {
@@ -298,17 +299,14 @@ function migration_export_main(array $argv): int
             }
             $source[(string) $table] = $pdo->query('SELECT * FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
         }
-        $configKeys = ['app:name' => 'app.name', 'app:locale' => 'app.locale', 'mail:host' => 'mail.mailers.smtp.host', 'mail:port' => 'mail.mailers.smtp.port', 'mail:username' => 'mail.mailers.smtp.username', 'mail:password' => 'mail.mailers.smtp.password', 'mail:encryption' => 'mail.mailers.smtp.encryption', 'mail:from:address' => 'mail.from.address', 'mail:from:name' => 'mail.from.name', 'pterodactyl:guzzle:timeout' => 'pterodactyl.guzzle.timeout', 'pterodactyl:guzzle:connect_timeout' => 'pterodactyl.guzzle.connect_timeout', 'pterodactyl:client_features:allocations:enabled' => 'pterodactyl.client_features.allocations.enabled', 'pterodactyl:client_features:allocations:range_start' => 'pterodactyl.client_features.allocations.range_start', 'pterodactyl:client_features:allocations:range_end' => 'pterodactyl.client_features.allocations.range_end', 'backups.default' => 'backups.default', 'backups.throttles.limit' => 'backups.throttles.limit', 'backups.throttles.period' => 'backups.throttles.period', 'backups.prune_age' => 'backups.prune_age', 'backups.presigned_url_lifespan' => 'backups.presigned_url_lifespan'];
-        $configKeys += ['app:timezone' => 'app.timezone', 'pterodactyl:client_features:databases:enabled' => 'pterodactyl.client_features.databases.enabled', 'pterodactyl:client_features:databases:allow_random' => 'pterodactyl.client_features.databases.allow_random', 'pterodactyl:client_features:schedules:per_schedule_task_limit' => 'pterodactyl.client_features.schedules.per_schedule_task_limit', 'activity:hide_admin_activity' => 'activity.hide_admin_activity', 'pterodactyl:email:send_install_notification' => 'pterodactyl.email.send_install_notification', 'pterodactyl:email:send_reinstall_notification' => 'pterodactyl.email.send_reinstall_notification'];
+        $configKeys = ['app:name' => 'app.name', 'app:locale' => 'app.locale', 'pterodactyl:guzzle:timeout' => 'pterodactyl.guzzle.timeout', 'pterodactyl:guzzle:connect_timeout' => 'pterodactyl.guzzle.connect_timeout', 'pterodactyl:client_features:allocations:enabled' => 'pterodactyl.client_features.allocations.enabled', 'pterodactyl:client_features:allocations:range_start' => 'pterodactyl.client_features.allocations.range_start', 'pterodactyl:client_features:allocations:range_end' => 'pterodactyl.client_features.allocations.range_end', 'backups.default' => 'backups.default', 'backups.throttles.limit' => 'backups.throttles.limit', 'backups.throttles.period' => 'backups.throttles.period', 'backups.prune_age' => 'backups.prune_age', 'backups.presigned_url_lifespan' => 'backups.presigned_url_lifespan'];
+        $configKeys += ['app:timezone' => 'app.timezone', 'pterodactyl:client_features:databases:enabled' => 'pterodactyl.client_features.databases.enabled', 'pterodactyl:client_features:databases:allow_random' => 'pterodactyl.client_features.databases.allow_random', 'pterodactyl:client_features:schedules:per_schedule_task_limit' => 'pterodactyl.client_features.schedules.per_schedule_task_limit', 'activity:hide_admin_activity' => 'activity.hide_admin_activity'];
         $config = [];
         foreach ($configKeys as $target => $key) {
             $value = $app->make('config')->get($key);
             if ($value !== null) {
                 $config[$target] = $value;
             }
-        }
-        if (($config['mail:encryption'] ?? null) === null) {
-            $config['mail:encryption'] = 'none';
         }
         $s3 = $app->make('config')->get('backups.disks.s3', []);
         $config['backups.s3'] = ['bucket' => $s3['bucket'] ?? '', 'region' => $s3['region'] ?? 'us-east-1', 'endpoint' => $s3['endpoint'] ?? '', 'access_key_id' => $s3['key'] ?? '', 'secret_access_key' => $s3['secret'] ?? '', 'session_token' => $s3['token'] ?? '', 'path_style' => (bool) ($s3['use_path_style_endpoint'] ?? false), 'part_size' => (int) $app->make('config')->get('backups.max_part_size', 5368709120), 'storage_class' => $s3['storage_class'] ?? ''];

@@ -40,3 +40,17 @@ test('invalid configuration stays byte-identical and its content is absent from 
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'voltra-clusterio-config-'));
  try {const file=path.join(dir,'config-controller.json'),before='{"privateFixtureSecret":';fs.writeFileSync(file,before);assert.throws(()=>applySettings(dir,controller),error=>!error.message.includes('privateFixtureSecret'));assert.equal(fs.readFileSync(file,'utf8'),before);}finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('host mode accepts blank Cluster Name because its native settings do not consume it',()=>{
+ assert.deepEqual(roleSettings({...host,CLUSTER_NAME:''}),roleSettings({...host,CLUSTER_NAME:'Unused label'}));
+});
+test('controller requires nonblank name of at most 100 Unicode characters before any config write',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'voltra-clusterio-name-'));
+ try {
+  const file=path.join(dir,'config-controller.json'),before='{"controller.name":"Operator name","operator.keep":true}\n';fs.writeFileSync(file,before);const listing=fs.readdirSync(dir);
+  for(const name of ['', '   ', undefined, '\u{1F600}'.repeat(101)]){
+   assert.throws(()=>applySettings(dir,{...controller,CLUSTER_NAME:name}),/controller requires a Cluster Name/i);assert.equal(fs.readFileSync(file,'utf8'),before);assert.deepEqual(fs.readdirSync(dir),listing);
+  }
+  applySettings(dir,{...controller,CLUSTER_NAME:'\u{1F600}'.repeat(100)});assert.equal(JSON.parse(fs.readFileSync(file,'utf8'))['controller.name'],'\u{1F600}'.repeat(100));
+ }finally {fs.rmSync(dir,{recursive:true,force:true});}
+});

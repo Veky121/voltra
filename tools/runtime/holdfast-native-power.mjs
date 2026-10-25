@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {api} from './openttd-compat-node.mjs';
+const dir='.local/holdfast-native',s=JSON.parse(fs.readFileSync(dir+'/private.json')),action=process.argv[2],tag=process.argv[3];
+if(!['start','stop'].includes(action)||!/^[a-z0-9_-]+$/.test(tag??''))throw Error('Invalid bounded action/tag');
+const n=JSON.parse(fs.readFileSync(s.node_receipt)),v=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(v.uuid!==s.uuid||v.node!==n.node||n.node_uuid!==s.node_uuid||v.egg!==s.egg_id||s.owner!=='racing_games'||v.external_id!=='holdfast-native-'+s.request_id||v.status!==null)throw Error('Foreign or installing fixture');
+const file=dir+'/'+action+'-'+tag+'.json';if(fs.existsSync(file))throw Error('Action already submitted');
+const inspected=spawnSync('docker',['inspect',s.uuid],{windowsHide:true,encoding:'utf8'});
+const state=inspected.status===0?JSON.parse(inspected.stdout)[0].State:null;
+if(action==='start'&&state?.Running||action==='stop'&&!state?.Running)throw Error('Unexpected actual native state');
+fs.writeFileSync(file,JSON.stringify({uuid:s.uuid,action,at:new Date().toISOString(),before:state},null,2)+'\n',{flag:'wx'});
+await api('/api/client/servers/'+s.identifier+'/power','POST',{signal:action});console.log({uuid:s.uuid,action,submitted:true});

@@ -1,13 +1,20 @@
+import {requestServerPower} from './serverPower';
+import type {PowerSignal} from './consoleLifecycle';
 import {useArtworkLibrary} from './ArtworkProvider';
-import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
+import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useLocation} from 'react-router-dom';
 import {api,Button} from '../lib';
+import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
+import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
 import {Icon,type IconName} from '../Icons';
-import {bytes,can,items,json,Notice,PageError,useAction,useServer,value} from './common';
+import {bytes,can,items,Notice,PageError,useAction,useServer,value} from './common';
 import './serverHeader.css';
+import './shadcn-cards.css';
+import './dashboard-ui.css';
 import {fallbackArtwork,getServerArtwork,type ServerArtwork} from './serverArtwork';
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {FavoriteButton} from '../ServerNavigation';
+import {InstallationPortsNotice} from './GamePorts';
 
 type Sample={at:number;cpu:number;memory:number;rx:number;tx:number;uptime:number};
 type Telemetry={state:string;resources:Record<string,any>;samples:Sample[];updated:number;error:string;refresh:()=>void};
@@ -33,7 +40,7 @@ function useTelemetry(base:string,enabled:boolean):Telemetry{
       }catch(error){
         if(active)setData(old=>({...old,error:error instanceof Error?error.message:String(error)}));
       }finally{
-        if(active)timer=setTimeout(poll,document.hidden?10000:3000);
+        if(active)timer=setTimeout(poll,document.hidden?10000:1000);
       }
     }
     void poll();
@@ -53,21 +60,21 @@ function PowerControls({compact=false}:{compact?:boolean}){
   const [pending,setPending]=useState('');
   const running=telemetry.state==='running',starting=telemetry.state==='starting';
   const blocked=!!server.status||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
-  const controls:[string,string,IconName,string,boolean][]=[
+  const controls:[PowerSignal,string,IconName,string,boolean][]=[
     ['start','Start','play','control.start',running||starting||telemetry.state==='stopping'],
     ['restart','Restart','restart','control.restart',!running],
     ['stop','Stop','stop','control.stop',!running&&!starting],
   ];
-  async function power(signal:string){
+  async function power(signal:PowerSignal){
     setPending(signal);
-    await action.run(()=>api(`${base}/power`,json('POST',{signal})),()=>{
+    await action.run(()=>requestServerPower(base,signal),()=>{
       telemetry.refresh();
       action.setSuccess(`${signal==='restart'?'Restart':signal==='start'?'Start':'Stop'} requested.`);
     });
     setPending('');
   }
   return <div className="server-power">
-    <div className="actions">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=><Button key={signal} variant={signal==='stop'?'danger':compact||signal==='restart'?'secondary':'default'} aria-label={compact?`${label} server`:undefined} title={compact?`${label} server`:undefined} aria-busy={pending===signal} disabled={blocked||disabled||action.busy} onClick={()=>void power(signal)}><Icon name={icon}/>{!compact&&(pending===signal?'Sending…':label)}</Button>)}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
+    <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=><Button key={signal} variant={signal==='stop'?'danger':compact||signal==='restart'?'secondary':'default'} aria-label={compact?`${label} server`:undefined} title={compact?`${label} server`:undefined} aria-busy={pending===signal} disabled={blocked||disabled||action.busy} onClick={()=>void power(signal)}><Icon name={icon}/>{!compact&&(pending===signal?'Sending…':label)}</Button>)}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
     <Notice action={action}/>
   </div>;
 }
@@ -95,47 +102,59 @@ export function ServerWorkspace({children}:{children:ReactNode}){
   const dashboardPage=/^\/server\/[^/]+\/?$/.test(pathname);
   const telemetry=useTelemetry(base,!server.status);
   return <TelemetryContext.Provider value={telemetry}>
-    {!dashboardPage?<header className="server-topbar"><div className="server-summary"><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div><ServerStateLine/></div><PowerControls compact/></header>:<header className="server-hero server-hero-with-artwork" data-artwork={art.id}>
+    {!dashboardPage?<header className="server-topbar"><div className="server-summary"><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div><ServerStateLine/></div><PowerControls compact/></header>:<header><Card className="server-hero server-hero-with-artwork shadcn-card" data-artwork={art.id}>
       <DashboardArtwork key={art.src} art={art}/>
-      <div className="server-hero-info">
-        <div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div>
-        {server.description&&<p className="server-description">{server.description}</p>}
+      <CardHeader className="server-hero-info">
+        <div className="server-hero-title"><CardTitle><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div></CardTitle></div>
+        {server.description&&<CardDescription className="server-description">{server.description}</CardDescription>}
         <ServerStateLine/>
-      </div>
-      <PowerControls/>
-    </header>}
+      </CardHeader>
+      <CardAction className="server-hero-controls"><PowerControls/></CardAction>
+    </Card></header>}
+
+    <InstallationPortsNotice key={server.identifier || server.uuid_short} identifier={server.identifier || server.uuid_short}/>
     <PageError error={telemetry.error}/>
     {children}
   </TelemetryContext.Provider>;
 }
 
 type Series={name:string;color:string;values:number[]};
-function UsageChart({title,series,maximum,format}:{title:string;series:Series[];maximum:number;format:(n:number)=>string}){
+function UsageChart({title,series,maximum,format,reading,limit,address}:{title:string;series:Series[];maximum:number;format:(n:number)=>string;reading?:string;limit?:string;address?:string}){
+  const chartRef=useRef<HTMLDivElement>(null),[chartWidth,setChartWidth]=useState(480);
+  useEffect(()=>{
+    const node=chartRef.current;if(!node)return;
+    const measure=()=>{const style=getComputedStyle(node);setChartWidth(Math.max(180,node.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)))};
+    measure();window.addEventListener('resize',measure);
+    const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(measure);
+    observer?.observe(node);return()=>{observer?.disconnect();window.removeEventListener('resize',measure)};
+  },[]);
   const observed=series.flatMap(s=>s.values);
   const scale=Math.max(maximum,...observed,1);
-  const left=72,right=460,top=16,bottom=164;
+  const chartHeight=144;
+  const left=72,right=chartWidth-20,top=16,bottom=chartHeight-28;
   const hasSamples=observed.length>0;
   const x=(index:number,length:number)=>length===1?right:left+(index/(length-1))*(right-left);
   const y=(v:number)=>bottom-(v/scale)*(bottom-top);
-  return <section className="usage-chart dashboard-panel" aria-label={`${title} chart`}>
-    <div className="dashboard-panel-heading"><h2>{title}</h2>{series.length>1&&<div className="chart-legend">{series.map(s=><span key={s.name} style={{color:s.color}}><span/>{s.name}</span>)}</div>}</div>
-    <div className="usage-chart-body">
-      <svg viewBox="0 0 480 192" role="img" aria-label={`${title}: ${hasSamples?series.map(s=>`${s.name} ${format(s.values.at(-1)||0)}`).join(', '):'waiting for live samples'}`}>
-        <title>{title}, live samples from this session</title>
+  return <Card className="usage-chart dashboard-panel shadcn-card" role="region" aria-label={`${title} chart`}>
+    <CardHeader className="dashboard-panel-heading"><CardTitle><div className="chart-heading"><h2>{title}</h2>{address&&<span className="chart-address" aria-label={`Server address: ${address}`} title={address}>{address}</span>}{reading!==undefined&&<p className="chart-reading"><strong>{reading}</strong>{limit&&<span> / {limit}</span>}</p>}</div></CardTitle><CardAction>{reading!==undefined?null:series.length>1?<div className="chart-legend">{series.map(s=><span key={s.name} style={{color:s.color}}><span/>{s.name}</span>)}</div>:<span className="chart-latest">{hasSamples?format(series[0].values.at(-1)||0):'Waiting'}</span>}</CardAction></CardHeader>
+    <CardContent className="usage-chart-body" ref={chartRef}>
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" role="img" aria-label={`${title}: ${hasSamples?series.map(s=>`${s.name} ${format(s.values.at(-1)||0)}`).join(', '):'waiting for live samples'}`}>
+        <title>{`${title}, live samples from this session`}</title>
         {[1,.5,0].map(f=><g key={f}><line x1={left} x2={right} y1={y(scale*f)} y2={y(scale*f)} className="chart-grid"/><text x={left-12} y={y(scale*f)+4} textAnchor="end" className="chart-axis">{format(scale*f)}</text></g>)}
         {series.map(s=>{
           if(!s.values.length)return null;
           const points=s.values.map((v,i)=>`${x(i,s.values.length)},${y(v)}`).join(' ');
           return <g key={s.name}>
-            {series.length===1&&s.values.length>1&&<polygon points={`${left},${bottom} ${points} ${right},${bottom}`} fill={s.color} fillOpacity=".12"/>}
-            <polyline points={points} fill="none" stroke={s.color} strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>
+            {series.length===1&&s.values.length>1&&<polygon points={`${left},${bottom} ${points} ${right},${bottom}`} fill={s.color} fillOpacity=".06"/>}
+            <polyline points={points} fill="none" stroke={s.color} strokeWidth="2" vectorEffect="non-scaling-stroke"/>
             <circle cx={x(s.values.length-1,s.values.length)} cy={y(s.values.at(-1)||0)} r="3" fill={s.color}/>
           </g>;
         })}
       </svg>
       {!hasSamples&&<p className="chart-waiting">Collecting live samples…</p>}
-    </div>
-  </section>;
+    </CardContent>
+    {reading===undefined&&!address&&<CardFooter className="chart-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name="activity"/></ItemMedia><ItemContent><ItemDescription>Samples from this session</ItemDescription></ItemContent></Item></CardFooter>}
+  </Card>;
 }
 
 function serverAddress(server:Record<string,any>){
@@ -150,10 +169,7 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
   const address=serverAddress(server);
   const limit=(key:string)=>server.limits?.[key]?bytes(number(server.limits[key])*1024**2):'∞';
   const cards:{label:string;icon:IconName;value:string;limit?:string}[]=[
-    {label:'CPU',icon:'cpu',value:updated?`${number(r.cpu_absolute).toFixed(2)}%`:'—',limit:server.limits?.cpu?`${server.limits.cpu}%`:'∞'},
-    {label:'Memory',icon:'memory',value:updated?bytes(r.memory_bytes):'—',limit:limit('memory')},
     {label:'Disk',icon:'disk',value:updated?bytes(r.disk_bytes):'—',limit:limit('disk')},
-    {label:'Address',icon:'network',value:address},
   ];
   const network=samples.slice(1).map((sample,index)=>{
     const previous=samples[index],elapsed=Math.max((sample.at-previous.at)/1000,.001);
@@ -162,16 +178,18 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
     return {rx:reset?0:Math.max(0,sample.rx-previous.rx)/elapsed,tx:reset?0:Math.max(0,sample.tx-previous.tx)/elapsed};
   });
   return <>
-    <div className="server-metrics">{cards.map(card=><section className="metric-card" data-metric={card.icon} key={card.label}>
-      <span className="metric-icon"><Icon name={card.icon}/></span>
-      <div><h2>{card.label}</h2><p className={card.label==='Address'?'metric-address':''}><span className="metric-reading">{card.value}</span>{card.limit&&<span className="metric-limit"> / {card.limit}</span>}</p></div>
-    </section>)}</div>
+    <div className="dashboard-charts dashboard-resource-charts">
+      <UsageChart title="CPU" reading={updated?`${number(r.cpu_absolute).toFixed(2)}%`:'\u2014'} limit={server.limits?.cpu?`${server.limits.cpu}%`:'\u221e'} series={[{name:'CPU',color:'var(--accent)',values:samples.map(s=>s.cpu)}]} maximum={number(server.limits?.cpu)||1} format={n=>`${n<1?n.toFixed(2):n.toFixed(0)}%`}/>
+      <UsageChart title="Memory" reading={updated?bytes(r.memory_bytes):'\u2014'} limit={limit('memory')} series={[{name:'Memory',color:'var(--theme-accent-b,var(--accent))',values:samples.map(s=>s.memory)}]} maximum={number(server.limits?.memory)*1024**2} format={bytes}/>
+      <UsageChart title="Network" address={address} series={[{name:'In',color:'var(--accent)',values:network.map(s=>s.rx)},{name:'Out',color:'var(--theme-accent-b,var(--muted))',values:network.map(s=>s.tx)}]} maximum={1} format={n=>`${bytes(n)}/s`}/>
+    {cards.map(card=><Card className="metric-card shadcn-card" data-metric={card.icon} key={card.label}>
+      <CardHeader className="metric-header"><CardTitle><h2>{card.label}</h2></CardTitle><CardAction><span className="metric-icon"><Icon name={card.icon}/></span></CardAction></CardHeader>
+      <CardContent className="metric-content"><p className={card.label==='Address'?'metric-address':''} title={`${card.value}${card.limit?` / ${card.limit}`:''}`}><span className="metric-reading">{card.value}</span>{card.limit&&<span className="metric-limit"> / {card.limit}</span>}</p>
+        {card.label==='Disk'?<div className="metric-disk-usage">{updated&&number(server.limits?.disk)>0?<div className="overview-meter" aria-label={`Disk usage ${card.value} of ${card.limit}`}><span style={{width:`${Math.min(100,number(r.disk_bytes)/(number(server.limits.disk)*1024**2)*100)}%`}}/></div>:<span>{updated?'Current usage':'Waiting for live samples'}</span>}</div>:null}
+      </CardContent>
+      <CardFooter className="metric-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name={card.icon}/></ItemMedia><ItemContent><ItemDescription>{card.limit?'Limit':'Server allocation'}</ItemDescription></ItemContent>{card.limit&&<ItemActions>{card.limit}</ItemActions>}</Item></CardFooter>
+    </Card>)}</div>
     {children}
-    <div className="dashboard-charts">
-      <UsageChart title="CPU load" series={[{name:'CPU',color:'var(--accent)',values:samples.map(s=>s.cpu)}]} maximum={number(server.limits?.cpu)||1} format={n=>`${n<1?n.toFixed(2):n.toFixed(0)}%`}/>
-      <UsageChart title="Memory" series={[{name:'Memory',color:'#adb5c4',values:samples.map(s=>s.memory)}]} maximum={number(server.limits?.memory)*1024**2} format={bytes}/>
-      <UsageChart title="Network" series={[{name:'In',color:'#93b2ee',values:network.map(s=>s.rx)},{name:'Out',color:'#a3a9b6',values:network.map(s=>s.tx)}]} maximum={1} format={n=>`${bytes(n)}/s`}/>
-    </div>
   </>;
 }
 

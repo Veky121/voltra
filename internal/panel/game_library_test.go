@@ -36,6 +36,14 @@ func TestGameLibraryMinecraftProvisioning(t *testing.T) {
 	var daemonCalls atomic.Int32
 	var rejectDaemon atomic.Bool
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path == "/api/system" && r.Method == "GET" {
+			writeJSON(w, 200, M{"os": "linux"})
+			return
+		}
 		if r.URL.Path != "/api/servers" || r.Method != "POST" {
 			t.Errorf("unexpected daemon operation %s %s", r.Method, r.URL.Path)
 		}
@@ -83,6 +91,9 @@ func TestGameLibraryMinecraftProvisioning(t *testing.T) {
 	if str(options["latest"]) != "26.3" || len(asSlice(options["versions"])) != 1 || len(asSlice(options["nodes"])) != 1 {
 		t.Fatal("invalid release/node options")
 	}
+	if !boolean(asMap(asSlice(options["nodes"])[0])["setup_available"]) {
+		t.Fatal("encrypted node credential prevented setup eligibility")
+	}
 	memberOptions := asMap(infraExpect(t, mux, num(user["id"]), "GET", "/api/client/game-library/minecraft", nil, 200)["attributes"])
 	if len(asSlice(memberOptions["nodes"])) != 0 {
 		t.Fatal("nodes disclosed to ordinary member")
@@ -108,7 +119,7 @@ func TestGameLibraryMinecraftProvisioning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if server["status"] != "installing" || num(server["owner_id"]) != adminID || server["image"] != "ghcr.io/pterodactyl/yolks:java_25" || num(server["allocation_id"]) != num(allocation["id"]) {
+	if server["status"] != "installing" || num(server["owner_id"]) != adminID || server["image"] != "ghcr.io/pterodactyl/yolks:java_25" || num(server["allocation_id"]) == num(allocation["id"]) {
 		t.Fatal("incorrect Minecraft deployment")
 	}
 	env, err := a.serverEnvironment(ctx, server)
@@ -120,7 +131,7 @@ func TestGameLibraryMinecraftProvisioning(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, _ := json.Marshal(envelope)
-	if !strings.Contains(string(raw), "25568") || !strings.Contains(string(raw), "server.properties") {
+	if !strings.Contains(string(raw), "25565") || !strings.Contains(string(raw), "server.properties") {
 		t.Fatal("assigned port not passed to Wings configuration")
 	}
 	duplicate := asMap(infraExpect(t, mux, adminID, "POST", path, input, 200)["attributes"])
@@ -132,9 +143,12 @@ func TestGameLibraryMinecraftProvisioning(t *testing.T) {
 		t.Fatal("managed egg not reused")
 	}
 	input["request_id"] = newUUID()
-	infraExpect(t, mux, adminID, "POST", path, input, 422)
+	preview := asMap(infraExpect(t, mux, adminID, "POST", "/api/client/game-library/minecraft/ports", M{"node_id": node["id"]}, 200)["attributes"])
+	if num(asMap(asSlice(preview["ports"])[0])["port"]) != 25566 {
+		t.Fatal("Minecraft fallback preview lost assigned-port conflict")
+	}
 	if daemonCalls.Load() != 1 {
-		t.Fatal("daemon called without a free allocation")
+		t.Fatal("preview called server creation")
 	}
 	secondAllocation := insert("allocations", M{"node_id": node["id"], "ip": "127.0.0.1", "port": 25569})
 	if err = a.exec(ctx, "UPDATE nodes SET memory=1024 WHERE id=$1", node["id"]); err != nil {

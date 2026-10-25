@@ -148,7 +148,7 @@ class ArmaTests(unittest.TestCase):
                 self.assertEqual(args[0], str(root / binary))
 
     def test_reforger_reinstall_exact_config_even_when_steam_fails(self):
-        for app in [1874900, 1890870]:
+        for app in [1874900]:
             with tempfile.TemporaryDirectory() as folder:
                 root = Path(folder)
                 config = root / 'config.json'
@@ -161,7 +161,7 @@ class ArmaTests(unittest.TestCase):
                     raise RuntimeError('fixture-only Steam interruption')
                 with patch.object(arma.steam, 'update', side_effect=replace_then_fail):
                     with self.assertRaises(RuntimeError):
-                        arma.update_reforger(root, {'SRCDS_APPID': str(app)})
+                        arma.update_reforger(root, {'SRCDS_APPID': str(app), 'REFORGER_ACCEPT_EULA': json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_agreement']['accept_value'], 'REFORGER_ACCEPT_BATTLEYE': json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_battleye_agreement']['accept_value']})
                 self.assertEqual(config.read_bytes(), data)
                 self.assertEqual(config.stat().st_mode, original.st_mode)
                 self.assertEqual(config.stat().st_mtime_ns, original.st_mtime_ns)
@@ -169,7 +169,7 @@ class ArmaTests(unittest.TestCase):
     def test_reforger_exact_argv_and_private_file(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            args, clients = arma.configure(root, 'reforger', self.env(LOG_INTERVAL='3', MAX_FPS=''))
+            args, clients = arma.configure(root, 'reforger', self.env(LOG_INTERVAL='3', MAX_FPS='', REFORGER_ACCEPT_EULA=json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_agreement']['accept_value'], REFORGER_ACCEPT_BATTLEYE=json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_battleye_agreement']['accept_value']))
             self.assertEqual(args[args.index('-logStats') + 1], '3000')
             self.assertNotIn('-maxFPS', args)
             self.assertEqual(clients, [])
@@ -199,6 +199,73 @@ class ArmaTests(unittest.TestCase):
             finally:
                 if process.poll() is None:
                     process.kill();process.wait()
+
+
+    def test_reforger_missing_wrong_or_generic_consent_blocks_before_download_or_write(self):
+        for value in [None, '0', '1', 'true', '1874900_eula_1', 'f' * 64]:
+            for action in ['install', 'configure', 'update']:
+                with self.subTest(value=value, action=action), tempfile.TemporaryDirectory() as folder:
+                    root = Path(folder); env = self.env()
+                    if value is not None: env['REFORGER_ACCEPT_EULA'] = value
+                    with patch.object(arma.steam, 'update') as download, self.assertRaisesRegex(ValueError, 'explicitly agree'):
+                        if action == 'install': arma.install(root, 'reforger', env)
+                        elif action == 'configure': arma.configure(root, 'reforger', env)
+                        else: arma.update_reforger(root, env)
+                    download.assert_not_called(); self.assertEqual(list(root.iterdir()), [])
+
+    def test_reforger_exact_stable_ack_and_config_unknowns_retained(self):
+        terms = json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_agreement']
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); config=root/'config.json'; content=b'{"operator_unknown":73,"game":{"mods":[]}}';config.write_bytes(content);config.chmod(0o640)
+            env=self.env(REFORGER_ACCEPT_EULA=terms['accept_value'],REFORGER_ACCEPT_BATTLEYE=json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_battleye_agreement']['accept_value'])
+            with patch.object(arma.steam,'update') as download:arma.install(root,'reforger',env)
+            download.assert_called_once();self.assertEqual(config.read_bytes(),content);self.assertEqual(config.stat().st_mode&0o777,0o640)
+            arma.configure(root,'reforger',env);self.assertEqual(json.loads(config.read_text())['operator_unknown'],73)
+            self.assertEqual(config.stat().st_mode&0o777,0o600)
+
+    def test_reforger_stable_ack_never_authorizes_experimental_or_swaps_app(self):
+        terms=json.loads(SOURCE.with_name('arma-releases.json').read_text())['reforger_agreement']
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);env=self.env(SRCDS_APPID='1890870',REFORGER_ACCEPT_EULA=terms['accept_value'])
+            with patch.object(arma.steam,'update')as download,self.assertRaisesRegex(ValueError,'separate publisher agreement review'):arma.install(root,'reforger',env)
+            download.assert_not_called();self.assertEqual(list(root.iterdir()),[])
+
+    def test_reforger_run_guard_precedes_update_config_and_native_launch(self):
+        with patch.object(sys,'argv',['arma-native.py','run','reforger']),patch.dict(os.environ,{},clear=True),patch.object(arma,'update_reforger')as update,patch.object(arma,'configure')as configure,patch.object(arma,'supervise')as native,self.assertRaisesRegex(ValueError,'explicitly agree'):
+            arma.main()
+        update.assert_not_called();configure.assert_not_called();native.assert_not_called()
+
+    def test_arma3_gate_is_noop_without_terms_pin_or_ack(self):
+        with patch.object(arma.json,'loads',side_effect=AssertionError('Arma3 must not read agreement')):
+            arma.agreement('arma3',{})
+
+
+    def test_battleye_missing_wrong_or_zero_blocks_with_server_consent(self):
+        pins=json.loads(SOURCE.with_name('arma-releases.json').read_text())
+        for value in [None,'0','1','true','f'*64]:
+            for enabled in ['true','false']:
+                for action in ['install','configure','update']:
+                    with self.subTest(value=value,enabled=enabled,action=action),tempfile.TemporaryDirectory()as folder:
+                        root=Path(folder);env=self.env(REFORGER_ACCEPT_EULA=pins['reforger_agreement']['accept_value'],BATTLEYE=enabled)
+                        if value is not None:env['REFORGER_ACCEPT_BATTLEYE']=value
+                        with patch.object(arma.steam,'update')as download,self.assertRaisesRegex(ValueError,'BattlEye EULA'):
+                            if action=='install':arma.install(root,'reforger',env)
+                            elif action=='configure':arma.configure(root,'reforger',env)
+                            else:arma.update_reforger(root,env)
+                        download.assert_not_called();self.assertEqual(list(root.iterdir()),[])
+
+    def test_battleye_false_never_implies_consent_and_correct_both_remain_literal(self):
+        pins=json.loads(SOURCE.with_name('arma-releases.json').read_text());env=self.env(REFORGER_ACCEPT_EULA=pins['reforger_agreement']['accept_value'],REFORGER_ACCEPT_BATTLEYE=pins['reforger_battleye_agreement']['accept_value'])
+        arma.agreement('reforger',env)
+        with tempfile.TemporaryDirectory()as folder:
+            arma.configure(Path(folder),'reforger',env);cfg=json.loads((Path(folder)/'config.json').read_text())
+            self.assertTrue(cfg['game']['gameProperties']['battlEye'])
+
+    def test_battleye_run_guard_before_update_config_and_native(self):
+        pins=json.loads(SOURCE.with_name('arma-releases.json').read_text())
+        with patch.object(sys,'argv',['arma-native.py','run','reforger']),patch.dict(os.environ,{'REFORGER_ACCEPT_EULA':pins['reforger_agreement']['accept_value']},clear=True),patch.object(arma,'update_reforger')as update,patch.object(arma,'configure')as configure,patch.object(arma,'supervise')as native,self.assertRaisesRegex(ValueError,'BattlEye EULA'):
+            arma.main()
+        update.assert_not_called();configure.assert_not_called();native.assert_not_called()
 
 
 unittest.main()

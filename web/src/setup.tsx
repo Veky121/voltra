@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { api, Button, Card, ErrorBox, Field, Loading } from "./lib";
+import {Select,  api, Button, Card, ErrorBox, Field, Loading } from "./lib";
 import "./setup.css";
 import BrandMark from "./BrandMark";
 
@@ -76,7 +76,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   // Only the server's explicit development mode preserves the existing local
   // workflow. Production never falls through to the application anonymously.
   if (!session.authenticated && !development) return <Login session={session} onAuthenticated={reload} />;
-  return <AccountSessionContext.Provider value={{canSignOut:session.authenticated&&status.auth_enabled,signOut:async()=>{await api('/api/auth/logout',{method:'POST',headers:sessionHeaders(session)});reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
+  return <AccountSessionContext.Provider value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{await api('/api/auth/logout',{method:'POST',headers:sessionHeaders(session)});reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
 }
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {
@@ -209,7 +209,6 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
   return <SetupFrame title="Set up your panel"><p className="setup-progress muted">{step < 2 ? "Administrator" : step < 4 ? "Address" : "Checks"}</p><h2 ref={heading} tabIndex={-1}>{titles[step]}</h2><form onSubmit={submit}>
     <fieldset disabled={!!busy} className="setup-fields">
       {step === 0 && <>
-        <p className="muted">Host games on your own hardware and share them with friends. This panel manages your servers.</p>
         <Field label="Username"><input required name="username" minLength={2} maxLength={64} pattern="[a-zA-Z0-9_.\-]+" title="Use letters, numbers, underscores, dots, or hyphens." autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} autoFocus /></Field>
         <Field label="Email"><input required name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
       </>}
@@ -219,7 +218,7 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
         <Field label={accessMode === "local" ? "Local panel URL" : "Public panel URL"} hint={accessMode === "local" ? "Use the address you open on this machine." : "Use your panel's HTTPS domain."}><input required name="public_url" type="url" autoComplete="url" value={publicURL} onChange={(event) => setPublicURL(event.target.value)} /></Field>
       </>}
       {step === 3 && <>
-        <Field label="HTTPS mode"><select name="tls_mode" value={tlsMode} onChange={(event) => setTLSMode(event.target.value as "proxy" | "automatic")}><option value="proxy">Existing reverse proxy</option><option value="automatic">Automatic certificates</option></select></Field>
+        <Field label="HTTPS mode"><Select name="tls_mode" value={tlsMode} onChange={(event) => setTLSMode(event.target.value as "proxy" | "automatic")}><option value="proxy">Existing reverse proxy</option><option value="automatic">Automatic certificates</option></Select></Field>
         {tlsMode === "automatic" ? <><Field label="Certificate email" hint="Point the domain to this server and allow port 443. Certificates need a successful HTTPS check."><input required type="email" name="acme_email" autoComplete="email" value={acmeEmail || email} onChange={(event) => setAcmeEmail(event.target.value)} /></Field><label className="setup-terms"><input required type="checkbox" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} /><span>I accept the <a href="https://letsencrypt.org/repository/" target="_blank" rel="noreferrer">certificate authority terms</a>.</span></label></> : <p className="muted">Your reverse proxy must already serve this panel over HTTPS.</p>}
       </>}
       {step === 4 && <>

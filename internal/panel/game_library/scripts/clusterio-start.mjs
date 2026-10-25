@@ -22,7 +22,10 @@ export function roleSettings(env) {
   if(!['controller','host'].includes(env.SERVER_MODE))throw Error('Select controller or host.');
   const port=Number(env.SERVER_PORT);
   if(!Number.isInteger(port)||port<1||port>65535)throw Error('Invalid allocated port.');
-  if(env.SERVER_MODE==='controller')return {'controller.name':env.CLUSTER_NAME,'controller.http_port':port,'controller.bind_address':'0.0.0.0'};
+  if(env.SERVER_MODE==='controller'){
+    if(typeof env.CLUSTER_NAME!=='string'||!env.CLUSTER_NAME.trim()||Array.from(env.CLUSTER_NAME).length>100)throw Error('A controller requires a Cluster Name of at most 100 characters. Hosts may leave it blank.');
+    return {'controller.name':env.CLUSTER_NAME,'controller.http_port':port,'controller.bind_address':'0.0.0.0'};
+  }
   let token;
   if(!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(env.CONTROLLER_TOKEN||''))throw Error('A valid host token from the Clusterio controller is required.');
   try {token=JSON.parse(Buffer.from(env.CONTROLLER_TOKEN.split('.')[1],'base64url'));} catch {throw Error('A valid host token from the Clusterio controller is required.');}

@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomBytes } from 'node:crypto';
-import { createServer } from 'node:net';
 import path from 'node:path';
 import { assert, attrs, rows, project, loadJSON, request, runID, Suite } from './common.mjs';
 
@@ -63,30 +62,7 @@ await suite.check('admin.settings-validate-persist', 'infrastructure', 'General 
     const publicSettings = attrs(await get('/api/admin/settings')); assert.ok(!('mail:password' in publicSettings)); assert.ok(!('secret_access_key' in publicSettings['backups.s3']));
   } finally { await patch('/api/admin/settings', { [key]: before[key] }); }
 }, ['GET /admin/settings', 'PATCH /admin/settings', 'GET /admin/settings/advanced', 'PATCH /admin/settings/advanced']);
-await suite.check('admin.mail-real-smtp', 'infrastructure', 'Mail test sends an actual SMTP message and rejects header injection', async () => {
-  const messages = []; const smtp = createServer(socket => {
-    socket.write('220 parity.local ESMTP\r\n'); let buffer = '', data = false, message = '';
-    socket.on('data', chunk => {
-      buffer += chunk.toString(); let pos;
-      while ((pos = buffer.indexOf('\r\n')) >= 0) {
-        const line = buffer.slice(0, pos); buffer = buffer.slice(pos + 2);
-        if (data) { if (line === '.') { data = false; messages.push(message); socket.write('250 queued\r\n'); } else message += `${line}\n`; }
-        else if (/^EHLO|^HELO/i.test(line)) socket.write('250 parity.local\r\n');
-        else if (/^MAIL FROM|^RCPT TO|^RSET/i.test(line)) socket.write('250 OK\r\n');
-        else if (/^DATA/i.test(line)) { data = true; message = ''; socket.write('354 End with dot\r\n'); }
-        else if (/^QUIT/i.test(line)) { socket.end('221 Bye\r\n'); }
-        else socket.write('250 OK\r\n');
-      }
-    });
-  });
-  await new Promise(resolve => smtp.listen(0, '127.0.0.1', resolve));
-  const before = attrs(await get('/api/admin/settings')); const changes = { 'mail:host': '127.0.0.1', 'mail:port': smtp.address().port, 'mail:username': '', 'mail:encryption': 'none', 'mail:from:address': 'parity@example.invalid' };
-  try {
-    await patch('/api/admin/settings', changes); assert.equal((await post('/api/admin/settings/mail/test', { email: 'receiver@example.invalid' })).sent, true);
-    assert.ok(messages.some(m => m.includes('receiver@example.invalid') && m.includes('SMTP server')));
-    await request('POST', '/api/admin/settings/mail/test', { email: 'a@example.invalid\r\nBcc: other@example.invalid' }, { status: [400, 422] });
-  } finally { await patch('/api/admin/settings', Object.fromEntries(Object.keys(changes).map(k => [k, before[k]]))); await new Promise(resolve => smtp.close(resolve)); }
-}, ['GET /admin/settings/mail', 'PATCH /admin/settings/mail', 'POST /admin/settings/mail/test']);
+
 await suite.check('database.real-mariadb-fixture', 'collaboration', 'Start an isolated MariaDB and provision a private host without exposing credentials', async () => {
   await docker(['run', '-d', '--rm', '--name', container, '-p', '127.0.0.1:53316:3306', '-e', 'MARIADB_ROOT_PASSWORD', '-e', 'MARIADB_ROOT_HOST=%', 'mariadb:11.8'], { MARIADB_ROOT_PASSWORD: rootPassword }, 60000); own('mariadb', () => docker(['rm', '-f', container]));
   await poll('MariaDB readiness', async () => { try { return await mysql('root', rootPassword, 'SELECT 1') === '1'; } catch { return false; } });

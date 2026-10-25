@@ -14,28 +14,29 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const lease=(game,id)=>managedNativeLease(JSON.parse(fs.readFileSync('.local/game-batch/queue.json','utf8')),id,game);
 function receipt(){
  const r=JSON.parse(fs.readFileSync(handle,'utf8'));
- if(!/^[a-f0-9-]{36}$/.test(r.run_id)||r.root!=='/var/lib/voltra-batch-20261023/managed-bridge/'+r.run_id||resolve(r.directory)!==join(base,r.run_id)||r.panel_url!=='http://127.0.0.1:18098'||r.node!==202)throw Error('Unexpected owned native namespace');
+ if(!/^[a-f0-9-]{36}$/.test(r.run_id)||r.root!=='/var/lib/voltra-batch-20261023/managed-bridge/'+r.run_id||resolve(r.directory)!==join(base,r.run_id)||r.panel_url!=='http://127.0.0.1:18098'||!Number.isSafeInteger(r.node)||r.node<1)throw Error('Unexpected owned native namespace');
  if(r.wings_container!=='voltra-managed-wings-'+r.run_id||r.connector_container!=='voltra-managed-node-'+r.run_id)throw Error('Unexpected owned process identity');
  return r;
 }
 const [command,game,id]=process.argv.slice(2);
+const proton=game==='palworld-proton',panelName=proton?'panel-managed-proton.test.exe':'panel-managed-native.test.exe';
 fs.mkdirSync(bin,{recursive:true});
 if(command==='build'){
  if(fs.existsSync(handle))throw Error('Inspect active native handle before building another artifact');
  run('go',['build','-trimpath','-o',join(bin,'voltra-node-linux'),'./cmd/node'],{env:{...process.env,GOOS:'linux',GOARCH:'amd64',CGO_ENABLED:'0'}});
- run('go',['test','-c','-o',join(bin,'panel-managed-native.test.exe'),'./internal/panel']);
- save(join(bin,'build.json'),{built_at:new Date().toISOString(),node_sha256:sha(join(bin,'voltra-node-linux')),panel_test_sha256:sha(join(bin,'panel-managed-native.test.exe')),native_test_source_sha256:sha('internal/panel/steam_catalog_native_test.go'),source_plan:JSON.parse(fs.readFileSync('artifacts/managed-steam-native-acceptance-plan.json','utf8')).source_sha256});
+ run('go',['test',...(proton?['-tags','voltra_palworld_proton_acceptance']:[]),'-c','-o',join(bin,panelName),'./internal/panel']);
+ save(join(bin,'build.json'),{built_at:new Date().toISOString(),node_sha256:sha(join(bin,'voltra-node-linux')),panel_test_sha256:sha(join(bin,panelName)),panel_name:panelName,acceptance_game:proton?'palworld-proton':null,acceptance_build_tag:proton?'voltra_palworld_proton_acceptance':null,native_test_source_sha256:sha('internal/panel/steam_catalog_native_test.go'),source_plan:Object.fromEntries([...new Set([...Object.keys(JSON.parse(fs.readFileSync(proton?'artifacts/managed-steam-palworld-proton-source.json':'artifacts/managed-steam-native-acceptance-plan.json','utf8')).source_sha256),...(proton?['internal/panel/steam.go','internal/panel/steam_create_completion_test.go','internal/panel/steam_palworld_platform_fixture_test.go']:[])])].map(path=>[path,sha(path)]))});
  console.log('Built isolated source Panel test executable and Linux connector; no runtime started');
 }else if(command==='start'){
  lease(game,id);
  if(fs.existsSync(handle))throw Error('Existing native handle must be inspected first');
  const built=JSON.parse(fs.readFileSync(join(bin,'build.json'),'utf8'));
- if(built.node_sha256!==sha(join(bin,'voltra-node-linux'))||built.panel_test_sha256!==sha(join(bin,'panel-managed-native.test.exe')))throw Error('Native build provenance changed');
+ if((built.acceptance_game??null)!==(proton?'palworld-proton':null)||built.panel_name!==panelName||built.node_sha256!==sha(join(bin,'voltra-node-linux'))||built.panel_test_sha256!==sha(join(bin,panelName)))throw Error('Native build provenance changed');
  const line=fs.readFileSync('.local/runtime.env','utf8').replace(/^\uFEFF/,'').split(/\r?\n/).find(line=>line.startsWith('DATABASE_URL='));
  if(!line)throw Error('Private fixture database transport unavailable');
  const dsn=line.slice('DATABASE_URL='.length).trim().replace(/^"|"$/g,'');
  const log=fs.openSync(join(base,'panel-harness-private.log'),'a',0o600);
- const child=spawn(join(bin,'panel-managed-native.test.exe'),['-test.run=^TestSteamCatalogNativeAcceptanceHarness$','-test.v','-test.timeout=3h10m'],{cwd:resolve('internal/panel'),env:{...process.env,TEST_DATABASE_URL:dsn,VOLTRA_MANAGED_NATIVE_GAME:game,VOLTRA_MANAGED_NATIVE_LEASE:id},windowsHide:true,detached:true,stdio:['ignore',log,log]});
+ const child=spawn(join(bin,panelName),[proton?'-test.run=^TestSteamCatalogProtonNativeAcceptanceHarness$':'-test.run=^TestSteamCatalogNativeAcceptanceHarness$','-test.v','-test.timeout=3h10m'],{cwd:resolve('internal/panel'),env:{...process.env,GOMEMLIMIT:'256MiB',TEST_DATABASE_URL:dsn,VOLTRA_MANAGED_NATIVE_GAME:game,VOLTRA_MANAGED_NATIVE_LEASE:id},windowsHide:true,detached:true,stdio:['ignore',log,log]});
  child.unref();fs.closeSync(log);
  let r;
  for(let n=0;n<30;n++){if(fs.existsSync(handle)){r=receipt();break;}await sleep(500);}

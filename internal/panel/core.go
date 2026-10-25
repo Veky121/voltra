@@ -37,12 +37,14 @@ type Config struct {
 	Listen, DatabaseURL, PublicURL, DaemonURL, WebDir, LocalesDir, EncryptionKey, Timezone string
 	DevMode                                                                                bool
 	DevUserID                                                                              int64
+	ConsoleHistoryLines                                                                    int
 }
 type App struct {
 	DB                 *pgxpool.Pool
 	Config             Config
 	HTTP               *http.Client
 	connectorHub       *connectorHub
+	privateSteam       *privateSteamHub
 	managedHTTPS       *managedHTTPS
 	artworkCache       serverArtworkCache
 	artworkLibraryOnce sync.Once
@@ -440,7 +442,12 @@ func (a *App) migrate(ctx context.Context) error {
 	}
 	return tx.Commit(ctx)
 }
-func (a *App) Close() { a.closeHTTPS(); a.connectors().close(); a.DB.Close() }
+func (a *App) Close() {
+	a.closePrivateSteam()
+	a.closeHTTPS()
+	a.connectors().close()
+	a.DB.Close()
+}
 func (a *App) SeedDevelopment(ctx context.Context) error {
 	if !a.Config.DevMode {
 		return nil
@@ -472,6 +479,7 @@ func (a *App) Handler() http.Handler {
 	a.registerProxyGateways(mux)
 	a.registerGameLibrary(mux)
 	a.registerSteam(mux)
+	a.registerPrivateSteam(mux)
 	a.registerSteamGames(mux)
 	a.registerGameQuickSetup(mux)
 	a.registerJava(mux)

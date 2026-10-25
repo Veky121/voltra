@@ -50,12 +50,16 @@ def configure(root, env):
         argv += ['+maxplayers', str(capacity)]
     else: argv += ['-game', game, '-debug', '+maxplayers', str(capacity)]
     cfg = root / game / ('server.cfg' if kind == 'sven' else 'cfg/server.cfg')
-    managed = cfg.with_name('voltra-managed.cfg'); wrapper = cfg.with_name('voltra-server.cfg')
+    # GoldSrc reparses '-' inside +command values as an option boundary.
+    # Keep Sven filenames command-parser safe; other reviewed games unchanged.
+    managed_name = 'voltra_managed.cfg' if kind == 'sven' else 'voltra-managed.cfg'
+    wrapper_name = 'voltra_server.cfg' if kind == 'sven' else 'voltra-server.cfg'
+    managed = cfg.with_name(managed_name); wrapper = cfg.with_name(wrapper_name)
     for path in (cfg, managed, wrapper):
         if not path.resolve().is_relative_to(root): raise ValueError('Native configuration escapes volume')
     private_write(managed, '// Setup controls only; operator server.cfg remains intact.\n' + ''.join(key + ' ' + value + '\n' for key, value in values.items()))
-    private_write(wrapper, 'exec server.cfg\nexec voltra-managed.cfg\n')
-    argv += ['+servercfgfile', 'voltra-server.cfg', '+exec', 'voltra-managed.cfg', '+map', game_map]
+    private_write(wrapper, 'exec server.cfg\nexec ' + managed_name + '\n')
+    argv += ['+servercfgfile', wrapper_name, '+exec', managed_name, '+map', game_map]
     environment = dict(os.environ)
     for key in ('PYTHONHOME', 'PYTHONPATH', 'LD_PRELOAD'): environment.pop(key, None)
     environment['LD_LIBRARY_PATH'] = ':'.join(str(root / p) for p in (('game/bin/linuxsteamrt64', 'game/csgo/bin/linuxsteamrt64') if kind == 'cs2' else ('bin',)))

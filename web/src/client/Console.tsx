@@ -3,6 +3,10 @@ import { api, Button, Input, Select, Field, Modal } from "../lib";
 import {useServerTelemetry} from "./ServerDashboard";
 import Terminal from './Terminal';
 import {consoleOutput} from './consoleOutput';
+import {consoleStateLine} from './consoleLifecycle';
+import {requestServerPower, consolePowerEvent, type ConsolePowerEvent} from './serverPower';
+import {appendConsoleHistory, emptyConsoleHistory} from './consoleHistory';
+import {ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS} from './consoleQueue';
 import './console.css';
 import {
   can,
@@ -42,10 +46,11 @@ export default function Console() {
   const a = useAction();
   const featureAction = useAction();
   const telemetry=useServerTelemetry();
-  const [lines, setLines] = useState<string[]>([]),
+  const [history, setHistory] = useState(emptyConsoleHistory),
     [status, setStatus] = useState("unknown"),
     [connection, setConnection] = useState("Connecting"),
     [socketError, setSocketError] = useState(""),
+    [historyError, setHistoryError] = useState(""),
     [feature, setFeature] = useState(""),
     [oauth, setOAuth] = useState(""),
     [token, setToken] = useState(""),
@@ -53,6 +58,7 @@ export default function Console() {
     [images, setImages] = useState<Record<string, string>>({});
   useEffect(()=>{if(telemetry.state!=='unknown')setStatus(telemetry.state)},[telemetry.state]);
   const socket = useRef<WebSocket | null>(null),
+    pendingLines = useRef(new ConsoleLineQueue()),
     statusRef = useRef(status),
     features = useRef<string[]>([]);
   statusRef.current = status;
@@ -60,15 +66,107 @@ export default function Console() {
     (s: string) => s.toLowerCase()
   );
   useEffect(() => {
+    pendingLines.current.clear();
+    setHistory(emptyConsoleHistory());
     let active = true,
       timer: ReturnType<typeof setTimeout>,
       retry = 0;
     let current: WebSocket | null = null;
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const scheduleDrain = () => {
+      if (!active || drainTimer !== undefined || !pendingLines.current.size) return;
+      drainTimer = setTimeout(drain, document.hidden || reducedMotion.matches ? 0 : CONSOLE_QUEUE_FRAME_MS);
+    };
+    const drain = () => {
+      drainTimer = undefined;
+      if (!active) return;
+      const incoming = pendingLines.current.take(performance.now(), document.hidden || reducedMotion.matches);
+      if (incoming.length) setHistory(old => active ? appendConsoleHistory(old, incoming) : old);
+      scheduleDrain();
+    };
+    const queueLines = (...lines: string[]) => { pendingLines.current.enqueue(lines); scheduleDrain(); };
+    const visibilityChanged = () => {
+      clearTimeout(drainTimer); drainTimer = undefined;
+      scheduleDrain();
+    };
+    document.addEventListener('visibilitychange', visibilityChanged);
+    let observedState = "unknown";
+    let historyMode: "loading" | "persistent" | "live" | "legacy" = "loading";
+    let replayTimer: ReturnType<typeof setTimeout>;
+    const replayAbort = new AbortController();
+    let cursor = "0", socketReady = false, replayedSaved = false, requestedLiveLogs = false;
+    const showingLive = () => historyMode === "live" || historyMode === "legacy";
+    const requestLiveLogs = () => {
+      if (socketReady && showingLive() && !requestedLiveLogs) {
+        current?.send(JSON.stringify({event:"send logs", args:[]}));
+        requestedLiveLogs = true;
+      }
+    };
+    // Once fallback starts, retain the live source for this visit. Switching back
+    // mid-stream would replay collector copies of lines already shown live.
+    const useLiveFallback = () => { historyMode = "live"; requestLiveLogs(); };
+    const replay = async () => {
+      let delay = 1000;
+      try {
+        const saved = await api(`${base}/console-history?after=${cursor}`, {signal: replayAbort.signal});
+        if (!active) return;
+        if (historyMode === "loading") historyMode = "persistent";
+        if (!saved.capture?.connected) useLiveFallback();
+        if (saved.reset && historyMode !== "live") {
+          pendingLines.current.clear();
+          setHistory(emptyConsoleHistory());
+        }
+        if (saved.truncated) queueLines("\x1b[0m\x1b[93m[Voltra]: Older output expired from the saved buffer while this console was disconnected.\x1b[0m");
+        const restored: string[] = [];
+        for (const entry of saved.data ?? []) {
+          if (replayedSaved && historyMode === "live" && entry.event !== "panel message") continue;
+          const text = consoleOutput(String(entry.line ?? ""), entry.event, true);
+          if (!text) continue;
+          const at = new Date(entry.created_at);
+          const stamp = entry.event === "panel message" && !Number.isNaN(at.getTime()) ? `[${at.toLocaleTimeString([], {hour12:false})}] ` : "";
+          if (!replayedSaved) restored.push(stamp + text);
+          else queueLines(stamp + text);
+        }
+        if (restored.length) setHistory(old => active ? appendConsoleHistory(old, restored) : old);
+        replayedSaved = true;
+        cursor = saved.cursor;
+        setHistoryError("");
+        if (saved.more) delay = 10;
+      } catch (error) {
+        if (!active || replayAbort.signal.aborted) return;
+        const message = error instanceof Error ? error.message : String(error);
+        if (historyMode === "loading" && message.trim() === "404 page not found") {
+          historyMode = "legacy";
+          requestLiveLogs();
+          return;
+        }
+        if (historyMode !== "legacy") useLiveFallback();
+        setHistoryError("Saved history is unavailable. Showing live output and retrying.");
+        delay = 3000;
+      }
+      if (active) replayTimer = setTimeout(replay, delay);
+    };
+    void replay();
+    const observeState = (next: string) => {
+      const line = consoleStateLine(observedState, next);
+      if (line) {
+        if (showingLive()) queueLines(line);
+        observedState = next;
+      }
+      statusRef.current = next;
+      setStatus(next);
+    };
+    const powerMessage = (event: Event) => {
+      const detail = (event as CustomEvent<ConsolePowerEvent>).detail;
+      if (detail?.base === base && historyMode === "legacy") queueLines(detail.line);
+    };
+    window.addEventListener(consolePowerEvent, powerMessage);
     const append = (s: string, event: string) => {
       const clean = consoleOutput(s, event);
       if (!clean) return;
       const colored = consoleOutput(s, event, true);
-      setLines((old) => [...old, ...colored.split(/\r?\n/)].slice(-3000));
+      if (showingLive()) for (const line of colored.split(/\r?\n/)) queueLines(line);
       if (statusRef.current === "running") return;
       const f = features.current.find((f) =>
         featureErrors[f]?.some((e) => clean.toLowerCase().includes(e))
@@ -108,7 +206,8 @@ export default function Console() {
                 retry = 0;
                 setSocketError("");
                 setConnection("Connected");
-                current?.send(JSON.stringify({ event: "send logs", args: [] }));
+                socketReady = true;
+                requestLiveLogs();
                 current?.send(
                   JSON.stringify({ event: "send stats", args: [] })
                 );
@@ -119,12 +218,12 @@ export default function Console() {
                 append(String(args[0] || ""), message.event);
                 break;
               case "status":
-                setStatus(args[0]);
+                observeState(String(args[0]));
                 break;
               case "stats": {
                 const v =
                   typeof args[0] === "string" ? JSON.parse(args[0]) : args[0];
-                if (v?.state) setStatus(v.state);
+                if (v?.state) observeState(String(v.state));
                 break;
               }
               case "token expiring":
@@ -153,6 +252,8 @@ export default function Console() {
             "The console connection failed. Check the node address and Wings service."
           );
         current.onclose = () => {
+          socketReady = false;
+          requestedLiveLogs = false;
           if (active) {
             setConnection("Disconnected");
             timer = setTimeout(connect, Math.min(1000 * 2 ** retry++, 15000));
@@ -169,7 +270,13 @@ export default function Console() {
     connect();
     return () => {
       active = false;
+      clearTimeout(drainTimer);
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener(consolePowerEvent, powerMessage);
+      pendingLines.current.clear();
       clearTimeout(timer);
+      clearTimeout(replayTimer);
+      replayAbort.abort();
       current?.close();
       socket.current = null;
     };
@@ -197,7 +304,7 @@ export default function Console() {
             }
           );
           if (status === "offline")
-            await api(`${base}/power`, json("POST", { signal: "restart" }));
+            await requestServerPower(base, "restart");
         }
         if (feature === "java_version") {
           await api(
@@ -205,14 +312,14 @@ export default function Console() {
             json("PUT", { docker_image: image })
           );
           if (status === "offline")
-            await api(`${base}/power`, json("POST", { signal: "restart" }));
+            await requestServerPower(base, "restart");
         }
         if (feature === "gsl_token") {
           await api(
             `${base}/startup/variable`,
             json("PUT", { key: "STEAM_ACC", value: token })
           );
-          await api(`${base}/power`, json("POST", { signal: "restart" }));
+          await requestServerPower(base, "restart");
         }
       },
       () => setFeature("")
@@ -221,7 +328,8 @@ export default function Console() {
     <section className="console-view" aria-label="Server console">
       <Notice action={a}/>
       <PageError error={socketError}/>
-      <Terminal lines={lines} status={status} connection={connection} busy={a.busy} onClear={()=>setLines([])} onSend={(command,done)=>{void a.run(()=>api(`${base}/command`,json('POST',{command})),done)}}/>
+      <PageError error={historyError}/>
+      <Terminal history={history} status={status} connection={connection} busy={a.busy} onClear={()=>{pendingLines.current.clear();setHistory(emptyConsoleHistory())}} onSend={(command,done)=>{void a.run(()=>api(`${base}/command`,json('POST',{command})),done)}}/>
       {feature && (
         <Modal
           title={
@@ -236,117 +344,119 @@ export default function Console() {
           }
           onClose={() => setFeature("")}
         >
-          <Notice action={featureAction} />
-          {feature === "eula" && (
-            <p>
-              To run this server you must agree to the{" "}
-              <a
-                href="https://www.minecraft.net/eula"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Minecraft EULA
-              </a>
-              . Accepting writes eula=true to eula.txt.
-            </p>
-          )}
-          {feature === "java_version" && (
-            <>
+          <div className="console-feature-content">
+            <Notice action={featureAction} />
+            {feature === "eula" && (
               <p>
-                The server requires a different Java runtime. Select an image
-                provided by this egg.
-              </p>
-              {can(permissions, "startup.docker-image") && (
-                <Field label="Docker image">
-                  <Select
-                    value={image}
-                    onChange={(e) => setImage(e.target.value)}
-                  >
-                    {Object.entries(images).map(([name, v]) => (
-                      <option key={v} value={v}>
-                        {name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
-            </>
-          )}
-          {feature === "gsl_token" && (
-            <>
-              <p>
-                Your Gameserver Login Token is invalid or expired.{" "}
+                To run this server you must agree to the{" "}
                 <a
+                  href="https://www.minecraft.net/eula"
                   target="_blank"
                   rel="noreferrer"
-                  href="https://steamcommunity.com/dev/managegameservers"
                 >
-                  Generate a Steam token
+                  Minecraft EULA
                 </a>
-                , or leave this empty to remove it.
+                . Accepting writes eula=true to eula.txt.
               </p>
-              <Field label="GSL token">
-                <Input
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                />
-              </Field>
-            </>
-          )}
-          {feature === "pid_limit" && (
-            <p>
-              The server cannot create more threads. Check its memory allowance
-              and container_pid_limit in Wings config.yml. Restart Wings after
-              changing its process limit.
-            </p>
-          )}
-          {feature === "steam_disk_space" && (
-            <p>
-              The install or update cannot complete because the node has
-              insufficient disk space. Check df -h on the node, remove unneeded
-              files, or increase disk capacity.
-            </p>
-          )}
-          {feature === "hytale_oauth" && (
-            <>
-              <p>
-                Authenticate your Hytale account to download or update the
-                server files.
-              </p>
-              <a
-                className="button"
-                href={oauth}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setFeature("")}
-              >
-                Authenticate with Hytale
-              </a>
-            </>
-          )}
-          <div className="actions">
-            <Button variant="secondary" onClick={() => setFeature("")}>
-              Close
-            </Button>
-            {feature === "eula" && can(permissions, "file.update") && (
-              <Button disabled={featureAction.busy} onClick={acceptFeature}>
-                I accept
-              </Button>
             )}
-            {feature === "java_version" &&
-              can(permissions, "startup.docker-image") && (
-                <Button
-                  disabled={featureAction.busy || !image}
-                  onClick={acceptFeature}
+            {feature === "java_version" && (
+              <>
+                <p>
+                  The server requires a different Java runtime. Select an image
+                  provided by this egg.
+                </p>
+                {can(permissions, "startup.docker-image") && (
+                  <Field label="Docker image">
+                    <Select
+                      value={image}
+                      onChange={(e) => setImage(e.target.value)}
+                    >
+                      {Object.entries(images).map(([name, v]) => (
+                        <option key={v} value={v}>
+                          {name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+              </>
+            )}
+            {feature === "gsl_token" && (
+              <>
+                <p>
+                  Your Gameserver Login Token is invalid or expired.{" "}
+                  <a
+                    target="_blank"
+                    rel="noreferrer"
+                    href="https://steamcommunity.com/dev/managegameservers"
+                  >
+                    Generate a Steam token
+                  </a>
+                  , or leave this empty to remove it.
+                </p>
+                <Field label="GSL token">
+                  <Input
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                  />
+                </Field>
+              </>
+            )}
+            {feature === "pid_limit" && (
+              <p>
+                The server cannot create more threads. Check its memory allowance
+                and container_pid_limit in Wings config.yml. Restart Wings after
+                changing its process limit.
+              </p>
+            )}
+            {feature === "steam_disk_space" && (
+              <p>
+                The install or update cannot complete because the node has
+                insufficient disk space. Check df -h on the node, remove unneeded
+                files, or increase disk capacity.
+              </p>
+            )}
+            {feature === "hytale_oauth" && (
+              <>
+                <p>
+                  Authenticate your Hytale account to download or update the
+                  server files.
+                </p>
+                <a
+                  className="button"
+                  href={oauth}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setFeature("")}
                 >
-                  Update Docker image
+                  Authenticate with Hytale
+                </a>
+              </>
+            )}
+            <div className="actions">
+              <Button variant="secondary" onClick={() => setFeature("")}>
+                Close
+              </Button>
+              {feature === "eula" && can(permissions, "file.update") && (
+                <Button disabled={featureAction.busy} onClick={acceptFeature}>
+                  I accept
                 </Button>
               )}
-            {feature === "gsl_token" && can(permissions, "startup.update") && (
-              <Button disabled={featureAction.busy} onClick={acceptFeature}>
-                Update GSL token
-              </Button>
-            )}
+              {feature === "java_version" &&
+                can(permissions, "startup.docker-image") && (
+                  <Button
+                    disabled={featureAction.busy || !image}
+                    onClick={acceptFeature}
+                  >
+                    Update Docker image
+                  </Button>
+                )}
+              {feature === "gsl_token" && can(permissions, "startup.update") && (
+                <Button disabled={featureAction.busy} onClick={acceptFeature}>
+                  Update GSL token
+                </Button>
+              )}
+            </div>
           </div>
         </Modal>
       )}

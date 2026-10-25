@@ -1,7 +1,13 @@
+import './gameSwitch.css';
 import { createContext, useContext, useState } from "react";
 import { api, Button } from "../lib";
+import {Switch} from '../ui/Settings';
 import './serverPageHeader.css';
+import './operations-ui.css';
 export type RecordData = Record<string, any>;
+export function ServerPageTitle({title,limit}:{title:string;limit?:number|null}){
+  return <div className="server-page-title"><h2>{title}</h2><span className="server-limit-badge">Limit: {limit ?? 'Unlimited'}</span></div>;
+}
 export const ServerContext = createContext<{
   server: RecordData;
   permissions: string[];
@@ -84,7 +90,7 @@ export function Pager({
 }) {
   const p = data?.meta?.pagination;
   return p && p.total_pages > 1 ? (
-    <div className="toolbar">
+    <div className="toolbar operations-pager" aria-label="Pagination">
       <Button
         variant="secondary"
         disabled={page <= 1}
@@ -130,12 +136,11 @@ export function Check({
   disabled?: boolean;
 }) {
   return (
-    <label className="check">
-      <input
-        type="checkbox"
+    <label className="check operations-check">
+      <Switch
         checked={checked}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
+        onCheckedChange={checked => onChange(checked)}
       />
       {label}
     </label>

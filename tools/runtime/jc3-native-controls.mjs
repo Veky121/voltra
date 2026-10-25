@@ -1,0 +1,4 @@
+import fs from 'node:fs';import {api} from './openttd-compat-node.mjs';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/jc3-native',{receipt:s}=await ownedStoppedServer(dir+'/private.json');if(s.owner!=='game_batch_inventory'||s.path!=='just_cause/just_cause_3/egg-j-c3-m-p.json')throw Error('Foreign fixture');
+const environment={MAX_PLAYER:'4',TICK_RATE:'30',SERVER_DESCRIPTION:'Owned native persistence acceptance',QUERY_PORT:String(s.ports[1]),STEAM_PORT:String(s.ports[2]),HTTP_PORT:String(s.ports[3]),AUTO_UPDATE:'1'};
+const file=dir+'/startup-controls.json';if(fs.existsSync(file))throw Error('Controls already submitted');await api('/api/application/servers/'+s.internal_id+'/startup','PATCH',{environment});fs.writeFileSync(file,JSON.stringify({uuid:s.uuid,environment,at:new Date().toISOString()},null,2)+'\n',{flag:'wx'});console.log({controls_submitted:environment});

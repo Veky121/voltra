@@ -8,6 +8,9 @@ import re
 import subprocess
 import tempfile
 import shutil
+import select
+import stat
+import time
 from source_install import update
 from source_next_install import download, apply_payload
 
@@ -54,17 +57,56 @@ def listing(text):
     return entries
 
 
-def unpack(archive,destination):
+def bounded_archive_output(arguments,maximum,timeout):
+    """Bound both time and bytes while inspecting untrusted archive metadata."""
+    process=subprocess.Popen(arguments,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    result=bytearray();deadline=time.monotonic()+timeout
+    try:
+        while True:
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise ValueError('Open Fortress archive inspection timed out')
+            if not select.select([process.stdout],[],[],remaining)[0]:
+                raise ValueError('Open Fortress archive inspection timed out')
+            block=os.read(process.stdout.fileno(),min(65536,maximum+1-len(result)))
+            if not block:break
+            result.extend(block)
+            if len(result)>maximum:raise ValueError('Open Fortress archive inspection exceeds limit')
+        if process.wait(timeout=max(.01,deadline-time.monotonic())):
+            raise ValueError('Open Fortress archive inspection failed')
+        return bytes(result)
+    finally:
+        if process.poll() is None:process.kill()
+        process.wait();process.stdout.close()
+
+
+def validate_archive(archive):
     # The only accepted 7z payload is the inspected official alpha identity.
+    archive=Path(archive)
+    root=next((p.parent for p in archive.parents if p.name=='.voltra'),None)
+    if archive.is_symlink() or not stat.S_ISREG(archive.stat().st_mode) or (root and not archive.resolve().is_relative_to(root.resolve())):
+        raise ValueError('Unsafe Open Fortress archive identity')
     digest=hashlib.sha256()
     with archive.open('rb') as stream:
         for block in iter(lambda:stream.read(1048576),b''):digest.update(block)
     if digest.hexdigest()!=RELEASE['sha256']:raise ValueError('Open Fortress archive identity mismatch')
-    root=next((p.parent for p in archive.parents if p.name=='.voltra'),None)
     executable=root/'.voltra/7zip/7z' if root else Path('/usr/bin/7z')
     if root and not executable.resolve().is_relative_to(root):raise ValueError('Private archive tool escapes volume')
-    result=subprocess.run([str(executable),'l','-slt',str(archive)],check=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
-    entries=listing(result.stdout.decode('utf-8','strict').replace('\r\n','\n'))
+    result=bounded_archive_output([str(executable),'l','-slt',str(archive)],16*1024**2,180)
+    entries=listing(result.decode('utf-8','strict').replace('\r\n','\n'))
+    return executable,entries
+
+
+def validate_gameinfo(archive,executable,entries):
+    member='open_fortress/gameinfo.txt'
+    if member not in entries:raise ValueError('Open Fortress gameinfo missing')
+    content=bounded_archive_output([str(executable),'e','-so',str(archive),member],1024**2,180)
+    mounted_gameinfo(content.decode('utf-8-sig'))
+
+
+def unpack(archive,destination):
+    # Steam updates precede extraction, so recheck the complete identity and
+    # member set here rather than trusting the earlier pre-update inspection.
+    executable,entries=validate_archive(archive)
     subprocess.run([str(executable),'x','-y','-o'+str(destination),str(archive)],check=True,stdout=subprocess.DEVNULL,timeout=600)
     root=destination.resolve()
     for path in destination.rglob('*'):
@@ -73,8 +115,8 @@ def unpack(archive,destination):
     return entries
 
 
-def mount_paths(gameinfo):
-    content=gameinfo.read_text(encoding='utf-8-sig');lines=[];replaced=0
+def mounted_gameinfo(content):
+    lines=[];replaced=0
     for line in content.splitlines(keepends=True):
         if re.match(r'\s*game\s+"',line):
             if '|all_source_engine_paths|..\\Team Fortress 2\\' in line:
@@ -82,7 +124,11 @@ def mount_paths(gameinfo):
             line=line.replace('\\','/')
         lines.append(line)
     if replaced!=8:raise ValueError('Reviewed Open Fortress TF2 mount layout changed')
-    gameinfo.write_text(''.join(lines),encoding='utf-8')
+    return ''.join(lines)
+
+
+def mount_paths(gameinfo):
+    gameinfo.write_text(mounted_gameinfo(gameinfo.read_text(encoding='utf-8-sig')),encoding='utf-8')
 
 
 def install(root,env,validate=True):
@@ -95,13 +141,16 @@ def install(root,env,validate=True):
     if not manifest.resolve().is_relative_to(root):raise ValueError('Open Fortress receipt escapes volume')
     old=json.loads(manifest.read_text()) if manifest.exists() else {}
     with tempfile.TemporaryDirectory(prefix='of-',dir=state) as temporary:
-        stage=Path(temporary);archive=stage/'openfortress.7z';asset=download(RELEASE,archive,maximum=3*1024**3);ready=stage/'ready';ready.mkdir()
-        unpack(archive,ready);mount_paths(ready/'open_fortress/gameinfo.txt')
+        stage=Path(temporary);archive=stage/'openfortress.7z';asset=download(RELEASE,archive,maximum=3*1024**3)
+        executable,entries=validate_archive(archive)
+        validate_gameinfo(archive,executable,entries)
         update(root,244310,env={**env,'SRCDS_BETAID':'previous2021'},validate=validate,required=('srcds_run',))
         tf2=root/'tf2'
         if not tf2.resolve().is_relative_to(root):raise ValueError('TF2 mount escapes server volume')
         tf2.mkdir(exist_ok=True)
         update(tf2,232250,env={**env,'SRCDS_APPID':'232250','SRCDS_BETAID':'public','SRCDS_BETAPASS':''},validate=validate,required=('tf/tf2_misc_dir.vpk',))
+        ready=stage/'ready';ready.mkdir()
+        unpack(archive,ready);mount_paths(ready/'open_fortress/gameinfo.txt')
         files,preserved=apply_payload(root,'open_fortress',ready/'open_fortress',old)
         # This 2013 SDK exposes dedicated *_srv names; the alpha also requests
         # their unsuffixed aliases. Add only missing, confined relative links.

@@ -124,6 +124,15 @@ func parseEggDocument(d M) (M, []M, error) {
 	variables := []M{}
 	for _, raw := range eggSlice(d["variables"]) {
 		v := asMap(raw)
+		if version == "PTDL_v1" {
+			// Laravel's v1 conversion explicitly supplies text presentation.
+			copy := M{}
+			for key, value := range v {
+				copy[key] = value
+			}
+			copy["field_type"] = "text"
+			v = copy
+		}
 		normalized, err := normalizeEggVariable(v, true)
 		if err != nil {
 			return nil, nil, err
@@ -903,7 +912,8 @@ func (a *App) eggExport(ctx context.Context, id int64) (M, error) {
 	}
 	outVars := []M{}
 	for _, v := range vars {
-		outVars = append(outVars, M{"name": v["name"], "description": v["description"], "env_variable": v["env_variable"], "default_value": v["default_value"], "user_viewable": v["user_viewable"], "user_editable": v["user_editable"], "rules": v["rules"], "field_type": "text"})
+		fieldType := eggVariableFieldType(v["field_type"])
+		outVars = append(outVars, M{"name": v["name"], "description": v["description"], "env_variable": v["env_variable"], "default_value": v["default_value"], "user_viewable": v["user_viewable"], "user_editable": v["user_editable"], "rules": v["rules"], "field_type": fieldType})
 	}
 	return M{"voltra": M{"java_config": asMap(e["java_config"])}, "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY VOLTRA", "meta": M{"version": "PTDL_v2", "update_url": e["update_url"]}, "exported_at": time.Now().UTC().Format(time.RFC3339), "name": e["name"], "author": e["author"], "description": e["description"], "features": raw["features"], "docker_images": e["docker_images"], "file_denylist": eggStrings(e["file_denylist"]), "startup": e["startup"], "config": M{"files": eggJSONString(e["config_files"]), "startup": eggJSONString(e["config_startup"]), "logs": eggJSONString(e["config_logs"]), "stop": e["config_stop"]}, "scripts": M{"installation": M{"script": e["script_install"], "container": e["script_container"], "entrypoint": e["script_entry"]}}, "variables": outVars}, nil
 }
@@ -921,7 +931,18 @@ func (a *App) exportEgg(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, d)
 }
 
+// Preserve string presentation metadata without treating it as an arbitrary
+// browser input type. Current controls special-case password/textarea and fall
+// back to text. Missing/nonstring metadata keeps the prior Go text fallback.
+func eggVariableFieldType(value any) string {
+	if kind, ok := value.(string); ok && kind != "" {
+		return kind
+	}
+	return "text"
+}
+
 func normalizeEggVariable(d M, imported bool) (M, error) {
+	fieldType := eggVariableFieldType(d["field_type"])
 	if _, ok := d["rules"].(string); !ok || strings.TrimSpace(str(d["rules"])) == "" {
 		return nil, bad("Variable rules must be a nonempty string")
 	}
@@ -956,7 +977,7 @@ func normalizeEggVariable(d M, imported bool) (M, error) {
 			}
 		}
 	}
-	v := M{"name": str(d["name"]), "description": str(d["description"]), "env_variable": str(d["env_variable"]), "default_value": str(d["default_value"]), "user_viewable": boolean(d["user_viewable"]), "user_editable": boolean(d["user_editable"]), "rules": str(d["rules"]), "field_type": "text"}
+	v := M{"name": str(d["name"]), "description": str(d["description"]), "env_variable": str(d["env_variable"]), "default_value": str(d["default_value"]), "user_viewable": boolean(d["user_viewable"]), "user_editable": boolean(d["user_editable"]), "rules": str(d["rules"]), "field_type": fieldType}
 	if options, ok := d["options"]; ok {
 		v["user_viewable"] = false
 		v["user_editable"] = false

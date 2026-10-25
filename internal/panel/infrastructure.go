@@ -3,7 +3,6 @@ package panel
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -11,9 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/mail"
 	"net/netip"
-	"net/smtp"
 	"net/url"
 	"path"
 	"regexp"
@@ -29,7 +26,6 @@ import (
 
 // Infrastructure routes deliberately share their application and admin implementations.
 func (a *App) registerInfrastructure(mux *http.ServeMux) {
-	a.registerNotifications(mux)
 	for _, base := range []string{"/api/application", "/api/admin"} {
 		for _, resource := range []string{"locations", "nodes"} {
 			for _, method := range []string{"GET", "POST"} {
@@ -67,7 +63,6 @@ func (a *App) registerInfrastructure(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/admin/settings", a.infraSettings)
 	mux.HandleFunc("PATCH /api/admin/settings", a.infraSettings)
-	mux.HandleFunc("POST /api/admin/settings/mail/test", a.infraMailTest)
 }
 
 func infraTable(resource string) string {
@@ -1536,8 +1531,6 @@ func infraSettingDefaults() M {
 		"pterodactyl:client_features:allocations:range_start": int64(25565), "pterodactyl:client_features:allocations:range_end": int64(26000),
 		"pterodactyl:client_features:databases:enabled": true, "pterodactyl:client_features:databases:allow_random": true,
 		"pterodactyl:client_features:schedules:per_schedule_task_limit": int64(10), "activity:hide_admin_activity": false,
-		"pterodactyl:email:send_install_notification": true, "pterodactyl:email:send_reinstall_notification": true,
-		"mail:host": "", "mail:port": int64(587), "mail:username": "", "mail:password": "", "mail:encryption": "tls", "mail:from:address": "panel@local.invalid", "mail:from:name": "Voltra",
 		"backups.default": "wings", "backups.throttles.limit": int64(2), "backups.throttles.period": int64(600), "backups.prune_age": int64(360), "backups.presigned_url_lifespan": int64(60),
 		"backups.s3": M{"bucket": "", "region": "us-east-1", "endpoint": "", "daemon_endpoint": "", "access_key_id": "", "secret_access_key": "", "session_token": "", "path_style": false, "part_size": int64(5 * 1024 * 1024 * 1024), "storage_class": ""},
 	}
@@ -1570,11 +1563,10 @@ func (a *App) infraLoadSettings(ctx context.Context) (M, error) {
 func infraPublicSettings(settings M) M {
 	result := M{}
 	for key, value := range settings {
-		if key != "mail:password" {
+		if !strings.HasPrefix(key, "mail:") && !strings.HasPrefix(key, "pterodactyl:email:") {
 			result[key] = value
 		}
 	}
-	result["mail:password_configured"] = str(settings["mail:password"]) != ""
 	s3 := M{}
 	for key, value := range asMap(settings["backups.s3"]) {
 		if key != "secret_access_key" && key != "session_token" {
@@ -1695,7 +1687,7 @@ func (a *App) infraSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	for _, key := range []string{"pterodactyl:client_features:databases:enabled", "pterodactyl:client_features:databases:allow_random", "activity:hide_admin_activity", "pterodactyl:email:send_install_notification", "pterodactyl:email:send_reinstall_notification"} {
+	for _, key := range []string{"pterodactyl:client_features:databases:enabled", "pterodactyl:client_features:databases:allow_random", "activity:hide_admin_activity"} {
 		if e = infraBool(settings, key); e != nil {
 			fail(w, e)
 			return
@@ -1715,45 +1707,6 @@ func (a *App) infraSettings(w http.ResponseWriter, r *http.Request) {
 	if num(settings[endKey]) <= num(settings[startKey]) {
 		fail(w, bad("The allocation ending port must exceed its starting port."))
 		return
-	}
-	for _, rule := range []struct {
-		key string
-		max int
-	}{{"mail:host", 253}, {"mail:username", 191}, {"mail:password", 4096}, {"mail:from:address", 254}, {"mail:from:name", 191}} {
-		if e = infraString(settings, rule.key, 0, rule.max); e != nil {
-			fail(w, e)
-			return
-		}
-		if strings.ContainsAny(str(settings[rule.key]), "\r\n") {
-			fail(w, bad("Mail settings cannot contain newlines."))
-			return
-		}
-	}
-	if strings.ContainsAny(str(settings["mail:host"]), " /\\?#@\t") {
-		fail(w, bad("mail:host must be a hostname or IP address."))
-		return
-	}
-	if e = infraInteger(settings, "mail:port", 1, 65535); e != nil {
-		fail(w, e)
-		return
-	}
-	encryption := str(settings["mail:encryption"])
-	if encryption != "none" && encryption != "tls" && encryption != "ssl" {
-		fail(w, bad("mail:encryption must be none, tls, or ssl."))
-		return
-	}
-	if _, e = mail.ParseAddress(str(settings["mail:from:address"])); e != nil {
-		fail(w, bad("mail:from:address must be a valid email address."))
-		return
-	}
-	if _, changed := data["mail:password"]; changed {
-		if str(settings["mail:password"]) != "" {
-			settings["mail:password"], e = a.seal(str(settings["mail:password"]))
-			if e != nil {
-				fail(w, e)
-				return
-			}
-		}
 	}
 	if str(settings["backups.default"]) != "wings" && str(settings["backups.default"]) != "s3" {
 		fail(w, bad("backups.default must be wings or s3."))
@@ -1815,114 +1768,4 @@ func (a *App) infraSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, item("settings", infraPublicSettings(settings)))
-}
-
-func (a *App) infraMailTest(w http.ResponseWriter, r *http.Request) {
-	if _, e := a.requireAdmin(r); e != nil {
-		fail(w, e)
-		return
-	}
-	data, e := decode(r)
-	if e != nil {
-		fail(w, e)
-		return
-	}
-	email := str(data["email"])
-	address, e := mail.ParseAddress(email)
-	if e != nil || address.Address != email || strings.ContainsAny(email, "\r\n") {
-		fail(w, bad("email must contain a valid recipient address."))
-		return
-	}
-	if e = a.sendNotification(r.Context(), email, "Voltra mail configuration test", "The panel successfully connected to your SMTP server and sent this test message.\r\n"); e != nil {
-		fail(w, APIError{Status: 502, Code: "MailDeliveryFailed", Detail: "The SMTP server did not accept the test message. Check its address, encryption, credentials and sender permissions."})
-		return
-	}
-	writeJSON(w, 200, M{"sent": true})
-}
-
-// sendNotification sends operational mail; identity and password email flows are intentionally absent.
-func (a *App) sendNotification(ctx context.Context, recipient, subject, body string) error {
-	if strings.ContainsAny(recipient+subject, "\r\n") {
-		return bad("Mail headers cannot contain newlines.")
-	}
-	to, e := mail.ParseAddress(recipient)
-	if e != nil {
-		return e
-	}
-	settings, e := a.infraLoadSettings(ctx)
-	if e != nil {
-		return e
-	}
-	host := str(settings["mail:host"])
-	if host == "" {
-		return fmt.Errorf("SMTP is not configured")
-	}
-	from, e := mail.ParseAddress(str(settings["mail:from:address"]))
-	if e != nil {
-		return e
-	}
-	password := str(settings["mail:password"])
-	if password != "" {
-		password, e = a.unseal(password)
-		if e != nil {
-			return e
-		}
-	}
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	address := net.JoinHostPort(host, fmt.Sprint(num(settings["mail:port"])))
-	conn, e := (&net.Dialer{}).DialContext(ctx, "tcp", address)
-	if e != nil {
-		return e
-	}
-	defer conn.Close()
-	deadline, _ := ctx.Deadline()
-	_ = conn.SetDeadline(deadline)
-	tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
-	encryption := str(settings["mail:encryption"])
-	if encryption == "ssl" {
-		secure := tls.Client(conn, tlsConfig)
-		if e = secure.HandshakeContext(ctx); e != nil {
-			return e
-		}
-		conn = secure
-	}
-	client, e := smtp.NewClient(conn, host)
-	if e != nil {
-		return e
-	}
-	defer client.Close()
-	if encryption == "tls" {
-		if ok, _ := client.Extension("STARTTLS"); !ok {
-			return fmt.Errorf("SMTP server does not support STARTTLS")
-		}
-		if e = client.StartTLS(tlsConfig); e != nil {
-			return e
-		}
-	}
-	if username := str(settings["mail:username"]); username != "" {
-		if e = client.Auth(smtp.PlainAuth("", username, password, host)); e != nil {
-			return e
-		}
-	}
-	if e = client.Mail(from.Address); e != nil {
-		return e
-	}
-	if e = client.Rcpt(to.Address); e != nil {
-		return e
-	}
-	writer, e := client.Data()
-	if e != nil {
-		return e
-	}
-	from.Name = str(settings["mail:from:name"])
-	message := "From: " + from.String() + "\r\nTo: " + to.String() + "\r\nSubject: " + subject + "\r\nDate: " + time.Now().Format(time.RFC1123Z) + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n" + body
-	if _, e = writer.Write([]byte(message)); e != nil {
-		writer.Close()
-		return e
-	}
-	if e = writer.Close(); e != nil {
-		return e
-	}
-	return client.Quit()
 }

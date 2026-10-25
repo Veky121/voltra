@@ -1,0 +1,228 @@
+{
+  "scope": "Archived native content acceptance top-level manifests; nested contents not validated",
+  "manifests": [
+    {
+      "archived_source": "P7dR8mSH-fabric-metadata.json",
+      "sha256": "28e465cd8286d5ce695566e190bea12756af6541d1ad05239f75978cd92a8fad",
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "fabric-api",
+        "provides": [
+          "fabric"
+        ],
+        "name": "Fabric API",
+        "version": "0.116.17+1.21.1",
+        "environment": "*",
+        "license": "Apache-2.0",
+        "icon": "assets/fabric/icon.png",
+        "contact": {
+          "homepage": "https://fabricmc.net",
+          "irc": "irc://irc.esper.net:6667/fabric",
+          "issues": "https://github.com/FabricMC/fabric/issues",
+          "sources": "https://github.com/FabricMC/fabric"
+        },
+        "authors": [
+          "FabricMC"
+        ],
+        "depends": {
+          "fabricloader": ">=0.15.11",
+          "java": ">=21",
+          "minecraft": ">=1.21- <1.21.2-"
+        },
+        "description": "Core API module providing key hooks and intercompatibility features.",
+        "jars": [
+          {
+            "file": "META-INF/jars/fabric-api-base-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-api-lookup-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-biome-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-block-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-block-view-api-v2-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-blockrenderlayer-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-client-tags-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-command-api-v2-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-content-registries-v0-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-convention-tags-v2-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-crash-report-info-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-data-attachment-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-data-generation-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-dimensions-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-entity-events-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-events-interaction-v0-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-game-rule-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-item-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-item-group-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-key-binding-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-lifecycle-events-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-loot-api-v3-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-message-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-model-loading-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-networking-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-object-builder-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-particles-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-recipe-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-registry-sync-v0-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-renderer-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-renderer-indigo-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-rendering-fluids-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-rendering-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-resource-conditions-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-resource-loader-v0-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-screen-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-screen-handler-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-sound-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-tag-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-transfer-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-transitive-access-wideners-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-command-api-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-commands-v0-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-convention-tags-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-keybindings-v0-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-loot-api-v2-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-renderer-registries-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-rendering-data-attachment-v1-0.116.17.jar"
+          },
+          {
+            "file": "META-INF/jars/fabric-rendering-v0-0.116.17.jar"
+          }
+        ]
+      }
+    },
+    {
+      "archived_source": "gvQqBUqZ-fabric-metadata.json",
+      "sha256": "b545c5b17e2eb903420e0d78dcde0fba2aebc1e3d94d5260e56dd09739b94fdf",
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "lithium",
+        "version": "0.15.4+mc1.21.1",
+        "name": "Lithium",
+        "description": "Lithium is a free and open-source optimization mod for Minecraft which makes a wide range of performance improvements to the game.",
+        "authors": [
+          "JellySquid",
+          "2No2Name"
+        ],
+        "contact": {
+          "homepage": "https://jellysquid.me/projects/",
+          "sources": "https://github.com/CaffeineMC/lithium-fabric",
+          "issues": "https://github.com/CaffeineMC/lithium-fabric/issues"
+        },
+        "license": "LGPL-3.0-only",
+        "icon": "assets/lithium/lithium-icon.png",
+        "environment": "*",
+        "entrypoints": {
+          "main": [
+            "net.caffeinemc.mods.lithium.fabric.LithiumFabricMod"
+          ]
+        },
+        "mixins": [
+          "lithium.mixins.json",
+          "lithium-fabric.mixins.json"
+        ],
+        "accessWidener": "lithium.accesswidener",
+        "depends": {
+          "fabricloader": ">=0.15.1",
+          "minecraft": [
+            "1.21",
+            "1.21.1"
+          ]
+        },
+        "breaks": {
+          "optifabric": "*"
+        }
+      }
+    }
+  ]
+}

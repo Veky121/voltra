@@ -249,7 +249,14 @@ func TestGameLibraryPackCatalogAndProvisioning(t *testing.T) {
 	}
 	provider := minecraftFixtureHTTP(t, fixture)
 	requests := 0
-	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests++; w.WriteHeader(202) }))
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/api/system" {
+			writeJSON(w, 200, M{"os": "linux"})
+			return
+		}
+		requests++
+		w.WriteHeader(202)
+	}))
 	defer daemon.Close()
 	a.HTTP = &http.Client{Transport: gameLibraryTransport(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Host == strings.TrimPrefix(daemon.URL, "http://") {
@@ -350,6 +357,10 @@ func TestGameLibraryExtendedProvisioning(t *testing.T) {
 	a.registerGameLibrary(mux)
 	requests := 0
 	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/api/system" {
+			writeJSON(w, 200, M{"os": "linux"})
+			return
+		}
 		if r.URL.Path != "/api/servers" || r.Method != "POST" {
 			t.Errorf("unexpected Wings %s %s", r.Method, r.URL.Path)
 		}
@@ -427,7 +438,7 @@ func TestGameLibraryExtendedProvisioning(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(str(egg["script_install"]), "bootstrap_java") || str(egg["script_container"]) != "ghcr.io/pterodactyl/installers:debian" {
+		if !strings.Contains(str(egg["script_install"]), "bootstrap_java") || str(egg["script_container"]) != minecraftInstallerImage {
 			t.Fatal("invalid installer contract")
 		}
 		infraExpect(t, mux, admin, "POST", "/api/client/game-library/minecraft/install", input, 200)

@@ -14,7 +14,7 @@ type AppProfile struct {
 
 var appProfiles = []AppProfile{
 	{1690800, []string{".config/Epic/FactoryGame/Saved", "FactoryGame/Saved"}, true},
-	{2394010, []string{"Pal/Saved"}, true},
+	{2394010, []string{"Pal/Saved", ".voltra"}, true},
 	{896660, []string{".voltra", "saves"}, false},
 	{294420, []string{"serverconfig.xml", "saves", ".voltra"}, false},
 }
@@ -30,13 +30,16 @@ func Profile(appID int64) (AppProfile, bool) {
 	return AppProfile{}, false
 }
 func Capabilities() []string {
-	out := []string{Capability, ProfileCapability, OptionsCapability}
+	out := []string{Capability, ProfileCapability, OptionsCapability, WindowsCapability, PalworldBridgeCapability}
 	for _, profile := range appProfiles {
 		out = append(out, AppCapability(profile.AppID))
 	}
 	return out
 }
 func KnownCapability(capability string) bool {
+	if KnownPrivateCapability(capability) {
+		return true
+	}
 	for _, known := range Capabilities() {
 		if known == capability {
 			return true

@@ -1,0 +1,22 @@
+.schedule-timing { margin: 4px 0 20px; padding: 16px; border: 1px solid var(--ui-border); border-radius: var(--ui-card-radius); background: var(--ui-hover); }
+.schedule-days { border: 0; padding: 0; margin: 0 0 16px; min-width: 0; }
+.schedule-days legend { padding: 0; margin-bottom: 10px; font-size:calc(12px * var(--ui-font-scale,1)); font-weight: 500; }
+.schedule-day-buttons { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.schedule-day-buttons button { min-width: 0; min-height: var(--ui-control-height); padding: 7px 4px; background: var(--ui-input); border: 1px solid var(--ui-border); color: var(--muted); border-radius: var(--ui-control-radius); font-size:calc(12px * var(--ui-font-scale,1)); font-weight: 400; }
+.schedule-day-buttons button:hover { background: var(--ui-hover); color: var(--text); filter: none; }
+.schedule-day-buttons button[aria-pressed="true"] { background: color-mix(in srgb,var(--accent) 12%,var(--ui-input)); border-color: color-mix(in srgb,var(--accent) 40%,transparent); color: var(--accent); }
+.schedule-day-buttons button:focus-visible, .schedule-advanced summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.schedule-interval { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size:calc(12px * var(--ui-font-scale,1)); }
+.schedule-interval input { width: 90px; }
+.schedule-interval select { width: 145px; }
+.schedule-timing-hint { font-size:calc(12px * var(--ui-font-scale,1)); line-height: 1.6; margin: 12px 0 18px; }
+.schedule-advanced { border-top: 1px solid var(--ui-divider); padding-top: 12px; }
+.schedule-advanced summary { cursor: pointer; color: var(--muted); font-size:calc(12px * var(--ui-font-scale,1)); font-weight: 400; width: fit-content; }
+.schedule-advanced[open] summary { margin-bottom: 16px; color: var(--text); }
+.schedule-cheat-sheet { border: 1px solid var(--ui-border); border-radius: var(--ui-control-radius); background: var(--ui-input); padding: 14px; color: var(--muted); font-size:calc(12px * var(--ui-font-scale,1)); line-height: 1.6; }
+.schedule-cheat-sheet h3 { margin-bottom: 8px; color: var(--text); font-size:calc(12px * var(--ui-font-scale,1)); font-weight: 500; }
+.schedule-cheat-sheet dl { grid-template-columns: 70px 1fr; gap: 6px 12px; }
+.schedule-cheat-sheet ul { padding-left: 18px; }
+.schedule-cheat-sheet p:last-child { margin-bottom: 0; }
+.schedule-custom { margin-bottom: 16px; color: var(--muted); font-size:calc(12px * var(--ui-font-scale,1)); line-height: 1.6; }
+@media (max-width: 440px) { .schedule-timing { padding: 12px; } .schedule-day-buttons { gap: 4px; } .schedule-day-buttons button { font-size:calc(11px * var(--ui-font-scale,1)); } .schedule-interval select { width: 120px; } }

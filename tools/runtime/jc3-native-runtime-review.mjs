@@ -1,0 +1,14 @@
+import fs from 'node:fs';import {spawnSync} from 'node:child_process';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/jc3-native',{receipt:s,node}=await ownedStoppedServer(dir+'/private.json'),canonical=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+if(s.owner!=='game_batch_inventory'||s.path!=='just_cause/just_cause_3/egg-j-c3-m-p.json')throw Error('Foreign fixture');
+const image=Object.values(canonical['solace_crafting/egg-solace-crafting.json'].egg.docker_images)[0];
+if(!/@sha256:[a-f0-9]{64}$/.test(image))throw Error('Unpinned proposed existing image');
+const inspect=spawnSync('docker',['image','inspect',image,'--format','{{.Id}}'],{windowsHide:true,encoding:'utf8'});if(inspect.status)throw Error('Candidate runtime not cached; do not pull');
+const isolated=process.argv[2]==='--isolated',suffix=isolated?'-isolated':'';
+const command="set -eu; cat /etc/os-release; getconf GNU_LIBC_VERSION; printf '\\nSERVER_LDD\\n'; LD_LIBRARY_PATH=/volume/lib:/volume/linux64:/volume/.steam/sdk64:/volume ldd /volume/Server; printf '\\nLIBNODE_LDD\\n'; LD_LIBRARY_PATH=/volume/lib:/volume/linux64:/volume/.steam/sdk64:/volume ldd /volume/lib/libnode.so.147";
+const p=spawnSync('docker',['run','--rm','--pull','never','--read-only','--network','none','--user','988:988','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','256m','--cpus','1','--pids-limit','64','--entrypoint','/bin/bash','--mount',`type=bind,source=${node.volume_root}/${s.uuid},target=/volume,readonly`,image,'-c',command],{windowsHide:true,encoding:'utf8',timeout:15000,maxBuffer:2e6});
+const output=(p.stdout??'')+(p.stderr??'');fs.writeFileSync(dir+'/runtime-compatibility'+suffix+'.log',output,{flag:'wx'});
+if(p.status||output.includes('not found'))throw Error('Candidate runtime fails actual dependency resolution: '+output);
+const result={image,cached_image_id:inspect.stdout.trim(),user:'988:988',read_only:true,network:'none',native_server_started:false,exit:p.status,output};fs.writeFileSync(dir+'/runtime-compatibility'+suffix+'.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+const profile=structuredClone(canonical[s.path]);profile.egg.docker_images={'Pinned Debian13 native runtime':image};
+if(!isolated){const stage='.local/jc3-native-source';fs.mkdirSync(stage,{recursive:true});fs.writeFileSync(stage+'/profiles.json',JSON.stringify({[s.path]:profile},null,2)+'\n');}console.log(result);

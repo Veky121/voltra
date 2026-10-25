@@ -25,6 +25,9 @@ type steamCatalogField struct {
 	Key, Label, Type, Default string
 	Min, Max                  float64
 	Secret                    bool
+	Required                  bool
+	MaxLength                 int
+	Options                   []string
 }
 
 func steamCatalogBridgeID(recipe string) string {
@@ -33,6 +36,26 @@ func steamCatalogBridgeID(recipe string) string {
 		return "7days"
 	case "satisfactory/egg-satisfactory.json":
 		return "satisfactory"
+	case "palworld/egg-palworld.json":
+		return "palworld-native"
+	case "palworld/egg-palworld-proton.json":
+		return "palworld-proton"
+	}
+	return ""
+}
+
+// These managed paths have separate reviewed native receipts; they do not use
+// recipe-adapter overrides. Keep their catalog aliases consistent with setup.
+func steamCatalogVerifiedDetail(recipe string) string {
+	switch steamCatalogBridgeID(recipe) {
+	case "7days":
+		return "Native Linux hosting tested with saved-world reload, private administration and reinstall preservation. Player gameplay was not tested."
+	case "satisfactory":
+		return "Native Linux hosting and saved-world preservation tested through both reinstall routes. Stop returned exit130 without an out-of-memory event. Player gameplay was not tested."
+	case "palworld-native":
+		return "Native Linux hosting tested with authenticated administration, save/reload and both reinstall routes. Player gameplay was not tested."
+	case "palworld-proton":
+		return "Windows hosting under Proton tested with maintained UE4SS, Lua and Blueprint loaders, save/reload and both reinstall routes. Existing native DLL mods or competing loaders require compatibility review. Player gameplay and crossplay were not tested."
 	}
 	return ""
 }
@@ -40,6 +63,8 @@ func steamCatalogBridgeID(recipe string) string {
 func steamCatalogFields(game string) []steamCatalogField {
 	common := []steamCatalogField{{Key: "AUTO_UPDATE", Label: "Automatic updates", Type: "boolean", Default: "1"}, {Key: "SRCDS_BETAID", Label: "Steam branch", Type: "text"}}
 	switch game {
+	case "palworld-native", "palworld-proton":
+		return steamPalworldFields(game)
 	case "7days":
 		return append(common, []steamCatalogField{
 			{Key: "MAX_PLAYERS", Label: "Maximum players", Type: "integer", Default: "8", Min: 1, Max: 2147483647},
@@ -71,6 +96,9 @@ var steamCatalogProtocols = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(,[A-Za-z]
 func steamCatalogParse(game string, input M, players int64) (steamCatalogConfiguration, error) {
 	out := steamCatalogConfiguration{Values: M{}, Secrets: map[string]string{}, Branch: "public", Automatic: true, Players: players}
 	fields := steamCatalogFields(game)
+	if steamPalworldVariant(game) {
+		fields = append(fields, steamCatalogField{Key: "SRCDS_BETAID", Label: "Steam branch", Type: "text"})
+	}
 	if len(fields) == 0 {
 		return out, bad("This game has no imported Steam controls.")
 	}
@@ -110,6 +138,12 @@ func steamCatalogParse(game string, input M, players int64) (steamCatalogConfigu
 		if !quickSingleLine(raw) || len(raw) > 4096 {
 			return out, bad(field.Label + " must be a single bounded value.")
 		}
+		if field.Required && raw == "" {
+			return out, bad(field.Label + " is required.")
+		}
+		if field.MaxLength > 0 && len([]rune(raw)) > field.MaxLength {
+			return out, bad(field.Label + " exceeds its character limit.")
+		}
 		if field.Secret && len([]byte(raw)) > 1024 {
 			return out, bad(field.Label + " must be at most 1024 UTF-8 bytes.")
 		}
@@ -137,7 +171,20 @@ func steamCatalogParse(game string, input M, players int64) (steamCatalogConfigu
 			raw = strconv.FormatFloat(n, 'f', -1, 64)
 		case "fixed":
 			if raw != field.Default {
-				return out, bad("The managed Steam app ID cannot be changed.")
+				if field.Key == "SRCDS_APPID" {
+					return out, bad("The managed Steam app ID cannot be changed.")
+				}
+				return out, bad(field.Label + " cannot be changed for this runtime variant.")
+			}
+		case "select":
+			valid := false
+			for _, option := range field.Options {
+				if raw == option {
+					valid = true
+				}
+			}
+			if !valid {
+				return out, bad("Invalid " + field.Label + ".")
 			}
 		}
 		if field.Key == "SRCDS_BETAID" && raw != "" && !steamCatalogBranch.MatchString(raw) {
@@ -170,6 +217,11 @@ func steamCatalogParse(game string, input M, players int64) (steamCatalogConfigu
 	out.Validate = str(out.Values["VALIDATE"]) == "1"
 	out.Automatic = str(out.Values["AUTO_UPDATE"]) == "1"
 	out.Players = num(out.Values["MAX_PLAYERS"])
+	if steamPalworldVariant(game) {
+		if err := steamPalworldValidate(out); err != nil {
+			return out, err
+		}
+	}
 	return out, nil
 }
 

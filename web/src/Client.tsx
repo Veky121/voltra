@@ -45,7 +45,7 @@ function Server() {
   const lifecycleState=value(r.data)?.status;
   useEffect(()=>{
     if(!['installing','restoring_backup'].includes(lifecycleState))return;
-    const timer=setInterval(r.reload,5000);
+    const timer=setInterval(r.reload,1000);
     return()=>clearInterval(timer);
   },[base,lifecycleState,r.reload]);
   if (r.loading && !r.data)
@@ -74,8 +74,8 @@ function Server() {
   ];
   const managedSteam = managedSteamServer(server);
   if(server.game==="minecraft")groups[2].tabs.unshift(["content","Mods & plugins","eggs","file.read"]);
-  if(server.game==="minecraft"||managedSteam)groups[1].tabs.unshift(["quick-setup","Game settings","settings","file.read-content"]);
-  if(managedSteam)groups[2].tabs.unshift(["steam","Steam maintenance","startup","startup.read"]);
+  groups[1].tabs.unshift(["quick-setup","Game settings","settings","file.read-content"]);
+  if(managedSteam||(Array.isArray(server.egg_features)&&server.egg_features.includes('voltra:steam-private-prepared-v1')))groups[2].tabs.unshift(["steam","Steam maintenance","startup","startup.read"]);
   if(administrator)groups.push({label:'Administration',tabs:[['admin-tools','Admin tools','wrench','']]});
   return (
     <ServerContext.Provider
@@ -151,3 +151,4 @@ export default function Client() {
     </Routes>
   );
 }
+

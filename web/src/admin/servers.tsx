@@ -1,6 +1,8 @@
+import {SectionTabs} from "../ui/SectionTabs";
 import { useEffect, useState } from "react";
 import "../client/serverAdminTools.css";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Switch } from "../ui/Settings";
 import {
   Action,
   DataTable,
@@ -35,34 +37,8 @@ const features = [
   f("allocation_limit", "Additional allocation limit", "number"),
   f("backup_limit", "Backup limit", "number"),
 ];
-export function ServerSettingsTabs({ tabs, active, onChange, scope = "server-settings" }: {
-  tabs: readonly (readonly [string, string])[];
-  active: string;
-  onChange: (tab: string) => void;
-  scope?: string;
-}) {
-  return <nav className="tabs server-settings-tabs" role="tablist" aria-label="Server settings">
-    {tabs.map(([key, label], index) => <button
-      type="button"
-      key={key}
-      role="tab"
-      id={`${scope}-tab-${key}`}
-      aria-selected={active === key}
-      aria-controls={`${scope}-panel-${key}`}
-      tabIndex={active === key ? 0 : -1}
-      className={active === key ? "active" : ""}
-      onClick={() => onChange(key)}
-      onKeyDown={(event) => {
-        const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
-          : event.key === "ArrowRight" ? (index + 1) % tabs.length
-          : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : null;
-        if (next === null) return;
-        event.preventDefault();
-        onChange(tabs[next][0]);
-        document.getElementById(`${scope}-tab-${tabs[next][0]}`)?.focus();
-      }}
-    >{label}</button>)}
-  </nav>;
+export function ServerSettingsTabs({tabs,active,onChange,scope='server-settings'}:{tabs:readonly (readonly [string,string])[];active:string;onChange:(tab:string)=>void;scope?:string}){
+ return <SectionTabs label="Server settings" scope={scope} className="server-settings-tabs" items={tabs.map(([id,label])=>({id,label}))} active={active} onChange={onChange}/>;
 }
 export function Servers() {
   return (
@@ -85,7 +61,7 @@ export function Server() {
   if (id === "new") return <CreateServer />;
   const record = q.data ? unwrap(q.data) : null;
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading title={record?.name ?? `Server #${id}`}>
         <Link to="/admin/servers">All servers</Link>
         {record && (
@@ -105,7 +81,7 @@ export function Server() {
       ]} />
       <section role="tabpanel" id={`server-settings-panel-${tab}`} aria-labelledby={`server-settings-tab-${tab}`} tabIndex={0}>
       {q.loading ? (
-        <p>Loading…</p>
+        <p className="admin-loading" role="status">Loading server...</p>
       ) : (
         record && (
           <>
@@ -113,7 +89,7 @@ export function Server() {
               <>
                 <div className="grid grid-2">
                   <Panel title="Server information">
-                    <dl>
+                    <dl className="admin-information">
                       {[
                         "uuid",
                         "identifier",
@@ -162,7 +138,7 @@ export function Server() {
         )
       )}
       </section>
-    </>
+    </div>
   );
 }
 function CreateServer() {
@@ -277,7 +253,7 @@ function CreateServer() {
   ];
   const eggVars = egg ? rows(egg.relationships?.variables ?? { data: [] }) : [];
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading title="Create server">
         <Link to="/admin/servers">All servers</Link>
       </Heading>
@@ -354,7 +330,7 @@ function CreateServer() {
           {Object.keys(integrationDefaults).length > 0 && <p className="muted">Saved global credentials are available for this egg. Values stay hidden and are applied when you create the server. <Link to="/admin/integrations">Manage integrations</Link></p>}
           {eggVars.filter(x => integrationDefaults[x.env_variable]).map(x => <div key={x.id} className="toolbar">
             <span>{x.name}: {integrationDefaults[x.env_variable].name}</span>
-            <label><input type="checkbox" checked={integrationOverrides[x.env_variable] ?? false} onChange={e => setIntegrationOverrides(v => ({ ...v, [x.env_variable]: e.target.checked }))} /> Override for this server</label>
+            <label className="admin-inline-switch"><Switch checked={integrationOverrides[x.env_variable] ?? false} onCheckedChange={checked => setIntegrationOverrides(v => ({ ...v, [x.env_variable]: checked }))} /> Override for this server</label>
           </div>)}
           <Fields
             fields={eggVars.filter(x => !integrationDefaults[x.env_variable] || integrationOverrides[x.env_variable]).map((x) =>
@@ -369,11 +345,11 @@ function CreateServer() {
             }
           />
         </Panel>
-        <button disabled={busy || eggQ.loading || integrationQ.loading || Boolean(integrationQ.error)}>
+        <div className="actions admin-form-actions"><button disabled={busy || eggQ.loading || integrationQ.loading || Boolean(integrationQ.error)}>
           {busy ? "Creating…" : "Create and install server"}
-        </button>
+        </button></div>
       </form>
-    </>
+    </div>
   );
 }
 export function Details({ record, onSaved }: { record: any; onSaved: () => void }) {
@@ -693,14 +669,16 @@ function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
               })
             }
           />
-          <button disabled={busy}>
+          <div className="actions admin-form-actions"><button disabled={busy}>
             {busy ? "Transferring…" : "Start transfer"}
-          </button>
+          </button></div>
         </form>
       </Panel>
       <Panel title="Transfer history">
         <ErrorMessage error={history.error} />
         <DataTable
+          loading={history.loading}
+          empty="No transfers yet."
           data={history.data ? rows(history.data) : []}
           columns={[
             { label: "Created", render: (x) => x.created_at },
@@ -737,7 +715,7 @@ function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
 export function DeleteServer({ record, returnTo = "/admin/servers" }: { record: any; returnTo?: string }) {
   const navigate = useNavigate();
   return (
-    <Panel title="Delete server">
+    <Panel title="Delete server" className="admin-danger-panel">
       <p>
         Deletes the container, server files, backups, database records, and
         panel configuration. This cannot be undone.
@@ -773,6 +751,8 @@ export function ServerMounts({ record, contextual = false }: { record: any; cont
       <ErrorMessage error={q.error} />
       <Panel title="Available mounts">
         <DataTable
+          loading={q.loading}
+          empty="No mounts available for this server."
           data={q.data ? rows(q.data) : []}
           columns={[
             {
@@ -826,6 +806,8 @@ export function ServerDatabases({ record }: { record: any }) {
       <ErrorMessage error={q.error} />
       <Panel title="Server databases">
         <DataTable
+          loading={q.loading}
+          empty="No databases for this server yet."
           data={q.data ? rows(q.data) : []}
           columns={[
             { label: "Database", render: (x) => x.database },
@@ -889,7 +871,7 @@ function DatabaseCredentials({ path }: { path: string }) {
   const [password, setPassword] = useState<string | null>(null),
     [error, setError] = useState("");
   return (
-    <div>
+    <div className="admin-credentials management-ui">
       {password === null ? (
         <button
           className="secondary"
@@ -908,7 +890,7 @@ function DatabaseCredentials({ path }: { path: string }) {
         </button>
       ) : (
         <>
-          <code>{password}</code>
+          <code className="admin-secret">{password}</code>
           <button
             className="secondary"
             onClick={() => navigator.clipboard.writeText(password)}

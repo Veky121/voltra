@@ -1,3 +1,4 @@
+import './games-ui.css';
 import {panelArtwork} from './artworkLibrary';
 import {useArtworkLibrary} from './ArtworkProvider';
 import {useState} from 'react';
@@ -29,9 +30,9 @@ export function GameLibraryCard({name,subtitle,artwork,to,onClick,note,noteTitle
       {guided&&<span className="library-card-kind">Guided setup</span>}
     </div>
     <div className="library-card-copy"><h3>{name}</h3><p>{subtitle}</p></div>
-    <span className="library-card-action">{disabledReason||'Set up server'}{!disabledReason&&<Icon name="chevron"/>}</span>
+    {disabledReason&&<span className="library-card-action">{disabledReason}</span>}
   </>;
-  return <article className="library-card">
+  return <article className="library-card games-ui">
     {to&&!disabledReason?<Link className="library-card-main" to={to}>{content}</Link>:onClick&&!disabledReason?<button type="button" className="library-card-main" onClick={onClick} aria-haspopup="dialog">{content}</button>:<div className="library-card-main library-card-main--disabled" aria-disabled="true">{content}</div>}
     {(note||source)&&<div className="library-card-foot"><span title={noteTitle}>{note}</span>{source&&<a href={source} target="_blank" rel="noreferrer" aria-label={`View recipe for ${name}`}>Recipe<Icon name="chevron"/></a>}</div>}
   </article>;

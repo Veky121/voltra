@@ -51,7 +51,7 @@ func quickFields(game string) []quickField {
 			{Key: "spawn-protection", Label: "Spawn protection radius", Type: "number", Min: 0, Max: 1000},
 			{Key: "allow-flight", Label: "Allow flight", Type: "boolean"},
 		}
-	case "palworld":
+	case "palworld", "palworld-native", "palworld-proton":
 		return []quickField{
 			{Key: "ServerName", Label: "Server name", Type: "text", Max: 100},
 			{Key: "ServerDescription", Label: "Description", Type: "text", Max: 512},
@@ -68,6 +68,9 @@ func quickFields(game string) []quickField {
 }
 
 func (a *App) registerGameQuickSetup(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/client/servers/{server}/game-settings", a.gameSettings)
+	mux.HandleFunc("PUT /api/client/servers/{server}/game-settings", a.gameSettings)
+	mux.HandleFunc("GET /api/client/servers/{server}/game-settings/folders", a.gameSettingsFolders)
 	mux.HandleFunc("GET /api/client/servers/{server}/quick-setup", a.gameQuickSetup)
 	mux.HandleFunc("PUT /api/client/servers/{server}/quick-setup", a.gameQuickSetup)
 }
@@ -96,8 +99,8 @@ func quickConfigPath(game string) string {
 	if game == "minecraft" {
 		return "/server.properties"
 	}
-	if game == "palworld" {
-		return palworldSettingsPath
+	if game == "palworld" || steamPalworldVariant(game) {
+		return steamPalworldSettingsPath(game)
 	}
 	return ""
 }
@@ -132,7 +135,12 @@ func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
 			fail(w, forbidden())
 			return
 		}
-		in, e := decode(r)
+		var in M
+		if steamPalworldVariant(game) {
+			in, e = decodeRaw(r)
+		} else {
+			in, e = decode(r)
+		}
 		if e != nil {
 			fail(w, e)
 			return
@@ -150,6 +158,25 @@ func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
 		revision, ok := in["revision"].(string)
 		if !ok || len(revision) != 64 {
 			fail(w, bad("Reload Quick setup before saving."))
+			return
+		}
+		if steamPalworldVariant(game) {
+			if e = a.steamPalworldQuickUpdate(ctx, s, game, file, revision, settings, patch); e != nil {
+				fail(w, e)
+				return
+			}
+			keys := make([]string, 0, len(patch))
+			for key := range patch {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			_ = a.audit(ctx, num(u["id"]), num(s["id"]), "server:quick-setup.update", M{"game": game, "keys": keys})
+			result, viewErr := a.quickSetupView(ctx, r, s, game)
+			if viewErr != nil {
+				fail(w, viewErr)
+				return
+			}
+			writeJSON(w, 200, item("game_quick_setup", result))
 			return
 		}
 		tx, e := a.DB.Begin(ctx)
@@ -186,7 +213,7 @@ func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
 			updated, e = valheimPatch(content, patch)
 		} else if game == "minecraft" {
 			updated, e = quickPatchProperties(content, patch)
-		} else if game == "palworld" {
+		} else if game == "palworld" || steamPalworldVariant(game) {
 			updated, e = quickPatchPalworld(content, patch)
 		} else {
 			e = bad("Manage Satisfactory settings in the game's built-in Server Manager.")
@@ -252,7 +279,7 @@ func quickValidateSettings(game string, settings M) (map[string]string, error) {
 					return nil, bad("Enter a server name and a world name using letters, numbers, underscores or dashes.")
 				}
 				encoded = v
-			} else if game == "palworld" {
+			} else if game == "palworld" || steamPalworldVariant(game) {
 				encoded = quickUnrealQuote(v)
 			} else {
 				encoded = quickPropertyEscape(v)
@@ -286,7 +313,7 @@ func quickValidateSettings(game string, settings M) (map[string]string, error) {
 				return nil, bad("Choose true or false for " + strings.ToLower(field.Label) + ".")
 			}
 			encoded = strconv.FormatBool(v)
-			if game == "palworld" {
+			if game == "palworld" || steamPalworldVariant(game) {
 				if v {
 					encoded = "True"
 				} else {
@@ -300,6 +327,8 @@ func quickValidateSettings(game string, settings M) (map[string]string, error) {
 }
 
 func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game string) (M, error) {
+	// Share listings only within this view. Saves must always read fresh state.
+	ctx = context.WithValue(ctx, quickListingContextKey{}, map[string][]M{})
 	file := quickConfigPath(game)
 	var content []byte
 	exists := true
@@ -337,7 +366,7 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 			}
 		}
 	}
-	if exists && game == "palworld" {
+	if exists && (game == "palworld" || steamPalworldVariant(game)) {
 		_, values, err = quickPalworldOptions(content)
 		if err != nil {
 			return nil, err
@@ -373,6 +402,11 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 			}
 			if field.Secret {
 				row["secret"] = true
+				if steamPalworldVariant(game) {
+					row["value"] = nil
+					row["configured"] = found && raw != ""
+					row["required"] = field.Key == "AdminPassword"
+				}
 			}
 			if field.Type == "select" {
 				options := []M{}
@@ -494,7 +528,14 @@ func (a *App) quickSetupList(ctx context.Context, s M, folder string) ([]M, bool
 // Only list a directory whose existence was established by its parent's
 // successful listing. Stock Wings may return 500 for an absent intermediate
 // parent through openat2. No HTTP error, including 404/500, proves absence.
+type quickListingContextKey struct{}
+
 func (a *App) quickSetupListExisting(ctx context.Context, s M, folder string) ([]M, error) {
+	cache, _ := ctx.Value(quickListingContextKey{}).(map[string][]M)
+	key := str(s["uuid"]) + "\x00" + folder
+	if entries, ok := cache[key]; ok {
+		return entries, nil
+	}
 	res, err := a.daemonServer(ctx, s, "GET", "/files/list-directory?"+url.Values{"directory": {folder}}.Encode(), nil)
 	if err != nil {
 		return nil, err
@@ -508,7 +549,31 @@ func (a *App) quickSetupListExisting(ctx context.Context, s M, folder string) ([
 	if len(data) > quickFileLimit || json.Unmarshal(data, &entries) != nil {
 		return nil, bad("The node returned an invalid or oversized folder listing.")
 	}
+	if cache != nil {
+		cache[key] = entries
+	}
 	return entries, nil
+}
+
+// A shortcut needs the directory entry, not a listing of its contents.
+func (a *App) quickSetupFolderExists(ctx context.Context, s M, folder string) (bool, error) {
+	parts, err := quickPathParts(folder)
+	if err != nil {
+		return false, err
+	}
+	if len(parts) == 0 {
+		_, exists, err := a.quickSetupList(ctx, s, folder)
+		return exists, err
+	}
+	entries, exists, err := a.quickSetupList(ctx, s, path.Dir(folder))
+	if err != nil || !exists {
+		return false, err
+	}
+	entry, exists, err := quickFindEntry(entries, parts[len(parts)-1])
+	if err != nil || !exists {
+		return false, err
+	}
+	return quickDirectoryEntry(entry), nil
 }
 
 func quickPathParts(name string) ([]string, error) {
@@ -572,7 +637,7 @@ func quickFileEntry(entry M) bool {
 func (a *App) quickSetupFolders(ctx context.Context, s M, game string, values map[string]string) ([]M, error) {
 	out := []M{}
 	add := func(label, folder, description string) error {
-		_, exists, err := a.quickSetupList(ctx, s, folder)
+		exists, err := a.quickSetupFolderExists(ctx, s, folder)
 		if err != nil {
 			return err
 		}
@@ -611,7 +676,7 @@ func (a *App) quickSetupFolders(ctx context.Context, s M, game string, values ma
 		if err := add("World saves", "/saves", "Back up and replace the complete world folder and its matching metadata while stopped. Save formats vary by game version."); err != nil {
 			return nil, err
 		}
-	} else if game == "palworld" {
+	} else if game == "palworld" || steamPalworldVariant(game) {
 		for _, folder := range []struct{ label, path string }{{"Saved games", "/Pal/Saved/SaveGames"}, {"Server configuration", "/Pal/Saved/Config/LinuxServer"}} {
 			if err := add(folder.label, folder.path, "Stop the server before uploading or replacing files. Back up saved games first."); err != nil {
 				return nil, err

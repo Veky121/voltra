@@ -1,0 +1,27 @@
+// Source coverage is separate from native/runtime acceptance.
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const read=p=>JSON.parse(fs.readFileSync(p));
+const catalog=read('internal/panel/game_library/upstream/catalog.json');
+const overrides=read('internal/panel/game_library/overrides.json');
+const bridgeSource=fs.readFileSync('internal/panel/steam_catalog_bridge.go','utf8');
+const bridgeFunction=bridgeSource.match(/func steamCatalogBridgeID\(recipe string\) string \{([\s\S]*?)\n\}/)?.[1];
+assert(bridgeFunction,'Managed recipe mapping was not found');
+const bridges=new Map([...bridgeFunction.matchAll(/case "([^"]+)":\s*return "([^"]+)"/g)].map(m=>[m[1],m[2]]));
+assert.equal(bridges.size,4,'Review changed managed bridge mapping');
+const specSource=fs.readFileSync('internal/panel/steam_games.go','utf8');
+const specBody=specSource.match(/var steamGameSpecs = \[\]steamGameSpec\{([\s\S]*?)\n\}/)?.[1];
+assert(specBody,'Managed setup specifications were not found');
+const specs=new Map([...specBody.matchAll(/\{ID:\s*"([^"]+)"([^\n]*)\}/g)].map(m=>[m[1],m[2]]));
+for(const id of bridges.values())assert(specs.has(id),'Managed specification was not parsed: '+id);
+const unavailable=[...specs].filter(([,body])=>{const value=body.match(/UnavailableReason:\s*([^,}\n]+)/)?.[1]?.trim();return value!==undefined&&value!=='""';}).map(([id])=>id);
+const games=catalog.entries.map(entry=>({path:entry.path,source:overrides[entry.path]?'recipe_adapter':bridges.has(entry.path)?'managed_bridge':'missing',revision:overrides[entry.path]?.revision??null,runtime_status:overrides[entry.path]?.verification??'separate_managed_evidence',managed_id:bridges.get(entry.path)??null}));
+const runtime_status_counts={};
+for(const game of games)runtime_status_counts[game.runtime_status]=(runtime_status_counts[game.runtime_status]??0)+1;
+const remaining_runtime_review=games.filter(game=>game.source==='recipe_adapter'&&game.runtime_status!=='runtime_verified').map(game=>({path:game.path,status:game.runtime_status,revision:game.revision}));
+assert.equal(games.length,240);
+assert.equal(games.filter(g=>g.source==='missing').length,0,'Catalog has missing source implementation');
+for(const path of Object.keys(overrides))assert(catalog.entries.some(e=>e.path===path),'Unknown override '+path);
+const report={observed_at:new Date().toISOString(),scope:'Source paths and declared recipe verification status only. This does not establish full feature parity or gameplay. Managed bridges require their separate acceptance receipts.',catalog:games.length,recipe_adapters:games.filter(g=>g.source==='recipe_adapter').length,managed_bridges:games.filter(g=>g.source==='managed_bridge').length,native_verified_overrides:games.filter(g=>g.runtime_status==='runtime_verified').length,runtime_status_counts,remaining_runtime_review,explicitly_unavailable:unavailable,games};
+fs.writeFileSync('artifacts/game-source-coverage.json',JSON.stringify(report,null,2)+'\n');
+console.log(JSON.stringify({...report,games:undefined,remaining_runtime_review:undefined},null,2));

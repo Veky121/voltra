@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { ScheduleTiming } from "./ScheduleTiming";
+import type { ScheduleCron } from "./scheduleTimingModel";
+import {SettingsRow,SettingsSection} from '../ui/Settings';
 import {
   api,
   useAPI,
@@ -18,6 +21,7 @@ import {
   json,
   Notice,
   PageError,
+  ServerPageTitle,
   useAction,
   useServer,
   value,
@@ -33,12 +37,9 @@ export function Databases() {
     [remote, setRemote] = useState("%"),
     [visible, setVisible] = useState<Record<string, boolean>>({});
   return (
-    <section>
-      <div className="toolbar">
-        <h2>Databases</h2>
-        <p className="muted">
-          Limit: {server.feature_limits?.databases ?? "Unlimited"}
-        </p>
+    <section className="operations-page databases-page">
+      <div className="toolbar server-page-toolbar">
+        <ServerPageTitle title="Databases" limit={server.feature_limits?.databases}/>
         {can(permissions, "database.create") && (
           <Button onClick={() => setOpen(true)}>Create database</Button>
         )}
@@ -48,6 +49,7 @@ export function Databases() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
+      {r.loading && <p className="operations-loading" role="status">Loading databases...</p>}
       <div className="grid grid-2">
         {items(r.data).map((d) => {
           const password =
@@ -56,27 +58,18 @@ export function Databases() {
             d.host?.port || 3306
           }`;
           return (
-            <Card key={d.id}>
-              <h3>{d.name || d.database}</h3>
-              <Field label="Host">
-                <Input readOnly value={host} />
-              </Field>
-              <Field label="Username">
-                <Input readOnly value={d.username} />
-              </Field>
-              <p className="muted">
-                Connections from: {d.connections_from || d.remote}
-              </p>
+            <SettingsSection key={d.id} title={d.name || d.database} className="operations-database">
+              <SettingsRow label="Host" control={<Input aria-label={`Host for ${d.name || d.database}`} readOnly value={host} />}/>
+              <SettingsRow label="Username" control={<Input aria-label={`Username for ${d.name || d.database}`} readOnly value={d.username} />}/>
+              <SettingsRow label="Connections from" control={<span className="settings-value">{d.connections_from || d.remote}</span>}/>
               {can(permissions, "database.view_password") && (
-                <>
-                  <Field label="Password">
+                <SettingsRow label="Password" control={
                     <Input
                       aria-label={`Password for ${d.name || d.database}`}
                       type={visible[d.id] ? "text" : "password"}
                       readOnly
                       value={password}
-                    />
-                  </Field>
+                    />}>
                   <Button
                     variant="secondary"
                     onClick={() =>
@@ -85,9 +78,9 @@ export function Databases() {
                   >
                     {visible[d.id] ? "Hide" : "Show"} password
                   </Button>
-                </>
+                </SettingsRow>
               )}
-              <div className="actions">
+              <div className="settings-actions operations-record-actions">
                 {can(permissions, "database.update") && (
                   <Button
                     variant="secondary"
@@ -137,12 +130,12 @@ export function Databases() {
                   </Button>
                 )}
               </div>
-            </Card>
+            </SettingsSection>
           );
         })}
       </div>
       {!r.loading && !items(r.data).length && (
-        <Card>No databases provisioned.</Card>
+        <Card className="operations-empty">No databases provisioned.</Card>
       )}
       {open && (
         <Modal title="Create database" onClose={() => setOpen(false)}>
@@ -194,7 +187,7 @@ export function Databases() {
 
 const emptySchedule = {
   name: "",
-  minute: "*",
+  minute: "0",
   hour: "*",
   day_of_month: "*",
   month: "*",
@@ -247,7 +240,7 @@ export function Schedules() {
       }
     );
   return (
-    <section>
+    <section className="operations-page schedules-page">
       <div className="toolbar server-page-toolbar">
         <h2>Schedules</h2>
         {can(permissions, "schedule.create") && (
@@ -261,18 +254,19 @@ export function Schedules() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
+      {r.loading && <p className="operations-loading" role="status">Loading schedules...</p>}
       {items(r.data).map((s) => (
-        <Card key={s.id}>
-          <div className="toolbar">
+        <Card key={s.id} className="operations-record schedule-record">
+          <div className="toolbar operations-record-heading">
             <h3>{s.name}</h3>
-            <span className="badge">
+            <span className={`badge ${s.is_processing ? 'operations-status-pending' : s.is_active ? 'operations-status-success' : ''}`}>
               {s.is_processing
                 ? "Processing"
                 : s.is_active
                 ? "Active"
                 : "Disabled"}
             </span>
-            <code>
+            <code className="schedule-cron">
               {s.cron?.minute || s.cron_minute} {s.cron?.hour || s.cron_hour}{" "}
               {s.cron?.day_of_month || s.cron_day_of_month}{" "}
               {s.cron?.month || s.cron_month}{" "}
@@ -342,7 +336,7 @@ export function Schedules() {
             Last run: {date(s.last_run_at)} · Next run: {date(s.next_run_at)}
             {s.only_when_online ? " · Only when online" : ""}
           </p>
-          <div className="table-wrap">
+          <div className="table-wrap operations-table schedule-tasks">
             <table className="table">
               <thead>
                 <tr>
@@ -426,7 +420,7 @@ export function Schedules() {
         </Card>
       ))}
       {!r.loading && !items(r.data).length && (
-        <Card>
+        <Card className="operations-empty">
           No schedules configured. Add a schedule to automate commands, power
           actions, or backups.
         </Card>
@@ -452,29 +446,7 @@ export function Schedules() {
                 }
               />
             </Field>
-            <div className="form-grid">
-              {[
-                ["minute", "Minute", "0–59"],
-                ["hour", "Hour", "0–23"],
-                ["day_of_month", "Day of month", "1–31"],
-                ["month", "Month", "1–12"],
-                ["day_of_week", "Day of week", "0–6"],
-              ].map(([key, label, hint]) => (
-                <Field
-                  key={key}
-                  label={label}
-                  hint={`${hint}; * means every value`}
-                >
-                  <Input
-                    required
-                    value={editing[key]}
-                    onChange={(e) =>
-                      setEditing({ ...editing, [key]: e.target.value })
-                    }
-                  />
-                </Field>
-              ))}
-            </div>
+            <ScheduleTiming value={editing as ScheduleCron} onChange={cron => setEditing({ ...editing, ...cron })} />
             <Check
               label="Schedule enabled"
               checked={editing.is_active}
@@ -485,7 +457,7 @@ export function Schedules() {
               checked={editing.only_when_online}
               onChange={(v) => setEditing({ ...editing, only_when_online: v })}
             />
-            <Button type="submit" disabled={a.busy}>
+            <Button type="submit" disabled={a.busy || !editing.day_of_week.trim()}>
               Save schedule
             </Button>
           </form>
@@ -598,7 +570,7 @@ export function Users() {
     ([, v]) => typeof v === "object" && v !== null
   ) as [string, any][];
   return (
-    <section>
+    <section className="operations-page server-users-page">
       <div className="toolbar server-page-toolbar">
         <h2>Server users</h2>
         {can(permissions, "user.create") && (
@@ -613,17 +585,18 @@ export function Users() {
       <Notice action={a} />
       <PageError error={r.error} />
       <PageError error={p.error} />
+      {r.loading && <p className="operations-loading" role="status">Loading users...</p>}
       <div className="grid grid-2">
         {items(r.data).map((u) => (
-          <Card key={u.uuid || u.id}>
-            <h3>{u.username || u.email}</h3>
+          <Card key={u.uuid || u.id} className="operations-record">
+            <h3>{u.username || u.email}{u.is_current_user && ' (you)'}</h3>
             <p>{u.email}</p>
             <p className="muted">
-              {u.permissions?.length || 0} permissions · Created{" "}
+              {u.inherited_access ? `${u.is_owner ? 'Server owner' : 'Administrator'} · Full access` : `${u.permissions?.length || 0} permissions`} · Created{" "}
               {date(u.created_at)}
             </p>
-            <div className="actions">
-              {can(permissions, "user.update") && (
+            <div className="actions operations-record-actions">
+              {!u.inherited_access && can(permissions, "user.update") && (
                 <Button
                   variant="secondary"
                   onClick={() =>
@@ -633,7 +606,7 @@ export function Users() {
                   Edit permissions
                 </Button>
               )}
-              {can(permissions, "user.delete") && (
+              {!u.inherited_access && can(permissions, "user.delete") && (
                 <Button
                   variant="danger"
                   disabled={a.busy}
@@ -661,9 +634,8 @@ export function Users() {
         ))}
       </div>
       {!r.loading && !items(r.data).length && (
-        <Card>
-          No additional users. The server owner and administrators retain
-          access.
+        <Card className="operations-empty">
+          No users found.
         </Card>
       )}
       {editing && (
@@ -712,6 +684,7 @@ export function Users() {
             </Field>
             <p className="muted">
               Select the actions this account can perform on this server.
+              Enable file.sftp to let them connect using their own SFTP password or SSH key.
             </p>
             {groups.map(([group, info]) => {
               const keys = Object.entries(

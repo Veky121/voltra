@@ -44,3 +44,28 @@ func TestPrivateBranchOptionsValidation(t *testing.T) {
 		t.Fatal("Updated node options capability not advertised")
 	}
 }
+
+func TestPalworldPlatformCompatibility(t *testing.T) {
+	legacy := Request{JobID: "11111111-1111-1111-1111-111111111111", ServerUUID: "22222222-2222-2222-2222-222222222222", AppID: 2394010, Operation: "check", Branch: "public"}
+	current := legacy
+	if err := current.Normalize(); err != nil {
+		t.Fatal(err)
+	}
+	if legacy.WithoutCredentials() != current.WithoutCredentials() {
+		t.Fatal("Old Linux replay identity changed")
+	}
+	current.Platform = "windows"
+	if err := current.Normalize(); err != nil {
+		t.Fatal(err)
+	}
+	if legacy.WithoutCredentials() == current.WithoutCredentials() {
+		t.Fatal("Cross-platform replay identity collapsed")
+	}
+	current.AppID = 1690800
+	if current.Normalize() == nil {
+		t.Fatal("Unreviewed Windows app accepted")
+	}
+	if !KnownCapability(WindowsCapability) || !KnownCapability(PalworldBridgeCapability) {
+		t.Fatal("New capability gates not advertised")
+	}
+}

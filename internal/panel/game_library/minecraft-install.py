@@ -168,7 +168,9 @@ def bootstrap_java(major, directory):
 def install(plan, root, work_directory=None):
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="voltra-minecraft-", dir=work_directory) as temporary:
+    # Wings mounts /tmp as a small tmpfs. Pack archives plus the Java bootstrap
+    # must use the server disk budget, not exhaust that tmpfs during extraction.
+    with tempfile.TemporaryDirectory(prefix="voltra-minecraft-", dir=work_directory or root) as temporary:
         staging = Path(temporary) / "server"
         staging.mkdir()
         for file in plan["files"]:

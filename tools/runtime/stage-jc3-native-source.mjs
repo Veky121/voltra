@@ -1,0 +1,7 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import crypto from 'node:crypto';
+const path='just_cause/just_cause_3/egg-j-c3-m-p.json',profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[path]);
+const source=fs.readFileSync('internal/panel/game_library/scripts/open-world-servers.py','utf8'),script=profile.egg.scripts.installation.script,marker="cat > .voltra/open_world_servers.py <<'VOLTRA_SOURCE'\n",start=script.indexOf(marker),end=script.indexOf('\nVOLTRA_SOURCE\n',start+marker.length);
+assert(start>=0&&end>start);profile.egg.scripts.installation.script=script.slice(0,start+marker.length)+source+script.slice(end);
+assert(!profile.egg.variables.some(v=>v.env_variable==='XVFB'));profile.egg.variables.push({name:'Disable unused display',env_variable:'XVFB',default_value:'0',rules:'required|in:0',description:'Linux native JC3 runs headless; disable the pinned image entrypoint optional Xvfb display.',user_viewable:false,user_editable:false,field_type:'text'});
+const dir='.local/jc3-native-source',bytes=JSON.stringify({[path]:profile},null,2)+'\n';fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(dir+'/profiles.json',bytes);
+const sha=x=>crypto.createHash('sha256').update(x).digest('hex');fs.writeFileSync(dir+'/source-hashes.json',JSON.stringify({'open-world-servers.py':sha(source),'profiles.json':sha(bytes)},null,2)+'\n');console.log({helper_sha256:sha(source),stage_sha256:sha(bytes),original_metadata_preserved:true});

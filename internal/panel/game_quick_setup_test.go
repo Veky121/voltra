@@ -163,6 +163,42 @@ func TestQuickSetupPermissionsStoppedStateAndRevision(t *testing.T) {
 	infraExpect(t, mux, num(u["id"]), "PUT", endpoint, M{"revision": readOnly["revision"], "settings": M{"pvp": false}}, 403)
 }
 
+func TestQuickSetupMinecraftListingReuseIsViewScoped(t *testing.T) {
+	a, mux, admin, server, f := quickSetupMinecraftFixture(t)
+	transport := a.HTTP.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	var requests []string
+	a.HTTP.Transport = gameLibraryTransport(func(r *http.Request) (*http.Response, error) {
+		requests = append(requests, r.URL.Path+"?"+r.URL.RawQuery)
+		return transport.RoundTrip(r)
+	})
+	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/quick-setup"
+	view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
+	if len(requests) != 2 || !strings.Contains(requests[0], "list-directory?directory=%2F") || !strings.Contains(requests[1], "contents?file=%2Fserver.properties") {
+		t.Fatalf("Minecraft settings should need just one root listing and one properties read: %v", requests)
+	}
+	if len(asSlice(view["folders"])) != 2 {
+		t.Fatal("existing shortcuts were lost")
+	}
+	// A later visit must see external file/folder edits, not the previous view.
+	f.mu.Lock()
+	f.Files["/server.properties"] = []byte("motd=External edit\nlevel-name=new-world\n")
+	delete(f.Folders, "/custom-world")
+	f.Folders["/new-world"] = []M{}
+	f.mu.Unlock()
+	requests = nil
+	next := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
+	if len(requests) != 2 || str(next["revision"]) == str(view["revision"]) {
+		t.Fatal("later view reused stale properties or made redundant requests")
+	}
+	folders, _ := json.Marshal(next["folders"])
+	if strings.Contains(string(folders), "/custom-world") || !strings.Contains(string(folders), "/new-world") {
+		t.Fatal("later view reused stale folder entries")
+	}
+}
+
 func TestQuickSetupConcurrentWritesUseOneRevision(t *testing.T) {
 	_, mux, admin, server, f := quickSetupMinecraftFixture(t)
 	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/quick-setup"

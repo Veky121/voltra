@@ -171,6 +171,22 @@ class AutomationSimsTests(unittest.TestCase):
             self.assertNotIn('secret-password', output.getvalue())
             self.assertNotIn('Filename:', output.getvalue())
 
+    def test_fortress_bridge_only_other_family_stop_kwargs_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            console = mock.Mock(); console.run.return_value = 42
+            bridge = mock.Mock(); bridge.supervise.return_value = -2
+            def helper(name):
+                return bridge if name == 'automation-fortress-console' else console
+            with mock.patch.object(adapter, 'configure', return_value=(['/owned/native'], ['secret'])), mock.patch.object(adapter, 'helper', side_effect=helper):
+                self.assertEqual(adapter.run(root, 'fortress', env(AUTO_UPDATE='0')), 130)
+                self.assertEqual(bridge.supervise.call_args.args[-1], 28021)
+                console.run.assert_not_called()
+                for game, stop in [('eco', 'exit'), ('foundry', '\x03')]:
+                    self.assertEqual(adapter.run(root, game, env(AUTO_UPDATE='0')), 42)
+                    self.assertEqual(console.run.call_args.args[3], stop)
+                    self.assertEqual(console.run.call_args.kwargs, {'terminal_input': True})
+
 
 if __name__ == '__main__':
     unittest.main()

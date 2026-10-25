@@ -9,6 +9,8 @@ import (
 
 const Capability = "steam-v1"
 const OptionsCapability = "steam-options-v1"
+const WindowsCapability = "steam-windows-palworld-v1"
+const PalworldBridgeCapability = "steam-palworld-bridge-v1"
 
 // Reserved but deliberately not advertised until native password parsing is
 // proven for every supported character. Validation alone remains available.
@@ -22,6 +24,7 @@ type Request struct {
 	Branch       string `json:"branch"`
 	BetaPassword string `json:"beta_password,omitempty"`
 	Validate     bool   `json:"validate,omitempty"`
+	Platform     string `json:"platform,omitempty"`
 }
 
 type Event struct {
@@ -46,6 +49,12 @@ func (r *Request) Normalize() error {
 	if r.AppID <= 0 || r.AppID > 2147483647 {
 		return errors.New("invalid Steam app ID")
 	}
+	if r.Platform == "" {
+		r.Platform = "linux"
+	}
+	if r.Platform != "linux" && (r.Platform != "windows" || r.AppID != 2394010) {
+		return errors.New("unsupported Steam target platform")
+	}
 	if r.Branch == "" {
 		r.Branch = "public"
 	}
@@ -63,4 +72,10 @@ func (r *Request) Normalize() error {
 }
 
 // Credentials are transient transport values, never durable replay identity.
-func (r Request) WithoutCredentials() Request { r.BetaPassword = ""; return r }
+func (r Request) WithoutCredentials() Request {
+	r.BetaPassword = ""
+	if r.Platform == "" {
+		r.Platform = "linux"
+	}
+	return r
+}

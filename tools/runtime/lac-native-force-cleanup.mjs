@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {api} from './openttd-compat-node.mjs';
+const dir='.local/lac-native',s=JSON.parse(fs.readFileSync(dir+'/private.json')),node=JSON.parse(fs.readFileSync(s.node_receipt));
+const server=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(server.uuid!==s.uuid||server.external_id!=='lac-native-'+s.request_id||server.egg!==s.egg_id||server.node!==s.node||s.node!==node.node||s.node_uuid!==node.node_uuid||s.owner!=='unreal_survival')throw Error('Owned cleanup identity mismatch');
+const info=JSON.parse(spawnSync('docker',['inspect',s.uuid],{windowsHide:true,encoding:'utf8'}).stdout)[0];
+if(info.Config.Labels.Service!=='Pterodactyl'||info.Config.Labels.ContainerType!=='server_process'||!info.Mounts.some(m=>m.Source===node.volume_root+'/'+s.uuid&&m.Destination==='/home/container'))throw Error('Exact owned game container mismatch');
+if(!info.State.Running)throw Error('Container already stopped; inspect instead');
+if(Date.now()-Date.parse(info.State.StartedAt)<120000)throw Error('Insufficient observed normal-stop failure window');
+const before={state:info.State,at:new Date().toISOString(),reason:'One ordinary Panel SIGINT Stop was delivered but did not terminate native publisher process. Root-authorized exact-owned bounded development cleanup, not normal Stop acceptance.'};
+fs.writeFileSync(dir+'/forced-cleanup-before.json',JSON.stringify(before,null,2)+'\n');
+const stopped=spawnSync('docker',['stop','--signal','SIGTERM','--timeout','15',s.uuid],{windowsHide:true,encoding:'utf8',timeout:25000});
+if(stopped.status)throw Error('Exact owned bounded cleanup did not finish: '+stopped.stderr);
+const after=JSON.parse(spawnSync('docker',['inspect',s.uuid],{windowsHide:true,encoding:'utf8'}).stdout)[0];
+if(after.State.Running)throw Error('Cleanup did not stop owned game');
+const result={before,...{state:after.State,at:new Date().toISOString(),normal_panel_stop:false,cleanup_signal:'SIGTERM',timeout_seconds:15}};
+const tag=process.argv[2]??'first';if(!/^[a-z0-9_-]+$/.test(tag))throw Error('Invalid tag');fs.writeFileSync(dir+'/forced-cleanup-'+tag+'.json',JSON.stringify(result,null,2)+'\n');console.log(result);

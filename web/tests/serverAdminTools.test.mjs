@@ -6,9 +6,9 @@ import {fileURLToPath} from 'node:url';
 // In-memory TSX fixtures. No browser, server, real fetch, or dist output.
 const fixtureKey = '__serverAdminToolsFixture';
 const modules = {
-  react: `export const useState=(...args)=>globalThis.${fixtureKey}.useState(...args); export const useEffect=(...args)=>globalThis.${fixtureKey}.useEffect(...args);`,
+  react: `export const useState=(...args)=>globalThis.${fixtureKey}.useState(...args); export const useEffect=(...args)=>globalThis.${fixtureKey}.useEffect(...args); export const useId=()=>globalThis.${fixtureKey}.useId(); export const useRef=initial=>useState(()=>({current:initial}))[0];`,
   'react/jsx-runtime': `export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key}); export const jsxs=jsx;`,
-  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a';`,
+  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a';`,
   lib: `import {jsx} from 'react/jsx-runtime';
     export const api=(...args)=>globalThis.${fixtureKey}.api(...args);
     export const useAPI=path=>globalThis.${fixtureKey}.query(path);
@@ -19,6 +19,14 @@ const modules = {
     export const ErrorBox=({children})=>children?jsx('div',{role:'alert',children}):null;
     export const Loading=()=>jsx('p',{role:'status',children:'Loading'});`,
   common: `export const useServer=()=>globalThis.${fixtureKey}.context;`,
+  // Keep the real Settings wrapper and its consumers, but isolate the shadcn
+  // primitive from this DOM-free React renderer. Model its boolean callback,
+  // controlled state and disabled guard instead of a legacy checkbox event.
+  switch: `import {jsx} from 'react/jsx-runtime';
+    export const Switch=({checked=false,onCheckedChange,disabled,render,nativeButton,inputRef,...props})=>jsx('button',{
+      ...props,type:'button',role:'switch','aria-checked':checked,disabled,
+      onClick:()=>{if(!disabled)onCheckedChange?.(!checked,{event:{type:'click'}});}
+    });`,
   shared: `export {api,useAPI,unwrap,rows} from 'fixture:lib';
     import {jsx} from 'react/jsx-runtime';
     export const f=(key,label,type,extra={})=>({key,label,type,...extra});
@@ -37,6 +45,7 @@ const bundled = await build({
   stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
+    builder.onResolve({filter:/components\/ui\/switch$/}, () => ({path:'switch',namespace:'fixture'}));
     builder.onResolve({filter:/^(react(?:\/jsx-runtime)?|react-router-dom|fixture:lib)$|(?:^|\/)lib$|(?:^|\/)common$|(?:^|\/)shared$/}, args => {
       const name=args.path === 'fixture:lib' ? 'lib' : args.path.replace(/^.*\//,'');
       const key=args.path.startsWith('react') ? args.path : name;
@@ -60,6 +69,7 @@ function fixture(Component=ui.default, props={}) {
       ['/api/application/servers/7?include=allocations,variables,user,node,egg',{data:item({id:7,name:'Fixture server',uuid:'safe-uuid',egg:2,container:{installed:1,environment:{PASSWORD:'never display this'}}})}],
       [base,{data:item(configuration())}],
     ]), queries:[], requests:[], navigations:[], confirmations:[], confirm:true, apiError:'', tree:null,
+    useId() { return f.useState(()=>`fixture-id-${f.nextId=(f.nextId||0)+1}`)[0]; },
     useState(initial) {
       const index=active.index++;
       if (!active.hooks[index]) {
@@ -118,9 +128,15 @@ function fixture(Component=ui.default, props={}) {
     field(key){return f.nodes(node=>node.props.id===`server-configuration-7-${key}`)[0];},
     override(key) {
       const group=f.nodes(node=>node.props.className==='server-configuration-field'&&f.textOf(node).includes(`server-configuration-7-${key}`))[0];
-      const checkbox=[];
-      function walk(node){if(Array.isArray(node))node.forEach(walk);else if(node&&typeof node==='object'){if(node.props.type==='checkbox')checkbox.push(node);walk(node.props.children);}}
-      walk(group);assert.ok(checkbox[0]);checkbox[0].props.onChange({target:{checked:true}});f.render();
+      const switches=[];
+      function walk(node){if(Array.isArray(node))node.forEach(walk);else if(node&&typeof node==='object'){if(node.props.role==='switch')switches.push(node);walk(node.props.children);}}
+      walk(group);assert.equal(switches.length,1,`missing override switch for ${key}`);
+      const control=switches[0];
+      assert.equal(control.props.disabled,false,`override switch for ${key} must be enabled`);
+      const wasChecked=control.props['aria-checked'];
+      control.props.onClick();f.render();
+      const refreshed=f.nodes(node=>node.props.role==='switch'&&node.props['aria-label']===control.props['aria-label'])[0];
+      assert.equal(refreshed.props['aria-checked'],!wasChecked,'Switch callback must update controlled state');
     },
     textOf(node){return JSON.stringify(node);},
     async save(){const form=f.nodes(node=>node.type==='form')[0];await form.props.onSubmit({preventDefault(){}});f.render();},
@@ -186,12 +202,29 @@ test('revision conflict retains draft; retry uses server endpoint and never invo
   assert.match(f.text(),/revision-2/);assert.match(f.text(),/Nothing was started or reinstalled/);
 });
 
+test('disabling an override through the Switch callback restores inheritance and omits the override on save',async()=>{
+  const f=fixture();
+  f.data.set(base,{data:item(configuration({overrides:{config_stop:'custom-stop'}}))});
+  f.render();f.tab('configuration');
+  assert.equal(f.field('config_stop').props.value,'custom-stop');
+  f.override('config_stop');
+  assert.equal(f.field('config_stop').props.disabled,true);
+  assert.equal(f.field('config_stop').props.value,'^C');
+  await f.save();
+  assert.deepEqual(f.requests,[{path:base,method:'PUT',body:{revision:'revision-1',overrides:{}}}]);
+});
+
 test('backend update guard and managed installer locks do not erase inherited values',()=>{
   const f=fixture();f.data.set(base,{data:item(configuration({managed:true,can_update:false}))});f.render();f.tab('configuration');
   for(const key of ['config_stop','config_files','script_container','script_entry','script_install'])assert.equal(f.field(key).props.disabled,true);
   assert.equal(f.field('script_install').props.value,'echo install');
   assert.match(f.text(),/Stop the server/);
   assert.equal(f.nodes(node=>node.type==='button'&&node.props.type==='submit')[0].props.disabled,true);
+  const controls=f.nodes(node=>node.props.role==='switch');
+  assert.ok(controls.length>0,'guarded configuration must retain its override switches');
+  for(const control of controls){assert.equal(control.props.disabled,true);control.props.onClick();}
+  f.render();
+  assert.ok(f.nodes(node=>node.props.role==='switch').every(node=>node.props['aria-checked']===false),'disabled Switch callbacks must not create overrides');
   assert.equal(f.requests.length,0);
 });
 

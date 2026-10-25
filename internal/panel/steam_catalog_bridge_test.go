@@ -32,8 +32,8 @@ func TestSteamCatalogBridgeRetainsEveryImportedControl(t *testing.T) {
 			t.Errorf("%s unexpected control count", game)
 		}
 	}
-	if count != 2 {
-		t.Fatalf("Mapped %d exact catalog entries, want two", count)
+	if count != 4 {
+		t.Fatalf("Mapped %d exact catalog entries, want four", count)
 	}
 }
 
@@ -234,12 +234,19 @@ func TestSteamCatalogBridgeAliasesAreExactAndPreserveVerification(t *testing.T) 
 		if verification == "" {
 			verification = "not_verified"
 		}
-		if str(summary["verification"]) != verification || str(summary["detail"]) != entry.Detail {
+		detail := entry.Detail
+		if reason := gameTemplateSetupUnavailable(entry); reason != "" {
+			detail = reason
+			if boolean(summary["available"]) {
+				t.Fatal("Unavailable managed dependency was exposed as installable")
+			}
+		}
+		if str(summary["verification"]) != verification || str(summary["detail"]) != detail {
 			t.Fatal("Alias incorrectly inherited another runtime result")
 		}
 	}
-	if count != 2 {
-		t.Fatal("Expected exactly two reviewed managed aliases")
+	if count != 4 {
+		t.Fatal("Expected exactly four reviewed managed aliases")
 	}
 	for _, path := range []string{"other/egg-satisfactory.json", "satisfactory/egg-other.json", "7_days_to_die/egg-7-days-to-die.json.bak"} {
 		if steamCatalogBridgeID(path) != "" {

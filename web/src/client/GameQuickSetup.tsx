@@ -1,73 +1,115 @@
-import {useRef, useState, type FormEvent} from 'react';
+import './games-ui.css';
+import {useCallback, useEffect, useRef, useState, type FormEvent} from 'react';
 import {Link, useParams} from 'react-router-dom';
-import {api, Button, Card, ErrorBox, Field, Input, Select, unwrap} from '../lib';
-import {can, json, useServer} from './common';
-import {GameHelpLinks} from './SteamGames';
-import {quickSettings, safeFolderLink, stoppedServer, type QuickField, type QuickSetup, type QuickValue} from './gameSetupModel';
+import {api, Button, Card, ErrorBox, Input, Select, Textarea, unwrap, useAPI} from '../lib';
+import {can, items, json, useServer} from './common';
+import {safeFolderLink, stoppedServer, type QuickField, type QuickSetup, type QuickValue} from './gameSetupModel';
 import {useGameRequest} from './useGameRequest';
 import {useServerTelemetry} from './ServerDashboard';
+import {GameSwitch} from './GameSwitch';
+import {readableSettingName, settingsGroups} from './gameSettingsLayout';
+import {StartupVariableField} from './ServerStartup';
+import type {StartupVariable, VariableWrite} from './startupSettingsModel';
 import './steamGames.css';
 
+type Settings = QuickSetup & {file: string; documents: {path: string; label: string}[]};
 export default function GameQuickSetup() {
   const {base, permissions, server} = useServer();
   const {id} = useParams();
+  const [file, setFile] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [search, setSearch] = useState('');
+  const dirty = useRef(false);
   const allowed = can(permissions, 'file.read-content');
-  const request = useGameRequest<QuickSetup>(base && allowed ? `${base}/quick-setup` : null);
-  return <div className="game-quick-page">
-    <header className="page-header"><div><h2>Quick setup</h2><p className="muted">Common game settings and folders for {server.name || 'this server'}.</p></div><Button variant="secondary" onClick={request.reload} disabled={!allowed || request.loading}>Refresh settings</Button></header>
-    {!base ? <ErrorBox>Select a server to open Quick setup.</ErrorBox> : !allowed ? <p className="muted">You need permission to read file contents to view game settings.</p> : <>
-      <ErrorBox>{request.error}</ErrorBox>
-      {request.error && <p className="muted">Settings may be unavailable until installation and the first game start finish. Refresh to try again.</p>}
-      {request.loading && !request.data && <p role="status">Loading game settings...</p>}
-      {request.data && <QuickSetupContent key={`${base}:${request.data.revision}`} data={request.data} serverID={id || server.identifier || server.uuid || ''} onSaved={request.reload}/>}
+  const request = useGameRequest<Settings>(base && allowed ? `${base}/game-settings${file ? `?file=${encodeURIComponent(file)}` : ''}` : null);
+  const inventory = useGameRequest<Settings>(base && allowed && (server.game === 'minecraft' || request.data?.game === 'minecraft') ? `${base}/game-settings?inventory=all` : null);
+  const folderRequest = useGameRequest<{folders: Settings['folders']}>(base && allowed && can(permissions, 'file.read') ? `${base}/game-settings/folders` : null);
+  const documents = [...new Map([...(request.data?.documents || []), ...(inventory.data?.documents || [])].map(doc => [doc.path, doc])).values()];
+  function discard() {return !dirty.current || window.confirm('Discard your unsaved settings?');}
+  return <div className="game-quick-page games-ui">
+    <header className="page-header game-settings-page-header"><h2>Game settings</h2>
+      {!!documents.length && <Select className="game-settings-document" aria-label="Configuration" value={file || request.data?.file || ''} disabled={request.loading} onChange={event => {if (discard()) {dirty.current = false; setSearch(''); setFile(event.target.value);}}}>{documents.map(doc => <option key={doc.path} value={doc.path}>{doc.label}</option>)}</Select>}
+      {request.data && request.data.fields.length > 12 && <Input className="game-settings-search" type="search" aria-label="Find a setting" placeholder="Find a setting..." value={search} onChange={event => setSearch(event.target.value)}/>}
+      <Button className="game-settings-refresh" variant="secondary" onClick={() => {if (discard()) {dirty.current = false; setRefresh(value => value + 1); request.reload(); inventory.reload(); folderRequest.reload();}}} disabled={!allowed || request.loading}>Refresh</Button></header>
+    <ErrorBox>{request.error}</ErrorBox>
+    {inventory.error && <p className="muted">World settings lookup failed. <button type="button" className="text-button" onClick={inventory.reload}>Retry</button></p>}
+    {request.loading && !request.data && <p role="status">Loading game settings...</p>}
+    {!allowed ? <p className="muted">File content permission is required.</p> : request.data && <>
+      <QuickSetupContent key={`${base}:${request.data.file}:${request.data.revision}:${refresh}`} data={request.data} search={search} folderRequest={folderRequest} serverID={id || server.identifier || server.uuid || ''} onSaved={() => {setRefresh(value => value + 1); request.reload();}} onDirty={value => {dirty.current = value;}}/>
     </>}
   </div>;
 }
 
-function QuickSetupContent({data, serverID, onSaved}: {data: QuickSetup; serverID: string; onSaved: () => void}) {
+function QuickSetupContent({data, search, folderRequest, serverID, onSaved, onDirty}: {data: Settings; search: string; folderRequest: {data: {folders: Settings['folders']} | null; loading: boolean; error: string; reload: () => void}; serverID: string; onSaved: () => void; onDirty: (dirty: boolean) => void}) {
   const {permissions, base, server} = useServer();
   const telemetry = useServerTelemetry();
-  const [draft, setDraft] = useState<Record<string, QuickValue>>(() => Object.fromEntries(data.fields.map(field => [field.key, field.value])));
+  const [draft, setDraft] = useState<Record<string, QuickValue>>({});
   const [error, setError] = useState(''), [success, setSuccess] = useState(''), [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(data);
+  const [startupDirty, setStartupDirty] = useState(false);
   const submitting = useRef(false);
   const writable = can(permissions, 'file.update');
   const stopped = stoppedServer(telemetry.state, telemetry.updated, telemetry.error, server.status);
   const blocked = !writable || !!server.is_node_under_maintenance || !!server.status || (data.requires_stop && !stopped);
-  const dirty = saved.fields.some(field => String(draft[field.key]) !== String(field.value));
+  const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => String(value) !== String(saved.fields.find(field => field.key === key)?.value)));
+  const dirty = Object.keys(changes).length > 0;
+  useEffect(() => {onDirty(dirty || startupDirty);}, [dirty, startupDirty, onDirty]);
+  useEffect(() => {if (!dirty && !startupDirty) return; const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';}; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);}, [dirty, startupDirty]);
   async function save(event: FormEvent) {
     event.preventDefault();
     if (blocked || !dirty || submitting.current) return;
-    setError(''); setSuccess('');
+    setError(''); setSuccess(''); submitting.current = true; setBusy(true);
     try {
-      const settings = quickSettings(saved.fields, draft);
-      submitting.current = true; setBusy(true);
-      const next = unwrap(await api(`${base}/quick-setup`, json('PUT', {settings, revision: saved.revision}))) as QuickSetup;
-      setSaved(next); setDraft(Object.fromEntries(next.fields.map(field => [field.key, field.value])));
-      setSuccess('Settings saved. They apply the next time the server starts.');
+      const settings = Object.fromEntries(Object.entries(changes).map(([key, value]) => [key, typeof value === 'boolean' ? value : String(value ?? '')]));
+      const next = unwrap(await api(`${base}/game-settings?file=${encodeURIComponent(saved.file)}`, json('PUT', {settings, revision: saved.revision}))) as Settings;
+      setSaved(next); setDraft({}); onDirty(false);
+      setSuccess('Saved. Applies on the next start.');
     } catch (error) {setError(error instanceof Error ? error.message : String(error));}
     finally {submitting.current = false; setBusy(false);}
   }
-  const folders = data.folders.map(folder => ({...folder, to: safeFolderLink(serverID, folder.path)})).filter(folder => folder.to);
+  function change(key: string, value: QuickValue) {setDraft(previous => ({...previous, [key]: value})); setSuccess('');}
+  const folders = [...new Map([...data.folders, ...(folderRequest.data?.folders || [])].map(folder => [folder.path, folder])).values()].map(folder => ({...folder, to: safeFolderLink(serverID, folder.path)})).filter(folder => folder.to);
+  const groups = settingsGroups(saved.fields, data.game, saved.file);
+  const visibleGroups = groups.map(group => ({...group, fields: group.fields.filter(field => `${field.key} ${readableSettingName(field)}`.toLowerCase().includes(search.trim().toLowerCase()))})).filter(group => group.fields.length);
   return <div className="game-quick-layout">
-    <Card className="game-settings-card"><h3>Game settings</h3>
-      {data.fields.length ? <form onSubmit={save}>
-        {!writable ? <p className="muted">These settings are read-only. File update permission is required to save.</p> : data.requires_stop && !stopped ? <p className="game-stop-note">Stop the server before saving settings. Its stopped state must be confirmed by the node.</p> : <p className="muted">Changes apply on the next start.</p>}
-        <fieldset className="steam-fields" disabled={blocked || busy}><div className="steam-form-grid">{saved.fields.map(field => <QuickSetting key={field.key} field={field} value={draft[field.key] ?? field.value} onChange={value => {setDraft(previous => ({...previous, [field.key]: value})); setSuccess('');}}/>)}</div><Button type="submit" disabled={blocked || !dirty || busy} aria-busy={busy}>{busy ? 'Saving...' : 'Save settings'}</Button></fieldset>
-        <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={onSaved}>Reload current settings</Button>}{success && <p role="status" className="success">{success}</p>}
-      </form> : <p className="muted">{data.game === 'satisfactory' ? 'Claim this server, set passwords and manage sessions in Satisfactory’s built-in Server Manager.' : 'No basic settings are available yet. Start the game once, then refresh this page.'}</p>}
-      <GameHelpLinks help={data.help ?? []}/>
+    <Card className="game-settings-card">
+      {saved.fields.length ? <form onSubmit={save}>
+        <fieldset className="steam-fields" disabled={blocked || busy}>{visibleGroups.map(group => <section key={group.id} className="game-settings-section" aria-label={group.label}><h4>{group.label}</h4><div className="game-properties-grid">{group.fields.map(field => <QuickSetting key={field.key} field={field} value={Object.hasOwn(draft, field.key) ? draft[field.key] : field.value} onChange={value => change(field.key, value)}/>)}</div></section>)}{!visibleGroups.length && <p className="muted">No matching settings.</p>}<div className="game-settings-save"><Button type="submit" disabled={blocked || !dirty || busy} aria-busy={busy}>{busy ? 'Saving...' : 'Save settings'}</Button>{dirty && <span className="muted">{Object.keys(changes).length} unsaved</span>}</div></fieldset>
+        <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={() => {if (!dirty || window.confirm('Discard your unsaved settings and reload?')) {onDirty(false); onSaved();}}}>Reload current settings</Button>}{success && <p role="status" className="success">{success}</p>}
+      </form> : <p className="muted">No generated server configuration was found. Start the game once to create its settings.</p>}
+      <GameStartupSettings onDirty={setStartupDirty}/>
     </Card>
-    <Card className="game-folders"><h3>Game folders</h3><p className="muted">Open a folder in Files to upload or manage its contents. Stop the server before replacing saves.</p>
-      {!can(permissions, 'file.read') ? <p className="muted">File list permission is required to open folders.</p> : <>
-        {folders.length ? <ul>{folders.map(folder => <li key={folder.path}><Link to={folder.to!}>{folder.label} <span aria-hidden="true">↗</span></Link><code>{folder.path}</code>{folder.description && <p className="muted">{folder.description}</p>}</li>)}</ul> : <p className="muted">No game folders were found yet. Start the game or create a session, then refresh. Only existing folders appear here.</p>}
-        <Link className="game-files-link" to={`/server/${encodeURIComponent(serverID)}/files`}>Open Files</Link>
-      </>}
-    </Card>
+    {can(permissions, 'file.read') && <Card className="game-folders"><div className="game-settings-heading"><h3>Game folders</h3><Link className="game-files-link" to={`/server/${encodeURIComponent(serverID)}/files`}>All files</Link></div>
+      {folders.length ? <ul>{folders.map(folder => <li key={folder.path}><Link to={folder.to!}><span className="game-folder-identity"><span>{folder.label}</span><code>{folder.path}</code></span></Link></li>)}</ul> : <p className="muted">Folders appear after the game creates them.</p>}
+      {folderRequest.loading && <p className="muted" role="status">Finding game folders...</p>}
+      {folderRequest.error && <p className="muted">Folder lookup failed. <button type="button" className="text-button" onClick={folderRequest.reload}>Retry</button></p>}
+    </Card>}
   </div>;
 }
 
 function QuickSetting({field, value, onChange}: {field: QuickField; value: QuickValue; onChange: (value: string | boolean) => void}) {
-  if (field.type === 'boolean') return <label className="game-boolean"><input type="checkbox" ref={node => {if (node) node.indeterminate = value === null;}} checked={value === true} onChange={event => onChange(event.target.checked)}/><span>{field.label}{value === null && <small className="muted"> · Game default</small>}</span></label>;
-  return <Field label={field.label}>{field.type === 'select' ? <Select value={value === null ? '' : String(value)} onChange={event => onChange(event.target.value)}>{value === null && <option value="" disabled>Game default</option>}{field.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select> : <Input type={field.secret ? 'password' : field.type === 'number' ? 'number' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} min={field.min} max={field.max} step={field.type === 'number' ? 'any' : undefined} required={field.type === 'number' && value !== null} placeholder={value === null ? 'Game default' : undefined} value={value === null ? '' : String(value)} onChange={event => onChange(event.target.value)}/>}</Field>;
+  const disabled = field.readonly || field.type === 'readonly';
+  const label = readableSettingName(field);
+  const id = `game-property-${encodeURIComponent(field.key)}`;
+  return <div className={`game-setting-row${field.type === 'boolean' ? ' is-boolean' : ''}`}><div className="game-setting-identity"><label htmlFor={id} title={field.key}>{label}</label>{disabled && <span className="game-setting-managed" title={field.type === 'readonly' ? 'This structured value needs the file editor.' : 'Managed by the server or template.'}>{field.type === 'readonly' ? 'File editor' : 'Managed'}</span>}</div><div className="game-setting-control">
+    {field.type === 'boolean' ? <GameSwitch id={id} aria-label={label} checked={value === true} disabled={disabled} onCheckedChange={checked => onChange(checked)}/>
+      : field.type === 'list' ? <Textarea id={id} aria-label={label} title="JSON list" rows={2} value={String(value ?? '[]')} onChange={event => onChange(event.target.value)}/>
+      : field.type === 'select' ? <Select id={id} aria-label={label} value={String(value ?? '')} disabled={disabled} onChange={event => onChange(event.target.value)}>{field.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>
+      : <Input id={id} aria-label={label} disabled={disabled} type={field.secret ? 'password' : field.type === 'number' ? 'number' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} step="any" placeholder={field.secret ? field.configured ? 'Configured' : 'Not configured' : undefined} value={value === null ? '' : String(value)} onChange={event => onChange(event.target.value)}/>}
+    {field.secret && field.configured && <button type="button" className="game-setting-clear" disabled={disabled} onClick={() => onChange('')}>Clear</button>}
+  </div></div>;
+}
+
+function GameStartupSettings({onDirty}: {onDirty: (dirty: boolean) => void}) {
+  const {base, permissions} = useServer();
+  const allowed = can(permissions, 'startup.read');
+  const [opened, setOpened] = useState(false);
+  const query = useAPI(allowed && opened ? `${base}/startup` : null);
+  const [saved, setSaved] = useState<Record<string, StartupVariable>>({});
+  const pending = useRef<Record<string, boolean>>({});
+  const changed = useCallback((key: string, dirty: boolean) => {pending.current[key] = dirty; onDirty(Object.values(pending.current).some(Boolean));}, [onDirty]);
+  const variables = query.data ? items(query.data) as StartupVariable[] : [];
+  async function save(payload: VariableWrite) {const response = await api(`${base}/startup/variable`, json('PUT', payload)); const variable = unwrap(response) as StartupVariable; if (!variable || variable.env_variable !== payload.key) throw new Error('The server did not confirm this setting.'); setSaved(previous => ({...previous, [variable.env_variable]: variable})); return variable;}
+  if (!allowed) return null;
+  return <details className="game-startup-settings" onToggle={event => setOpened(event.currentTarget.open)}><summary>Startup options</summary><ErrorBox>{query.error}</ErrorBox>{query.loading && <p role="status">Loading startup options...</p>}{variables.map(variable => <StartupVariableField key={variable.env_variable} variable={saved[variable.env_variable] || variable} permitted={can(permissions, 'startup.update')} onSave={save} onDirty={changed}/>)}</details>;
 }

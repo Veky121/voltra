@@ -69,7 +69,8 @@ def install(root,env):
         if manifest.file_size>64*1024:raise ValueError('Server JAR manifest is oversized')
         if b'Main-Class:' not in archive.read(manifest):raise ValueError('Server JAR has no executable main class')
     receipt={'project':'spigot','minecraft':version,'origin':origin,'jar':jar,'sha256':hashlib.sha256(raw).hexdigest(),'source':source,'buildtools':None if custom else pinned['buildtools']}
-    with tempfile.TemporaryDirectory(prefix='voltra-spigot-publish-') as directory:
+    # Wings may mount /tmp as a small tmpfs; JARs can exceed that capacity.
+    with tempfile.TemporaryDirectory(prefix='.voltra-spigot-publish-',dir=root) as directory:
         staging=Path(directory);(staging/jar).write_bytes(raw)
         record=staging/'.voltra/spigot/release.json';record.parent.mkdir(parents=True);record.write_text(json.dumps(receipt,sort_keys=True)+'\n')
         publish(staging,root,jar)

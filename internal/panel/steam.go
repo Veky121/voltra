@@ -101,6 +101,7 @@ func (a *App) clientSteamStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	out["beta_password_configured"] = str(state["beta_password_encrypted"]) != ""
 	out["console_password_configured"] = str(state["console_password_encrypted"]) != ""
+	out["join_password_configured"] = str(state["join_password_encrypted"]) != ""
 	public := []M{}
 	for _, job := range jobs {
 		j := steamJobPublic(job)
@@ -306,6 +307,9 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 	if err = tx.QueryRow(ctx, "SELECT id FROM servers WHERE id=$1 FOR UPDATE", server["id"]).Scan(&id); err != nil {
 		return nil, err
 	}
+	if err = blockPublicSteamOwnership(ctx, tx, id); err != nil {
+		return nil, err
+	}
 	if reinstall {
 		current, e := queryRowMap(tx.QueryRow(ctx, "SELECT row_to_json(s) FROM servers s WHERE id=$1", id))
 		if e != nil {
@@ -382,6 +386,11 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 func queryRowMap(row pgx.Row) (M, error) { var m M; err := row.Scan(&m); return m, err }
 
 func (a *App) managedServerPower(ctx context.Context, server M, action string) (*http.Response, error) {
+	if action == "start" || action == "restart" {
+		if err := blockPublicSteamOwnership(ctx, a.DB, num(server["id"])); err != nil {
+			return nil, err
+		}
+	}
 	state, err := a.one(ctx, "SELECT * FROM steam_servers WHERE server_id=$1", server["id"])
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a.unmanagedServerPower(ctx, server, action)
@@ -462,7 +471,13 @@ func (a *App) steamSocketPower(ctx context.Context, user, server M, raw []byte) 
 		return true, err
 	}
 	if !managed {
-		return false, nil
+		private, err := hasPrivateSteamOwnership(ctx, a.DB, num(server["id"]))
+		if err != nil {
+			return true, err
+		}
+		if !private {
+			return false, nil
+		}
 	}
 	if len(message.Args) != 1 {
 		return true, bad("A single power action is required.")
@@ -553,8 +568,9 @@ func (a *App) processSteamJob(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
+	private := str(job["executor"]) == steamapi.PrivateProvider
 	// A prior mutation may have changed files before losing its ACK. Never assume it succeeded.
-	if str(job["stage"]) == "installing" || str(job["stage"]) == "updating" || str(job["stage"]) == "verifying" || boolean(job["files_changed"]) {
+	if !private && (str(job["stage"]) == "installing" || str(job["stage"]) == "updating" || str(job["stage"]) == "verifying" || boolean(job["files_changed"])) {
 		_ = a.exec(ctx, "UPDATE steam_servers SET needs_repair=true WHERE server_id=$1", job["server_id"])
 		a.finishSteamJob(ctx, job, token, errors.New("Maintenance was interrupted. Verify and repair files before starting."))
 		return true
@@ -581,10 +597,18 @@ func (a *App) processSteamJob(ctx context.Context) bool {
 			}
 		}
 	}()
-	err = a.runSteamJob(workCtx, job, token)
+	if private {
+		err = a.runPrivateSteamJob(workCtx, job, token)
+	} else {
+		err = a.runSteamJob(workCtx, job, token)
+	}
 	finishCtx, finishCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer finishCancel()
-	a.finishSteamJob(finishCtx, job, token, err)
+	if private {
+		a.finishPrivateSteamJob(finishCtx, job, token, err)
+	} else {
+		a.finishSteamJob(finishCtx, job, token, err)
+	}
 	return true
 }
 
@@ -833,6 +857,14 @@ func (a *App) recordSteamResult(ctx context.Context, server M, result steamapi.E
 
 func (a *App) executeSteam(ctx context.Context, server, state, job M, token, operation string) (steamapi.Event, error) {
 	request := steamapi.Request{JobID: str(job["id"]), Operation: operation, ServerUUID: str(server["uuid"]), AppID: num(state["app_id"]), Branch: str(state["branch"]), Validate: operation != "check" && boolean(state["validate_on_start"])}
+	if steamPalworldVariant(str(state["game"])) {
+		if !a.steamPalworldNodeAvailable(num(server["node_id"]), str(state["game"])) {
+			return steamapi.Event{}, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node for this Palworld runtime variant."}
+		}
+		if str(state["game"]) == "palworld-proton" {
+			request.Platform = "windows"
+		}
+	}
 	if cipher := str(state["beta_password_encrypted"]); cipher != "" {
 		secret, err := a.unseal(cipher)
 		if err != nil {

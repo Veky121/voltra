@@ -4,7 +4,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 const directory='.local/batch-node',name='voltra-batch-20261023',root='/var/lib/'+name;
 fs.mkdirSync(directory,{recursive:true});
-const docker=args=>execFileSync('docker',args,{encoding:'utf8',maxBuffer:4*1024*1024}).trim();
+const docker=args=>execFileSync('docker',args,{encoding:'utf8',windowsHide:true,maxBuffer:4*1024*1024}).trim();
 const api=async(method,url,body)=>{const r=await fetch('http://127.0.0.1:8088'+url,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const raw=await r.text();if(!r.ok)throw Error(method+' '+url+' HTTP '+r.status);return raw?JSON.parse(raw):null};
 const attrs=x=>x.attributes,rows=x=>x.data.map(attrs);
 if(!fs.existsSync(directory+'/baseline.json'))fs.writeFileSync(directory+'/baseline.json',JSON.stringify({captured_at:new Date().toISOString(),containers:JSON.parse(docker(['ps','-a','--format','json']).split('\n').map(x=>x).length?'['+docker(['ps','-a','--format','json']).split('\n').join(',')+']':'[]'),networks:docker(['network','ls','--format','{{.ID}} {{.Name}}'])},null,2));
@@ -20,6 +20,9 @@ config.remote='http://host.docker.internal:8088';
 config.allowed_origins=['http://127.0.0.1:8088'];
 config.api={...config.api,host:'0.0.0.0',port:18090,upload_limit:4096};
 config.system={...config.system,root_directory:root,data:root+'/volumes',log_directory:root+'/logs',backup_directory:root+'/backups',archive_directory:root+'/archives',tmp_directory:root+'/tmp',sftp:{...config.system?.sftp,bind_port:12030}};
+// First-attempt acceptance must retain a crash rather than silently restarting it.
+// This configuration belongs only to the named disposable test daemon.
+config.system.crash_detection={...config.system.crash_detection,enabled:false};
 // Docker Desktop publishes loopback host ports only on 127.0.0.1, not guest bridge addresses.
 // Network creation below explicitly supplies the actual bridge gateway.
 config.docker={...config.docker,network:{name,network_mode:name,interface:'127.0.0.1',interfaces:{v4:{subnet:'172.30.90.0/24',gateway:'172.30.90.1'},v6:{subnet:'fdba:17c8:6c90::/64',gateway:'fdba:17c8:6c90::1'}}}};

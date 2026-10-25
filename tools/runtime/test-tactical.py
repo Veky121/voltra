@@ -2,6 +2,7 @@ import os
 import io
 import sys
 import types
+import signal
 import tempfile
 from pathlib import Path
 import unittest
@@ -42,7 +43,7 @@ class TacticalTests(unittest.TestCase):
             argv, child, secrets, _ = runtime.configure(root, env); self.assertIn('-RCONPASSWORD=private123', argv); self.assertIn('private123', secrets); self.assertIn('-fullcrashdump', argv)
             content = (root / 'PostScriptum/ServerConfig/Server.cfg').read_text(); self.assertIn('PreventTeamChangeIfUnbalanced=false', content); self.assertIn('RecordDemos=false', content)
             with mock.patch.object(runtime, 'run', return_value=250) as native: self.assertEqual(runtime.main(root, env), 250)
-            self.assertEqual(native.call_args.args[3], '\x03'); self.assertTrue(native.call_args.kwargs['terminal_input'])
+            self.assertEqual(native.call_args.args[3], '\x03'); self.assertTrue(native.call_args.kwargs['terminal_input']); self.assertEqual(native.call_args.kwargs['stop_signal'],signal.SIGINT)
 
     def test_native_role_collisions_missing_pairs_and_bad_settings_refused(self):
         cases = [('squad', {'VOLTRA_ALLOCATED_PORTS':'28010,28012,28013,28014,28015,28016'}), ('squad', {'QUERY_PORT':'28015'}), ('squad', {'reservedslots':'81'}), ('squad', {'allowteamchange':'yes'}), ('sandstorm', {'ADDSWITCHES':'-Port=29000'}), ('sandstorm', {'ADDSWITCHES':'-Rcon'}), ('sandstorm', {'ADDSWITCHES':'-Rcon -RconListenPort=29000'}), ('sandstorm', {'MAP_NAME':'../escape'}), ('sandstorm', {'ADDSWITCHES':'-Mods; shutdown'}), ('postscriptum', {'QUERY_PORT':'28010'})]
@@ -150,6 +151,14 @@ class TacticalTests(unittest.TestCase):
                 if kind=='postscriptum':self.assertEqual(services['RCON_PORT'],28012)
                 env['QUERY_PORT']='0'
                 with self.assertRaises(ValueError):runtime.configure(root,env)
+
+    def test_all_original_tactical_interrupt_callers_select_sigint(self):
+        for kind in installer.GAMES:
+            with self.subTest(kind=kind),tempfile.TemporaryDirectory()as directory:
+                root=Path(directory);env=self.fixture(root,kind,AUTO_UPDATE='0')
+                with mock.patch.object(runtime,'configure',return_value=([],{},[],b'ready')),mock.patch.object(runtime,'run',return_value=250)as native:
+                    self.assertEqual(runtime.main(root,env),250)
+                self.assertEqual(native.call_args.kwargs['stop_signal'],signal.SIGINT)
 
 
 unittest.main()

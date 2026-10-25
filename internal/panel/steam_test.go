@@ -58,6 +58,7 @@ type steamTestRuntime struct {
 	state         string
 	operations    []string
 	validations   []bool
+	requests      []steamapi.Request
 	syncStartups  []string
 	failSyncOnce  bool
 	cancelSync    context.CancelFunc
@@ -204,6 +205,7 @@ func steamRuntime(t *testing.T) *steamTestRuntime {
 				rt.mu.Lock()
 				rt.operations = append(rt.operations, request.Operation)
 				rt.validations = append(rt.validations, request.Validate)
+				rt.requests = append(rt.requests, request)
 				fail := request.Operation == "check" && rt.failCheck || request.Operation != "check" && rt.failMutation
 				available := rt.available
 				block := rt.block

@@ -10,6 +10,8 @@ import shlex
 import shutil
 import sys
 import tempfile
+import threading
+import stat
 import time
 import urllib.request
 import zipfile
@@ -87,10 +89,17 @@ def patch_properties(content,values):
     return ''.join(lines)
 
 def patch_holdfast(content,values):
-    global_lines=[];rotation=[];seen=set();in_rotation=False
+    global_lines=[];rotation=[];seen=set();in_rotation=False;active_rotation=False
     for line in content.splitlines(keepends=True):
-        if line.strip().startswith('!map_rotation'):in_rotation=True
-        if in_rotation:rotation.append(line);continue
+        marker=line.strip()
+        if marker=='!map_rotation start':in_rotation=True;active_rotation=True
+        if in_rotation:
+            if active_rotation and re.match(r'^\s*maximum_players\s+',line) and 'maximum_players' in values:
+                ending='\r\n' if line.endswith('\r\n') else '\n'
+                rotation.append('maximum_players '+str(values['maximum_players'])+ending)
+            else:rotation.append(line)
+            if marker=='!map_rotation end':active_rotation=False
+            continue
         if line.strip()=='# Voltra managed server fields':continue
         match=re.match(r'^\s*([a-z_]+)\s+(.*?)(?:\r?\n)?$',line)
         if match and match[1] in values:
@@ -246,13 +255,92 @@ def configure(root,game,env):
         write_config(root,target,patch_properties(old,values));secret.extend((password,admin));return [str(root/'RisingWorldServer.x64'),'+Server_Port='+str(ports['primary'])],secret
     raise ValueError('Unknown Steam/native recipe')
 
+def holdfast_redaction_values(values):
+    """Mask full credentials and publisher-clipped character/UTF-8 prefixes."""
+    result=[]
+    for value in values:
+        if not value:continue
+        # Redactor accepts strings. Drop an incomplete final UTF-8 code point;
+        # masking its complete prefix also prevents a raw 32-byte secret match.
+        for candidate in (value,value[:32],value.encode('utf-8')[:32].decode('utf-8',errors='ignore')):
+            if candidate and candidate not in result:result.append(candidate)
+    return result
+
+
+class HoldfastLog:
+    """Forward only fresh publisher log bytes, with anchored no-symlink reads."""
+    def __init__(self, root, path, console, credentials):
+        self.root=Path(root).resolve();self.relative=Path(path).relative_to(self.root)
+        if not self.relative.parts or any(p in ('.','..') for p in self.relative.parts):raise ValueError('Invalid Holdfast log path')
+        self.console=console;self.credentials=credentials;self.done=threading.Event();self.error=None
+        self.previous=self.identity();self.previous_prefix=self.prefix();self.thread=threading.Thread(target=self.follow,daemon=True)
+    def opened(self):
+        descriptor=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:
+            for part in self.relative.parts[:-1]:
+                following=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=descriptor);os.close(descriptor);descriptor=following
+            result=os.open(self.relative.parts[-1],os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=descriptor)
+            if not stat.S_ISREG(os.fstat(result).st_mode):os.close(result);raise ValueError('Holdfast log must be a regular file')
+            return result
+        finally:os.close(descriptor)
+    def identity(self):
+        try:
+            descriptor=self.opened()
+            try:
+                s=os.fstat(descriptor);return (s.st_dev,s.st_ino,s.st_mtime_ns,s.st_size)
+            finally:os.close(descriptor)
+        except FileNotFoundError:return None
+    def prefix(self):
+        try:
+            descriptor=self.opened()
+            try:return os.pread(descriptor,256,0)
+            finally:os.close(descriptor)
+        except FileNotFoundError:return b''
+    def follow(self):
+        redactor=self.console.Redactor(self.credentials)
+        position=self.previous[3] if self.previous else 0;inode=self.previous[:2] if self.previous else None;fresh=False;prefix=self.previous_prefix
+        try:
+            while True:
+                closing=self.done.is_set()
+                try:
+                    descriptor=self.opened()
+                    try:
+                        s=os.fstat(descriptor);identity=(s.st_dev,s.st_ino,s.st_mtime_ns,s.st_size)
+                        if identity!=self.previous:fresh=True
+                        if fresh:
+                            if inode!=(s.st_dev,s.st_ino)or s.st_size<position or os.pread(descriptor,len(prefix),0)!=prefix:position=0
+                            prefix=os.pread(descriptor,256,0)
+                            inode=(s.st_dev,s.st_ino);os.lseek(descriptor,position,os.SEEK_SET)
+                            remaining=262144
+                            while remaining>0:
+                                block=os.read(descriptor,min(65536,remaining))
+                                if not block:break
+                                position+=len(block);remaining-=len(block);sys.stdout.buffer.write(redactor.feed(block));sys.stdout.buffer.flush()
+                    finally:os.close(descriptor)
+                except FileNotFoundError:pass
+                if closing:break
+                self.done.wait(.05)
+            sys.stdout.buffer.write(redactor.feed(b'',final=True));sys.stdout.buffer.flush()
+        except (OSError,ValueError) as error:self.error=error
+    def start(self):self.thread.start()
+    def finish(self):
+        self.done.set();self.thread.join(timeout=5)
+        if self.thread.is_alive()or self.error:raise ValueError('Holdfast native log forwarding failed')
+
+
 def run(root,game,env):
     if env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1':install(root,game,env)
     argv,secrets=configure(root,game,env);environment=dict(os.environ)
     for key in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD','LD_LIBRARY_PATH'):environment.pop(key,None)
     environment['HOME']=str(root)
     if game=='rising':environment['LD_LIBRARY_PATH']=str(root/'linux64')+':'+text(env,'VOLTRA_NATIVE_LD_LIBRARY_PATH','/linux64',4096)
-    code=helper('native-console').run(root,argv,environment,'\x03',secrets,terminal_input=True)
+    console=helper('native-console')
+    if game=='holdfast':
+        secrets=holdfast_redaction_values(secrets)
+        log=HoldfastLog(root,argv[argv.index('-logFile')+1],console,secrets);log.start()
+        try:code=console.run(root,argv,environment,'\x03',secrets,terminal_input=True)
+        finally:log.finish()
+    else:code=console.run(root,argv,environment,'\x03',secrets,terminal_input=True)
     return code if code>=0 else 128-code
 
 if __name__=='__main__':

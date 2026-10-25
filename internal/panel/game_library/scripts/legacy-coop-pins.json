@@ -1,0 +1,23 @@
+{
+  "league": {
+    "repository": "https://github.com/LeagueSandbox/GameServer",
+    "commit": "b37c75483abf66048af7c914e7fab700efaa5e21",
+    "packets_repository": "https://github.com/LeagueSandbox/LeaguePackets",
+    "packets_commit": "207baab80dc4cd203dd2d41ce9d98f1aae7a1544",
+    "license": "AGPL-3.0 server source; Apache-2.0 LeaguePackets; Content/client assets not downloaded or licensed by this adapter",
+    "archived": true,
+    "target_framework": "net6.0",
+    "client_version": "4.20.0.315"
+  },
+  "sit": {
+    "repository": "https://github.com/stayintarkov/SIT.Aki-Server-Mod",
+    "observed_latest": "1.6.4",
+    "tag_commit": "26b9c364963ba49de71d5761bed1135ddad50f77",
+    "aki_version": "3.8.0",
+    "client_version": "0.14.1.3.29351",
+    "linux_asset": "SITCoop-1.6.4-WithAki3.8.0-2dd4d9-linux.tar.gz",
+    "bytes": 145648622,
+    "publisher_sha256": null,
+    "license": "Mixed components: SIT team MIT; README says Paulov contributions unlicensed and disallows unauthorized/commercial use; SPT and other component licenses apply"
+  }
+}

@@ -1,5 +1,3 @@
-/* Decorative mesh stays behind the library; cards and dialogs keep their contrast. */
+/* Keep the library in the existing page frame and theme background. */
 .game-library-page{position:relative;isolation:isolate}
-.game-library-page::before{content:"";position:absolute;inset:0 0 auto;height:1250px;max-height:100%;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#11121414 0%,#11121440 48%,var(--canvas,#111214) 100%),url('/backgrounds/library-mesh.svg') top center/cover no-repeat;mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);opacity:.8}
 .game-library-page>.page-header{position:relative}
-@media(max-width:760px){.game-library-page::before{height:1000px;background-position:top center,top 0 left 38%;opacity:.65;mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}}

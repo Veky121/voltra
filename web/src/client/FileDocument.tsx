@@ -102,7 +102,6 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
   return <section className="file-document" aria-label={`File: ${path}`}>
     <header className="file-document-toolbar"><strong title={path}>{path}</strong><div>
       {readable&&<a className="button secondary" href={download} download={path.split('/').at(-1)}>Download</a>}
-      <Button variant="secondary" onClick={close}>Back to files</Button>
       <button type="button" className="file-document-close" aria-label="Close file" title="Close file" onClick={close}><Icon name="close"/></button>
     </div></header>
     <div className="file-document-content">

@@ -140,6 +140,12 @@ def install(root, game, env):
 
 
 def configure(root, game, env):
+    if game == 'fortress':
+        env = dict(env)
+        # Preserve the original API name and accept Wings' uppercase runtime key.
+        if 'G_RushMode' in env and 'G_RUSHMODE' in env and env['G_RushMode'] != env['G_RUSHMODE']:
+            raise ValueError('Conflicting original and Wings variable G_RushMode')
+        if 'G_RUSHMODE' in env:env['G_RushMode'] = env['G_RUSHMODE']
     root = Path(root).resolve()
     options(game, env)
     if game == 'eco':
@@ -275,6 +281,10 @@ def run(root, game, env):
         log_thread = threading.Thread(target=follow_unity, args=(log, finished, credentials), daemon=True)
         log_thread.start()
     try:
+        if game == 'fortress':
+            code = helper('automation-fortress-console').supervise(helper('native-console'), root, argv, environment,
+                                                                 credentials, shared.roles(env, ['RCON_PORT'])['RCON_PORT'])
+            return code if code >= 0 else 128 - code
         code = helper('native-console').run(root, argv, environment, 'exit' if game == 'eco' else '\x03', credentials, terminal_input=True)
         return code if code >= 0 else 128 - code
     finally:

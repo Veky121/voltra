@@ -1,0 +1,53 @@
+{
+  "upstream_revision": "c637a6d1e0449b167efeff81bb9a0177aa3df6c2",
+  "wine_runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+  "mono": {
+    "version": "9.1.0",
+    "url": "https://dl.winehq.org/wine/wine-mono/9.1.0/wine-mono-9.1.0-x86.msi",
+    "bytes": 84623872,
+    "sha256": "8a0a1e6837b494df49927e5d759b1c6908e89b8a2f8e3ad025e1c2881882476e",
+    "digest_provenance": "https://github.com/wine-mirror/wine/blob/wine-9.8/dlls/appwiz.cpl/addons.c",
+    "license": "Wine Mono and bundled components retain respective upstream licenses"
+  },
+  "forest_default_config": " > $HOME/TheForestDedicatedServer_Data/forest/config/config.cfg\r\n// Dedicated Server Settings.\r\n// Server IP address - Note: If you have a router, this address is the internal address, and you need to configure ports forwarding, append the current game port here as well\r\nserverIP\r\n// Steam Communication Port - Note: If you have a router you will need to open this port.\r\nserverSteamPort\r\n// Game Communication Port - Note: If you have a router you will need to open this port.\r\nserverGamePort\r\n// Query Communication Port - Note: If you have a router you will need to open this port.\r\nserverQueryPort\r\n// Server display name\r\nserverName\r\n// Maximum number of players\r\nserverPlayers 5\r\n// Server password. blank means no password\r\nserverPassword\r\n// Your Steam account name. blank means anonymous (see Steam server account bellow)\r\nserverSteamAccount\r\n// Enable VAC (Valve Anti Cheat) on the server. off by default, uncomment to enable\r\nenableVAC on\r\n// Time between server auto saves in minutes\r\nserverAutoSaveInterval 15\r\n// Game difficulty mode. Must be set to \"Peaceful\" \"Normal\" or \"Hard\"\r\ndifficulty Normal\r\n// New or continue a game. Must be set to \"New\" or \"Continue\"\r\ninitType New\r\n// Slot to save the game. Must be set 1 2 3 4 or 5\r\nslot 1\r\n// Show event log. Must be set \"off\" or \"on\"\r\nshowLogs off\r\n// Contact email for server admin\r\nserverContact email@gmail.com\r\n// No enemies. Must be set to \"on\" or \"off\"\r\nveganMode off\r\n// No enemies during day time. Must be set to \"on\" or \"off\"\r\nvegetarianMode off\r\n// Reset all structure holes when loading a save. Must be set to \"on\" or \"off\"\r\nresetHolesMode off\r\n// Regrow 10% of cut down trees when sleeping. Must be set to \"on\" or \"off\"\r\ntreeRegrowMode off\r\n// Allow building destruction. Must be set to \"on\" or \"off\"\r\nallowBuildingDestruction on\r\n// Allow enemies in creative games. Must be set to \"on\" or \"off\"\r\nallowEnemiesCreativeMode off\r\n// Allow clients to use the built in development console. Must be set to \"on\" or \"off\"\r\nallowCheats off\r\n// Allows defining a custom folder for save slots, leave empty to use the default location\r\nsaveFolderPath\r\n// Target FPS when no client is connected\r\ntargetFpsIdle 5\r\n// Target FPS when there is at least one client connected\r\ntargetFpsActive 60\r",
+  "sample_world": {
+    "guid": "11223344-5566-7788-99aa-bbccddeeff00",
+    "source_commit": "c637a6d1e0449b167efeff81bb9a0177aa3df6c2",
+    "files": [
+      {
+        "name": "StartGameConfig.json",
+        "bytes": 243,
+        "git_blob_sha1": "6abc6a0e590c0d862830c2654b172f9644d3901a",
+        "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/sunkenland/world_files/Worlds/World~11223344-5566-7788-99aa-bbccddeeff00/StartGameConfig.json",
+        "sha256": "e389395bcc388fcfd6d440b97b791385e09f6d6fc283f6693eebd9e6a3e0ff6f",
+        "top_level_keys": [
+          "StartGameConfig"
+        ]
+      },
+      {
+        "name": "WorldSetting.json",
+        "bytes": 608,
+        "git_blob_sha1": "03e94a5ddea3cfc4ca686aaa183b6a06f34ba9d8",
+        "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/sunkenland/world_files/Worlds/World~11223344-5566-7788-99aa-bbccddeeff00/WorldSetting.json",
+        "sha256": "0cdd81bf35b57d06f7e4d3c8042e788e6c463ad01487cce5c118ddd2dfb0bd5b",
+        "top_level_keys": [
+          "ApplicationVersion",
+          "WorldSettingProfile"
+        ]
+      },
+      {
+        "name": "world.json",
+        "bytes": 19519,
+        "git_blob_sha1": "06a5c1f427c13953835c293d8761eb6c9f7f6304",
+        "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/sunkenland/world_files/Worlds/World~11223344-5566-7788-99aa-bbccddeeff00/world.json",
+        "sha256": "efd592cc2a818541aa665af78b4c287a679e6a1ce9d4e9655f47b2abef43a746",
+        "top_level_keys": [
+          "nonstandard JSON; actual format acceptance remains unverified"
+        ]
+      }
+    ],
+    "license": "Upstream game-eggs MIT metadata; no new game license granted",
+    "compatibility": "Legacy catalog sample; current publisher world-format compatibility unverified",
+    "identity": "Pinned Git blob SHA1, length AND independently computed SHA256 from exactly authorized20KB public source fetch; no native compatibility proof"
+  }
+}

@@ -1,0 +1,48 @@
+import fs from 'node:fs';
+import {setTimeout as delay} from 'node:timers/promises';
+import {api,rows} from './openttd-compat-node.mjs';
+import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/aapg-native',{receipt:s}=await ownedStoppedServer(dir+'/private.json');
+const tag=process.argv[2]??'first';if(!/^[a-z0-9_-]+$/.test(tag))throw Error('Invalid phase tag');
+const server=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(server.egg!==s.egg_id||server.external_id!=='aapg-native-'+s.request_id||s.owner!=='game_batch_inventory')throw Error('Owned egg identity mismatch');
+if(fs.existsSync(dir+'/'+tag+'-reinstall-request.json'))throw Error('Reinstall already requested; inspect the same installer');
+const profile=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[s.path];
+if(profile.revision!=='tactical-next-v1'||!profile.egg.startup.endsWith('tactical_next_runtime.py'))throw Error('Unexpected reviewed AAPG source');
+const exclusive=rows(await api('/api/application/servers')).filter(candidate=>candidate.egg===s.egg_id);
+if(exclusive.length!==1||exclusive[0].uuid!==s.uuid)throw Error('Temporary egg is not exclusive to this owned server');
+const egg=(await api('/api/admin/eggs/'+s.egg_id)).attributes;
+if(egg.nest_id!==s.nest_id)throw Error('Owned egg/nest association changed');
+fs.writeFileSync(dir+'/fixture-exclusivity-'+tag+'.json',JSON.stringify({uuid:s.uuid,server:s.internal_id,egg:s.egg_id,nest:s.nest_id,matching_servers:exclusive.map(candidate=>({id:candidate.id,uuid:candidate.uuid})),at:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
+await api('/api/admin/eggs/'+s.egg_id+'/import','POST',profile.egg);
+fs.writeFileSync(dir+'/source-profile-current.json',JSON.stringify(profile,null,2)+'\n');
+fs.writeFileSync(dir+'/source-profile-'+tag+'.json',JSON.stringify(profile,null,2)+'\n',{flag:'wx'});
+const credentials=(await api('/api/client/servers/'+s.identifier+'/websocket')).data;
+const socket=new WebSocket(credentials.socket);
+const stream=fs.createWriteStream(dir+'/'+tag+'-installer-stream.log',{flags:'wx'});
+try{
+ await new Promise((resolve,reject)=>{
+  const timeout=setTimeout(()=>reject(Error('Installer websocket auth timed out')),10000);
+  socket.addEventListener('open',()=>socket.send(JSON.stringify({event:'auth',args:[credentials.token]})));
+  socket.addEventListener('error',()=>{clearTimeout(timeout);reject(Error('Installer websocket failed'));});
+  socket.addEventListener('message',message=>{
+   const value=JSON.parse(String(message.data));
+   if(value.event==='auth success'){clearTimeout(timeout);resolve();}
+   if(value.event==='install output'||value.event==='install started'||value.event==='install completed')stream.write(JSON.stringify(value)+'\n');
+  });
+ });
+ fs.writeFileSync(dir+'/'+tag+'-reinstall-request.json',JSON.stringify({uuid:s.uuid,phase:tag,at:new Date().toISOString()},null,2)+'\n');
+ await api('/api/application/servers/'+s.internal_id+'/startup','PATCH',{environment:{},skip_scripts:false});
+ await api('/api/application/servers/'+s.internal_id+'/reinstall','POST',{});
+ console.log('Owned AAPG real installer requested; no start submitted.');
+ await delay(3000);
+ const deadline=Date.now()+180000;
+ while(Date.now()<deadline){
+  const current=(await api('/api/application/servers/'+s.internal_id)).attributes;
+  if(current.uuid!==s.uuid)throw Error('Server identity changed');
+  if(current.status==='install_failed')throw Error('Corrected source installer failed; do not retry');
+  if(current.status===null){fs.writeFileSync(dir+'/'+tag+'-reinstall-completed.json',JSON.stringify({uuid:s.uuid,status:null,at:new Date().toISOString()},null,2)+'\n');console.log('Corrected source installer completed.');break;}
+  await delay(2000);
+ }
+ if(!fs.existsSync(dir+'/'+tag+'-reinstall-completed.json'))throw Error('Installer still pending; inspect same handle');
+}finally{socket.close();stream.end();}

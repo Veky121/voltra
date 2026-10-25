@@ -1,0 +1,2 @@
+/* Only game controls opt in. Geometry and theme colors belong to ui/Settings. */
+.game-switch-input[data-slot=switch]{flex:0 0 auto;align-self:center}

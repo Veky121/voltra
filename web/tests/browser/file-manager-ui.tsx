@@ -6,6 +6,10 @@ import FileManager from '../../src/client/FileManager';
 import {ServerContext} from '../../src/client/common';
 import '../../src/styles.css';
 import '../../src/theme.css';
+import '../../src/design-system.css';
+import '../../src/shell-ui.css';
+import '../../src/shadcn.css';
+import '../../src/shadcn-app.css';
 import {runFileManagerSuite} from './file-manager-ui-suite';
 
 const calls:{path:string;method:string}[]=[];

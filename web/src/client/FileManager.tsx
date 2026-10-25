@@ -1,18 +1,22 @@
+import './gameSwitch.css';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {getDroppedFiles} from '@uppy/core/utils';
 import {api,Button,Field,Input,Modal} from '../lib';
+import {Switch} from '../ui/Settings';
 import {Icon,type IconName} from '../Icons';
 import {bytes,can,date,json,PageError,useServer} from './common';
 import FileTransfers,{type FileTransfersHandle} from './FileTransfers';
 import FileDocument from './FileDocument';
 import FileExplorer from './FileExplorer';
 import FileMenu from './FileMenu';
+import {DropdownMenuItem} from '../components/ui/dropdown-menu';
 import useFileNavigationGuard from './useFileNavigationGuard';
 import {blocksFileNavigation,childPath,fileName,filePath,isArchive,newName,parentPath,type FileEntry} from './fileManagerModel';
 import './fileManager.css';
 import './fileWorkspace.css';
 import './fileMenu.css';
+import './files-ui.css';
 
 type Dialog={kind:'folder'|'new'|'rename'|'move'|'chmod'|'delete'|'pull'|'details';paths:string[]};
 export default function FileManager(){const {base,permissions}=useServer();return <Workspace key={base} base={base} permissions={permissions}/>}
@@ -79,7 +83,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
   }
   const single=selected.length===1?records.current.get(selected[0]):undefined,detail=dialog?.paths[0]?records.current.get(dialog.paths[0]):undefined;
   const menuFile=rowMenu?records.current.get(rowMenu.id):undefined;
-  function menuAction(label:string,icon:IconName,action:()=>void,danger=false){return <button type="button" role="menuitem" className={`file-menu-item${danger?' is-danger':''}`} disabled={busy} onClick={()=>{setRowMenu(null);action()}}><Icon name={icon}/>{label}</button>}
+  function menuAction(label:string,icon:IconName,action:()=>void,danger=false){return <DropdownMenuItem className={`file-menu-item${danger?' is-danger':''}`} variant={danger?'destructive':'default'} disabled={busy} onClick={()=>{setRowMenu(null);action()}}><Icon name={icon}/>{label}</DropdownMenuItem>}
   const titles={folder:'Create folder',new:'Create file',rename:'Rename',move:'Move items',chmod:'Unix permissions',delete:'Delete items',pull:'Download from URL',details:'File details'};
   return <section className="fm-workspace" aria-label="File manager">
     <header className="fm-heading server-page-toolbar"><h1>Files</h1>
@@ -128,12 +132,13 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
         {dialog.kind==='delete'?<><p>Delete {dialog.paths.length} selected {dialog.paths.length===1?'item':'items'}? This cannot be undone.</p><ul>{dialog.paths.slice(0,10).map(path=><li key={path}>{path}</li>)}</ul></>:dialog.kind==='chmod'?<Field label="Octal mode"><Input required pattern="[0-7]{3,4}" autoFocus value={mode} onChange={e=>setMode(e.target.value)}/></Field>:<>
           {dialog.kind==='pull'&&<Field label="Source URL"><Input required type="url" value={url} onChange={e=>setURL(e.target.value)}/></Field>}
           <Field label={dialog.kind==='move'?'Destination directory':dialog.kind==='pull'?'File name, optional':'Name'}><Input autoFocus required={dialog.kind!=='pull'} value={name} onChange={e=>setName(e.target.value)}/></Field>
-          {dialog.kind==='pull'&&<><label className="fm-check"><input type="checkbox" checked={useHeader} onChange={e=>setUseHeader(e.target.checked)}/>Use the source Content-Disposition filename</label><label className="fm-check"><input type="checkbox" checked={foreground} onChange={e=>setForeground(e.target.checked)}/>Wait for download to finish</label></>}
+          {dialog.kind==='pull'&&<><label className="fm-check"><Switch checked={useHeader} onCheckedChange={checked => setUseHeader(checked)}/>Use the source Content-Disposition filename</label><label className="fm-check"><Switch checked={foreground} onCheckedChange={checked => setForeground(checked)}/>Wait for download to finish</label></>}
         </>}
         <div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setDialog(null)}>Cancel</Button><Button type="submit" disabled={busy} variant={dialog.kind==='delete'?'danger':'default'}>{busy?'Working…':dialog.kind==='delete'?'Delete':dialog.kind==='pull'?'Download':'Save'}</Button></div>
       </form>}
     </Modal>}
   </section>;
 }
+
 
 

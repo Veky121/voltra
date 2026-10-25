@@ -50,6 +50,7 @@ func (a *App) registerGameLibrary(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/client/game-library", a.gameLibraryCatalog)
 	mux.HandleFunc("GET /api/client/game-library/minecraft", a.gameLibraryMinecraft)
 	mux.HandleFunc("POST /api/client/game-library/minecraft/install", a.gameLibraryInstallMinecraft)
+	mux.HandleFunc("POST /api/client/game-library/minecraft/ports", a.minecraftGamePorts)
 	mux.HandleFunc("GET /api/client/game-library/minecraft/loaders", a.gameLibraryLoaderVersions)
 	mux.HandleFunc("GET /api/client/game-library/minecraft/modpacks", a.gameLibraryModpacks)
 	mux.HandleFunc("GET /api/client/game-library/minecraft/modpacks/{provider}/{project}/versions", a.gameLibraryModpackVersions)
@@ -104,7 +105,7 @@ func (a *App) gameLibraryMinecraft(w http.ResponseWriter, r *http.Request) {
 	}
 	nodes := []M{}
 	if boolean(user["root_admin"]) {
-		nodes, err = a.query(r.Context(), `SELECT n.id,n.name,(SELECT COUNT(*) FROM allocations al WHERE al.node_id=n.id AND al.server_id IS NULL) free_allocations FROM nodes n WHERE n.public=true AND n.maintenance_mode=false ORDER BY n.name`)
+		nodes, err = a.query(r.Context(), `SELECT n.*,(SELECT COUNT(*) FROM allocations al WHERE al.node_id=n.id AND al.server_id IS NULL) free_allocations FROM nodes n WHERE n.public=true AND n.maintenance_mode=false ORDER BY n.name`)
 		if err != nil {
 			fail(w, err)
 			return
@@ -114,6 +115,28 @@ func (a *App) gameLibraryMinecraft(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, err)
 		return
+	}
+	for i, node := range nodes {
+		reason := ""
+		if e := a.gameNodeResources(r.Context(), node, 10240, 1024); e != nil {
+			reason = e.Error()
+		}
+		if reason == "" {
+			// Listing rows retain encrypted credentials. Resolve the node through
+			// the ordinary daemon path before probing its availability.
+			resolved, e := a.node(r.Context(), num(node["id"]))
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			probe, e := a.daemon(r.Context(), resolved, "GET", "/api/system?v=2", nil)
+			if e != nil {
+				reason = "Node is unreachable."
+			} else {
+				probe.Body.Close()
+			}
+		}
+		nodes[i] = M{"id": node["id"], "name": node["name"], "free_allocations": node["free_allocations"], "automatic_ports": true, "setup_available": reason == "", "unavailable_reason": reason}
 	}
 	writeJSON(w, 200, item("minecraft_options", M{"latest": manifest.Latest.Release, "versions": versions, "nodes": nodes, "can_install": boolean(user["root_admin"]), "loaders": minecraftLoaders, "runtimes": runtimes}))
 }
@@ -161,6 +184,11 @@ func (a *App) minecraftRelease(ctx context.Context, version string) (minecraftMe
 func (a *App) gameLibraryMinecraftEgg(ctx context.Context) (M, error) {
 	return a.gameLibraryMinecraftLoaderEgg(ctx, "vanilla")
 }
+
+// The former installer tag resolves to Bullseye, whose security package URLs
+// no longer supply the Python bootstrap. Pin the maintained multiarch base.
+const minecraftInstallerImage = "debian@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8"
+
 func (a *App) gameLibraryMinecraftLoaderEgg(ctx context.Context, loader string, legacy ...bool) (M, error) {
 	if !minecraftLoaderKnown(loader) {
 		return nil, bad("Select a supported Minecraft loader.")
@@ -206,7 +234,7 @@ func (a *App) gameLibraryMinecraftLoaderEgg(ctx context.Context, loader string, 
 			javaConfig["args_file"] = "user_jvm_args.txt"
 		}
 		script := strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", minecraftInstallPython, 1)
-		err = tx.QueryRow(ctx, `INSERT INTO eggs(uuid,nest_id,author,name,description,features,docker_images,startup,config_files,config_startup,config_stop,script_install,script_entry,script_container,java_config) VALUES($1,$2,'library@voltra.local',$8,'Minecraft installed from verified upstream downloads.','["minecraft","eula","java_version"]',$3,$4,$5,$6,'stop',$7,'bash','ghcr.io/pterodactyl/installers:debian',$9) RETURNING id`, eggUUID, nestID, images, "java -Xms128M -XX:MaxRAMPercentage=80.0 -Dterminal.jline=false -Dterminal.ansi=true -jar server.jar nogui", files, M{"done": "Done ("}, script, "Minecraft "+strings.ToUpper(loader[:1])+loader[1:], javaConfig).Scan(&eggID)
+		err = tx.QueryRow(ctx, `INSERT INTO eggs(uuid,nest_id,author,name,description,features,docker_images,startup,config_files,config_startup,config_stop,script_install,script_entry,script_container,java_config) VALUES($1,$2,'library@voltra.local',$8,'Minecraft installed from verified upstream downloads.','["minecraft","eula","java_version"]',$3,$4,$5,$6,'stop',$7,'bash',$10,$9) RETURNING id`, eggUUID, nestID, images, "java -Xms128M -XX:MaxRAMPercentage=80.0 -Dterminal.jline=false -Dterminal.ansi=true -jar server.jar nogui", files, M{"done": "Done ("}, script, "Minecraft "+strings.ToUpper(loader[:1])+loader[1:], javaConfig, minecraftInstallerImage).Scan(&eggID)
 		if err != nil {
 			return nil, err
 		}
@@ -227,6 +255,14 @@ func (a *App) gameLibraryMinecraftLoaderEgg(ctx context.Context, loader string, 
 			}
 		}
 	} else if err != nil {
+		return nil, err
+	}
+	// Upgrade only the exact managed default. Keep custom installer scripts,
+	// images and every other administrator edit intact.
+	managedScript := strings.ReplaceAll(strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", minecraftInstallPython, 1), "\r\n", "\n")
+	previousPython := strings.Replace(minecraftInstallPython, "    # Wings mounts /tmp as a small tmpfs. Pack archives plus the Java bootstrap\n    # must use the server disk budget, not exhaust that tmpfs during extraction.\n    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory or root) as temporary:", "    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory) as temporary:", 1)
+	previousScript := strings.ReplaceAll(strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", previousPython, 1), "\r\n", "\n")
+	if _, err = tx.Exec(ctx, "UPDATE eggs SET script_container=$2,script_install=$3,updated_at=now() WHERE id=$1 AND author='library@voltra.local' AND script_container IN ('ghcr.io/pterodactyl/installers:debian',$2) AND replace(script_install,chr(13)||chr(10),chr(10)) IN ($3,$4) AND (script_container<>$2 OR script_install<>$3)", eggID, minecraftInstallerImage, managedScript, previousScript); err != nil {
 		return nil, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -287,10 +323,20 @@ func (a *App) gameLibraryInstallMinecraft(w http.ResponseWriter, r *http.Request
 		fail(w, bad("A valid installation request ID is required."))
 		return
 	}
+	conn, err := a.DB.Acquire(r.Context())
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	defer steamUnlock(conn)
+	if err = steamSessionLock(r.Context(), conn, fmt.Sprintf("voltra:minecraft-provision:%d:%s", num(user["id"]), requestID)); err != nil {
+		fail(w, err)
+		return
+	}
 	externalID := fmt.Sprintf("game-library:%d:%s", num(user["id"]), requestID)
 	existing, err := a.one(r.Context(), "SELECT * FROM servers WHERE external_id=$1", externalID)
 	if err == nil {
-		writeJSON(w, 200, item("game_installation", M{"identifier": existing["uuid_short"], "name": existing["name"], "status": existing["status"]}))
+		writeJSON(w, 200, item("game_installation", M{"identifier": existing["uuid_short"], "name": existing["name"], "status": existing["status"], "ports": a.gameInstallPortResponse(r.Context(), existing, gameTemplate{ID: "minecraft"})}))
 		return
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -364,11 +410,70 @@ func (a *App) gameLibraryInstallMinecraft(w http.ResponseWriter, r *http.Request
 			break
 		}
 	}
-	server, err := a.createServer(r.Context(), M{"name": strings.TrimSpace(name), "description": "Minecraft " + plan.Loader + " " + plan.Version, "owner_id": user["id"], "egg_id": egg["id"], "external_id": externalID, "image": effective["image"], "startup": minecraftPlanStartup(plan), "java_config": javaConfig, "node_id": nodeID, "deploy": M{"locations": []any{}}, "memory": memory, "swap": 0, "disk": 10240, "io": 500, "cpu": 200, "backup_limit": 1, "start_on_completion": true, "environment": env, "_minecraft_pack_artwork": plan.PackArtwork})
+	candidates := []M{}
+	if nodeID > 0 {
+		node, e := a.node(r.Context(), nodeID)
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		candidates = append(candidates, node)
+	} else {
+		candidates, err = a.query(r.Context(), "SELECT * FROM nodes WHERE public AND NOT maintenance_mode ORDER BY id")
+		if err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	var selected M
+	var portPlan gamePortPlan
+	var allocations []M
+	for _, node := range candidates {
+		if !boolean(node["public"]) || boolean(node["maintenance_mode"]) {
+			continue
+		}
+		if err = steamSessionLock(r.Context(), conn, fmt.Sprintf("voltra:steam-node-provision:%d", num(node["id"]))); err != nil {
+			fail(w, err)
+			return
+		}
+		if err = a.gameNodeResources(r.Context(), node, 10240, memory); err != nil {
+			continue
+		}
+		node, err = a.node(r.Context(), num(node["id"]))
+		if err != nil {
+			continue
+		}
+		probe, e := a.daemon(r.Context(), node, "GET", "/api/system?v=2", nil)
+		if e != nil {
+			err = e
+			continue
+		}
+		probe.Body.Close()
+		portPlan, _, err = a.planGamePorts(r.Context(), node, gameTemplate{ID: "minecraft"}, M{})
+		if err != nil {
+			continue
+		}
+		allocations, err = a.provisionGamePorts(r.Context(), node, portPlan)
+		if err != nil {
+			continue
+		}
+		selected = node
+		break
+	}
+	if selected == nil {
+		if err == nil {
+			err = bad("No available node can provision this Minecraft server.")
+		}
+		fail(w, err)
+		return
+	}
+	nodeID = num(selected["id"])
+	server, err := a.createServer(r.Context(), M{"name": strings.TrimSpace(name), "description": "Minecraft " + plan.Loader + " " + plan.Version, "owner_id": user["id"], "egg_id": egg["id"], "external_id": externalID, "image": effective["image"], "startup": minecraftPlanStartup(plan), "java_config": javaConfig, "node_id": nodeID, "allocation_id": allocations[0]["id"], "memory": memory, "swap": 0, "disk": 10240, "io": 500, "cpu": 200, "backup_limit": 1, "start_on_completion": true, "environment": env, "_minecraft_pack_artwork": plan.PackArtwork})
 	if err != nil {
 		fail(w, err)
 		return
 	}
+	portPlan = a.finishGamePortPlan(r.Context(), user, selected, server, gameTemplate{ID: "minecraft"}, portPlan)
 	_ = a.audit(r.Context(), num(user["id"]), num(server["id"]), "server:game-library.install", M{"game": "minecraft", "version": plan.Version, "loader": plan.Loader, "provider": plan.Provider, "eula_accepted": true})
-	writeJSON(w, 201, item("game_installation", M{"identifier": server["uuid_short"], "name": server["name"], "status": server["status"], "version": plan.Version, "loader": plan.Loader}))
+	writeJSON(w, 201, item("game_installation", M{"identifier": server["uuid_short"], "name": server["name"], "status": server["status"], "version": plan.Version, "loader": plan.Loader, "ports": portPlan}))
 }

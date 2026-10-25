@@ -1,0 +1,93 @@
+{
+  "at": "2026-10-23T14:57:06.133Z",
+  "copied": [
+    {
+      "source": "tools/runtime/steam-private-provider/AppMetadata.cs",
+      "target": "tools/runtime/steam-private-content/AppMetadata.cs",
+      "sha256": "16795aed1078248e9a8ef8abde42e8f10453797446ad970a68d60465fcb90cd3"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/ContentContract.cs",
+      "target": "tools/runtime/steam-private-content/ContentContract.cs",
+      "sha256": "0c7b09f97c3dee962d066592abefeb260e1f90d3d9e01f4a9292990a335112fe"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/FdAuthenticator.cs",
+      "target": "tools/runtime/steam-private-content/FdAuthenticator.cs",
+      "sha256": "53d43a00e869f45d441306390a350fbd1147c23aa18c7837dab9c4ecc6095022"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/Fields.cs",
+      "target": "tools/runtime/steam-private-content/Fields.cs",
+      "sha256": "df594deaf0e7981f277c853eff0b029830301c5eadc456eb32f055fb05b476b2"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/global.json",
+      "target": "tools/runtime/steam-private-content/global.json",
+      "sha256": "3f9b8063fdc946bf82db965d9a228d4ea581390f83680ee3b952fb0ec00b2cf3"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/LICENSE",
+      "target": "tools/runtime/steam-private-content/LICENSE",
+      "sha256": "47b9dbe742cbc63567bbf82196ed5f831e28c5e280871388fdc21a0ecc19a25d"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/MetadataAbiTests.cs",
+      "target": "tools/runtime/steam-private-content/MetadataAbiTests.cs",
+      "sha256": "9f7a993fb41e8e24271b80b32e326ed230ded35b3b8d2e53a189b7b54b9f7d5e"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/MetadataTests.cs",
+      "target": "tools/runtime/steam-private-content/MetadataTests.cs",
+      "sha256": "53f8db76055cab4b0a818d8cec78a0d689136e728880c77ef3a74efc98bb11a1"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/MetadataUInt64.cs",
+      "target": "tools/runtime/steam-private-content/MetadataUInt64.cs",
+      "sha256": "07254df0eef2a22d3ddcdada1992f3d94f6c907127bc36835461456fdd44f851"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/NuGet.Config",
+      "target": "tools/runtime/steam-private-content/NuGet.Config",
+      "sha256": "4bf5559aa66356f9992f4c5b905ba7a715066c1d7d79e59767dab6da1b5264a9"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/packages.lock.json",
+      "target": "tools/runtime/steam-private-content/packages.lock.json",
+      "sha256": "31099215ae9c48735c680780a9119aff146a329d96ac7889b46e6bb157deebdc"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/Program.cs",
+      "target": "tools/runtime/steam-private-content/Program.cs",
+      "sha256": "025f41ed0b24624092e9a9bc74d9441bcdc0627d9f904354b9b267fd9fe048a5"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/Protocol.cs",
+      "target": "tools/runtime/steam-private-content/Protocol.cs",
+      "sha256": "c5844b26a9fbb4bd2cef31bd62f18439333254f77aba81f85a1b19a8956016f8"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/SelfTests.cs",
+      "target": "tools/runtime/steam-private-content/SelfTests.cs",
+      "sha256": "e9c64cb0d6890b998c61af44072b2ad8eee768b15f3895cad73a820407d880f2"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/SessionTeardown.cs",
+      "target": "tools/runtime/steam-private-content/SessionTeardown.cs",
+      "sha256": "ea2567c29f8c9a5a07f8801b0888ecc90483bce1308010bdbc5ef992689b3d54"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/SessionTests.cs",
+      "target": "tools/runtime/steam-private-content/SessionTests.cs",
+      "sha256": "4b75d31f5ba0fd52e799fd793c22ad4c3082444ba5cd5dc87bcebb02cf12b1f9"
+    },
+    {
+      "source": "tools/runtime/steam-private-provider/SessionTransport.cs",
+      "target": "tools/runtime/steam-private-content/SessionTransport.cs",
+      "sha256": "78d904bed075ff7a06850b4751c4dfb35732769f37dd03064e3792336d0566b4"
+    }
+  ],
+  "original_license": "MIT",
+  "frozen_originals_modified": false,
+  "GPL_source_copied_or_compiled": false
+}

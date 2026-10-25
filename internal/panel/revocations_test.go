@@ -224,17 +224,14 @@ func TestRevocationsEnqueueFailureRollsBackSubuserMutation(t *testing.T) {
 	if code >= 200 && code < 300 {
 		t.Fatal("mutation succeeded without durable revocation", code, out)
 	}
-	var users, grants, notifications int64
+	var users, grants int64
 	if e := a.DB.QueryRow(ctx, "SELECT count(*) FROM users WHERE email='mustrollback@example.test'").Scan(&users); e != nil {
 		t.Fatal(e)
 	}
 	if e := a.DB.QueryRow(ctx, "SELECT count(*) FROM subusers").Scan(&grants); e != nil {
 		t.Fatal(e)
 	}
-	if e := a.DB.QueryRow(ctx, "SELECT count(*) FROM notification_jobs").Scan(&notifications); e != nil {
-		t.Fatal(e)
-	}
-	if users != 0 || grants != 0 || notifications != 0 {
-		t.Fatal("failed enqueue left partial mutation", users, grants, notifications)
+	if users != 0 || grants != 0 {
+		t.Fatal("failed enqueue left partial mutation", users, grants)
 	}
 }

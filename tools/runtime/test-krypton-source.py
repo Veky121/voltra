@@ -19,6 +19,7 @@ HERE=Path(__file__).resolve().parent
 spec=importlib.util.spec_from_file_location('fork_fixtures',HERE/'test-java-forks.py')
 base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
 source=base.load('krypton_source_build','krypton-source-build.py');fork=base.fork
+cache=base.load('krypton_source_cache','krypton-source-cache.py')
 
 
 class SourceTests(unittest.TestCase):
@@ -49,6 +50,17 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(nodes.find('g:configuration/g:verify-metadata',ns).text,'true')
         for artifact in nodes.findall('.//g:artifact',ns):
             self.assertTrue(artifact.findall('g:sha256',ns))
+
+    def test_source_memory_preflight_is_specific_to_compilation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            limit=Path(directory)/'memory.max';limit.write_text(str(2*1024**3))
+            with self.assertRaisesRegex(ValueError,'at least4GiB'):source.require_build_memory([limit])
+            limit.write_text(str(4*1024**3));self.assertEqual(source.require_build_memory([limit]),4*1024**3)
+            limit.write_text('max');self.assertIsNone(source.require_build_memory([limit]))
+
+    def test_control_characters_are_not_archive_paths(self):
+        for value in ['root/null\x00tail','root/new\nline','root/del\x7f']:
+            with self.assertRaises(ValueError):source.name(value)
 
     def test_unsafe_zip_entries_rejected_before_writes(self):
         for bad in ['/absolute','root/../escape','root/./dot','root\\backslash','root//empty']:

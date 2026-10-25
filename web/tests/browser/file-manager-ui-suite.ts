@@ -10,7 +10,7 @@ export async function runFileManagerSuite(onProgress:(text:string)=>void=()=>{})
   const explorer=()=>document.querySelector<HTMLElement>('.file-explorer')!;
   const layout=()=>document.querySelector<HTMLElement>('.fm-file-layout')!;
   const fullWidth=()=>Math.abs(explorer().getBoundingClientRect().width-layout().getBoundingClientRect().width)<2;
-  const close=async()=>{button('Back to files').click();await wait(()=>!query().has('file')&&!document.querySelector('.fm-document-pane')&&fullWidth())};
+  const close=async()=>{byLabel('Close file').click();await wait(()=>!query().has('file')&&!document.querySelector('.fm-document-pane')&&fullWidth())};
   await wait(()=>check('/server.properties')&&fullWidth());
   const originalExplorer=explorer();
   assert(fullWidth()&&!document.querySelector('.fm-browser'),'blue explorer fills the width without a second browser panel');
@@ -42,6 +42,19 @@ export async function runFileManagerSuite(onProgress:(text:string)=>void=()=>{})
   await wait(()=>innerWidth<=760||explorer().getBoundingClientRect().width<=251);
   assert(innerWidth<=760||explorer().getBoundingClientRect().width<=251,'opening contracts the explorer to the left');
   assert(innerWidth<=760||Math.abs(explorer().getBoundingClientRect().height-document.querySelector('.fm-document-pane')!.getBoundingClientRect().height)<2,'desktop editor and explorer have equal heights');
+  assert(!document.querySelector('.file-editor-status'),'editor omits the saved-status strip');
+  const footer=document.querySelector('.file-editor-hints')!,syntax=footer.querySelector<HTMLButtonElement>('.editor-language-trigger')!;
+  assert(!!syntax&&footer.lastElementChild?.classList.contains('editor-language-picker'),'syntax picker lives at the bottom-right of the editor footer');
+  syntax.click();await wait(()=>document.querySelector('.editor-language-menu'));
+  const menuRect=document.querySelector('.editor-language-menu')!.getBoundingClientRect(),contentRect=document.querySelector('.file-document-content')!.getBoundingClientRect();
+  assert(menuRect.bottom<=footer.getBoundingClientRect().top&&menuRect.top>=contentRect.top-1&&menuRect.width<=contentRect.width,'footer syntax menu opens upward inside the file pane');
+  Array.from(document.querySelectorAll<HTMLButtonElement>('.editor-language-options [role=option]')).find(e=>e.textContent?.startsWith('Plain text'))!.click();
+  await wait(()=>syntax.getAttribute('aria-label')==='Syntax: Plain text'&&!document.querySelector('.editor-language-menu'));
+  assert(!document.querySelector('.file-document-draft')&&query().get('file')===unicodePath,'changing footer syntax does not change file contents or create a draft');
+  syntax.click();await wait(()=>document.querySelector('.editor-language-menu'));
+  Array.from(document.querySelectorAll<HTMLButtonElement>('.editor-language-options [role=option]')).find(e=>e.textContent?.startsWith('Auto-detect'))!.click();
+  await wait(()=>syntax.getAttribute('aria-label')?.startsWith('Syntax: Auto'));
+  assert(document.activeElement===syntax,'auto detection restores and returns focus to the footer selector');
   assert(byLabel('Close file')===document.querySelector('.file-document-toolbar button:last-child'),'X closes the file from the far end of the toolbar');
   byLabel('Close file').click();await wait(()=>!query().has('file')&&!document.querySelector('.fm-document-pane')&&fullWidth());
   assert(explorer()===originalExplorer,'closing expands the same explorer to full width');
@@ -67,7 +80,7 @@ export async function runFileManagerSuite(onProgress:(text:string)=>void=()=>{})
   assert(scroll.scrollHeight>scroll.clientHeight&&scroll.clientHeight>100,'long files overflow inside the bounded editor');
   const pageY=scrollY;scroll.scrollTop=400;
   assert(scroll.scrollTop>0&&scrollY===pageY,'editor scrolling does not scroll the page');
-  button('Back to files').click();await wait(()=>!query().has('file')&&document.querySelector('.fm-document-pane.is-closing'));
+  byLabel('Close file').click();await wait(()=>!query().has('file')&&document.querySelector('.fm-document-pane.is-closing'));
   assert(document.querySelector('.fm-file-content')!.hasAttribute('inert'),'closing editor is inert during the expansion transition');
   byLabel('Open /server.properties').click();await wait(()=>query().has('file')&&document.querySelector('.fm-document-pane:not(.is-closing) .cm-editor'));
   await new Promise(resolve=>setTimeout(resolve,280));

@@ -1,0 +1,117 @@
+/* Application composition over the official shadcn primitives. */
+.app-shell.voltra-shadcn-shell{display:flex;min-height:0;gap:0;background:var(--theme-background,linear-gradient(150deg,#1b202b,#10151e));--scn-sidebar:transparent;--scn-background:color-mix(in srgb,var(--theme-shell-b,#141820) 85%,#070a11)}
+.voltra-shadcn-content{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;border:1px solid var(--ui-border);border-radius:14px;box-shadow:0 2px 8px #00000012;background:radial-gradient(ellipse at 95% 0,color-mix(in srgb,var(--theme-accent-b,#326f73) 3%,transparent),transparent 55%),var(--scn-background)}
+.voltra-shadcn-shell>.skip-link{z-index:250}
+.voltra-sidebar{color:var(--text);--sidebar-accent:var(--scn-sidebar-accent);--sidebar-border:var(--ui-border)}
+.voltra-sidebar-header{padding:18px 12px 12px;gap:14px}
+.voltra-sidebar-brand-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:30px}
+.voltra-sidebar-brand{display:flex;align-items:center;gap:9px;min-width:0;color:var(--text);font-size:calc(15px * var(--ui-font-scale,1));font-weight:600;letter-spacing:-.025em;text-decoration:none}
+.voltra-sidebar-brand:hover{text-decoration:none;color:var(--text)}
+.voltra-sidebar-brand .brand-mark{width:27px;height:27px;flex-shrink:0}
+.voltra-sidebar-brand>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.voltra-sidebar-collapse{display:grid;place-items:center;flex-shrink:0;width:26px;height:26px;min-height:0;padding:4px;background:transparent;border:1px solid var(--ui-border);border-radius:6px;color:var(--muted);box-shadow:none}
+button.voltra-sidebar-collapse:hover{background:var(--ui-hover);color:var(--text);filter:none}
+.voltra-sidebar-collapse svg{width:14px;height:14px}
+.voltra-sidebar .panel-switcher{min-height:34px;padding:3px;border:1px solid var(--ui-border);border-radius:8px;background:#ffffff02}
+.voltra-sidebar .panel-switcher-indicator{border-color:#ffffff06;border-radius:5px;background:#ffffff07;box-shadow:none}
+.voltra-sidebar .panel-switcher a{font-size:calc(11px * var(--ui-font-scale,1));color:var(--muted);font-weight:400;min-height:26px;padding:4px 6px}
+.voltra-sidebar .panel-switcher a.is-selected{color:var(--text)}
+.voltra-sidebar .panel-switcher a:hover{color:var(--text)}
+.voltra-sidebar .panel-switcher .nav-icon,.voltra-sidebar .panel-switcher .nav-icon svg{width:14px;height:14px;background:transparent;color:inherit}
+.voltra-sidebar-scroll{min-height:0;gap:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#ffffff14 transparent;padding:0 4px 10px}
+.voltra-nav-group{padding:8px 8px 10px}
+.voltra-nav-group [data-slot=sidebar-group-label]{height:25px;padding:0 8px;font-size:calc(10px * var(--ui-font-scale,1));line-height:1.4;letter-spacing:0;color:color-mix(in srgb,var(--muted) 80%,transparent);font-weight:400}
+.voltra-nav-group [data-slot=sidebar-menu],.voltra-sidebar-back,.voltra-server-menu{padding:0;margin:0;list-style:none;gap:3px}
+.voltra-sidebar [data-slot=sidebar-menu-item]{list-style:none}
+.voltra-nav-link,.voltra-sidebar-back [data-slot=sidebar-menu-button]{display:flex;align-items:center;gap:9px;min-height:38px;padding:8px 10px;border:1px solid transparent;border-radius:7px;background:transparent;color:#a8b1bf;font-size:calc(12px * var(--ui-font-scale,1));font-weight:400;line-height:1.4;text-decoration:none;white-space:nowrap;box-shadow:none;cursor:pointer}
+.voltra-nav-link:hover,.voltra-sidebar-back [data-slot=sidebar-menu-button]:hover{background:var(--ui-hover);color:var(--text);text-decoration:none;filter:none}
+.voltra-nav-link[data-active]{border-color:color-mix(in srgb,var(--accent) 13%,transparent);background:var(--scn-sidebar-accent);color:var(--accent);font-weight:500;box-shadow:inset 0 1px #ffffff04}
+.voltra-nav-link .nav-icon{display:flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:0;border-radius:0;background:transparent;color:inherit;flex-shrink:0}
+.voltra-nav-link svg,.voltra-nav-link .nav-icon svg,.voltra-sidebar-back svg{width:18px;height:18px;stroke-width:1.8;color:inherit}
+.voltra-nav-link>span:not(.nav-icon):not(.voltra-sidebar-count):not(.voltra-shortcut-status){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voltra-sidebar-count{margin-left:auto;padding:1px 5px;min-width:18px;border-radius:4px;font-size:calc(10px * var(--ui-font-scale,1));text-align:center;background:#ffffff07;color:inherit;line-height:1.4}
+.voltra-sidebar-back{padding:0 8px 5px}
+.voltra-sidebar-back [data-slot=sidebar-menu-button]{font-size:calc(11px * var(--ui-font-scale,1));color:var(--muted)}
+.voltra-sidebar-sections:empty{display:none}
+.voltra-shortcut-artwork{width:20px;height:20px;object-fit:cover;border-radius:5px;flex-shrink:0;background:var(--surface-muted)}
+.voltra-shortcut-status{margin-left:auto;flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--amber)}
+.voltra-shortcut-empty{margin:0 16px 12px;font-size:calc(11px * var(--ui-font-scale,1));color:var(--muted);line-height:1.5}
+.voltra-sidebar-advanced{margin:4px 8px 10px;border:0}
+.voltra-sidebar-advanced>summary{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border:0;border-radius:6px;font-size:calc(10px * var(--ui-font-scale,1));font-weight:400;color:var(--muted);list-style:none;cursor:pointer;white-space:nowrap}
+.voltra-sidebar-advanced>summary::-webkit-details-marker{display:none}
+.voltra-sidebar-advanced>summary::after{content:'⌄';font-size:calc(13px * var(--ui-font-scale,1))}
+.voltra-sidebar-advanced[open]>summary::after{transform:rotate(180deg)}
+.voltra-sidebar-advanced>summary:hover{background:var(--ui-hover);color:var(--text)}
+.voltra-advanced-group{padding:0}
+.voltra-advanced-group>[data-slot=sidebar-group-label]{display:none}
+.voltra-navigation-error{padding:10px;margin:6px 8px;border:1px solid #edc48220;border-radius:7px;background:#edc48206;color:var(--amber);font-size:calc(11px * var(--ui-font-scale,1));overflow-wrap:anywhere}
+.voltra-navigation-error button{display:flex;align-items:center;gap:5px;margin-top:7px;padding:0;border:0;min-height:20px;background:transparent;color:inherit;font-size:calc(11px * var(--ui-font-scale,1))}
+.voltra-navigation-error button svg{width:12px;height:12px}
+.voltra-server-menu{margin:2px 0 4px}
+button.voltra-server-picker{display:flex;align-items:center;gap:9px;min-height:49px;height:auto;padding:8px;border:1px solid var(--ui-border);border-radius:8px;background:#ffffff02;color:var(--text);box-shadow:none;text-align:left;cursor:pointer}
+button.voltra-server-picker:hover,button.voltra-server-picker[data-popup-open]{background:var(--ui-hover);filter:none}
+.voltra-server-picker-icon{display:grid;place-items:center;flex-shrink:0;width:30px;height:30px;border:1px solid var(--ui-border);border-radius:6px;background:#ffffff03;color:var(--accent)}
+.voltra-server-picker-icon svg{width:17px;height:17px}
+.voltra-server-picker-icon{overflow:hidden}
+.voltra-server-picker-artwork{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.voltra-server-dropdown .voltra-server-picker-artwork{width:24px;height:24px;flex-shrink:0;border-radius:5px}
+.voltra-server-picker-copy{flex:1;min-width:0;overflow:hidden}
+.voltra-server-picker-copy strong,.voltra-account-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(11px * var(--ui-font-scale,1));font-weight:500;line-height:1.5}
+.voltra-server-picker-copy small,.voltra-account-copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(10px * var(--ui-font-scale,1));font-weight:400;color:var(--muted);line-height:1.5;margin-top:2px}
+.voltra-picker-chevron{margin-left:auto;width:13px;height:13px;flex-shrink:0;color:var(--muted)}
+.voltra-sidebar-footer{padding:10px 12px 14px;gap:6px}
+.voltra-sidebar-footer [data-slot=sidebar-menu]{list-style:none;margin:0;padding:0}
+button.voltra-account-trigger{display:flex;align-items:center;gap:9px;min-height:46px;height:auto;padding:6px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text);text-align:left;box-shadow:none;cursor:pointer}
+button.voltra-account-trigger:hover,button.voltra-account-trigger[data-popup-open]{background:var(--ui-hover);filter:none}
+.voltra-account-avatar{display:grid;place-items:center;width:29px;height:29px;flex-shrink:0;border-radius:7px;border:1px solid var(--ui-border);background:linear-gradient(135deg,color-mix(in srgb,var(--theme-accent-a,#4d78c9) 28%,var(--theme-shell-a,#1b202b)),color-mix(in srgb,var(--theme-accent-b,#326f73) 20%,var(--theme-shell-b,#141820)));color:var(--text);font-size:calc(11px * var(--ui-font-scale,1));font-weight:500}
+.voltra-account-copy{flex:1;min-width:0}
+.voltra-account-error{font-size:calc(11px * var(--ui-font-scale,1));line-height:1.5;color:var(--red);margin:0;padding:0 5px;overflow-wrap:anywhere}
+.voltra-dropdown{z-index:260;min-width:190px;max-width:min(320px,calc(100vw - 24px));padding:5px;border:1px solid var(--line-strong);border-radius:9px;background:var(--scn-popover);color:var(--text);box-shadow:0 12px 36px #0005;animation:none}
+.voltra-dropdown [data-slot=dropdown-menu-label]{font-size:calc(10px * var(--ui-font-scale,1));color:var(--muted);padding:6px 8px;font-weight:400}
+.voltra-dropdown [data-slot=dropdown-menu-item]{display:flex;align-items:center;gap:9px;min-height:32px;padding:7px 8px;border:0;border-radius:5px;background:transparent;color:var(--text);font-size:calc(12px * var(--ui-font-scale,1));font-weight:400;text-decoration:none;cursor:pointer;outline:none}
+.voltra-dropdown [data-slot=dropdown-menu-item]:hover,.voltra-dropdown [data-slot=dropdown-menu-item][data-highlighted]{background:var(--ui-hover);color:var(--text);filter:none}
+.voltra-dropdown [data-slot=dropdown-menu-item][data-variant=destructive]{color:var(--red)}
+.voltra-dropdown [data-slot=dropdown-menu-item][data-disabled]{opacity:.45;cursor:not-allowed}
+.voltra-dropdown [data-slot=dropdown-menu-item] svg{width:15px;height:15px;color:var(--muted);stroke-width:1.8}
+.voltra-dropdown [data-slot=dropdown-menu-item][data-variant=destructive] svg{color:inherit}
+.voltra-dropdown [data-slot=dropdown-menu-separator]{height:1px;margin:5px -1px;background:var(--ui-divider)}
+.voltra-picker-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voltra-mobile-toolbar{display:none}
+.legacy-card{gap:0;overflow:visible}
+body.voltra-desktop .voltra-shadcn-shell{min-height:0;height:calc(100dvh - 40px);margin-top:40px}
+body.voltra-desktop .voltra-shadcn-shell [data-slot=sidebar-container]{top:40px;height:calc(100dvh - 40px)}
+body.voltra-desktop .voltra-sidebar[data-mobile=true]{top:40px;height:calc(100dvh - 40px)}
+body.voltra-desktop [data-slot=sheet-overlay]{top:40px}
+@media(min-width:768px){
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-header{padding:16px 4px 8px;gap:12px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-brand-row{flex-direction:column;gap:12px;align-items:center}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-brand>span,.voltra-shadcn-shell [data-collapsible=icon] .voltra-server-picker-copy,.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-copy,.voltra-shadcn-shell [data-collapsible=icon] .voltra-picker-chevron,.voltra-shadcn-shell [data-collapsible=icon] .voltra-nav-link>span:not(.nav-icon),.voltra-shadcn-shell [data-collapsible=icon] .voltra-shortcut-empty{display:none}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar .panel-switcher{grid-template-columns:minmax(0,1fr);gap:3px;width:100%;padding:3px}
+ .voltra-shadcn-shell [data-collapsible=icon] .panel-switcher a{padding:6px;min-height:28px}
+ .voltra-shadcn-shell [data-collapsible=icon] .panel-switcher a.is-selected{border:0;background:#ffffff09;border-radius:5px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-nav-group{padding:5px 4px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-nav-link,.voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-back [data-slot=sidebar-menu-button]{justify-content:center;min-height:32px;height:32px;padding:7px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-back{padding:0 4px 5px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-back span{display:none}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-server-picker{padding:3px;border:0;justify-content:center;min-height:32px;width:32px;height:32px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-server-picker-icon{width:28px;height:28px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-shortcut-artwork{width:20px;height:20px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-footer{padding:8px 4px 12px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-account-trigger{padding:0;justify-content:center;min-height:32px;width:32px;height:32px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-advanced{margin:4px 0}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-advanced>summary{justify-content:center;font-size:0;padding:6px}
+ .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-advanced>summary::after{font-size:calc(14px * var(--ui-font-scale,1))}
+}
+@media(max-width:767px){
+ .app-shell.voltra-shadcn-shell{padding:0;background:var(--scn-background)}
+ .voltra-shadcn-content{border:0;border-radius:0;margin:0;box-shadow:none}
+ .voltra-mobile-toolbar{display:flex;align-items:center;gap:9px;padding:10px 16px;border-bottom:1px solid var(--ui-divider);font-size:calc(12px * var(--ui-font-scale,1));font-weight:500;background:var(--scn-background)}
+ .voltra-mobile-toolbar [data-slot=sidebar-trigger]{display:grid;place-items:center;min-height:36px;width:36px;height:36px;padding:7px;border:1px solid var(--ui-border);border-radius:6px;background:transparent;color:var(--muted)}
+ .voltra-sidebar[data-mobile=true]{z-index:250;width:min(18rem,calc(100vw - 36px));max-width:calc(100vw - 36px);height:100dvh;border:0;border-radius:0 14px 14px 0;background:var(--theme-background,#151a23);box-shadow:0 12px 80px #0007}
+ .voltra-sidebar[data-mobile=true] .voltra-sidebar-close{display:grid;place-items:center;width:28px;height:28px;min-height:28px;padding:5px;border:1px solid var(--ui-border);border-radius:6px;background:transparent;color:var(--muted)}
+ .voltra-sidebar[data-mobile=true] .panel-switcher{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .voltra-sidebar[data-mobile=true] .panel-switcher a span:not(.nav-icon){display:block}
+ .voltra-sidebar[data-mobile=true] [data-slot=sidebar-menu-button]{min-height:36px}
+ .voltra-sidebar[data-mobile=true] .voltra-sidebar-footer{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){.voltra-shadcn-shell [data-slot],.voltra-dropdown{animation:none!important;transition:none!important}}

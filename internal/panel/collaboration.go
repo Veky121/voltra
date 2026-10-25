@@ -83,18 +83,27 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		q := "SELECT u.*,su.permissions FROM subusers su JOIN users u ON u.id=su.user_id WHERE su.server_id=$1"
 		args := []any{s["id"]}
+		if r.PathValue("user") == "" {
+			q = "SELECT u.*,su.permissions,(u.id=$2) AS server_owner FROM users u LEFT JOIN subusers su ON su.user_id=u.id AND su.server_id=$1 WHERE su.id IS NOT NULL OR u.id=$2 OR (u.root_admin AND NOT u.disabled)"
+			args = append(args, s["owner_id"])
+		}
 		if r.PathValue("user") != "" {
 			q += " AND (u.uuid=$2 OR u.id::text=$2)"
 			args = append(args, r.PathValue("user"))
 		}
-		q += " ORDER BY su.id"
+		q += " ORDER BY u.id"
 		rows, e := a.query(ctx, q, args...)
 		if e != nil {
 			fail(w, e)
 			return
 		}
 		for i := range rows {
-			rows[i] = collabUser(rows[i])
+			user := rows[i]
+			rows[i] = collabUser(user)
+			rows[i]["is_owner"] = boolean(user["server_owner"])
+			rows[i]["is_admin"] = boolean(user["root_admin"])
+			rows[i]["is_current_user"] = num(user["id"]) == num(actor["id"])
+			rows[i]["inherited_access"] = boolean(user["server_owner"]) || boolean(user["root_admin"])
 		}
 		if r.PathValue("user") != "" {
 			if len(rows) == 0 {
@@ -147,14 +156,6 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		_, err = tx.Exec(ctx, "DELETE FROM subusers WHERE id=$1", target["subuser_id"])
 		if err == nil {
-			snapshot := M{}
-			for k, v := range s {
-				snapshot[k] = v
-			}
-			snapshot["_notification_key"] = "subuser-removed:" + str(target["subuser_id"]) + ":" + str(target["created_at"])
-			err = a.queueNotificationTx(ctx, tx, target, snapshot, "server.removed")
-		}
-		if err == nil {
 			err = tx.Commit(ctx)
 		}
 		if err != nil {
@@ -176,7 +177,6 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	createdSubuser := target == nil
-	createdAccount := false
 	if target == nil {
 		email := strings.ToLower(strings.TrimSpace(str(d["email"])))
 		addr, e := mail.ParseAddress(email)
@@ -197,7 +197,6 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 		if len(rr) > 0 {
 			target = M(rr[0])
 		} else {
-			createdAccount = true
 			username := "user_" + strings.ToLower(randomToken(6)) + "0"
 			rows, e = tx.Query(ctx, "INSERT INTO users(uuid,username,email,name_first,name_last) VALUES($1,$2,$3,'','') RETURNING *", newUUID(), username, email)
 			if e != nil {
@@ -226,17 +225,6 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		var subuserID int64
 		err = tx.QueryRow(ctx, "INSERT INTO subusers(server_id,user_id,permissions) VALUES($1,$2,$3::jsonb) RETURNING id", s["id"], target["id"], collabJSON(permissions)).Scan(&subuserID)
-		if err == nil {
-			snapshot := M{}
-			for k, v := range s {
-				snapshot[k] = v
-			}
-			snapshot["_notification_key"] = "subuser-added:" + str(subuserID)
-			err = a.queueNotificationTx(ctx, tx, target, snapshot, "server.added")
-			if err == nil && createdAccount {
-				err = a.queueNotificationTx(ctx, tx, target, snapshot, "account.created")
-			}
-		}
 	} else {
 		if err = a.queueRevocationTx(ctx, tx, s, target); err != nil {
 			fail(w, err)

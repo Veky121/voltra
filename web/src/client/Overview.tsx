@@ -1,12 +1,15 @@
 import {useArtworkLibrary} from './ArtworkProvider';
-import {useCallback,useEffect,useState,type CSSProperties} from "react";
+import {useCallback,useEffect,useState} from "react";
 import {Link,useSearchParams} from "react-router-dom";
-import {api,Button,Card,Input} from "../lib";
+import {api,Button,Input} from "../lib";
+import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
+import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
 import {Icon} from "../Icons";
 import {bytes,items,PageError,value} from "./common";
 import {fallbackArtwork,getServerArtwork,type ServerArtwork} from "./serverArtwork";
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import "./workspace.css";
+import './shadcn-cards.css';
 import "./overview.css";
 import {useServerNavigation} from '../ServerNavigation';
 
@@ -51,7 +54,7 @@ function useOverview(){
         }));
         if(active)setUpdated(Date.now());
       }catch(err){if(active)setError(err instanceof Error?err.message:String(err));}
-      finally{if(active){setLoading(false);setRefreshing(false);timer=setTimeout(poll,15000);}}
+      finally{if(active){setLoading(false);setRefreshing(false);timer=setTimeout(poll,1000);}}
     }
     void poll();
     return()=>{active=false;clearTimeout(timer);abort.abort();};
@@ -75,22 +78,21 @@ function Artwork({art,priority}:{art:ServerArtwork;priority:boolean}){
 function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
   useArtworkLibrary();
   const r=s.resources,art=getServerArtwork(s);
-  return <Link className="overview-server-card" data-state={s.liveState} data-artwork={art.id} to={`/server/${s.identifier||s.uuid}`}>
-    <div className="overview-server-art">
-      <Artwork key={art.src} art={art} priority={priority}/>
-      <span className="overview-game-label">{art.name}</span>
-      <span className={`overview-state state-${s.liveState}`}><span className="status-dot"/>{labels[s.liveState]||s.liveState.replaceAll("_"," ")}</span>
-    </div>
-    <div className="overview-server-body">
-    <div className="overview-server-heading"><div className="server-identity-heading"><ServerIdentityIcon artwork={s.artwork} lazy={!priority}/><div className="overview-server-title"><h2>{s.name}</h2>{(s.artwork?.pack_name||s.description)&&<p title={[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}>{[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}</p>}</div></div></div>
-    <div className="overview-resources">
+  return <Card className="overview-server-card shadcn-card" data-state={s.liveState} data-artwork={art.id}>
+    <Link className="overview-server-link" to={`/server/${s.identifier||s.uuid}`}>
+    <CardHeader className="overview-server-header">
+      <CardDescription className="overview-game-label">{art.name}</CardDescription>
+      <CardAction><span className={`overview-state state-${s.liveState}`}><span className="status-dot"/>{labels[s.liveState]||s.liveState.replaceAll("_"," ")}</span></CardAction>
+      <div className="overview-server-heading"><div className="server-identity-heading"><ServerIdentityIcon artwork={s.artwork} lazy={!priority}/><div className="overview-server-title"><CardTitle><h2>{s.name}</h2></CardTitle>{(s.artwork?.pack_name||s.description)&&<CardDescription title={[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}>{[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}</CardDescription>}</div></div><div className="overview-server-art"><Artwork key={art.src} art={art} priority={priority}/></div></div>
+    </CardHeader>
+    <CardContent className="overview-resources">
       <Meter label="CPU" reading={r?`${Number(r.cpu_absolute||0).toFixed(1)}%`:"—"} ratio={Number(r?.cpu_absolute||0)/(s.limits?.cpu||100)}/>
       <Meter label="Memory" reading={r?storageReading(Number(r.memory_bytes||0),s.limits?.memory):"—"} ratio={s.limits?.memory?Number(r?.memory_bytes||0)/(s.limits.memory*1024**2):0}/>
       <Meter label="Disk" reading={r?storageReading(Number(r.disk_bytes||0),s.limits?.disk):"—"} ratio={s.limits?.disk?Number(r?.disk_bytes||0)/(s.limits.disk*1024**2):0}/>
-    </div>
-    <div className="overview-server-footer"><span><Icon name="nodes"/>{s.node}</span><span className="overview-open">{s.resourceError?"Live status unavailable":"Open server"}<Icon name="chevron"/></span></div>
-    </div>
-  </Link>;
+    </CardContent>
+    <CardFooter className="overview-server-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name="nodes"/></ItemMedia><ItemContent><ItemDescription title={s.node}>{s.node}</ItemDescription></ItemContent><ItemActions className="overview-open">{s.resourceError?"Live status unavailable":"Open server"}<Icon name="chevron"/></ItemActions></Item></CardFooter>
+    </Link>
+  </Card>;
 }
 export default function Overview(){
   const q=useOverview(),[search,setSearch]=useState(""),[filter,setFilter]=useState('all');
@@ -110,13 +112,13 @@ export default function Overview(){
   return <div className="page workspace-page overview-page">
     <h1 className="overview-accessible-title">Server overview</h1>
     <div className="overview-totals" aria-label="Server totals">
-      {[{label:"Total servers",count:q.servers.length,icon:"server",kind:"total"},{label:"Running",count:running,icon:"play",kind:"running"},{label:"Stopped",count:stopped,icon:"stop",kind:"stopped"}].map(x=><Card className={`overview-total total-${x.kind}`} key={x.kind} style={{'--total-share':`${q.servers.length?x.count/q.servers.length*100:0}%`} as CSSProperties}><span className="overview-total-icon"><Icon name={x.icon as "server"|"play"|"stop"}/></span><div className="overview-total-copy"><p title={x.label}>{x.label}</p><strong>{q.loading?"—":x.count}</strong></div><span className="overview-total-decoration" aria-hidden="true"><Icon name="server"/></span><span className="overview-total-track" aria-hidden="true"><span/></span></Card>)}
+      {[{label:"Total servers",count:q.servers.length,icon:"server",kind:"total"},{label:"Running",count:running,icon:"play",kind:"running"},{label:"Stopped",count:stopped,icon:"stop",kind:"stopped"}].map(x=><Card className={`overview-total shadcn-card total-${x.kind}`} key={x.kind}><CardHeader><CardTitle>{x.label}</CardTitle><CardAction><span className="overview-total-icon" aria-hidden="true"><Icon name={x.icon as "server"|"play"|"stop"}/></span></CardAction></CardHeader><CardContent><strong>{q.loading?"—":x.count}</strong></CardContent></Card>)}
     </div>
     <PageError error={q.error}/>
     {(view==='favorites'||view==='recent')&&<div className="overview-view-heading"><h2>{view==='favorites'?'Favorites':'Recent servers'}</h2><Button variant="secondary" onClick={()=>setParams({})}>Show all servers</Button></div>}
-    <div className="overview-list-heading"><div><h2>Your servers <span className="overview-count">{q.servers.length}</span></h2><p className="muted">{other>0?`${other} ${other===1?"server is":"servers are"} changing state or awaiting status.`:'Select a server to open its workspace.'}</p></div><div className="toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" aria-label="Search servers" placeholder="Find a server or node…" value={search} onChange={e=>setSearch(e.target.value)}/></div><Button className={q.refreshing?'is-refreshing':''} variant="secondary" disabled={q.refreshing} onClick={q.reload} title={q.updated?`Last checked ${new Date(q.updated).toLocaleTimeString()}. Automatically refreshes every 15 seconds.`:'Refresh server status'}><Icon name="restart"/><span>{q.refreshing?"Updating…":"Refresh"}</span></Button></div></div>
+    <div className="overview-list-heading"><div><h2>Your servers <span className="overview-count">{q.servers.length}</span></h2><p className="muted">{other>0?`${other} ${other===1?"server is":"servers are"} changing state or awaiting status.`:'Select a server to open its workspace.'}</p></div><div className="toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" className="overview-search-input" aria-label="Search servers" placeholder="Find a server or node…" value={search} onChange={e=>setSearch(e.target.value)}/></div><Button className={q.refreshing?'is-refreshing':''} variant="secondary" disabled={q.refreshing} onClick={q.reload} title={q.updated?`Last checked ${new Date(q.updated).toLocaleTimeString()}. Automatically refreshes every second.`:'Refresh server status'}><Icon name="restart"/><span>{q.refreshing?"Updating…":"Refresh"}</span></Button></div></div>
     <div className="overview-filters" role="group" aria-label="Filter servers by status">{filters.map(f=><button key={f.id} type="button" aria-pressed={filter===f.id} onClick={()=>setFilter(f.id)}>{f.label}<span>{q.loading?'—':f.count}</span></button>)}</div>
     {q.loading?<div className="overview-server-grid overview-skeletons" role="status" aria-label="Loading servers">{[0,1].map(i=><div className="overview-skeleton" key={i} aria-hidden="true"><span/><span/><span/></div>)}</div>:<div className="overview-server-grid">{filtered.map((s,index)=><ServerCard key={s.uuid} server={s} priority={index<2}/>)}</div>}
-    {!q.loading&&!q.error&&!filtered.length&&<Card className="workspace-empty"><span className="workspace-empty-icon"><Icon name={emptySavedView?(view==='favorites'?'star':'clock'):q.servers.length?'search':'server'}/></span><h2>{emptySavedView?(view==='favorites'?'No favorites yet':'No recent servers yet'):q.servers.length?"No servers in this view":"Your first server starts here"}</h2><p className="muted">{emptySavedView?(view==='favorites'?'Star a server to keep it in your favorites.':'Servers you open appear here.'):q.servers.length?'Try a different search or status filter.':'Choose a game from the library to create your first server.'}</p>{emptySavedView?<Button variant="secondary" onClick={()=>{setParams({});setSearch('');setFilter('all')}}>Browse servers</Button>:q.servers.length?<Button variant="secondary" onClick={()=>{setSearch('');setFilter('all')}}>Clear filters</Button>:<Link className="button" to="/game-library">Explore Game Library<Icon name="chevron"/></Link>}</Card>}
+    {!q.loading&&!q.error&&!filtered.length&&<Card className="workspace-empty shadcn-card"><CardHeader><span className="workspace-empty-icon"><Icon name={emptySavedView?(view==='favorites'?'star':'clock'):q.servers.length?'search':'server'}/></span><CardTitle><h2>{emptySavedView?(view==='favorites'?'No favorites yet':'No recent servers yet'):q.servers.length?"No servers in this view":"Your first server starts here"}</h2></CardTitle><CardDescription>{emptySavedView?(view==='favorites'?'Star a server to keep it in your favorites.':'Servers you open appear here.'):q.servers.length?'Try a different search or status filter.':'Choose a game from the library to create your first server.'}</CardDescription></CardHeader><CardContent>{emptySavedView?<Button variant="secondary" onClick={()=>{setParams({});setSearch('');setFilter('all')}}>Browse servers</Button>:q.servers.length?<Button variant="secondary" onClick={()=>{setSearch('');setFilter('all')}}>Clear filters</Button>:<Link className="button" to="/game-library">Explore Game Library<Icon name="chevron"/></Link>}</CardContent></Card>}
   </div>;
 }

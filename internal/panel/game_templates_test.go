@@ -78,7 +78,7 @@ func TestGameTemplateCatalogCompatibility(t *testing.T) {
 	if len(catalog.Entries) < 240 || len(catalog.Revision) != 40 {
 		t.Fatal("incomplete pinned catalog")
 	}
-	if catalog.Revision == "c637a6d1e0449b167efeff81bb9a0177aa3df6c2" && len(catalog.Entries) != 240 {
+	if catalog.Revision == "c637a6d1e0449b167efeff81bb9a0177aa3df6c2" && len(catalog.Entries) != 241 {
 		t.Fatal("pinned catalog is missing recipes")
 	}
 	ids := map[string]bool{}

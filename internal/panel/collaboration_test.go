@@ -324,13 +324,6 @@ func TestCollaborationPostgresSchedulingAndSubusers(t *testing.T) {
 	if accountErr != nil || !usernamePattern.MatchString(str(account["username"])) {
 		t.Fatalf("invitation username violates native account invariant: %v", accountErr)
 	}
-	jobs, e := a.query(ctx, "SELECT event,payload FROM notification_jobs WHERE user_id=$1 ORDER BY id", invitedID)
-	if e != nil || len(jobs) != 2 || str(jobs[0]["event"]) != "server.added" || str(jobs[1]["event"]) != "account.created" {
-		t.Fatal("invite notifications not durable", jobs, e)
-	}
-	if str(asMap(jobs[0]["payload"])["recipient"]) != "invited@example.test" {
-		t.Fatal("notification recipient snapshot missing")
-	}
 	code, out = collabRequest(t, a, invitedID, "POST", base+"/users", M{"email": "escalated@example.test", "permissions": []string{"file.delete"}})
 	if code != 403 {
 		t.Fatalf("permission escalation %d %v", code, out)
@@ -436,10 +429,7 @@ func TestCollaborationPostgresSchedulingAndSubusers(t *testing.T) {
 	if code != 204 {
 		t.Fatal("remove subuser", code, out)
 	}
-	removed, e := a.one(ctx, "SELECT * FROM notification_jobs WHERE user_id=$1 AND event='server.removed'", invitedID)
-	if e != nil || str(asMap(removed["payload"])["recipient"]) != "invited@example.test" {
-		t.Fatal("removed notification snapshot missing", removed, e)
-	}
+
 }
 
 func TestCollaborationRealMySQLProvisioning(t *testing.T) {

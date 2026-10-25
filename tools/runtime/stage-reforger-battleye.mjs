@@ -1,0 +1,17 @@
+﻿import fs from 'node:fs';import assert from 'node:assert/strict';import {createHash}from'node:crypto';
+const d='.local/reforger-battleye-agreement/',base='internal/panel/game_library/scripts/',all=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),pins=JSON.parse(fs.readFileSync(base+'arma-releases.json')),terms=pins.reforger_battleye_agreement,stage={},changes=[];
+const help='The bundled BattlEye End-User License Agreement is separate from the Arma Reforger Server EULA. Default off blocks target installation/update and launch until the exact reviewed BattlEye text is explicitly acknowledged. This requirement also applies when BATTLEYE is false because target installation includes the licensed library. The original BATTLEYE=true default is preserved; no acceptance is inferred from that setting.';
+for(const[path,p]of Object.entries(all)){
+ const script=p.egg?.scripts?.installation?.script;if(!script?.includes('cat > .voltra/arma-native.py '))continue;const c=structuredClone(p),modules=[];
+ for(const name of ['arma-native.py','arma-releases.json']){
+  const re=new RegExp("(cat > \\.voltra/"+name.replaceAll('.','\\.')+" <<'([^']+)'\\r?\\n)([\\s\\S]*?)(\\r?\\n\\2)");const m=re.exec(c.egg.scripts.installation.script);if(!m){assert.equal(name,'arma-releases.json');continue;}
+  const raw=fs.readFileSync(base+name,'utf8').replaceAll('\r\n','\n');assert(raw.endsWith('\n'));c.egg.scripts.installation.script=c.egg.scripts.installation.script.replace(re,(_m,open,_del,_body,end)=>open+raw.slice(0,-1)+end);assert.equal(re.exec(c.egg.scripts.installation.script)[3]+'\n',raw);modules.push(name);
+ }
+ if(path==='arma/arma_reforger/egg-arma-reforger.json'){
+  assert(!p.egg.variables.some(v=>v.env_variable===terms.environment),'Second agreement already integrated');c.egg.variables.push({name:'Accept BattlEye EULA',env_variable:terms.environment,default_value:'0',rules:'required|string|in:0,'+terms.accept_value,description:'Separate explicit agreement required before downloading bundled BattlEye or launching. Default off; not inferred from the server EULA or BATTLEYE setting.',user_viewable:true,user_editable:true,field_type:'text'});c.agreements=[...p.agreements,terms];c.setup_steps.push(help);
+ }
+ const check=structuredClone(c);check.egg.scripts.installation.script=p.egg.scripts.installation.script;if(path.includes('arma_reforger')){check.egg.variables.pop();check.agreements=p.agreements;check.setup_steps.pop();}assert.deepEqual(check,p,'Unrelatedmetadata drift');stage[path]=c;changes.push({path,modules});
+}
+assert.equal(changes.length,5);assert.equal(changes.filter(x=>x.modules.includes('arma-releases.json')).length,2);
+fs.writeFileSync(d+'profiles.json',JSON.stringify(stage,null,2)+'\n');fs.writeFileSync(d+'canonical-before.json',JSON.stringify(all,null,2)+'\n');for(const name of ['arma-native.py','arma-releases.json'])fs.writeFileSync(d+name,fs.readFileSync(base+name));for(const[path,p]of Object.entries(stage)){const target=d+'eggs/'+path;fs.mkdirSync(target.slice(0,target.lastIndexOf('/')),{recursive:true});fs.writeFileSync(target,JSON.stringify(p,null,2)+'\n');}
+const manifest={at:new Date().toISOString(),changes,files:['arma-native.py','arma-releases.json','profiles.json','terms.txt'].map(name=>({path:d+name,sha256:createHash('sha256').update(fs.readFileSync(d+name)).digest('hex')}))};fs.writeFileSync(d+'manifest.json',JSON.stringify(manifest,null,2)+'\n');console.log(manifest);

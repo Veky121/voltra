@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +27,7 @@ type connectorControl struct {
 	healthAt       time.Time
 	healthChecking bool
 	capabilities   map[string]bool
+	panelOrigin    string
 }
 type connectorPending struct {
 	control *connectorControl
@@ -150,21 +153,53 @@ func (a *App) connectNodeConnector(w http.ResponseWriter, r *http.Request) {
 		var message struct {
 			Type         string   `json:"type"`
 			Capabilities []string `json:"capabilities"`
+			PanelOrigin  string   `json:"panel_origin"`
 		}
 		if e = socket.ReadJSON(&message); e != nil {
 			return
 		}
 		if message.Type == "hello" {
 			h.mu.Lock()
+			c.panelOrigin = connectorPanelOrigin(message.PanelOrigin)
 			c.capabilities = map[string]bool{}
 			for _, capability := range message.Capabilities {
-				if steamapi.KnownCapability(capability) {
+				if steamapi.KnownCapability(capability) || capability == "network-v1" {
 					c.capabilities[capability] = true
 				}
 			}
 			h.mu.Unlock()
 		}
 	}
+}
+
+// This is authenticated node configuration, never a browser-supplied Origin.
+// It selects a header on the already-bound Wings transport, not a destination.
+func connectorPanelOrigin(raw string) string {
+	if len(raw) > 2048 || strings.ContainsAny(raw, "\r\n") {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return ""
+	}
+	return strings.TrimRight(u.String(), "/")
+}
+
+func (a *App) consoleUpstreamOrigin(ctx context.Context, node M) string {
+	if str(node["connection_mode"]) == "outbound" {
+		h := a.connectors()
+		h.mu.Lock()
+		c := h.controls[num(node["id"])]
+		origin := ""
+		if c != nil {
+			origin = c.panelOrigin
+		}
+		h.mu.Unlock()
+		if origin != "" {
+			return origin
+		}
+	}
+	return a.panelPublicURL(ctx)
 }
 
 type connectorStream struct {
@@ -231,6 +266,22 @@ func (a *App) dialNodeConnector(ctx context.Context, id int64) (net.Conn, error)
 	return a.dialNodeService(ctx, id, "")
 }
 func (a *App) dialNodeService(ctx context.Context, id int64, service string) (net.Conn, error) {
+	return a.dialNodeServiceGrant(ctx, id, service, nil)
+}
+
+// Private grants travel only on the authenticated control connection. They are
+// never accepted from a browser header or forwarded to an ordinary Wings stream.
+func (a *App) dialPrivateNodeService(ctx context.Context, id int64, grant steamapi.PrivateStreamGrant) (net.Conn, error) {
+	if err := grant.Validate(); err != nil {
+		return nil, err
+	}
+	return a.dialNodeServiceGrant(ctx, id, steamapi.PrivateStreamService, &grant)
+}
+
+func (a *App) dialNodeServiceGrant(ctx context.Context, id int64, service string, grant *steamapi.PrivateStreamGrant) (net.Conn, error) {
+	if (service == steamapi.PrivateStreamService) != (grant != nil) {
+		return nil, errors.New("private Steam stream requires an authenticated scope")
+	}
 	h := a.connectors()
 	h.mu.Lock()
 	c := h.controls[id]
@@ -238,9 +289,9 @@ func (a *App) dialNodeService(ctx context.Context, id int64, service string) (ne
 		h.mu.Unlock()
 		return nil, errors.New("node connector is offline or at its connection limit")
 	}
-	if service != "" && (service != "steam" || !c.capabilities["steam-v1"]) {
+	if service != "" && !((service == "steam" && c.capabilities["steam-v1"]) || (service == "network" && c.capabilities["network-v1"]) || (service == steamapi.PrivateStreamService && c.capabilities[steamapi.PrivateCapability])) {
 		h.mu.Unlock()
-		return nil, errors.New("update and reconnect the node agent to enable Steam maintenance")
+		return nil, errors.New("update and reconnect the node agent to enable the requested service")
 	}
 	h.mu.Unlock()
 	if !a.validConnector(ctx, id, c.token) {
@@ -257,7 +308,11 @@ func (a *App) dialNodeService(ctx context.Context, id int64, service string) (ne
 	defer func() { h.mu.Lock(); delete(h.pending, key); h.mu.Unlock() }()
 	c.write.Lock()
 	_ = c.socket.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	e := c.socket.WriteJSON(M{"type": "open", "id": key, "service": service})
+	message := M{"type": "open", "id": key, "service": service}
+	if grant != nil {
+		message["private_grant"] = grant
+	}
+	e := c.socket.WriteJSON(message)
 	c.write.Unlock()
 	if e != nil {
 		h.stop(c)

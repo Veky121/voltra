@@ -12,6 +12,10 @@ import (
 // publisher files while retaining saves/configuration and leaving power off.
 // The caller has already enforced the native route's permission.
 func (a *App) managedSteamReinstall(w http.ResponseWriter, r *http.Request, server M, successStatus int) bool {
+	if err := blockPublicSteamOwnership(r.Context(), a.DB, num(server["id"])); err != nil {
+		fail(w, err)
+		return true
+	}
 	_, err := a.one(r.Context(), "SELECT server_id FROM steam_servers WHERE server_id=$1", server["id"])
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false

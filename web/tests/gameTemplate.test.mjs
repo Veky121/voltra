@@ -1,9 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {templateVariableControl, templateAdditionalPorts, templatePrimaryPort, templatePortsValid, templatePortRanges, templatePortEnvironment} from '../src/client/gameTemplateModel.ts';
+import {templateAgreementsAccepted, templateMemoryWarning, templateStorageWarning, templateVariableControl, templateAdditionalPorts, templatePrimaryPort, templatePortsValid, templatePortRanges, templatePortEnvironment} from '../src/client/gameTemplateModel.ts';
+
+test('template storage warnings distinguish below-default limits from adequate or invalid values', () => {
+ const selected=64*1024;
+ assert.match(templateStorageWarning('Counter-Strike 2',selected,160*1024),/160 GiB.*selected 64 GiB.*updates may run out of space/);
+ for(const value of [160*1024,192*1024,null,0,127,NaN,Infinity,128.5])assert.equal(templateStorageWarning('Game',value,160*1024),null);
+ assert.equal(templateStorageWarning('Game',128,NaN),null);
+ assert.equal(templateStorageWarning('Game',128,0),null);
+ assert.match(templateStorageWarning('Small server',128,1024),/0.125 GiB/);
+});
 
 const automaticRole = environment => ({environment, condition:'nonzero', allocated_value:true, auto_allocate:true, exclude_primary:true, minimum:1, maximum:65535, count:3});
 const automaticAllocations = [28000,28001,28002,28003].map((port,index)=>({id:index+1,ip:'192.0.2.1',port}));
+
+test('absolute native port exclusions agree for manual, automatic, primary and companion choices',()=>{
+ const allocations=[2757,2758,2759,2760,2761].map((port,index)=>({id:index+1,ip:'192.0.2.1',port}));
+ const rule={...automaticRole('DISCOVERY_PORT'),count:2,exclude_ports:[2758]},manual=templatePortRanges([rule],{DISCOVERY_PORT:'2757'}),automatic=templatePortRanges([rule],{DISCOVERY_PORT:''});
+ assert.deepEqual(templateAdditionalPorts(allocations,3,2,[],false,manual),[1]);
+ assert.equal(templatePortsValid(allocations,3,[1],2,false,manual),true);
+ const unavailable=allocations.filter(a=>a.port!==2757);assert.deepEqual(templateAdditionalPorts(unavailable,3,2,[],false,automatic),[4]);
+ assert.equal(templatePortEnvironment([rule],{DISCOVERY_PORT:''},unavailable,3,[4]).environment.DISCOVERY_PORT,'2760');
+ assert.equal(templatePortsValid(allocations,2,[1],2,false,manual),false);
+ assert.equal(templatePortsValid(allocations,3,[1,2],2,false,manual),false);
+ assert.ok(templatePortEnvironment([rule],{DISCOVERY_PORT:'2758'},allocations,3,[2]).error);
+ assert.ok(templatePortEnvironment([{...rule,auto_allocate:false}],{DISCOVERY_PORT:'2757'},allocations,2,[1]).error);
+ const pair={...rule,count:3,allocated_offsets:[1]};assert.equal(templatePortsValid(allocations,3,[1,2],3,false,templatePortRanges([pair],{DISCOVERY_PORT:'2757'})),false);
+ for(const exclude_ports of [[0],[-1],[65536],[2758,2758],[1.5],'2758'])assert.equal(templatePortsValid(allocations,3,[1],2,false,templatePortRanges([{...rule,exclude_ports}],{DISCOVERY_PORT:'2757'})),false);
+ assert.equal(templatePortsValid(allocations,3,[1],2,false,templatePortRanges([{...rule,allocated_value:false}],{DISCOVERY_PORT:'2757'})),false);
+});
 
 test('service-relative groups autofill companions and reject sparse, overlapping or unselected pairs', () => {
   const allocations=[28000,28001,28003,28004,28009,28010].map((port,index)=>({id:index+1,ip:'192.0.2.1',port}));
@@ -233,4 +258,36 @@ test('allocated roles cannot reuse explicitly reserved relative ports', () => {
   assert.equal(valid('27999',{exclude_offsets:[]}),true);
   for(const excluded of [[0],[-1,-1],[65535],[-65535],[0.5],{}])assert.equal(valid('0',{exclude_offsets:excluded}),false);
   assert.equal(valid('0',{allocated_value:false,exclude_primary:false}),false);
+});
+
+test('publisher agreement requires the exact reviewed version and never boolean or old acceptance', () => {
+ const agreement={environment:'ACCEPT_EULA',accept_value:'a'.repeat(64)};
+ for(const value of [undefined,'0','true','1','b'.repeat(64)])assert.equal(templateAgreementsAccepted([agreement],{ACCEPT_EULA:value}),false);
+ assert.equal(templateAgreementsAccepted([agreement],{ACCEPT_EULA:'a'.repeat(64)}),true);
+ assert.equal(templateAgreementsAccepted(undefined,{}),true);
+ assert.equal(templateAgreementsAccepted([{...agreement,accept_value:''}],{ACCEPT_EULA:''}),false);
+ assert.equal(templateAgreementsAccepted([agreement,{environment:'SECOND',accept_value:'b'.repeat(64)}],{ACCEPT_EULA:'a'.repeat(64)}),false);
+});
+
+test('below-default memory warns without redefining valid custom limits', () => {
+ assert.match(templateMemoryWarning('Renown',4096,8192),/8 GiB of memory.*4 GiB.*fail to start/);
+ assert.match(templateMemoryWarning('Renown',7168,8192),/7 GiB/);
+ for(const value of [8192,16384,null,0,127,NaN,Infinity,128.5])assert.equal(templateMemoryWarning('Renown',value,8192),null);
+});
+
+test('literal excluded defaults are blocked without treating them as regular expressions', () => {
+ const control=templateVariableControl({env_variable:'ADMIN_PASSWORD',rules:'required|string|not_in:ChangeMe,a.b',default_value:'ChangeMe'});
+ const pattern=new RegExp('^(?:'+control.pattern+')$','v');
+ assert.equal(pattern.test('ChangeMe'),false);assert.equal(pattern.test('a.b'),false);
+ assert.equal(pattern.test('axb'),true);assert.equal(pattern.test('ChangeMe-now'),true);
+ assert.equal(templateVariableControl({env_variable:'NAME',rules:'string',default_value:''}).pattern,undefined);
+ assert.equal(templateVariableControl({env_variable:'NAME',rules:'string|not_in:"a,b"',default_value:''}).pattern,undefined);
+});
+
+test('template boolean enums keep the native wire values behind switches', () => {
+ for (const rules of ['boolean','required|in:0,1','required|in:false,true']) {
+  const control=templateVariableControl({env_variable:'ENABLE_PVP',rules,default_value:'0'});
+  assert.equal(control.boolean,true,rules);
+ }
+ assert.equal(templateVariableControl({env_variable:'DIFFICULTY',rules:'in:0,1,2',default_value:'1'}).boolean,false);
 });

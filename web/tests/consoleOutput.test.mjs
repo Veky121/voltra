@@ -25,3 +25,10 @@ test('hides only standalone demo readiness signals from console output', () => {
   assert.equal(consoleOutput('Starting\r\n\x1b[32mVOLTRA_READY\x1b[0m\r\nDone', 'console output'), 'Starting\nDone');
   assert.equal(consoleOutput('VOLTRA_READY', 'install output'), 'VOLTRA_READY');
 });
+
+
+test('brands only the leading container prompt and keeps the command intact', () => {
+  assert.equal(consoleOutput('container@pterodactyl~ java -version', 'console output'), 'container@voltra~ java -version');
+  assert.equal(consoleOutput('container@pterodactyl~ bash -c eval$IFS"$VOLTRA_JAVA_SCRIPT"', 'console output'), 'container@voltra~ bash -c eval$IFS"$VOLTRA_JAVA_SCRIPT"');
+  assert.equal(consoleOutput('Player says container@pterodactyl~', 'console output'), 'Player says container@pterodactyl~');
+});

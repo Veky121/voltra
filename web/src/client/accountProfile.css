@@ -1,0 +1,13 @@
+.account-page>h1{font-size:calc(22px * var(--ui-font-scale,1));font-weight:550;letter-spacing:-.025em;margin-bottom:24px}
+.account-profile-role{padding:3px 8px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-hover);color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));line-height:1.5}
+.account-credentials .settings-row-layout{grid-template-columns:minmax(0,1fr);gap:10px}
+.account-credentials .settings-row-control{justify-content:flex-start}
+.account-credentials .settings-section{margin-bottom:0}
+.account-credentials .settings-section-heading{min-height:30px}
+.account-credentials .account-secret{margin-bottom:24px}
+.account-credentials textarea{font-family:ui-monospace,Consolas,monospace;font-size:calc(12px * var(--ui-font-scale,1))}
+.account-credentials .operations-record code{overflow-wrap:anywhere}
+.sftp-password .settings-group>form{border-top:1px solid var(--ui-divider)}
+.desktop-apps .grid{align-items:start}
+.desktop-apps .settings-row-body>.actions{justify-content:flex-end}
+@media(max-width:760px){.account-page>h1{font-size:calc(20px * var(--ui-font-scale,1));margin-bottom:20px}.account-page .account-tabs{margin-bottom:24px}.account-credentials .settings-section{margin-bottom:8px}}

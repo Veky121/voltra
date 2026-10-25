@@ -40,8 +40,26 @@ func TestSteamOptionsExplainMissingPortsAndCapacity(t *testing.T) {
 		t.Fatal("fixture node missing")
 	}
 	first := asMap(nodes[0])
-	if boolean(first["setup_available"]) || !strings.Contains(str(first["unavailable_reason"]), "consecutive") {
-		t.Fatal("setup did not explain missing consecutive ports")
+	if !boolean(first["setup_available"]) || !boolean(first["automatic_ports"]) || str(first["unavailable_reason"]) != "" {
+		t.Fatal("automatic setup still requires a preassigned consecutive pool", first)
+	}
+	before, err := a.one(context.Background(), "SELECT count(*) n FROM allocations WHERE node_id=$1", node["id"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview := asMap(infraExpect(t, mux, admin, "POST", "/api/client/game-library/steam/7days/ports", M{"node_id": node["id"]}, 200)["attributes"])
+	ports := asSlice(preview["ports"])
+	if len(ports) != 4 {
+		t.Fatal("7 Days preview must include all four required ports", preview)
+	}
+	for offset, raw := range ports {
+		if num(asMap(raw)["port"]) != 26900+int64(offset) {
+			t.Fatal("automatic preview lost preferred consecutive ports", preview)
+		}
+	}
+	after, err := a.one(context.Background(), "SELECT count(*) n FROM allocations WHERE node_id=$1", node["id"])
+	if err != nil || num(before["n"]) != num(after["n"]) {
+		t.Fatal("options/preview created allocations", err)
 	}
 	if _, err := a.DB.Exec(context.Background(), "UPDATE nodes SET memory=4096 WHERE id=$1", node["id"]); err != nil {
 		t.Fatal(err)
@@ -163,6 +181,19 @@ func TestSevenDaysInitializationAndNativeSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	primary, err := a.one(ctx, "SELECT ip,port FROM allocations WHERE id=$1 AND server_id=$2", server["allocation_id"], server["id"])
+	if err != nil || num(primary["port"]) != 26900 {
+		t.Fatal("automatic install did not choose the preferred game port", primary, err)
+	}
+	assigned, err := a.query(ctx, "SELECT ip,port FROM allocations WHERE server_id=$1 ORDER BY port", server["id"])
+	if err != nil || len(assigned) != 4 {
+		t.Fatal("7 Days install did not assign all required ports", assigned, err)
+	}
+	for offset, allocation := range assigned {
+		if str(allocation["ip"]) != str(primary["ip"]) || num(allocation["port"]) != num(primary["port"])+int64(offset) {
+			t.Fatal("required companion offsets were not preserved", assigned)
+		}
+	}
 	wings.Files[sevenDaysSettingsPath] = []byte(`<ServerSettings><!-- keep --><property name="ServerName" value="Default"/><property name="CustomFuture" value="kept"/><property name="GameDifficulty" value="2"/></ServerSettings>`)
 	if err = a.steamGameAfterInstall(ctx, server); err != nil {
 		t.Fatal(err)
@@ -171,7 +202,7 @@ func TestSevenDaysInitializationAndNativeSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for key, want := range map[string]string{"ServerPassword": `secret<&"`, "ServerPort": "23560", "TelnetPort": "8081", "TelnetPassword": "", "ServerVisibility": "0", "CustomFuture": "kept"} {
+	for key, want := range map[string]string{"ServerPassword": `secret<&"`, "ServerPort": str(primary["port"]), "TelnetPort": "8081", "TelnetPassword": "", "ServerVisibility": "0", "CustomFuture": "kept"} {
 		if values[key].Value != want {
 			t.Errorf("%s=%q want %q", key, values[key].Value, want)
 		}

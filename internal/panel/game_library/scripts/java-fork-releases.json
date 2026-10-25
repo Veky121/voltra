@@ -58,11 +58,16 @@
     "available": false,
     "repaired_source": {
       "available": true,
-      "version": "a9eff54633-voltra-data-cb27856f",
+      "version": "a9eff54633-voltra-data-cb27856f-registry1-world3218",
       "commit": "a9eff5463328f34072cdaf37aae3e77b14fcac93",
       "minecraft": "1.19.3",
       "recipe": "krypton-source-releases.json",
-      "native_verified": false
+      "native_verified": false,
+      "source_build_verified": false,
+      "config_only_verified": false,
+      "output_cache_descriptor": "krypton-source-cache.json",
+      "official_registry_generation_inputs": "proprietary temporary inputs only; no Mojang JAR/classes/mappings redistributed",
+      "source_stage_status": "world3218 engine patch staged; full engine build and native acceptance pending"
     },
     "prerequisite": "Archived publisher; originalCI and currentofficial downloadAPI DNS unavailable. Supply an entitled existing serverJAR or await official endpoint recovery."
   }

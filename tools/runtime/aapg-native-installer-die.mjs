@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const dir='.local/aapg-native',s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+const tag=process.argv[2]??'first';if(!/^[a-z0-9_-]+$/.test(tag))throw Error('Invalid tag');
+const request=JSON.parse(fs.readFileSync(dir+'/'+tag+'-reinstall-request.json'));
+if(s.owner!=='game_batch_inventory'||request.uuid!==s.uuid)throw Error('Owned installer receipt mismatch');
+const result=spawnSync('docker',['events','--since',request.at,'--until',new Date().toISOString(),'--filter','type=container','--filter','event=die','--filter','container='+s.uuid+'_installer','--format','{{json .}}'],{windowsHide:true,encoding:'utf8',timeout:15000,maxBuffer:2e6});
+if(result.status!==0)throw Error('Docker event read failed');
+const events=result.stdout.trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line));
+const matched=events.filter(event=>event.Action==='die'&&event.Actor?.Attributes?.name===s.uuid+'_installer');
+fs.writeFileSync(dir+'/'+tag+'-installer-die-events.json',JSON.stringify({uuid:s.uuid,since:request.at,events:matched},null,2)+'\n',{flag:'wx'});
+if(matched.length!==1||matched[0].Actor.Attributes.exitCode!=='0')throw Error('Exact single installer DIE0 not established');
+console.log({installer:s.uuid+'_installer',container_id:matched[0].Actor.ID,raw_exit:matched[0].Actor.Attributes.exitCode});

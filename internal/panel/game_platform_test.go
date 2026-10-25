@@ -44,7 +44,7 @@ func TestARM64FactorioPlatformGate(t *testing.T) {
 			break
 		}
 	}
-	if entry.Profile != "factorio-arm64-2.0.77-v1" || entry.Verification == "runtime_verified" {
+	if entry.Profile != "factorio-arm64-version-choice-v2" || entry.Verification == "runtime_verified" {
 		t.Fatal("ARM64 profile missing or incorrectly inherited x64 verification")
 	}
 	endpoint := "/api/client/game-library/templates/" + entry.ID
@@ -92,5 +92,8 @@ func TestARM64FactorioPlatformGate(t *testing.T) {
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 	if !strings.Contains(script, "exec box64 ./bin/x64/factorio") || !strings.Contains(script, "jq-linux-arm64") || strings.Contains(script, "jq-linux-amd64") {
 		t.Fatal("ARM64 execution or native jq architecture incorrect")
+	}
+	if !strings.Contains(script, "--architecture box64") || !strings.Contains(script, "command -v box64") || !strings.Contains(script, "requires a Linux ARM64 node") {
+		t.Fatal("ARM64 must retain explicit x64 payload via Box64 and node prerequisites")
 	}
 }

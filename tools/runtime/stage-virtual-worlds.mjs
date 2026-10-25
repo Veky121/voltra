@@ -4,7 +4,6 @@ const profiles={};
 const definitions=[
  ['neos','neosvr/egg-neos-v-r.json','Mono legacy headless','327404b6358bdc3b558587713b21fbc1719c10b369a38f32b33045954ab4627b',2048,8192],
  ['resonite','resonite/egg-resonite.json','.NET 10 headless','9173704345a6ea815622cede2ef15cd7f317f4374d4b7a361929d2d4756ed351',4096,12288],
- ['nwn','neverwinter_nights_ee/egg-neverwinter-nights--enhanced-edition.json','Debian native Linux','db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8',1024,4096],
 ];
 for(const[game,path,label,digest,memory,disk]of definitions){
  const entry=catalog.entries.find(e=>e.path===path);if(!entry)throw Error('Missing original recipe '+path);
@@ -53,4 +52,4 @@ for(const[game,path,label,digest,memory,disk]of definitions){
 }
 fs.mkdirSync('.local/virtual-worlds',{recursive:true});
 fs.writeFileSync('.local/virtual-worlds/profiles.json',JSON.stringify(profiles,null,2)+'\n');
-console.log('Staged three source-only virtual-world profiles; canonical overrides untouched.');
+console.log('Staged two source-only virtual-world profiles; canonical overrides untouched.');

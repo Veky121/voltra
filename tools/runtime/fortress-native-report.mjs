@@ -1,0 +1,37 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+const dir='.local/fortress-native',read=name=>JSON.parse(fs.readFileSync(dir+'/'+name+'.json'));
+const text=name=>fs.readFileSync(dir+'/'+name+'.log','utf8');
+const first=read('first-stop-progress'),direct=read('quit-probe-stop'),stop=read('bridge-stop'),reload=read('bridge-reload-stop');
+const before=read('snapshot-bridge-before'),after=read('verify-bridge-before'),saved=read('snapshot-bridge-saved'),final=read('snapshot-bridge-final');
+const precleanup=process.argv.includes('--precleanup');
+const live=read('live-bridge'),liveReload=read('live-bridge-reload'),cleanup=precleanup?null:read('cleanup');
+const source=read('installed-source-bridge/manifest'),profile=read('source-profile-bridge');
+const rows=[];function check(name,passed,evidence,detail){if(!passed)throw Error('Acceptance failed: '+name);rows.push({name,status:'passed',evidence,detail});}
+check('anonymous Linux public branch',before.release.appid===443600&&before.release.platform==='linux'&&before.release.branch==='linux_server_headless'&&before.release.StateFlags===4,['metadata-review.json','first-reinstall-completed.json'],{build:before.release.buildid});
+check('actual ELF64 publisher payload',before.binary.elf.startsWith('7f454c460201')&&before.binary.bytes===29506752,['snapshot-bridge-before.json'],before.binary);
+check('original Stop failure retained',first.state.ExitCode===130&&!first.state.OOMKilled,['first-stop-progress.json'],{raw:130,graceful:false});
+check('publisher-supported direct quit proof',direct.state.ExitCode===0&&!direct.state.OOMKilled&&text('quit-probe-stop').includes('WorldScript : Game shut down ok!'),['rcon-help-complete.json','rcon-quit-probe.json','quit-probe-stop.json']);
+check('real current helper APIReinstall',fs.existsSync(dir+'/bridge-reinstall-completed.json')&&Object.keys(source).length===9,['bridge-reinstall-request.json','bridge-reinstall-completed.json','installed-source-bridge/manifest.json']);
+for(const [name,value]of Object.entries(source)){
+ const pattern=new RegExp('cat > \\.voltra/'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+" <<'([^']+)'\\n([\\s\\S]*?)\\n\\1\\n");
+ const match=profile.egg.scripts.installation.script.replace(/\r\n/g,'\n').match(pattern);
+ check('actual installed source '+name,!!match&&crypto.createHash('sha256').update(match[2]+'\n').digest('hex')===value.sha256,['installed-source-bridge/'+name]);
+}
+check('strict Reinstall world/config/mod retention',JSON.stringify(before.files)===JSON.stringify(after.files),['snapshot-bridge-before.json','verify-bridge-before.json'],{files:Object.keys(before.files).length,comparison:['SHA256','bytes','mode','UID','GID']});
+check('actual allocated sockets',live.listeners.some(x=>x.protocol==='udp'&&x.port===28000)&&live.listeners.some(x=>x.protocol==='tcp'&&x.port===28001),['live-bridge.json'],{game_udp:28000,rcon_tcp:28001});
+check('native readiness and original world reload',text('bridge-console').includes('Server now ready for players to join!')&&text('bridge-console').includes('SetSettingsFromWorldData for [VoltraAcceptance]'),['bridge-console.log']);
+check('genuine dashboard console command',text('bridge-console').includes('Command [help] executed successfully.')&&text('bridge-console').includes('Handling Packet - ExecCommandOrAuthResponse with ID 4102'),['command-bridge.json','bridge-console.log']);
+check('normal APIStop uses authenticated native quit',stop.state.ExitCode===0&&!stop.state.OOMKilled&&text('bridge-stop').includes('Quit command received and is being executed.'),['stop-bridge-final.json','bridge-stop.json']);
+check('native world/thread/Steam shutdown markers',text('bridge-stop').includes('WorldScript : Game shut down ok!')&&text('bridge-stop').includes('WorldScript : Steamworks shut down ok!')&&text('bridge-stop').includes('WorldScript Shutdown'),['bridge-stop.log']);
+check('original allocation/player/public/pause controls',saved.configs['Default/serveroverrides.ini'].includes('RCONPort = 28001')&&saved.configs['Default/serveroverrides.ini'].includes('MaxPlayers = 3')&&saved.configs['Default/serveroverrides.ini'].includes('WorldName = VoltraAcceptance')&&saved.configs['Default/serveroverrides.ini'].includes('IsPublic = false')&&saved.configs['Default/serveroverrides.ini'].includes('AutoPause = false'),['snapshot-bridge-saved.json']);
+check('original difficulty and world-generation controls',saved.configs['Default/firstrun.ini'].includes('Resources = scarce')&&saved.configs['Default/firstrun.ini'].includes('Conveyors = slow')&&saved.configs['Default/firstrun.ini'].includes('Power = scarce')&&saved.configs['Default/firstrun.ini'].includes('Day = normal')&&['RushMode = false','FlatLand = false','CarePackage = false'].every(s=>saved.configs['Default/firstrun.ini'].includes(s)),['snapshot-bridge-saved.json']);
+check('second current-source reload of persisted world',liveReload.world_exists&&text('bridge-reload-ready').includes('SetSettingsFromWorldData for [VoltraAcceptance]')&&text('bridge-reload-ready').includes('Server now ready for players to join!'),['bridge-reload-ready.log','live-bridge-reload.json']);
+check('second normal Stop raw0 and native shutdown',reload.state.ExitCode===0&&!reload.state.OOMKilled&&text('bridge-reload-stop').includes('WorldScript : Game shut down ok!'),['stop-bridge-reload.json','bridge-reload-stop.json']);
+check('final generated state present',Object.keys(final.files).some(x=>x.startsWith('.config/unity3d/ProjectorGames/FortressCraft/Worlds/VoltraAcceptance/')),['snapshot-bridge-final.json']);
+if(precleanup){console.log({precleanup_rows_passed:rows.length});process.exit(0);}
+check('exact owned cleanup',Object.values(cleanup.checks).every(Boolean),['cleanup.json'],cleanup.checks);
+const report={recipe:'fortresscraft_evolved/egg-fortresscraft-evolved.json',review_requested:true,native_gameplay_tested:false,rows,source_changes:{scope:'Fortress-only authenticated RCON console bridge; Eco/Foundry unchanged',bridge_sha256:source['automation-fortress-console.py'].sha256,family_sha256:source['automation-sims.py'].sha256},resource_budget:{memory_mib:4096,disk_mib:16384,ports:2,memory_peak_bytes:Math.max(Number(live.memory_peak.trim()),Number(liveReload.memory_peak.trim()))},limitations:['No external player/client gameplay, join-password/admin authorization or public-listing proof. Virtual native host is publisher behavior, not a tested client.','No unsupported UDP/A2S query invented: actual UDP gameplay listener and authenticated native RCON help/quit observed.','First original PTY Ctrl-C Stop produced130/noOOM and lacked normal cleanup markers; final supported RCON bridge Stop produced0 with native shutdown markers.','World generation/reload/compressed archive persistence and strict Reinstall retention verified; no player buildings/progress created.','Publisher Unity nonfatal JobTempAlloc/leak warnings and unsupported image-effect warnings retained in raw logs.','Helper archive optional node-container cat log-recovery returned127 because node image has no cat; actual installer websocket stream/completion and installed helper bytes independently captured.'],evidence_root:dir,cleanup:cleanup.checks};
+fs.writeFileSync('artifacts/fortress-native-acceptance.json',JSON.stringify(report,null,2)+'\n');
+fs.copyFileSync(dir+'/cleanup.json','artifacts/fortress-native-cleanup.json');
+console.log({rows:rows.length,source_helpers:Object.keys(source).length,review_requested:true});

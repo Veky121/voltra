@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "revision": "palworld-ue4ss-2281fa31-v1",
+  "files": {
+    "palworld-loader-install.py": "f3002deb7cb142c324b409370ad58a1049766d134f8b9178e8ed0d876848715a",
+    "palworld-loader-pins.json": "cd2585414f8e59b8d483ed9df7cb658944873b2eebef0a1226bc956ffa01d87a",
+    "runtime-probe.LICENSE": "0a4876ecdb1fd59d297c7352d04e20657f857a7f1946fa9461334e7033ccc378",
+    "runtime-probe.exe": "6c8f67de8ce7232e1128a49c16098c8b544f56647b52ceedfd6e9485213e1235",
+    "runtime.py": "83db80a823b705e42407fe506032ddfd4145825adea87deb2971534031f5ae6b",
+    "steam_template.py": "7d908cdc739fbb999fdfb13f48f3e8d3a5fdf26fbfa48091dee1442913078897"
+  },
+  "probe": {
+    "target": "windows/amd64",
+    "compiler": "go version go1.25.5 windows/amd64",
+    "source_files": {
+      "LICENSE": "65eb5a57b0a731a7e78826bcabf95c3027696e4e12ccd0fdeaab6cd28fc5e7e1",
+      "go.mod": "9a08a31fc3b55fc7fc7f4711ae8c7017d6b4e837d3b2447b564bba3dda037168",
+      "imports.json": "7152fec84ab363eb9d345a1cff48f9573b5468c4c617487563655e22be75b91f",
+      "main_windows.go": "7a6d936551d42338a56aea41220914e1259edcbda36c00aa5696fa48f89962a9",
+      "main_windows_test.go": "086ab83ed8dd1bcf36de5d38c4d89076dcd184e20495597b7fc3c4900df3aa58"
+    },
+    "flags": [
+      "-trimpath",
+      "-buildvcs=false",
+      "-ldflags=-s -w -buildid="
+    ]
+  }
+}

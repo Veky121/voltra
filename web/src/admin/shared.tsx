@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, rows, unwrap, useAPI as useCoreAPI } from "../lib";
+import {Select,  api, rows, unwrap, useAPI as useCoreAPI } from "../lib";
+import { Switch } from "../ui/Settings";
+import "./management-ui.css";
 
 export { api, rows, unwrap };
 // Administration selectors and local table searches need every page, including
@@ -94,14 +96,14 @@ export function defaults(fields: FieldSpec[]) {
 }
 export function ErrorMessage({ error }: { error?: string }) {
   return error ? (
-    <div className="error" role="alert">
+    <div className="error admin-feedback management-ui" role="alert">
       {error}
     </div>
   ) : null;
 }
 export function Notice({ children }: { children: ReactNode }) {
   return (
-    <div className="success" role="status">
+    <div className="success admin-feedback management-ui" role="status">
       {children}
     </div>
   );
@@ -114,7 +116,7 @@ export function Heading({
   children?: ReactNode;
 }) {
   return (
-    <div className="page-header">
+    <div className="page-header admin-heading management-ui">
       <div>
         <p className="eyebrow">Administration</p>
         <h1>{title}</h1>
@@ -126,12 +128,14 @@ export function Heading({
 export function Panel({
   title,
   children,
+  className = "",
 }: {
   title?: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="card">
+    <section className={`card admin-panel management-ui ${className}`}>
       {title && <h2>{title}</h2>}
       {children}
     </section>
@@ -141,48 +145,51 @@ export function DataTable({
   data,
   columns,
   empty = "No records yet.",
+  loading = false,
 }: {
   data: RecordData[];
   columns: { label: string; render: (r: RecordData) => ReactNode }[];
   empty?: string;
+  loading?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const filtered = data.filter((x) =>
     JSON.stringify(x).toLowerCase().includes(search.toLowerCase())
   );
   return (
-    <>
-      <div className="toolbar">
+    <div className="admin-data management-ui" aria-busy={loading}>
+      <div className="toolbar admin-data-toolbar">
         <input
+          type="search"
           aria-label="Search records"
           placeholder="Search records…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <span className="muted">{filtered.length} records</span>
+        <span className="muted admin-record-count" role="status">{loading ? "Loading..." : `${filtered.length} ${filtered.length === 1 ? "record" : "records"}`}</span>
       </div>
-      <div style={{ overflowX: "auto" }}>
+      <div className="admin-table-scroll">
         <table className="table">
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.label}>{c.label}</th>
+                <th scope="col" key={c.label}>{c.label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r, i) => (
+            {loading ? <tr><td colSpan={columns.length} className="admin-table-empty">Loading records...</td></tr> : filtered.map((r, i) => (
               <tr key={r.id ?? r.identifier ?? i}>
                 {columns.map((c) => (
                   <td key={c.label}>{c.render(r)}</td>
                 ))}
               </tr>
             ))}
+            {!loading && !filtered.length && <tr><td colSpan={columns.length} className="admin-table-empty">{search ? "No records match your search." : empty}</td></tr>}
           </tbody>
         </table>
       </div>
-      {!filtered.length && <p className="muted">{empty}</p>}
-    </>
+    </div>
   );
 }
 export function Fields({
@@ -195,25 +202,23 @@ export function Fields({
   onChange: (value: RecordData) => void;
 }) {
   return (
-    <div className="form-grid">
+    <div className="form-grid admin-fields management-ui">
       {fields.map((field) => {
         const v = value[field.key] ?? "";
         const set = (next: any) => onChange({ ...value, [field.key]: next });
         return (
-          <label className="field" key={field.key}>
+          <label className={`field admin-field${field.type === "checkbox" ? " admin-field-switch" : ""}${field.type === "json" ? " admin-field-code" : ""}`} key={field.key}>
             <span>
               {field.label}
               {field.required && " *"}
             </span>
             {field.type === "checkbox" ? (
-              <input
-                type="checkbox"
-                role="switch"
+              <Switch
                 checked={Boolean(v)}
-                onChange={(e) => set(e.target.checked)}
+                onCheckedChange={checked => set(checked)}
               />
             ) : field.type === "select" || field.type === "multiselect" ? (
-              <select
+              <Select
                 disabled={field.disabled}
                 multiple={field.type === "multiselect"}
                 required={field.required}
@@ -247,7 +252,7 @@ export function Fields({
                     {x.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : field.type === "textarea" || field.type === "json" ? (
               <textarea
                 rows={field.type === "json" ? 7 : 4}
@@ -325,6 +330,7 @@ export function Editor({
   return (
     <Panel title={title}>
       <form
+        className="admin-editor-form"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -365,7 +371,7 @@ export function Editor({
         <ErrorMessage error={error} />
         {saved && <Notice>Changes saved.</Notice>}
         <Fields fields={fields} value={value} onChange={setValue} />
-        <div className="actions">
+        <div className="actions admin-form-actions">
           <button disabled={busy} type="submit">
             {busy ? "Saving…" : submit}
           </button>
@@ -395,7 +401,7 @@ export function Action({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   return (
-    <div>
+    <div className="admin-action management-ui">
       <button
         className={danger ? "danger" : "secondary"}
         disabled={busy}
@@ -422,7 +428,7 @@ export function Action({
       </button>
       <ErrorMessage error={error} />
       {done && (
-        <small className="success" role="status">
+        <small className="success admin-action-status" role="status">
           Completed.
         </small>
       )}
@@ -444,7 +450,7 @@ export function ResourceList({
 }) {
   const q = useAPI(endpoint);
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading title={title}>
         <Link className="button" to={`${base}/new`}>
           Create {title.toLowerCase().replace(/s$/, "")}
@@ -456,7 +462,7 @@ export function ResourceList({
       {description && <p className="muted">{description}</p>}
       <ErrorMessage error={q.error} />
       {q.loading ? (
-        <p>Loading…</p>
+        <p className="admin-loading" role="status">Loading records...</p>
       ) : (
         <Panel>
           <DataTable
@@ -482,7 +488,7 @@ export function ResourceList({
           />
         </Panel>
       )}
-    </>
+    </div>
   );
 }
 export function ResourceEditor({
@@ -505,7 +511,7 @@ export function ResourceEditor({
   const q = useAPI(creating ? null : `${endpoint}/${id}`);
   const record = q.data ? unwrap(q.data) : undefined;
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading
         title={
           creating
@@ -530,7 +536,7 @@ export function ResourceEditor({
       </Heading>
       <ErrorMessage error={q.error} />
       {!creating && q.loading ? (
-        <p>Loading…</p>
+        <p className="admin-loading" role="status">Loading details...</p>
       ) : (
         <Editor
           fields={fields}
@@ -544,12 +550,12 @@ export function ResourceEditor({
         />
       )}
       {record && children?.(record)}
-    </>
+    </div>
   );
 }
 export function JsonView({ value }: { value: any }) {
   return (
-    <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+    <pre className="admin-json management-ui">
       {JSON.stringify(value, null, 2)}
     </pre>
   );

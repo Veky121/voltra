@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {api} from './openttd-compat-node.mjs';
+const dir='.local/holdfast-native',s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+const node=JSON.parse(fs.readFileSync(s.node_receipt));
+if(node.node!==s.node||node.node_uuid!==s.node_uuid||node.root!=='/var/lib/voltra-batch-20261023'||s.owner!=='racing_games')throw Error('Owned node identity changed');
+const server=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(server.uuid!==s.uuid||server.node!==s.node||server.egg!==s.egg_id||server.external_id!=='holdfast-native-'+s.request_id)throw Error('Owned Holdfast identity mismatch');
+const name=server.status==='installing'?s.uuid+'_installer':s.uuid;
+const inspected=spawnSync('docker',['inspect',name],{windowsHide:true,encoding:'utf8'});
+const logs=spawnSync('docker',['logs',name],{windowsHide:true,encoding:'utf8',maxBuffer:16*1024*1024});
+const info=inspected.status===0?JSON.parse(inspected.stdout)[0]:null;
+const output={uuid:s.uuid,server_status:server.status,container:name,state:info?.State??null,logs:logs.status===0?logs.stdout+logs.stderr:logs.stderr,at:new Date().toISOString()};
+const tag=process.argv[2]??'current';if(!/^[a-zA-Z0-9_-]+$/.test(tag))throw Error('Invalid observation tag');
+fs.writeFileSync(dir+'/'+tag+'.json',JSON.stringify(output,null,2)+'\n');fs.writeFileSync(dir+'/'+tag+'.log',output.logs);
+console.log({...output,logs:output.logs.slice(-4500)});

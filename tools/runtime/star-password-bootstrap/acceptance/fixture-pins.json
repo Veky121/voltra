@@ -1,0 +1,72 @@
+{
+  "wine_image": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+  "source_commit": "8333063595fa3c49ad307f3b0f732accbb760d25",
+  "binary": "StarRupture/Binaries/Win64/StarRuptureServerEOS-Win64-Shipping.exe",
+  "app_id": 3809400,
+  "main_manifest": "3659990775896995763",
+  "shared_manifest": "5753583882400741046",
+  "archives": [
+    {
+      "sha256": "b9a166a756605b21058a64cde93bcaab1a855dba3553e5c7e6ce0fa8fdfad7b9",
+      "bytes": 8748315,
+      "members": {
+        "dwmapi.dll": "dwmapi.dll",
+        "ue4ss/UE4SS.dll": "ue4ss/UE4SS.dll",
+        "ue4ss/LICENSE": "ue4ss/LICENSE"
+      }
+    },
+    {
+      "sha256": "0d91b15a75a7787bd4a469d1b3338a27c3e19ca843b5f8778f69a4d13f63b5de",
+      "bytes": 423121,
+      "members": {
+        "ue4ss/UE4SS-settings.ini": "StarRupture/UE4SS-settings.ini",
+        "ue4ss/UE4SS_Signatures/StaticConstructObject.lua": "StarRupture/UE4SS_Signatures/StaticConstructObject.lua"
+      }
+    }
+  ],
+  "files": {
+    "dwmapi.dll": {
+      "bytes": 279552,
+      "sha256": "93b9431a5a4f32c675d269c5da1c9b3ec6f88552ec20c282ab435f411e9271fb"
+    },
+    "ue4ss/UE4SS.dll": {
+      "bytes": 20640768,
+      "sha256": "ce5e3c46a920cc00b2817ac61e438c9162830290379d0b5b9c4dfc2b29459290"
+    },
+    "ue4ss/LICENSE": {
+      "bytes": 1085,
+      "sha256": "99e1d8f8b7cb68e8b2313380ae3b0c8115e39dfbc443fcf21fd67ab74ce1d57e"
+    },
+    "ue4ss/UE4SS-settings.ini": {
+      "bytes": 8014,
+      "sha256": "197adb1eafe0f5dc7b8bca94c4df06618bcbe6a2dce2a1ac5b1307fcab32e605"
+    },
+    "ue4ss/UE4SS_Signatures/StaticConstructObject.lua": {
+      "bytes": 289,
+      "sha256": "92e19ac4afca7449671efa2d522c09224b6a45109e2caaba230454ab49fc2b03"
+    }
+  },
+  "lua": {
+    "bytes": 4604,
+    "sha256": "0f0fe319de3abefca7af8ba57a326a20308945d64aa1c756e1ec7e89a4872e4e"
+  },
+  "production_gates_changed": false,
+  "native_payload": {
+    "build_id": "25642172",
+    "bytes": 233178112,
+    "sha256": "3a0f160767b24a621a73b75dd6d43ae262ceef56127b340fef30860ef8041757",
+    "file_version": [
+      5,
+      6,
+      1,
+      0
+    ],
+    "product_version": [
+      5,
+      6,
+      1,
+      0
+    ],
+    "evidence": ".local/star-native-acceptance/acquisition.json"
+  }
+}

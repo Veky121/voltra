@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import sys
@@ -94,4 +95,55 @@ class Building(unittest.TestCase):
     def test_wrong_original_app_id_rejected_before_download(self):
         with patch.object(game,'update') as update,self.assertRaises(ValueError):game.install(self.root,'longvinter',{'SRCDS_APPID':'1639880'})
         update.assert_not_called()
+    def retention_target(self):
+        target=self.root/game.metadata()['longvinter']['config'];target.parent.mkdir(parents=True);target.write_bytes('; unknown operator Ω\n[Custom]\nLiteral=$() quoted " value\n'.encode());target.chmod(0o640);os.chown(target,988,989);return target
+    def deleted_native(self,target,changed=False):
+        backup=target.with_name(target.name+'.backup');backup.write_bytes(b'changed native settings' if changed else target.read_bytes());backup.chmod(0o600);os.chown(backup,988,989);target.unlink();return 130
+    def retention_status(self):return json.loads((self.root/'.voltra/longvinter-config-retention.json').read_text())
+    def test_longvinter_native_deleted_config_restores_unknown_bytes_metadata_raw130(self):
+        target=self.retention_target();before=(target.read_bytes(),target.stat().st_mode&511,target.stat().st_uid,target.stat().st_gid)
+        with patch.object(game,'run',side_effect=lambda *a,**k:self.deleted_native(target)):
+            self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertEqual((target.read_bytes(),target.stat().st_mode&511,target.stat().st_uid,target.stat().st_gid),before);self.assertEqual(self.retention_status(),{'status':'restored-matching-native-backup','native_exit':130})
+    def test_longvinter_current_updated_file_is_never_overwritten(self):
+        target=self.retention_target()
+        def native(*a,**k):target.write_bytes(b'live operator/native replacement');return 130
+        with patch.object(game,'run',side_effect=native):self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertEqual(target.read_bytes(),b'live operator/native replacement');self.assertEqual(self.retention_status()['status'],'current-file-retained')
+    def test_longvinter_changed_native_backup_conflict_preserves_backup_and_absence(self):
+        target=self.retention_target()
+        with patch.object(game,'run',side_effect=lambda *a,**k:self.deleted_native(target,True)):self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertFalse(target.exists());self.assertEqual(target.with_name(target.name+'.backup').read_bytes(),b'changed native settings');self.assertEqual(self.retention_status()['status'],'backup-content-conflict')
+    def test_longvinter_exception_restores_without_masking_original_error(self):
+        target=self.retention_target();before=target.read_bytes()
+        def native(*a,**k):self.deleted_native(target);raise RuntimeError('original native failure')
+        with patch.object(game,'run',side_effect=native),self.assertRaisesRegex(RuntimeError,'original native failure'):game.native_run(self.root,'longvinter',[],{},[],b'ready')
+        self.assertEqual(target.read_bytes(),before);self.assertIsNone(self.retention_status()['native_exit'])
+    def test_longvinter_backup_owner_conflict_fails_closed(self):
+        target=self.retention_target()
+        def native(*a,**k):self.deleted_native(target);os.chown(target.with_name(target.name+'.backup'),0,0);return 130
+        with patch.object(game,'run',side_effect=native):self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertFalse(target.exists());self.assertEqual(self.retention_status()['status'],'backup-owner-conflict')
+    def test_longvinter_backup_symlink_refused_without_touching_outside(self):
+        target=self.retention_target();outside=self.root/'outside';outside.write_bytes(target.read_bytes())
+        def native(*a,**k):target.unlink();target.with_name(target.name+'.backup').symlink_to(outside);return 130
+        with patch.object(game,'run',side_effect=native):self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertFalse(target.exists());self.assertEqual(self.retention_status()['status'],'restore-error');self.assertIn(b'unknown operator',outside.read_bytes())
+    def test_longvinter_concurrent_file_creation_wins_exclusive_publication(self):
+        target=self.retention_target()
+        def race(*a,**k):target.write_bytes(b'concurrent operator file');raise FileExistsError('fixture race')
+        with patch.object(game,'run',side_effect=lambda *a,**k:self.deleted_native(target)),patch.object(game.os,'link',side_effect=race):self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertEqual(target.read_bytes(),b'concurrent operator file');self.assertEqual(self.retention_status()['status'],'current-file-retained');self.assertFalse(list(target.parent.glob('.voltra-longvinter-*')))
+    def test_longvinter_permission_failure_keeps_native_exit_and_explicit_status(self):
+        target=self.retention_target()
+        with patch.object(game,'run',side_effect=lambda *a,**k:self.deleted_native(target)),patch.object(game.os,'link',side_effect=PermissionError('fixture denied')):self.assertEqual(game.native_run(self.root,'longvinter',[],{},[],b'ready'),130)
+        self.assertFalse(target.exists());self.assertEqual(self.retention_status()['status'],'restore-error');self.assertFalse(list(target.parent.glob('.voltra-longvinter-*')))
+    def test_longvinter_restore_owner_assignment_failure_does_not_publish(self):
+        target=self.retention_target();snapshot=game.longvinter_config_snapshot(self.root,game.metadata()['longvinter']['config']);self.deleted_native(target)
+        with patch.object(game.os,'fchown',side_effect=PermissionError('fixture owner denied')),self.assertRaises(PermissionError):game.longvinter_restore_config(self.root,snapshot)
+        self.assertFalse(target.exists());self.assertFalse(list(target.parent.glob('.voltra-longvinter-*')))
+    def test_other_building_games_keep_original_native_run_contract(self):
+        for name,stop in [('brickadia','exit'),('frozen','\x03')]:
+            with patch.object(game,'run',return_value=7) as run:self.assertEqual(game.native_run(self.root,name,['argv'],{'env':'value'},['secret'],b'ready'),7)
+            self.assertEqual(run.call_args.args,(self.root,['argv'],{'env':'value'},stop));self.assertTrue(run.call_args.kwargs['terminal_input'])
 if __name__=='__main__':unittest.main()

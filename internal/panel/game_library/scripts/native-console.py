@@ -44,7 +44,7 @@ def validated_stop_sequence(sequence):
     return sequence
 
 
-def run(root, argv, environment, stop_command, credentials=(), ready_marker=None, autosave_seconds=0, save_command='save', terminal_input=False, terminal_query_reply=False, terminal_enter_carriage_return=False, stop_sequence=(), stop_sequence_timeout=30, output_observer=None):
+def run(root, argv, environment, stop_command, credentials=(), ready_marker=None, autosave_seconds=0, save_command='save', terminal_input=False, terminal_query_reply=False, terminal_enter_carriage_return=False, stop_sequence=(), stop_sequence_timeout=30, output_observer=None, stop_signal=None, stop_signal_timeout=60):
     if output_observer is not None and not callable(output_observer):raise ValueError('Invalid private output observer')
     if output_observer is not None:credentials=tuple(credentials)
     if any(c in stop_command + save_command for c in '\r\n\x00') or autosave_seconds < 0:
@@ -52,6 +52,11 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
     if terminal_query_reply and not terminal_input:raise ValueError('Terminal query replies require a native PTY')
     if terminal_enter_carriage_return and not terminal_input:raise ValueError('Carriage-return Enter requires a native PTY')
     stop_sequence=validated_stop_sequence(stop_sequence)
+    if stop_signal is not None and (not isinstance(stop_signal,int)or isinstance(stop_signal,bool)or stop_signal not in (signal.SIGINT,signal.SIGTERM)):
+        raise ValueError('Native stop signal must be SIGINT or SIGTERM')
+    if stop_signal is not None and stop_sequence:raise ValueError('Choose native signal or acknowledged stdin shutdown')
+    if not isinstance(stop_signal_timeout,(int,float))or isinstance(stop_signal_timeout,bool)or not 0<stop_signal_timeout<=300:
+        raise ValueError('Invalid native signal grace timeout')
     if not isinstance(stop_sequence_timeout,(int,float))or not 0<stop_sequence_timeout<=300:raise ValueError('Invalid stop acknowledgment timeout')
     master = slave = None
     if terminal_input:
@@ -114,6 +119,16 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
             pass
 
     stopping=threading.Event();stop_state=None
+    def native_signal_stop():
+        # The group was created by this invocation. Never accept an external PID.
+        def deliver(value):
+            try:os.killpg(child.pid,value)
+            except ProcessLookupError:pass
+        deliver(stop_signal)
+        if finished.wait(stop_signal_timeout)or child.poll()is not None:return
+        print('Native stop signal grace expired; escalating owned process group. Save completion is unconfirmed.',flush=True)
+        deliver(signal.SIGTERM)
+        if not finished.wait(10)and child.poll()is None:deliver(signal.SIGKILL)
     def ordered_stop():
         nonlocal stop_state
         import time
@@ -130,6 +145,10 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
                         print('Native stop acknowledgment missing; final stop command was not sent.',flush=True);return
         stop_state=None
     def stop(*_):
+        if stop_signal is not None:
+            if not stopping.is_set():
+                stopping.set();threading.Thread(target=native_signal_stop,daemon=True).start()
+            return
         if not stop_sequence:
             send((stop_command + '\n').encode('utf-8'));return
         if not stopping.is_set():

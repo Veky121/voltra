@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {randomBytes} from 'node:crypto';
+import {execFileSync,spawnSync} from 'node:child_process';
+import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/onset-native',file=dir+'/private.json',{receipt:s,node}=await ownedStoppedServer(file);
+if(s.owner!=='unreal_survival'||s.db_container)throw Error('Existing or foreign DB fixture');
+const native=JSON.parse(spawnSync('docker',['inspect',s.uuid],{windowsHide:true,encoding:'utf8'}).stdout)[0];
+if(native.State.Running||!native.HostConfig.NetworkMode.startsWith(node.container))throw Error('Expected stopped owned game network');
+const lease=JSON.parse(execFileSync(process.execPath,['tools/runtime/batch-queue.mjs','resize',JSON.stringify({lease_id:s.lease_id,owner:'unreal_survival',memory_mib:2048,stopped_confirmed:true,limits:{memory_mib:20480}})],{windowsHide:true,encoding:'utf8'}));
+s.db_container=node.container+'-onset-'+s.identifier+'-db';s.db_user='voltra_onset_acceptance';s.db_database='voltra_onset_acceptance';s.db_password=randomBytes(24).toString('hex');s.db_root_password=randomBytes(32).toString('hex');s.db_network=native.HostConfig.NetworkMode;s.lease_memory_mib=lease.memory_mib;
+fs.writeFileSync(file,JSON.stringify(s,null,2)+'\n',{mode:0o600});
+const env=path.resolve(dir+'/db.env');fs.writeFileSync(env,['MARIADB_ROOT_PASSWORD='+s.db_root_password,'MARIADB_DATABASE='+s.db_database,'MARIADB_USER='+s.db_user,'MARIADB_PASSWORD='+s.db_password,''].join('\n'),{mode:0o600});
+const image=spawnSync('docker',['image','inspect','mariadb:11.8','--format','{{.Id}}'],{windowsHide:true,encoding:'utf8'});if(image.status||!/^sha256:[a-f0-9]{64}$/.test(image.stdout.trim()))throw Error('Existing DB image required');s.db_image=image.stdout.trim();fs.writeFileSync(file,JSON.stringify(s,null,2)+'\n',{mode:0o600});
+const run=spawnSync('docker',['run','--detach','--pull','never','--name',s.db_container,'--network',s.db_network,'--memory','512m','--cpus','1','--tmpfs','/var/lib/mysql:rw,size=256m','--label','voltra.acceptance.owner=unreal_survival','--label','voltra.acceptance.server='+s.uuid,'--label','voltra.acceptance.request='+s.request_id,'--env-file',env,s.db_image],{windowsHide:true,encoding:'utf8'});
+if(run.status)throw Error('Owned isolated DB creation failed: '+run.stderr);
+fs.writeFileSync(dir+'/db-create.json',JSON.stringify({container:s.db_container,image:s.db_image,network:s.db_network,public_ports:[],memory_mib:512,lease_memory_mib:2048,panel_game_memory_mib:1024,at:new Date().toISOString()},null,2)+'\n');console.log({container:s.db_container,private_only:true,memory_mib:512,inclusive_lease:2048});

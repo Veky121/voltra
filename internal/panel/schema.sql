@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sftp_password_hash text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname text NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS browser_sessions (
  token_hash text PRIMARY KEY,user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  expires_at timestamptz NOT NULL,created_at timestamptz NOT NULL DEFAULT now()
@@ -183,12 +185,9 @@ ALTER TABLE server_transfers DROP CONSTRAINT IF EXISTS server_transfers_old_allo
 ALTER TABLE server_transfers DROP CONSTRAINT IF EXISTS server_transfers_new_allocation_fkey;
 ALTER TABLE database_hosts DROP CONSTRAINT IF EXISTS database_hosts_node_id_fkey;
 ALTER TABLE database_hosts ADD CONSTRAINT database_hosts_node_id_fkey FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE SET NULL;
-CREATE TABLE IF NOT EXISTS notification_jobs (
- id bigserial PRIMARY KEY,user_id bigint REFERENCES users(id) ON DELETE SET NULL,server_id bigint REFERENCES servers(id) ON DELETE SET NULL,event text NOT NULL,dedupe_key text UNIQUE,payload jsonb NOT NULL,
- status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent')),attempts integer NOT NULL DEFAULT 0,next_attempt_at timestamptz NOT NULL DEFAULT now(),locked_until timestamptz,lock_token text,last_error text,delivered_at timestamptz,
- created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS notification_jobs_due ON notification_jobs(status,next_attempt_at) WHERE status IN ('pending','sending');
+-- Outbound panel email was removed. Retire its queue and transport credentials.
+DROP TABLE IF EXISTS notification_jobs;
+DELETE FROM settings WHERE key LIKE 'mail:%' OR key LIKE 'pterodactyl:email:%';
 CREATE TABLE IF NOT EXISTS daemon_revocations (
  id bigserial PRIMARY KEY,node_id bigint NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,server_uuid text NOT NULL,user_uuid text NOT NULL,generation bigint NOT NULL DEFAULT 1,attempts bigint NOT NULL DEFAULT 0,next_attempt_at timestamptz NOT NULL DEFAULT now(),
  lease_until timestamptz,lease_token text,last_error text,completed_at timestamptz,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
@@ -205,6 +204,7 @@ CREATE TABLE IF NOT EXISTS steam_servers (
 );
 ALTER TABLE steam_servers ADD COLUMN IF NOT EXISTS beta_password_encrypted text NOT NULL DEFAULT '';
 ALTER TABLE steam_servers ADD COLUMN IF NOT EXISTS console_password_encrypted text NOT NULL DEFAULT '';
+ALTER TABLE steam_servers ADD COLUMN IF NOT EXISTS join_password_encrypted text NOT NULL DEFAULT '';
 ALTER TABLE steam_servers ADD COLUMN IF NOT EXISTS validate_on_start boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS steam_jobs (
  id text PRIMARY KEY,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,operation text NOT NULL CHECK(operation IN ('install','check','update','verify','start')),
@@ -218,6 +218,41 @@ CREATE TABLE IF NOT EXISTS steam_job_events (
  id bigserial PRIMARY KEY,job_id text NOT NULL REFERENCES steam_jobs(id) ON DELETE CASCADE,stage text NOT NULL,detail text NOT NULL,created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS steam_job_events_job ON steam_job_events(job_id,id);
+ALTER TABLE steam_jobs ADD COLUMN IF NOT EXISTS executor text NOT NULL DEFAULT 'steamcmd-v1' CHECK(executor IN ('steamcmd-v1','steamkit-depot-v1'));
+CREATE TABLE IF NOT EXISTS steam_private_authorizations (
+ id text PRIMARY KEY,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,actor_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ owner_scope text NOT NULL CHECK(owner_scope ~ '^[a-f0-9]{64}$'),generation text NOT NULL,identity_cipher text NOT NULL,credential_cipher text NOT NULL DEFAULT '',revoked boolean NOT NULL DEFAULT false,
+ created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS steam_private_authorizations_actor ON steam_private_authorizations(server_id,actor_id);
+CREATE TABLE IF NOT EXISTS steam_private_jobs (
+ job_id text PRIMARY KEY REFERENCES steam_jobs(id) ON DELETE CASCADE,authorization_id text NOT NULL REFERENCES steam_private_authorizations(id) ON DELETE CASCADE,actor_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ actor_auth_kind text NOT NULL CHECK(actor_auth_kind IN ('session','api_key')),actor_auth_id text NOT NULL,
+ authorization_generation text NOT NULL,node_id bigint NOT NULL,server_owner_id bigint NOT NULL,egg_id bigint NOT NULL,installation_id text NOT NULL DEFAULT '',
+ request jsonb NOT NULL,input_cipher text NOT NULL DEFAULT '',input_consumed boolean NOT NULL DEFAULT false,cancel_requested boolean NOT NULL DEFAULT false,
+ receipt jsonb,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
+);
+-- Publication ownership outlives credential records and terminal job outcomes.
+CREATE TABLE IF NOT EXISTS steam_private_attempts (
+ job_id text PRIMARY KEY,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+ node_id bigint NOT NULL,server_owner_id bigint NOT NULL,egg_id bigint NOT NULL,installation_id text NOT NULL,
+ request jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS steam_private_attempts_server ON steam_private_attempts(server_id,created_at DESC);
+INSERT INTO steam_private_attempts(job_id,server_id,node_id,server_owner_id,egg_id,installation_id,request,created_at)
+ SELECT p.job_id,j.server_id,p.node_id,p.server_owner_id,p.egg_id,p.installation_id,p.request,p.created_at
+ FROM steam_private_jobs p JOIN steam_jobs j ON j.id=p.job_id
+ ON CONFLICT(job_id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS steam_private_publications (
+ server_id bigint PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
+ job_id text NOT NULL,node_id bigint NOT NULL,server_owner_id bigint NOT NULL,egg_id bigint NOT NULL,installation_id text NOT NULL,
+ receipt jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO steam_private_publications(server_id,job_id,node_id,server_owner_id,egg_id,installation_id,receipt,updated_at)
+ SELECT DISTINCT ON(j.server_id) j.server_id,p.job_id,p.node_id,p.server_owner_id,p.egg_id,p.installation_id,p.receipt,p.updated_at
+ FROM steam_private_jobs p JOIN steam_jobs j ON j.id=p.job_id WHERE p.receipt IS NOT NULL
+ ORDER BY j.server_id,p.updated_at DESC,p.job_id DESC
+ ON CONFLICT(server_id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS user_server_navigation (
  user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
@@ -276,3 +311,16 @@ DROP TRIGGER IF EXISTS proxy_guard_server ON servers;
 CREATE TRIGGER proxy_guard_server BEFORE UPDATE ON servers FOR EACH ROW EXECUTE FUNCTION proxy_guard_server();
 CREATE UNIQUE INDEX IF NOT EXISTS proxy_node_clients_admin_origin ON proxy_node_clients(admin_url);
 ALTER TABLE servers ADD COLUMN IF NOT EXISTS minecraft_pack jsonb NOT NULL DEFAULT '{}';
+
+-- Disposable bounded console history, retained across panel and game restarts.
+CREATE TABLE IF NOT EXISTS console_log_entries (
+ id bigserial PRIMARY KEY, server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+ event text NOT NULL CHECK(event IN ('console output','daemon message','install output','panel message')),
+ line text NOT NULL CHECK(octet_length(line)<=17000), created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS console_log_entries_server ON console_log_entries(server_id,id DESC);
+CREATE TABLE IF NOT EXISTS console_log_collectors (
+ server_id bigint PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
+ lease_owner text NOT NULL DEFAULT '', lease_until timestamptz NOT NULL DEFAULT '-infinity',
+ connected boolean NOT NULL DEFAULT false, last_event_at timestamptz
+);

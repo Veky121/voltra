@@ -52,11 +52,13 @@ export function Nest() {
       {() => (
         <>
           <Panel title="Eggs">
-            <Link className="button" to={`/admin/eggs/new?nest=${id}`}>
+            <div className="actions admin-list-actions"><Link className="button" to={`/admin/eggs/new?nest=${id}`}>
               Create egg
-            </Link>
+            </Link></div>
             <ErrorMessage error={q.error} />
             <DataTable
+              loading={q.loading}
+              empty="No eggs in this nest yet."
               data={q.data ? rows(q.data) : []}
               columns={[
                 {
@@ -90,13 +92,13 @@ function EggImport({
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
   return (
-    <Panel title={eggID ? "Replace from egg file" : "Import egg"}>
+    <Panel title={eggID ? "Replace from egg file" : "Import egg"} className="admin-egg-import">
       <p className="muted">
         Import a Voltra-compatible egg JSON file with its installation script,
         configuration, variables, and Docker images.
       </p>
       <label className="field">
-        Egg JSON file
+        <span>Egg JSON file</span>
         <input
           type="file"
           accept=".json,application/json"
@@ -107,8 +109,9 @@ function EggImport({
         />
       </label>
       <label className="field">
-        Egg JSON
+        <span>Egg JSON</span>
         <textarea
+          className="admin-code-input"
           rows={8}
           value={json}
           onChange={(e) => setJSON(e.target.value)}
@@ -121,7 +124,7 @@ function EggImport({
           {success}
         </p>
       )}
-      <button
+      <div className="actions admin-form-actions"><button
         disabled={busy || !json}
         onClick={async () => {
           setError("");
@@ -145,7 +148,7 @@ function EggImport({
         }}
       >
         {busy ? "Importing…" : eggID ? "Replace egg" : "Import egg"}
-      </button>
+      </button></div>
     </Panel>
   );
 }
@@ -180,7 +183,7 @@ export function Egg() {
     f("update_url", "Update URL"),
   ];
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading
         title={id === "new" ? "Create egg" : `Egg · ${record?.name ?? id}`}
       >
@@ -244,7 +247,7 @@ export function Egg() {
         </SidebarSection>
       )}
       {q.loading ? (
-        <p>Loading…</p>
+        <p className="admin-loading" role="status">Loading egg...</p>
       ) : (
         <>
           {tab === "details" && (
@@ -316,7 +319,7 @@ export function Egg() {
           )}
         </>
       )}
-    </>
+    </div>
   );
 }
 const variableFields = [
@@ -336,11 +339,13 @@ function EggVariables({ eggID }: { eggID: string }) {
   const endpoint = `${eggs}/${eggID}/variables`;
   const q = useAPI(endpoint);
   return (
-    <>
+    <div className="admin-variable-list management-ui">
       <ErrorMessage error={q.error} />
+      {q.loading && <p className="admin-loading" role="status">Loading variables...</p>}
+      {!q.loading && q.data && !rows(q.data).length && <Panel><p className="muted">No variables yet. Add a variable to make it available to servers using this egg.</p></Panel>}
       {q.data &&
         rows(q.data).map((v) => (
-          <div key={v.id}>
+          <div key={v.id} className="admin-variable">
             <Editor
               title={v.name}
               endpoint={`${endpoint}/${v.id}`}
@@ -367,6 +372,6 @@ function EggVariables({ eggID }: { eggID: string }) {
         onSaved={q.reload}
         submit="Create variable"
       />
-    </>
+    </div>
   );
 }

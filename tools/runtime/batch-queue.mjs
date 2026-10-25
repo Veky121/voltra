@@ -22,27 +22,69 @@ function positive(value, name) {
   if (!Number.isSafeInteger(value) || value < 1) throw Error(`${name} must be a positive integer`);
   return value;
 }
+function cleanupReceiptPath(value) {
+  return typeof value==='string' && /^artifacts\/[a-zA-Z0-9_./-]+\.json$/.test(value) && !value.split('/').includes('..');
+}
 export function claim(state, plan, request, limits) {
-  for (const key of ['memory_mib','disk_mib','ports']) positive(request[key], key);
-  for (const key of ['memory_mib','disk_mib','max_active','port_min','port_max']) positive(limits[key], key);
-  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(request.owner || '')) throw Error('owner must be a short non-secret worker label');
   const game = plan.games.find(g => g.path === request.game);
   if (!game || game.state !== 'queued') throw Error('game is absent or reserved for existing review');
+  if (request.kind === 'utility') throw Error('Use claim-utility for a utility task');
   const reservation = (state.reservations || []).find(r=>r.game===request.game);
   if (reservation && reservation.owner!==request.owner) throw Error('game reserved by another worker');
-  if (state.claims.some(c => c.game === request.game && c.status !== 'released')) throw Error('game already claimed or finished');
+  return allocateLease(state,request,limits,false);
+}
+export function claimUtility(state, request, limits) {
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(request.task || '')) throw Error('utility task must be a short non-secret label');
+  if (request.game !== undefined) throw Error('Utility tasks cannot claim a catalog recipe');
+  return allocateLease(state,{...request,game:'utility/'+request.task},limits,true);
+}
+// A retry records a separate attempt. Never rewrite a tested/blocked outcome to
+// released merely to make it claimable. The caller must freshly verify cleanup;
+// this ledger records that review, it cannot inspect Wings or Docker itself.
+export function claimReviewedRetry(state, plan, request, limits) {
+  const game=plan.games.find(g=>g.path===request.game);
+  if(!game || game.state!=='queued' || request.kind==='utility')throw Error('Retry requires a queued catalog game');
+  const reservation=(state.reservations||[]).find(r=>r.game===request.game);
+  if(reservation && reservation.owner!==request.owner)throw Error('game reserved by another worker');
+  return reviewedRetry(state,request,limits,false);
+}
+export function claimReviewedUtilityRetry(state, request, limits) {
+  if(!/^[a-zA-Z0-9_-]{1,64}$/.test(request.task||'') || request.game!==undefined)throw Error('Utility retry requires a task label, not a catalog recipe');
+  return reviewedRetry(state,{...request,game:'utility/'+request.task},limits,true);
+}
+function reviewedRetry(state,request,limits,utility) {
+  const previous=state.claims.filter(c=>c.game===request.game).at(-1);
+  const review=request.retry_review;
+  if(!previous || !['tested','blocked','released'].includes(previous.status) || !previous.finished_at || previous.lease_id!==review?.lease_id)throw Error('Retry requires the latest terminal lease');
+  if(state.claims.some(c=>c.game===request.game && c.status==='active'))throw Error('game already claimed');
+  if(review.game!==request.game || review.resources_removed!==true || !/^[a-zA-Z0-9_-]{1,64}$/.test(review.reviewer||'') || !cleanupReceiptPath(review.cleanup_receipt) || !/^[a-f0-9]{64}$/.test(review.cleanup_sha256||''))throw Error('Retry requires an exact cleanup review and receipt hash');
+  if(utility && previous.kind!=='utility')throw Error('Utility retry requires a previous utility lease');
+  const row=allocateLease(state,request,limits,utility,previous.lease_id);
+  row.retry_of=previous.lease_id;
+  row.retry_review=structuredClone(review);
+  return row;
+}
+function allocateLease(state,request,limits,utility,retryOf) {
+  for (const key of ['memory_mib','disk_mib']) positive(request[key], key);
+  if (utility) {
+    if (!Number.isSafeInteger(request.ports) || request.ports < 0) throw Error('utility ports must be a nonnegative integer');
+  } else positive(request.ports,'ports');
+  for (const key of ['memory_mib','disk_mib','max_active','port_min','port_max']) positive(limits[key], key);
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(request.owner || '')) throw Error('owner must be a short non-secret worker label');
+  if (!retryOf && state.claims.some(c => c.game === request.game && c.status !== 'released')) throw Error('game already claimed or finished');
   const active = state.claims.filter(c => c.status === 'active');
   const reserve = limits.reserved_disk_mib ?? 20480;
   if (!Number.isSafeInteger(reserve) || reserve < 0) throw Error('reserved_disk_mib must be a nonnegative integer');
   if (active.length >= limits.max_active || active.reduce((s,c)=>s+c.memory_mib,0)+request.memory_mib > limits.memory_mib || active.reduce((s,c)=>s+c.disk_mib,0)+request.disk_mib+reserve > limits.disk_mib) throw Error('resource budget exhausted');
   const used = new Set(active.flatMap(c => c.ports));
-  let ports;
-  for (let first=limits.port_min; first+request.ports-1<=limits.port_max; first++) {
+  let ports=utility && request.ports===0 ? [] : undefined;
+  for (let first=limits.port_min; !ports && first+request.ports-1<=limits.port_max; first++) {
     const candidate = Array.from({length:request.ports},(_,i)=>first+i);
     if (candidate.every(p=>!used.has(p))) { ports=candidate; break; }
   }
   if (!ports) throw Error('port pool exhausted');
   const row = {lease_id:crypto.randomUUID(), owner:request.owner, game:request.game, memory_mib:request.memory_mib, disk_mib:request.disk_mib, ports, status:'active', claimed_at:new Date().toISOString()};
+  if(utility){row.kind='utility';row.task=request.task;}
   state.claims.push(row); return row;
 }
 export function release(state, id, owner, outcome, resourcesRemoved) {
@@ -55,14 +97,23 @@ export function release(state, id, owner, outcome, resourcesRemoved) {
   return row;
 }
 export function resize(state, request, limits) {
-  positive(request.memory_mib,'memory_mib');positive(limits.memory_mib,'memory budget');
+  const memoryChange=request.memory_mib!==undefined,diskChange=request.disk_mib!==undefined;
+  if(!memoryChange&&!diskChange)throw Error('Resize requires memory_mib or disk_mib');
+  if(memoryChange){positive(request.memory_mib,'memory_mib');positive(limits.memory_mib,'memory budget');}
+  if(diskChange){positive(request.disk_mib,'disk_mib');positive(limits.disk_mib,'disk budget');}
   const row=state.claims.find(c=>c.lease_id===request.lease_id && c.owner===request.owner && c.status==='active');
   if(!row)throw Error('No owned active lease to resize');
-  if(request.stopped_confirmed!==true)throw Error('Memory resize requires confirmed stopped native server');
-  const used=state.claims.filter(c=>c.status==='active' && c!==row).reduce((sum,c)=>sum+c.memory_mib,0);
-  if(used+request.memory_mib>limits.memory_mib)throw Error('Memory budget exhausted');
-  row.resource_changes ||= [];row.resource_changes.push({previous_memory_mib:row.memory_mib,memory_mib:request.memory_mib,at:new Date().toISOString()});
-  row.memory_mib=request.memory_mib;return row;
+  if(request.stopped_confirmed!==true)throw Error('Resource resize requires confirmed stopped native server and installer');
+  const active=state.claims.filter(c=>c.status==='active' && c!==row);
+  if(memoryChange&&active.reduce((sum,c)=>sum+c.memory_mib,0)+request.memory_mib>limits.memory_mib)throw Error('Memory budget exhausted');
+  if(diskChange){
+    const reserve=limits.reserved_disk_mib??20480;
+    if(!Number.isSafeInteger(reserve)||reserve<0)throw Error('reserved_disk_mib must be a nonnegative integer');
+    if(active.reduce((sum,c)=>sum+c.disk_mib,0)+request.disk_mib+reserve>limits.disk_mib)throw Error('Disk budget exhausted');
+  }
+  const nextMemory=memoryChange?request.memory_mib:row.memory_mib;
+  row.resource_changes ||= [];row.resource_changes.push({previous_memory_mib:row.memory_mib,memory_mib:nextMemory,...(diskChange?{previous_disk_mib:row.disk_mib,disk_mib:request.disk_mib}:{}),at:new Date().toISOString()});
+  row.memory_mib=nextMemory;if(diskChange)row.disk_mib=request.disk_mib;return row;
 }
 export function replacePort(state, request, limits) {
   const row=state.claims.find(c=>c.lease_id===request.lease_id && c.owner===request.owner && c.status==='active');
@@ -82,13 +133,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const statePath=path.resolve(process.env.GAME_BATCH_STATE || path.join(root,'.local/game-batch/queue.json'));
   const result=transact(statePath,state=>{
     if(command==='status') return state;
+    if(command==='claim-utility') {
+      if(!args.limits) throw Error('claim-utility requires explicit resource limits');
+      return claimUtility(state,args,args.limits);
+    }
     if(command==='release') return release(state,args.lease_id,args.owner,args.outcome,args.resources_removed===true);
     if(command==='resize') return resize(state,args,args.limits||{});
     if(command==='replace-port') return replacePort(state,args,args.limits||{});
     if(command==='requeue') {
-      const row=state.claims.find(c=>c.lease_id===args.lease_id && c.owner===args.owner);
-      if(!row || !['tested','blocked'].includes(row.status)) throw Error('requeue requires owned cleaned terminal lease');
-      row.previous_outcome=row.status; row.status='released'; row.requeued_at=new Date().toISOString(); return row;
+      throw Error('Historical outcomes are retained; use claim-reviewed-retry with a cleanup review');
     }
     if(command==='reserve') {
       if(!/^[a-zA-Z0-9_-]{1,64}$/.test(args.owner || '')) throw Error('invalid owner');
@@ -101,9 +154,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       if(existing) return existing;
       const row={owner:args.owner,game:args.game}; state.reservations.push(row); return row;
     }
-    if(command!=='claim') throw Error('usage: batch-queue.mjs claim|release|status JSON');
-    const plan=JSON.parse(fs.readFileSync(path.join(root,'artifacts/game-batch-plan.json'),'utf8'));
+    if(!['claim','claim-reviewed-retry','claim-reviewed-utility-retry'].includes(command)) throw Error('usage: batch-queue.mjs claim|claim-reviewed-retry|claim-reviewed-utility-retry|release|status JSON');
     if(!args.limits) throw Error('claim requires explicit node resource/port limits');
+    if(command==='claim-reviewed-retry' || command==='claim-reviewed-utility-retry') {
+      const receipt=args.retry_review?.cleanup_receipt;
+      if(!cleanupReceiptPath(receipt))throw Error('Invalid cleanup receipt path');
+      const digest=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,receipt))).digest('hex');
+      if(digest!==args.retry_review.cleanup_sha256)throw Error('Cleanup receipt hash changed');
+      if(command==='claim-reviewed-utility-retry')return claimReviewedUtilityRetry(state,args,args.limits);
+      const plan=JSON.parse(fs.readFileSync(path.join(root,'artifacts/game-batch-plan.json'),'utf8'));
+      return claimReviewedRetry(state,plan,args,args.limits);
+    }
+    const plan=JSON.parse(fs.readFileSync(path.join(root,'artifacts/game-batch-plan.json'),'utf8'));
     return claim(state,plan,args,args.limits);
   });
   console.log(JSON.stringify(result,null,2));

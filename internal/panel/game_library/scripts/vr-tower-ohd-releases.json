@@ -1,0 +1,12 @@
+{
+  "Game.ini": {
+    "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/pavlov_vr/Game.ini",
+    "sha256": "20747d515858f45b341bba10795b7bd6c83909088fdd0d2b1d17e3ac6781e237",
+    "bytes": 626
+  },
+  "RconSettings.txt": {
+    "url": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/pavlov_vr/RconSettings.txt",
+    "sha256": "7c0237bd905b299b2dea7923d1136ef9988667c182494671acdc555c756f06ec",
+    "bytes": 15
+  }
+}

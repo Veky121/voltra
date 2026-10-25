@@ -1,22 +1,43 @@
-.minecraft-content { display: grid; gap: 1.5rem; }
-.minecraft-content h1,.minecraft-content h2,.minecraft-content h3 { margin-top: 0; }
-.minecraft-content .mc-content-context { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
-.mc-content-search { display: flex; align-items: end; gap: .75rem; margin: 1rem 0; }
-.mc-content-search .field { flex: 1; }
-.mc-content-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
-.mc-content-filters .field { min-width: min(100%,250px); }
-.mc-content-filters p { flex: 1; min-width: min(100%,240px); margin: 0; font-size: .85rem; }
-.mc-content-projects { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,280px),1fr)); gap: 1rem; }
-.mc-content-project { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
-.mc-content-project > p { flex: 1; overflow-wrap: anywhere; margin: 0; }
-.mc-project-heading { display: flex; gap: .75rem; align-items: center; min-width: 0; }
-.mc-project-heading img { border-radius: .6rem; object-fit: contain; flex-shrink: 0; }
-.mc-project-heading h3 { margin-bottom: .25rem; overflow-wrap: anywhere; }
-.mc-installed { padding: 0; margin: 0; list-style: none; }
-.mc-installed li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border, #333); }
-.mc-installed li > div { display: grid; gap: .25rem; min-width: 0; overflow-wrap: anywhere; }
-.mc-content-warning { padding: .8rem 1rem; border: 1px solid #a48138; border-radius: .6rem; background: #a4813814; }
-.mc-content-warning p:first-child { margin-top: 0; }
-.mc-content-ack { display: flex; gap: .7rem; align-items: start; }
-.mc-content-ack input { width: auto; margin-top: .25rem; flex-shrink: 0; }
-@media(max-width:600px) { .mc-content-search { align-items: stretch; flex-direction: column; } .mc-installed li { align-items: start; } }
+@import "./games-ui.css";
+.minecraft-content{display:grid;gap:16px;width:100%;min-width:0}
+.minecraft-content h1,.minecraft-content h2,.minecraft-content h3{margin-top:0}
+.minecraft-content>.mc-content-header{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:14px;margin-bottom:0}
+.mc-content-header h2{font-size:calc(22px * var(--ui-font-scale,1));margin:0}
+.mc-content-header>.button{margin-left:auto}
+.minecraft-content .mc-content-context{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+.minecraft-content .mc-content-tabs{margin:0}
+.mc-content-count{font-size:calc(10px * var(--ui-font-scale,1));line-height:1;border:1px solid var(--ui-border);border-radius:5px;padding:3px 5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mc-content-panel{min-width:0}
+.mc-content-search,.mc-installed-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 14px;min-width:0}
+.mc-content-search>input,.mc-installed-toolbar>input{flex:1;min-width:0}
+.mc-content-search>select{flex:0 1 230px;min-width:150px}
+.mc-content-search>.button{flex-shrink:0}
+.mc-content-filters{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;margin:0 0 16px;font-size:calc(12px * var(--ui-font-scale,1))}
+.mc-content-filters>.muted{font-size:calc(11px * var(--ui-font-scale,1))}
+.mc-content-projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:12px}
+.mc-content-project.card{display:flex;flex-direction:column;gap:12px;min-width:0;margin:0;padding:16px}
+.mc-content-project>p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;margin:0;color:var(--muted)}
+.mc-content-project footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto}
+.mc-content-project footer .badge{font-size:calc(10px * var(--ui-font-scale,1))}
+.mc-content-project footer .button{font-size:calc(12px * var(--ui-font-scale,1));min-height:32px;padding:6px 10px}
+.mc-project-heading{display:flex;gap:10px;align-items:center;min-width:0}
+.mc-project-heading>div{min-width:0}
+.mc-project-heading img{border-radius:7px;object-fit:contain;flex-shrink:0}
+.mc-project-heading h3{font-size:calc(14px * var(--ui-font-scale,1));margin:0 0 3px;overflow-wrap:anywhere}
+.mc-project-heading small{font-size:calc(11px * var(--ui-font-scale,1))}
+.mc-installed-toolbar>input{max-width:460px}
+.mc-installed-toolbar>a{margin-left:auto;font-size:calc(12px * var(--ui-font-scale,1));white-space:nowrap}
+.mc-installed{padding:0;margin:0;list-style:none}
+.mc-installed li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--ui-border)}
+.mc-installed li>div{display:flex;align-items:center;gap:14px;min-width:0;overflow-wrap:anywhere}
+.mc-installed strong{font-size:calc(13px * var(--ui-font-scale,1));font-weight:500}
+.mc-installed small{font-size:calc(11px * var(--ui-font-scale,1));white-space:nowrap}
+.mc-installed .button{font-size:calc(12px * var(--ui-font-scale,1));min-height:32px;padding:6px 10px;flex-shrink:0}
+.mc-content-empty{display:flex;align-items:center;justify-content:center;min-height:100px;margin:0;font-size:calc(13px * var(--ui-font-scale,1));color:var(--muted);text-align:center}
+.mc-content-provider-status{margin:0;padding:12px 14px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.5}
+.mc-content-note{font-size:calc(11px * var(--ui-font-scale,1));margin:16px 0 0}
+.mc-content-warning{padding:12px 14px;border:1px solid color-mix(in srgb,var(--game-warning) 24%,transparent);border-radius:var(--ui-control-radius);background:color-mix(in srgb,var(--game-warning) 6%,transparent);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.mc-content-warning p:first-child{margin-top:0}
+.mc-content-ack{display:flex;gap:10px;align-items:center;font-size:calc(12px * var(--ui-font-scale,1));cursor:pointer}
+.mc-content-ack input{flex-shrink:0}
+@media(max-width:600px){.minecraft-content>.mc-content-header{flex-wrap:wrap;gap:10px}.mc-content-header .mc-content-context{order:3;width:100%}.mc-content-search{flex-wrap:wrap}.mc-content-search>input{flex-basis:calc(100% - 92px)}.mc-content-search>select{order:3;flex-basis:100%}.mc-installed li>div{display:grid;gap:4px}}

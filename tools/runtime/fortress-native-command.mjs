@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import {api} from './openttd-compat-node.mjs';
+const dir='.local/fortress-native',s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+const command=process.argv[2],tag=process.argv[3];
+if(command!=='help'||!/^[a-z0-9_-]+$/.test(tag??''))throw Error('Only actual publisher-help-confirmed console probe allowed');
+const n=JSON.parse(fs.readFileSync(s.node_receipt)),v=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(v.uuid!==s.uuid||v.node!==n.node||s.node_uuid!==n.node_uuid||v.egg!==s.egg_id||s.owner!=='game_batch_inventory'||v.status!==null)throw Error('Foreign/installer fixture');
+const file=dir+'/command-'+tag+'.json';if(fs.existsSync(file))throw Error('Command already submitted');
+fs.writeFileSync(file,JSON.stringify({command,at:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
+await api('/api/client/servers/'+s.identifier+'/command','POST',{command});
+console.log({command,submitted:true});

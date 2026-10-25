@@ -95,8 +95,6 @@ func (a *App) RunCommand(ctx context.Context, args []string, out io.Writer) erro
 			return e
 		}
 		return cliPrint(out, M{"maintenance": enabled})
-	case "p:environment:mail":
-		return a.cliMail(ctx, rest, out)
 	case "p:environment:setup":
 		return a.cliSetup(ctx, rest, out)
 	case "p:telemetry":
@@ -119,7 +117,7 @@ func (a *App) RunCommand(ctx context.Context, args []string, out io.Writer) erro
 }
 
 func (a *App) cliHelp(out io.Writer) error {
-	return cliPrint(out, M{"commands": []string{"p:info", "health", "migrate", "db:seed", "p:user:make", "p:user:list", "p:user:update", "p:user:delete", "p:location:make", "p:location:delete", "p:node:make", "p:node:list", "p:node:configuration", "p:server:bulk-power", "p:schedule:process", "p:maintenance:prune-backups", "p:maintenance:prune-activity", "down", "up", "p:environment:setup", "p:environment:database", "p:environment:mail", "p:environment:addons:run-hooks", "p:telemetry", "import-legacy", "export-snapshot"}, "notes": []string{"Commands are noninteractive. Supply required fields as --name=value or --name value.", "Bulk power and account/location deletion preview their selection unless --force is supplied.", "Node configuration intentionally contains the Wings authentication token; store it privately.", "Snapshots require --file and are never printed to standard output.", "Cloudflare authentication is deferred; account commands never set passwords."}})
+	return cliPrint(out, M{"commands": []string{"p:info", "health", "migrate", "db:seed", "p:user:make", "p:user:list", "p:user:update", "p:user:delete", "p:location:make", "p:location:delete", "p:node:make", "p:node:list", "p:node:configuration", "p:server:bulk-power", "p:schedule:process", "p:maintenance:prune-backups", "p:maintenance:prune-activity", "down", "up", "p:environment:setup", "p:environment:database", "p:environment:addons:run-hooks", "p:telemetry", "import-legacy", "export-snapshot"}, "notes": []string{"Commands are noninteractive. Supply required fields as --name=value or --name value.", "Bulk power and account/location deletion preview their selection unless --force is supplied.", "Node configuration intentionally contains the Wings authentication token; store it privately.", "Snapshots require --file and are never printed to standard output.", "Cloudflare authentication is deferred; account commands never set passwords."}})
 }
 
 func cliPrint(out io.Writer, v any) error {
@@ -672,7 +670,7 @@ func (a *App) cliStoreSettings(ctx context.Context, settings M) error {
 }
 
 // Reuse the settings handler's validation, encryption, and persistence rather
-// than growing a second mail-configuration implementation in the CLI.
+// than growing a second settings implementation in the CLI.
 func (a *App) cliApplySettings(ctx context.Context, data M, out io.Writer) error {
 	admin, e := a.one(ctx, "SELECT id FROM users WHERE root_admin AND NOT disabled ORDER BY id LIMIT 1")
 	if e != nil {
@@ -712,48 +710,6 @@ type cliHTTPOutput struct {
 func (w *cliHTTPOutput) Header() http.Header            { return w.header }
 func (w *cliHTTPOutput) WriteHeader(status int)         { w.code = status }
 func (w *cliHTTPOutput) Write(data []byte) (int, error) { return w.body.Write(data) }
-func (a *App) cliMail(ctx context.Context, args []string, out io.Writer) error {
-	opts, p, e := cliParse(args, []string{"driver", "email", "from", "encryption", "host", "port", "username", "password"}, nil)
-	if e != nil {
-		return e
-	}
-	if e = cliRequireNoPositionals(p); e != nil {
-		return e
-	}
-	if driver := opts["driver"]; driver != "" && driver != "smtp" {
-		return bad("This service's notification transport is SMTP; provider APIs and sendmail are not configured.")
-	}
-	if len(opts) == 0 {
-		settings, e := a.infraLoadSettings(ctx)
-		if e != nil {
-			return e
-		}
-		public := infraPublicSettings(settings)
-		for key := range public {
-			if !strings.HasPrefix(key, "mail:") {
-				delete(public, key)
-			}
-		}
-		return cliPrint(out, public)
-	}
-	data := M{}
-	for option, key := range map[string]string{"host": "mail:host", "email": "mail:from:address", "from": "mail:from:name", "encryption": "mail:encryption", "username": "mail:username", "password": "mail:password"} {
-		if value, ok := opts[option]; ok {
-			data[key] = value
-		}
-	}
-	if value, ok := opts["port"]; ok {
-		port, e := cliPositive(value, "--port", 587)
-		if e != nil {
-			return e
-		}
-		data["mail:port"] = port
-	}
-	if len(data) == 0 {
-		return bad("No mail settings were provided.")
-	}
-	return a.cliApplySettings(ctx, data, out)
-}
 func (a *App) cliSetup(ctx context.Context, args []string, out io.Writer) error {
 	opts, p, e := cliParse(args, []string{"name", "locale", "url", "author", "timezone", "cache", "session", "queue", "redis-host", "redis-pass", "redis-port", "settings-ui", "telemetry"}, []string{"new-salt"})
 	if e != nil {

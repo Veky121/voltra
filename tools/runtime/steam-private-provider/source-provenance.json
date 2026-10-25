@@ -1,0 +1,37 @@
+{
+  "depot_source_commit": "6396afe2e34a6c40459bcb6bdafa43c83c9db8cc",
+  "steamkit_actual_package_source_commit": "49387aec55c24104946af7a7b160148358e538b4",
+  "additional_source_bytes": 1649993,
+  "files": [
+    {
+      "file": "upstream/SteamKit-49387aec55c24104946af7a7b160148358e538b4.tar.gz",
+      "url": "https://codeload.github.com/SteamRE/SteamKit/tar.gz/49387aec55c24104946af7a7b160148358e538b4",
+      "bytes": 1635448,
+      "sha256": "ea674bc6fe2639f5f16061a2317ca25e2596d07fbea34a77b447f6b4b76d297e"
+    },
+    {
+      "file": "licenses/protobuf-net-Licence.txt",
+      "url": "https://raw.githubusercontent.com/protobuf-net/protobuf-net/f24c4c97bb146d763425a04b6b8dd7fd89219ef3/Licence.txt",
+      "bytes": 998,
+      "sha256": "2054377b5c04fb70c67fe91ca12417e9d413e533169f1270ef69bd815f3053f3"
+    },
+    {
+      "file": "licenses/ZstdSharp-LICENSE",
+      "url": "https://raw.githubusercontent.com/oleg-st/ZstdSharp/2cd0c019693bc786a5fe5c3be94e107b24e7267e/LICENSE",
+      "bytes": 1074,
+      "sha256": "9a6a7216e532c4ee4f78881d31fb641c27148eb01b2d0e8e3235ffe9a70a662c"
+    },
+    {
+      "file": "licenses/System.IO.Hashing-LICENSE.TXT",
+      "url": "https://raw.githubusercontent.com/dotnet/dotnet/95017c711e6afc1085133d440e42b4bd78155701/LICENSE.TXT",
+      "bytes": 1115,
+      "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+    },
+    {
+      "file": "licenses/Apache-2.0.txt",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+  ]
+}

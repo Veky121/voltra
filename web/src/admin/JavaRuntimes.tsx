@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Field, Input, api, rows, useAPI } from "../lib";
 import { ErrorMessage, Heading, Panel } from "./shared";
+import { Switch } from "../ui/Settings";
 
 type JavaRuntime = {
   id: string;
@@ -45,7 +46,7 @@ export function JavaRuntimes() {
     setSaved(false);
   };
   return (
-    <>
+    <div className="admin-management-page management-ui">
       <Heading title="Java runtimes" />
       <p className="muted">Register container images with the Java version and distribution they provide. The panel uses this catalog to select a runtime. Images are not discovered or verified here.</p>
       <ErrorMessage error={query.error} />
@@ -71,11 +72,12 @@ export function JavaRuntimes() {
         }}>
           <ErrorMessage error={error} />
           {saved && <p className="success" role="status">Java runtime catalog saved.</p>}
-          <fieldset disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+          <fieldset disabled={busy} className="admin-fieldset">
             {runtimes.map((runtime, index) => (
-              <details className="card" key={index} open={openIndex === index} onInvalid={() => setOpenIndex(index)}>
-                <summary style={{ cursor: "pointer", marginBottom: openIndex === index ? 16 : 0 }} onClick={(event) => { event.preventDefault(); setOpenIndex((old) => old === index ? null : index); }}>
-                  {runtime.name || `Runtime ${index + 1}`} / Java {runtime.major} / {runtime.distribution || "No distribution"}{!runtime.enabled && " / Disabled"}
+              <details className="card admin-disclosure admin-runtime" key={index} open={openIndex === index} onInvalid={() => setOpenIndex(index)}>
+                <summary onClick={(event) => { event.preventDefault(); setOpenIndex((old) => old === index ? null : index); }}>
+                  <span className="admin-disclosure-title">{runtime.name || `Runtime ${index + 1}`}</span>
+                  <span className="admin-disclosure-meta"><span className="badge">Java {runtime.major}</span><span>{runtime.distribution || "No distribution"}</span>{!runtime.enabled && <span className="badge">Disabled</span>}</span>
                 </summary>
                 <div className="form-grid">
                   <Field label="Runtime ID" hint="Keep this stable. Server settings refer to this ID.">
@@ -94,25 +96,25 @@ export function JavaRuntimes() {
                     <Input required maxLength={511} placeholder="registry.example.com/java:21" value={runtime.image} spellCheck={false} onChange={(e) => update(index, { image: e.target.value })} />
                   </Field>
                   <Field label="Enabled">
-                    <input type="checkbox" checked={runtime.enabled} onChange={(e) => update(index, { enabled: e.target.checked })} />
+                    <Switch checked={runtime.enabled} onCheckedChange={checked => update(index, { enabled: checked })} />
                   </Field>
                 </div>
-                <Button variant="secondary" onClick={() => {
+                <div className="actions admin-form-actions"><Button variant="secondary" onClick={() => {
                   setRuntimes((old) => old.filter((_, i) => i !== index));
                   setOpenIndex(null);
                   setSaved(false);
-                }}>Remove {runtime.name || `runtime ${index + 1}`}</Button>
+                }}>Remove {runtime.name || `runtime ${index + 1}`}</Button></div>
               </details>
             ))}
             {!runtimes.length && <Panel>No runtimes registered. Add a runtime to make it available to Java servers.</Panel>}
             <p className="muted">Disabling or removing a runtime can prevent servers that use it from starting.</p>
-            <div className="actions">
+            <div className="actions admin-form-actions admin-form-actions-split">
               <Button variant="secondary" onClick={() => { setOpenIndex(runtimes.length); setRuntimes((old) => [...old, blankRuntime()]); setSaved(false); }}>Add runtime</Button>
               <Button type="submit">{busy ? "Saving..." : "Save runtime catalog"}</Button>
             </div>
           </fieldset>
         </form>
       )}
-    </>
+    </div>
   );
 }

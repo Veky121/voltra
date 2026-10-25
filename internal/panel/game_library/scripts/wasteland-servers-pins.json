@@ -1,0 +1,26 @@
+{
+  "upstream_revision": "c637a6d1e0449b167efeff81bb9a0177aa3df6c2",
+  "wine_runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+  "mono": {
+    "version": "9.1.0",
+    "url": "https://dl.winehq.org/wine/wine-mono/9.1.0/wine-mono-9.1.0-x86.msi",
+    "bytes": 84623872,
+    "sha256": "8a0a1e6837b494df49927e5d759b1c6908e89b8a2f8e3ad025e1c2881882476e",
+    "digest_provenance": "https://github.com/wine-mirror/wine/blob/wine-9.8/dlls/appwiz.cpl/addons.c",
+    "license": "Wine Mono and bundled components retain respective upstream licenses"
+  },
+  "night_default_ini": {
+    "source": "https://raw.githubusercontent.com/pterodactyl/game-eggs/c637a6d1e0449b167efeff81bb9a0177aa3df6c2/night_of_the_dead/ServerSettings.ini",
+    "bytes": 3477,
+    "sha256": "c62ee2dbfcd6ac7dc702d159c99f49f597f527d4a4d1c32913d63312c4fec3b3",
+    "content": "[ServerSettings]\nServerName=\nPassword=\nMaxPlayers=16\n[SystemSettings]\nIngameAdminPassword=\nDefaultMessageOfTheDay=\n; INSTALL_DIR/Saved/SaveGames/SAVE_NAME\nSaveName=\n; In-game hour, integer, Default: 1 = 5 min(realtime).\nSaveIntervalHour=2\n[GameSettings]\n; Peaceful/Easy/Normal/Hard/Survival/Challenge/Legend/Custom\nDifficulty=Normal\n[GameSettings/General]\n; 0=disable, 1=enbale\nNoWave=0 // No Wave\nNoSpawnBuildingBlocker=0 // Activate Building Forbidden Area\nNoZombieRespawn=0 // No Zombie Respawn\nNaturalObjectRespawn=0 // Natural Objects Respawn\nSyntheticObjectRespawn=0 // Synthetic Object Respawn\nNoGeneratorTrouble=0 // No Generator Breakdown\nNoDeathResearchDrop=0 // No Research Lost Upon Dying\nDropItemsOnExit=0 // Drop Items on Exit\nHardcore=0 // Hardcore\nNoTeamKill=0 // No Teamkill\nNoEnding=0 // No Ending\n; 0=PvP, 1=PvE\nMODSelect=1 // Mode\n; It works only when the difficulty is Custom.\n[GameSettings/Basic]\n; 0 <= value <= 100\nNormalZombieHealth=17 // Light Zombie HP\nSpecialZombieHealth=17 // Heavy Zombie HP\nGiantZombieHealth=17 // Giant Zombie HP\nZombieDamage=18 // Zombie Damage\nZombieMovementSpeed=35 // Zombie Movement Speed\nWorldZombieSpawn=17 // World Zombie Spawn Amount\nWaveZombieHealth=25 // Wave Zombie HP\nWaveNormalZombieAmount=44 // Light Zombie Amount\nWaveSpecialZombieAmount=17 // Heavy Zombie Amount\nWaveGiantZombieAmount=21 // Giant Zombie Amount\nAnimalHealth=17 // Animal HP\nAnimalDamage=18 // Animal Attack Damage\n; 30 / 60 / 120 / 180 / 240\nWorldNormalZombieRespawnTime=120 // Light Zombie Respawn Time\n; 120 / 300 / 600 / 900 / 1200\nWorldSpecialZombieRespawnTime=600 // Heavy Zombie Respawn Time\n; 120 / 300 / 600 / 900 / 1200\nWorldGiantZombieRespawnTime=600 // Giant Zombie Respawn Time\n; It works only when the difficulty is Custom.\n[GameSettings/Advanced]\n; 0 = disable, 1 = enable\nNoExperienceLoss=0 // No EXP Lost Upon Dying\nNoDeathItemDrop=0 // No Items Drop Upon Dying\nNoDeathEquipmentItemDrop=0 // No Equipment Drop Upon Dying\n; 0 <= value <= 100\nResearchDataConsumption=50 // Research Data Consumption\nFishSpeed=66 // Fish Speed\nBuildingHit=90 // Building HP\nTrapDamage=66 // Trap Attack Damage\nResourcesReturnedAfterBuildingDestroyed=30 // Materials Return Rate After Building Destruction\nFishingGaugeDecrease=40 // Fish Power\nSuperiorOrHigherEquipmentGainMultiplier=40 // High-Grade Equipment Drop Rate\n; 1 / 2 / 3 / 4 / 5\nAmountOfExperienceGained=1 // Gain EXP Amount\n; 1 / 2 / 3\nResourceAcquisition=1 // Item Obtained Amount\n; 0 / 1 / 2 / 5 / 10 / 12 / 15\nInitialFoodAmount=10 // Initial Food Amount\n; 240 / 360 / 480 / 720 / 840 / 960 / 1200\nNaturalObjectRespawnTime=0 // Natural Objects Respawn Time\nSyntheticObjectRespawnTime=0 // Synthetic Objects Respawn Time\n; 1 / 1.25 / 1.5 / 1.75 / 2\nFarmResourceOutput=1.25 // Farm Resource Production Amount\n; 0.5 / 1 / 1.5 / 2 / 2.5\nMachineResourceOutput=1.25 // Machine Resource Production Amount\n; 0.5 / 1 / 1.5 / 2 / 2.5\nAnimalTrapTime=1 // Animal Trap Time\n; 0.5 / 1 / 1.5\nFarmResourceProductionTime=1 // Farm Resource Production Time\nMachineResourceProductionTime=1 // Machine Resource Production Time\n; 0.5 / 1 / 1.5 / 2 / 2.5\nElectricGeneration=1 // Power Generated\n; 0.5 / 1 / 1.5\nElectricConsumption=1 // Power Consumption\n; 0.5 / 1 / 1.5 / 2 / 2.5\nElectricOvercurrentLimit=1 // Power Limit\n; 0.5 / 1 / 1.5\nElectricStandbyPower=1 // Standby Power\n; It works only when the difficulty is Custom.\n[GameSettings/Detail]\n; 60 / 120 / 180 / 240 / 300\nOneDayTime=120 // Times per Day",
+    "license": "Pinned game-eggs MIT config; no game/runtime rights granted"
+  },
+  "plains_eula": {
+    "path": "EULA.txt",
+    "environment": "PLAINS_ACCEPT_EULA",
+    "sha256": "9b8cab870158a54a15526ed3af2c4104d8b420cdb9260f729b91f7665eb3ba5a",
+    "bytes": 10984,
+    "effective_date": "2026-03-03"
+  }
+}

@@ -41,16 +41,14 @@ function Overview() {
     <>
       <Heading title="Administration" />
       <div
-        className="grid"
+        className="grid admin-summary-grid"
         style={{ gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}
       >
         {entries.map(([label, q, to]) => (
           <Panel key={label}>
             <NavLink to={to}>
               <span className="muted">{label}</span>
-              <strong
-                style={{ display: "block", fontSize: "2.5rem", marginTop: 12 }}
-              >
+              <strong className="admin-summary-value">
                 {q.loading ? "…" : q.data ? rows(q.data).length : "—"}
               </strong>
             </NavLink>
@@ -60,6 +58,7 @@ function Overview() {
       </div>
       <Panel title="Servers">
         <DataTable
+          loading={servers.loading}
           data={servers.data ? rows(servers.data) : []}
           columns={[
             {
@@ -93,19 +92,12 @@ function Overview() {
           ]}
         />
       </Panel>
-      <Panel title="Local development">
-        <p className="muted">
-          Sign-in is deferred while parity is tested. Accounts, ownership,
-          permissions, application API keys, and Wings credentials remain
-          active.
-        </p>
-      </Panel>
     </>
   );
 }
 export default function Admin() {
   return (
-    <div className="page">
+    <div className="page admin-page">
       <Routes>
         <Route path="/admin">
           <Route index element={<Overview />} />

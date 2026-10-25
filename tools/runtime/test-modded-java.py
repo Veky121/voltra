@@ -108,6 +108,22 @@ class ModdedJavaTests(unittest.TestCase):
             spigot.install(root,{'DL_VERSION':'26.3','SERVER_JARFILE':'custom.jar'})
             self.assertEqual(command.call_count,1)
 
+    def test_spigot_publication_uses_server_disk_when_system_tmp_is_unavailable(self):
+        output=io.BytesIO()
+        with zipfile.ZipFile(output,'w') as package:
+            package.writestr('META-INF/MANIFEST.MF','Main-Class: fixture.Main\n')
+        temporary_directory=tempfile.TemporaryDirectory
+        with temporary_directory() as directory:
+            root=Path(directory)
+            def server_disk_only(*args,**kwargs):
+                self.assertTrue(Path(kwargs['dir']).resolve().is_relative_to(root))
+                return temporary_directory(*args,**kwargs)
+            with mock.patch.object(spigot,'fetch',return_value=output.getvalue()),mock.patch.object(spigot.tempfile,'TemporaryDirectory',side_effect=server_disk_only):
+                spigot.install(root,{'DL_PATH':'https://example.invalid/server.jar'})
+            self.assertEqual((root/'server.jar').read_bytes(),output.getvalue())
+            self.assertTrue((root/'.voltra/spigot/release.json').is_file())
+            self.assertEqual(list(root.glob('.voltra-spigot-publish-*')),[])
+
     def test_spigot_original_custom_url_is_data_not_shell(self):
         self.assertEqual(spigot.download_url('https://example.invalid/{{DL_VERSION}}/${DL_VERSION}.jar','1.21.11'),'https://example.invalid/1.21.11/1.21.11.jar')
         with self.assertRaises(ValueError):spigot.download_url('https://example.invalid/{{UNKNOWN}}','26.3')

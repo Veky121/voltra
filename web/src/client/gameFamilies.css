@@ -1,0 +1,22 @@
+.game-library-heading.page-header{align-items:center;gap:24px}
+.game-library-heading>.field{display:grid;grid-template-columns:auto minmax(0,360px);align-items:center;gap:12px;width:min(460px,100%);margin:0;font-size:calc(12px * var(--ui-font-scale,1))}
+.game-library-heading>.field>span{white-space:nowrap}
+.game-family-count{font-size:calc(12px * var(--ui-font-scale,1));margin:0 0 16px}
+.game-family-dialog>p{font-size:calc(13px * var(--ui-font-scale,1));margin-bottom:22px}
+.game-family-section+.game-family-section{margin-top:24px}
+.game-family-section>h3{font-size:calc(11px * var(--ui-font-scale,1));font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin:0 0 10px}
+.game-family-options{display:grid;gap:10px}
+.game-family-option{position:relative;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-surface);overflow:hidden;transition:border-color 160ms,background 160ms}
+.game-family-option:has(a.game-family-option-main:hover){border-color:var(--line-strong);background:var(--ui-hover)}
+.game-family-option-main{display:flex;flex-direction:column;gap:7px;position:relative;padding:16px 48px 16px 16px;color:var(--text);text-decoration:none}
+.game-family-option-main:hover{text-decoration:none;color:var(--text)}
+.game-family-option-main strong{font-size:calc(13px * var(--ui-font-scale,1));line-height:1.5}
+.game-family-option-main>span:not(.game-family-option-arrow){color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;white-space:pre-line}
+.game-family-option-main small{color:var(--muted);font-size:calc(10px * var(--ui-font-scale,1));line-height:1.5}
+.game-family-option-arrow{position:absolute;right:17px;top:17px;color:var(--muted);transition:transform 160ms}
+.game-family-option-main:hover .game-family-option-arrow{transform:translateX(3px)}
+.game-family-option-main:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;border-radius:var(--ui-control-radius)}
+.game-family-option-main.is-disabled{opacity:.65}
+.game-family-recipe{display:block;width:fit-content;margin:0 16px 12px;color:var(--muted);font-size:calc(10px * var(--ui-font-scale,1))}
+@media(max-width:760px){.game-library-heading.page-header{align-items:stretch;gap:16px}.game-library-heading>.field{width:100%;grid-template-columns:auto minmax(0,1fr)}.game-family-option-main{padding:14px 38px 14px 14px}.game-family-option-main strong{font-size:calc(13px * var(--ui-font-scale,1))}}
+@media(prefers-reduced-motion:reduce){.game-family-option,.game-family-option-arrow{transition:none}}

@@ -61,6 +61,11 @@ func validateTemplatePortRules(entry gameTemplate, environment M, primary M, add
 		for _, allocation := range additional {
 			ports[num(allocation["port"])] = true
 		}
+		for _, excluded := range rule.ExcludePorts {
+			if ports[int64(excluded)] {
+				return bad("A selected port is excluded by this recipe.")
+			}
+		}
 		for port := range ports {
 			if port >= int64(rule.Minimum) && port <= int64(rule.Maximum) {
 				count++
@@ -81,6 +86,15 @@ func validateTemplatePortRules(entry gameTemplate, environment M, primary M, add
 			port := primaryPort + int64(offset)
 			if port < int64(rule.Minimum) || port > int64(rule.Maximum) || !ports[port] {
 				return bad(fmt.Sprintf("This mode needs an allocation at the game port %+d on the same address.", offset))
+			}
+		}
+		if rule.AllocatedValue {
+			for _, delta := range append([]int{0}, rule.AllocatedOffsets...) {
+				for _, excluded := range rule.ExcludePorts {
+					if allocatedValue+int64(delta) == int64(excluded) {
+						return bad("The configured service port or companion uses an excluded native port.")
+					}
+				}
 			}
 		}
 		for _, offset := range rule.AllocatedOffsets {

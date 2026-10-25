@@ -1,0 +1,17 @@
+@import "./games-ui.css";
+.game-ports{border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-input);padding:14px;min-width:0}
+.game-ports-heading{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.game-ports-heading>strong{font-size:calc(12px * var(--ui-font-scale,1));font-weight:550}
+.game-ports-heading>span{font-size:calc(10px * var(--ui-font-scale,1));border:1px solid var(--ui-border);border-radius:6px;background:var(--ui-hover);padding:2px 6px;color:var(--muted)}
+.game-ports dl{margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.game-ports dl>div{display:grid;grid-template-columns:minmax(80px,1fr) minmax(0,3fr);gap:12px}
+.game-ports dt{color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));overflow-wrap:anywhere}
+.game-ports dd{margin:0;font-size:calc(12px * var(--ui-font-scale,1));overflow-wrap:anywhere}
+.game-ports p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;margin:8px 0 0;overflow-wrap:anywhere}
+.game-ports dd p{margin-top:3px}
+.game-ports-forwarding{border-top:1px solid var(--ui-divider);padding-top:10px}
+.game-ports-forwarding>p:first-child{margin-top:0}
+.installation-ports-notice{margin:0 0 16px}
+.installation-ports-notice>button{margin-top:8px}
+.game-ports-details{margin-top:10px;color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1))}.game-ports-details summary{cursor:pointer;width:fit-content}.game-ports-details[open] summary{margin-bottom:8px}
+@media(max-width:420px){.game-ports dl>div{grid-template-columns:minmax(0,1fr);gap:4px}}

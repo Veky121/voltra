@@ -25,9 +25,11 @@ function redact(value){
  if(typeof value==='string'){for(const secret of [state.console_password,state.game_admin_password,state.game_token,...(state.previous_console_passwords??[])].filter(Boolean))value=value.replaceAll(secret,'[redacted]');}
  return value;
 }
+let lastStatus;
 async function api(method,path,body){
  active();
  const response=await fetch(runtime.panel_url+path,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
+ lastStatus=response.status;
  const text=await response.text();let result;try{result=text?JSON.parse(text):{};}catch{throw Error('Fixture Panel returned non-JSON response');}
  if(!response.ok)throw Error(JSON.stringify(redact({status:response.status,result})));
  return result;
@@ -76,8 +78,10 @@ if(command==='create'){
   result=await api('POST',prefix+'/steam/'+args[0],{});
  }else if(command==='reinstall-client'){
   result=await api('POST',prefix+'/settings/reinstall',{});
+  result={...result,http_status:lastStatus,route:'client'};
  }else if(command==='reinstall-admin'){
   result=await api('POST','/api/application/servers/'+encodeURIComponent(state.uuid)+'/reinstall',{});
+  result={...result,http_status:lastStatus,route:'application'};
  }else if(command==='startup')result=await api('GET',prefix+'/startup');
  else throw Error('Choose create,status,power,console,settings,maintenance,startup');
  console.log(JSON.stringify(redact(result)));

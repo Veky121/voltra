@@ -2,17 +2,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {embeddedPython} from './embedded-python.mjs';
 const scripts='internal/panel/game_library/scripts';
 const sources=new Map(fs.readdirSync(scripts).filter(n=>n.endsWith('.py')).map(n=>[n.slice(0,-3).replaceAll('-','_'),fs.readFileSync(path.join(scripts,n),'utf8')]));
 const normalize=s=>s.replaceAll('\r\n','\n').trimEnd();
 const profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
 const modules=[],mismatches=[];
 for(const [recipe,profile] of Object.entries(profiles)){
- const pattern=/cat\s+>\s*([^\s]+\.py)\s+<<'([^']+)'\r?\n([\s\S]*?)\r?\n\2(?:\r?\n|$)/g;
- for(const match of profile.egg.scripts.installation.script.matchAll(pattern)){
-  const name=path.posix.basename(match[1]).slice(0,-3).replaceAll('-','_');
-  modules.push({recipe,name,source:normalize(match[3])});
-  if(sources.has(name)&&normalize(match[3])!==normalize(sources.get(name)))mismatches.push({recipe,module:name});
+ for(const match of embeddedPython(profile.egg.scripts.installation.script)){
+  const name=path.posix.basename(match.file).slice(0,-3).replaceAll('-','_');
+  modules.push({recipe,name,source:normalize(match.source)});
+  if(sources.has(name)&&normalize(match.source)!==normalize(sources.get(name)))mismatches.push({recipe,module:name});
  }
 }
 const inspect=spawnSync('docker',['image','inspect','python:3.13-slim','--format','{{.Id}}'],{encoding:'utf8',windowsHide:true});

@@ -41,6 +41,7 @@ func (a *App) registerOperations(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/client/servers/{server}/command", a.clientCommand)
 	mux.HandleFunc("POST /api/client/servers/{server}/power", a.clientPower)
 	mux.HandleFunc("GET /api/client/servers/{server}/websocket", a.clientWebsocket)
+	mux.HandleFunc("GET /api/client/servers/{server}/console-history", a.clientConsoleHistory)
 	mux.HandleFunc("GET /api/client/servers/{server}/ws", a.clientSocketProxy)
 	for _, op := range []string{"list", "contents", "download", "upload"} {
 		mux.HandleFunc("GET /api/client/servers/{server}/files/"+op, a.clientFiles)
@@ -245,12 +246,15 @@ func (a *App) clientPower(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
+	a.recordConsolePower(r.Context(), num(s["id"]), signal, "requested")
 	resp, e := a.daemonServer(r.Context(), s, "POST", "/power", M{"action": signal})
 	if e != nil {
+		a.recordConsolePower(r.Context(), num(s["id"]), signal, "failed")
 		fail(w, e)
 		return
 	}
 	resp.Body.Close()
+	a.recordConsolePower(r.Context(), num(s["id"]), signal, "accepted")
 	a.opAudit(r, s, "server:power."+signal, M{})
 	w.WriteHeader(204)
 }
@@ -371,7 +375,7 @@ func (a *App) clientSocketProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	target := strings.Replace(strings.Replace(opNodeAddress(n), "http://", "ws://", 1), "https://", "wss://", 1) + "/api/servers/" + url.PathEscape(str(s["uuid"])) + "/ws"
 	headers := http.Header{}
-	headers.Set("Origin", a.panelPublicURL(r.Context()))
+	headers.Set("Origin", a.consoleUpstreamOrigin(r.Context(), n))
 	dialer := *websocket.DefaultDialer
 	if str(n["connection_mode"]) == "outbound" {
 		dialer.NetDialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -1288,6 +1292,10 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 		}
 		if !boolean(changed["user_editable"]) {
 			fail(w, bad("The environment variable is read-only"))
+			return
+		}
+		if e = a.validateClusterioStartupChange(ctx, s, changed, rows, d); e != nil {
+			fail(w, e)
 			return
 		}
 		if boolean(d["reset"]) || boolean(changed["secret"]) {

@@ -521,7 +521,7 @@ func minecraftStringIn(values []any, value string) bool {
 // Pack-provided shell/batch scripts and prebuilt JVM libraries are not executed.
 func minecraftServerPackPrefix(reader *zip.Reader) (string, error) {
 	prefix := ""
-	found := false
+	candidates := map[string]bool{}
 	for _, f := range reader.File {
 		parts := strings.Split(f.Name, "/")
 		for i, p := range parts {
@@ -530,16 +530,30 @@ func minecraftServerPackPrefix(reader *zip.Reader) (string, error) {
 				if candidate != "" {
 					candidate += "/"
 				}
-				if found && candidate != prefix {
-					return "", bad("The server pack has ambiguous instance folders.")
+				candidates[candidate] = true
+				if len(candidates) == 1 || len(candidate) < len(prefix) {
+					prefix = candidate
 				}
-				prefix, found = candidate, true
 				break
 			}
 		}
 	}
-	if !found {
+	if len(candidates) == 0 {
 		return "", bad("This server pack needs a custom setup script and has no supported server content folders. Choose another version.")
+	}
+	// Content can itself contain sample config/mods folders (RLCraft's loading
+	// screen resources do). Only disregard those below a supported content
+	// folder of the selected instance; independent sibling instances remain
+	// ambiguous regardless of ZIP entry order.
+	content := map[string]bool{"mods": true, "config": true, "defaultconfigs": true, "kubejs": true, "scripts": true, "datapacks": true, "resources": true, "global_packs": true, "resourcepacks": true}
+	for candidate := range candidates {
+		if candidate == prefix {
+			continue
+		}
+		relative, inside := strings.CutPrefix(candidate, prefix)
+		if !inside || !content[strings.Split(relative, "/")[0]] {
+			return "", bad("The server pack has ambiguous instance folders.")
+		}
 	}
 	return prefix, nil
 }

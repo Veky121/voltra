@@ -92,6 +92,24 @@ download evidence; record the original acquisition and content identity.
 
 Checks: `node --test tools/runtime/batch-queue.test.mjs`.
 
+Utilities use `claim-utility`, or exported `claimUtility` inside the same atomic
+`transact` wrapper. Supply a short `task` and `owner`, explicit memory/disk/port
+counts and the normal pool limits. Do not supply a catalog `game` or invent an
+egg for a parser/dependency probe. A utility with no listeners uses `ports: 0`.
+Utility rows have `kind: "utility"` and consume the same RAM, disk reserve and
+active-worker budget as game rows. The normal cleanup confirmation and owner
+checks still apply before release; a utility lease does not authorize unrelated
+acquisition, account login or service changes.
+
+The named disposable Wings daemon disables automatic crash retries so the first
+native failure remains observable. Existing daemons require a coordinated idle
+window: `batch-crash-policy.mjs prepare` checks the receipt, live node UUID,
+configuration mount, ownership label and all running game-volume mounts before
+producing a plan. `apply` rechecks that plan, saves the private original config
+and refreshes only that owned daemon. It never targets the Panel or Docker
+service. Verify each server's actual Wings `crash_detection_enabled` afterward;
+a configuration file alone does not establish the live setting.
+
 After merging staged profiles, run `node tools/runtime/audit-profile-python-source.mjs`
 to compile embedded Python without executing it and compare known helper copies
 with their current source files. This uses the existing local Python Docker image

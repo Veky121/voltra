@@ -5,7 +5,7 @@ export const minecraftAPI = "/api/client/game-library/minecraft";
 export type MinecraftRuntime = {id: string | number; name: string; major: number; distribution: string; image: string; enabled: boolean};
 export type MinecraftOptions = {
   latest: string; versions: string[]; can_install: boolean;
-  nodes: {id: string | number; name: string; free_allocations: number}[];
+  nodes: {id: string | number; name: string; free_allocations: number; automatic_ports?: boolean; setup_available?: boolean}[];
   loaders: {id: string; name: string}[]; runtimes?: MinecraftRuntime[];
 };
 export type PackProvider = "curseforge" | "modrinth";

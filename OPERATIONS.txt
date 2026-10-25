@@ -13,7 +13,7 @@ Open http://127.0.0.1:8088. The startup script creates or starts the separate
 pteroclone-postgres container on 127.0.0.1:55432. It generates database and
 encryption secrets once in ignored .local/runtime.env. Preserve this file and
 the PostgreSQL volume together. Losing ENCRYPTION_KEY makes saved daemon,
-database, SMTP and S3 credentials unreadable.
+database and S3 credentials unreadable.
 
 First-run setup at /setup creates an administrator with password sign-in.
 Existing development installs retain their loopback development identity until
@@ -40,9 +40,9 @@ APP_TIMEZONE defaults to UTC; the persisted app:timezone setting overrides it fo
 WEB_DIR defaults to web/dist. LOCALES_DIR optionally overlays bundled locale
 JSON files. DEV_USER_ID selects a local development account (default 1).
 
-The Go process runs the schedule, notification and daemon revocation workers.
-SMTP is configured through Administration > Settings. Without SMTP,
-notifications stay in the durable queue and retry rather than disappear.
+The Go process runs the schedule and daemon revocation workers.
+The panel does not send email. Account email addresses remain user identifiers.
+Schema upgrades remove obsolete SMTP settings and the email delivery queue.
 Configure Wings from Administration > Nodes. Existing Wings is retained.
 Add nodes opens the automatic pairing flow. Select Local or External, install
 the node connector, and copy its connection string into the private
@@ -186,3 +186,24 @@ Signed self-updates use Wails' built-in updater and are disabled until a
 release manifest URL and signing public key are supplied at build time.
 GitHub setup, release publishing and native code signing remain future release
 tasks. See desktop/README.md for connection details, tests and release setup.
+
+Persistent console history
+--------------------------
+The panel keeps one read-only Wings WebSocket per server, including when no
+browser is open. PostgreSQL retains the newest 5,000 lines, capped at 8 MiB
+of console text per server. CONSOLE_HISTORY_LINES changes the line limit
+from 1 to 50,000. Individual lines exceeding 16 KiB are marked as truncated.
+Restart the panel to change the limit. A subsequent log batch applies it.
+The console loads saved history and follows a cursor, polling once per second.
+Clear display only clears this browser view. Reload shows retained history.
+History survives game stops/crashes and panel restarts; deleting a server
+removes its cache. These disposable caches are excluded from portable snapshots.
+Reading history requires current websocket.connect access. Installation output
+remains administrator-only, matching Wings. Logs can contain game-generated
+private information; history is never a public or browser-local cache.
+Capture requires the panel, PostgreSQL and Wings connection to be available.
+The console reports disconnection, and each collector connection adds a gap
+notice. Output from an outage is not recovered or silently guessed. Capture
+starts after deploying this backend; it cannot recover already-lost logs.
+Wings history replay has no cursor or end marker, so the collector deliberately
+does not append it on reconnect, avoiding duplicated or reordered game logs.

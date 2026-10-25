@@ -94,3 +94,9 @@ test('preview uses saved values and redacts secret placeholders, raw values and 
   assert.match(commandPreview({},[]),/No command preview/);
   assert.equal(commandPreview({startup_command:'run --players 16'},[variable]),'run --players 16');
 });
+
+test('two-value boolean enums use switches without turning ordinary enums into toggles', () => {
+ for (const rules of ['required|boolean','required|in:0,1','required|in:1,0','required|in:true,false']) assert.equal(variableControl({...variable,rules}).boolean,true,rules);
+ assert.equal(variableControl({...variable,rules:'required|in:0,1,2'}).boolean,false);
+ assert.equal(variableControl({...variable,env_variable:'API_TOKEN',rules:'in:0,1'}).boolean,false);
+});

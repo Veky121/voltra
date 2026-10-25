@@ -58,6 +58,11 @@ func (e *Executor) recoverServer(ctx context.Context, r steamapi.Request) error 
 			if err = restoreConfigs(dir, backup); err != nil {
 				return err
 			}
+			if rec.PalworldMods {
+				if err = restorePalworldMods(dir, filepath.Join(e.journal, phaseID(rec.Request)+".palworld-mods")); err != nil {
+					return err
+				}
+			}
 		}
 		rec.RecoveryNeeded = false
 		rec.Terminal = &steamapi.Event{Type: "error", Stage: "interrupted", Error: "previous execution interrupted; run a new repair job while stopped", Detail: "Previous execution interrupted; configuration restored where necessary.", FilesChanged: rec.Mutating}
@@ -65,6 +70,7 @@ func (e *Executor) recoverServer(ctx context.Context, r steamapi.Request) error 
 			return err
 		}
 		_ = os.Remove(backup)
+		removePalworldModBackup(filepath.Join(e.journal, phaseID(rec.Request)+".palworld-mods"))
 	}
 	return nil
 }

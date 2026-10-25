@@ -1,0 +1,13 @@
+import fs from'node:fs';import{createHash}from'node:crypto';import{api,rows}from'./openttd-compat-node.mjs';import{ownedStoppedServer}from'./cache-owned-server.mjs';
+const d='.local/craftopia-native',{receipt:s}=await ownedStoppedServer(d+'/private.json');if(fs.existsSync(d+'/operator-fixtures.json'))throw Error('Own operator fixture already recorded');
+const a=(await api('/api/application/servers/'+s.internal_id)).attributes;if(a.egg!==s.egg_id||a.external_id!=='craftopia-native-'+s.request_id)throw Error('Exact own identity');
+const base='http://127.0.0.1:8088/api/client/servers/'+s.identifier;
+const r=await fetch(base+'/files/contents?file='+encodeURIComponent('/ServerSetting.ini'),{signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('Config readHTTP'+r.status);const before=await r.text();
+if(before.includes('[VoltraAcceptance]'))throw Error('No adoption of unknown marker');
+const after=before+'\n; Disposable Voltra operator comment retained across reinstall\n[VoltraAcceptance]\nLiteral = $value ; unknown setting retained\n';
+const roots=rows(await api('/api/client/servers/'+s.identifier+'/files/list?directory=/'));if(!roots.some(x=>x.name==='mods'))await api('/api/client/servers/'+s.identifier+'/files/create-folder','POST',{root:'/',name:'mods'});
+const name='voltra-preservation-'+s.request_id+'.txt',entries=rows(await api('/api/client/servers/'+s.identifier+'/files/list?directory=/mods'));if(entries.some(x=>x.name===name))throw Error('Own fixture name already exists');
+async function write(file,body){const x=await fetch(base+'/files/write?file='+encodeURIComponent(file),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body,signal:AbortSignal.timeout(10000)});if(!x.ok)throw Error('Owned writeHTTP'+x.status);}
+await write('/ServerSetting.ini',after);await write('/mods/'+name,'Disposable operator-owned mod-directory text marker. No executable mod or gameplay asset.\n');
+const verify=await fetch(base+'/files/contents?file='+encodeURIComponent('/ServerSetting.ini'),{signal:AbortSignal.timeout(10000)});if(!verify.ok||await verify.text()!==after)throw Error('Own config verification failed');
+fs.writeFileSync(d+'/operator-fixtures.json',JSON.stringify({uuid:s.uuid,config:'ServerSetting.ini',before_sha256:createHash('sha256').update(before).digest('hex'),after_sha256:createHash('sha256').update(after).digest('hex'),comment_and_unknown_section:true,mod_text_marker:'mods/'+name,normal_files_api:true,at:new Date().toISOString()},null,2)+'\n',{flag:'wx'});console.log({server:s.internal_id,config_marker:true,mod_text_marker:name,normal_files_api:true});

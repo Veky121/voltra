@@ -13,6 +13,9 @@ import (
 
 func startupSecretName(name string) bool {
 	name = strings.ToUpper(name)
+	if name == "GAME_SERIAL" || name == "DLC_PRODUCT_KEY" {
+		return true
+	}
 	for _, part := range []string{"PASSWORD", "PASSWD", "PASSPHRASE", "TOKEN", "SECRET", "API_KEY", "APIKEY", "PRIVATE_KEY", "ACCESS_KEY", "LICENSE_KEY", "LICENCE_KEY", "CREDENTIAL"} {
 		if strings.Contains(name, part) {
 			return true

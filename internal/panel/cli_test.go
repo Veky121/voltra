@@ -182,24 +182,12 @@ func TestCLIAccountsSettingsMaintenancePostgres(t *testing.T) {
 			t.Fatalf("%s does not report effective timezone: %v", command, report)
 		}
 	}
-	cliRunJSON(t, a, "p:environment:mail", "--driver=smtp", "--host=localhost", "--port=2525", "--email=panel@example.test", "--from=CLI Panel", "--password=smtp-private-secret")
-	password, e := a.one(ctx, "SELECT value FROM settings WHERE key='mail:password'")
-	if e != nil {
-		t.Fatal(e)
-	}
-	if str(password["value"]) == "smtp-private-secret" {
-		t.Fatal("mail password stored plaintext")
-	}
-	plain, e := a.unseal(str(password["value"]))
-	if e != nil || plain != "smtp-private-secret" {
-		t.Fatal("mail password encryption failed")
-	}
-	for _, command := range []string{"p:info", "env", "p:environment:database", "p:environment:mail", "p:telemetry"} {
+	for _, command := range []string{"p:info", "env", "p:environment:database", "p:telemetry"} {
 		var output bytes.Buffer
 		if e = a.RunCommand(ctx, []string{command}, &output); e != nil {
 			t.Fatal(e)
 		}
-		for _, secret := range []string{"smtp-private-secret", "cli-private-encryption-secret", "public-secret", "query-secret"} {
+		for _, secret := range []string{"cli-private-encryption-secret", "public-secret", "query-secret"} {
 			if strings.Contains(output.String(), secret) {
 				t.Fatalf("%s leaked %s", command, secret)
 			}
@@ -373,7 +361,9 @@ func TestCLISnapshotFilesPostgres(t *testing.T) {
 	target.Config.EncryptionKey = "different-target-key"
 	ctx := context.Background()
 	cliRunJSON(t, source, "p:user:make", "--username=snapshot-user", "--email=snapshot-private@example.test", "--name-first=Snapshot", "--name-last=User", "--admin=true")
-	cliRunJSON(t, source, "p:environment:mail", "--password=snapshot-private-secret")
+	if err := source.cliApplySettings(ctx, M{"backups.s3": M{"secret_access_key": "snapshot-private-secret"}}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
 	filename := filepath.Join(t.TempDir(), "private-snapshot.json")
 	var report bytes.Buffer
 	if e := source.RunCommand(ctx, []string{"export-snapshot", "--file", filename}, &report); e != nil {
@@ -418,11 +408,11 @@ func TestCLISnapshotFilesPostgres(t *testing.T) {
 	if e != nil || row["username"] != "snapshot-user" {
 		t.Fatal("snapshot user not restored")
 	}
-	setting, e := target.one(ctx, "SELECT value FROM settings WHERE key='mail:password'")
+	setting, e := target.one(ctx, "SELECT value FROM settings WHERE key='backups.s3'")
 	if e != nil {
 		t.Fatal(e)
 	}
-	plain, e := target.unseal(str(setting["value"]))
+	plain, e := target.unseal(str(asMap(setting["value"])["secret_access_key"]))
 	if e != nil || plain != "snapshot-private-secret" {
 		t.Fatal("snapshot secret not re-encrypted for target")
 	}

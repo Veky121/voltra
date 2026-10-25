@@ -4,11 +4,13 @@ import {api,useAPI,Button,Input,Field,Modal} from '../lib';
 import {Icon,type IconName} from '../Icons';
 import {bytes,can,date,download,items,json,Notice,PageError,useAction,useServer,value,type RecordData} from './common';
 import FileMenu from './FileMenu';
+import {DropdownMenuItem} from '../components/ui/dropdown-menu';
 import FileExplorer from './FileExplorer';
 import useFileNavigationGuard from './useFileNavigationGuard';
 import {commitDraft,discardDraft,isDraftDirty,loadedDraft} from './fileDraft';
 import './files.css';
 import './fileWorkspace.css';
+import './files-ui.css';
 const FileEditor=lazy(()=>import('./FileEditor'));
 
 function containerPath(path:string){
@@ -29,7 +31,7 @@ function modifiedAt(timestamp:string,now:number){
 }
 type OpenMenu={kind:'row'|'tools'|'selection';anchor:HTMLButtonElement;file?:RecordData};
 function MenuItem({icon,children,onClick,danger=false,disabled=false}:{icon:IconName;children:ReactNode;onClick:()=>void;danger?:boolean;disabled?:boolean}){
-  return <button type="button" role="menuitem" className={`file-menu-item${danger?' is-danger':''}`} onClick={onClick} disabled={disabled}><Icon name={icon}/><span>{children}</span></button>;
+  return <DropdownMenuItem className={`file-menu-item${danger?' is-danger':''}`} variant={danger?'destructive':'default'} onClick={onClick} disabled={disabled}><Icon name={icon}/><span>{children}</span></DropdownMenuItem>;
 }
 
 export default function Files(){

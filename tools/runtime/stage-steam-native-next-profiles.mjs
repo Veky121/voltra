@@ -1,5 +1,13 @@
 import fs from 'node:fs';
 const base='internal/panel/game_library/scripts/',catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),previous=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),profiles={};
+if(process.argv.includes('--rising-console-candidate')){
+ const path='rising_world/unity/egg-rising-world-unity.json',profile=structuredClone(previous[path]);
+ const pattern=/(cat > \.voltra\/steam-native-next\.py <<'VOLTRA_STEAM_NATIVE_SOURCE'\n)[\s\S]*?(\nVOLTRA_STEAM_NATIVE_SOURCE\n)/g;
+ let count=0;profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.replace(pattern,(_,begin,end)=>{count++;return begin+fs.readFileSync(base+'steam-native-next.py','utf8')+end;});
+ if(count!==1)throw Error('Expected exact one native family embedding');
+ fs.mkdirSync('.local/steam-native-next',{recursive:true});fs.writeFileSync('.local/steam-native-next/rising-profiles.json',JSON.stringify({[path]:profile},null,2)+'\n');
+ console.log('Staged Rising-only console candidate; all canonical metadata and other helper embeddings preserved.');process.exit(0);
+}
 for(const [path,game] of [['colony_survival/egg-colony-survival.json','colony'],['hurtworld/egg-hurtworld.json','hurtworld'],['holdfast/egg-holdfast-na-w.json','holdfast'],['rising_world/unity/egg-rising-world-unity.json','rising']]){
  const entry=catalog.entries.find(e=>e.path===path),egg=structuredClone(entry.egg),revision=game+'-native-v1';
  egg.docker_images={'Pinned Linux native Steam runtime':'ghcr.io/ptero-eggs/steamcmd@sha256:c8a93dc0e256d1dba10aed6a0d8d6e739d4f1809f4e3b7428d0c01adc6e6e68b'};

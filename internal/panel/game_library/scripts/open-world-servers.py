@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import sys
 import tempfile
 import time
@@ -16,6 +17,11 @@ from additional_survival_install import private_bytes
 def load(name,file):
     spec=importlib.util.spec_from_file_location(name,Path(__file__).with_name(file))
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
+
+
+def onset_compat(root,provision=False):
+    module=load('onset_mariadb_compat','onset-mariadb-compat.py')
+    return module.provision(root) if provision else module.location(root)
 
 
 release=load('open_world_release','native-release.py')
@@ -137,7 +143,7 @@ def install(root,game,env):
     root=Path(root).resolve()
     if game not in ('onset','jc3','lac'):raise ValueError('Unknown reviewed open-world game')
     if game!='lac':
-        if game=='onset' and env.get('SRCDS_APPID','1204170')!='1204170':raise ValueError('Onset application identity is fixed')
+        if env.get('SRCDS_APPID',str(PINS[game]['appid']))!=str(PINS[game]['appid']):raise ValueError('Dedicated application identity is fixed')
         platform='windows' if env.get('WINDOWS_INSTALL','0')=='1' else 'linux'
         app=PINS[game]['appid'];arguments(root,app,env,True,platform=platform)
         required=(('OnsetServer.exe',) if platform=='windows' else ('OnsetServer',)) if game=='onset' else (('Server.exe',) if platform=='windows' else ('Server',))
@@ -149,7 +155,10 @@ def install(root,game,env):
             if path.is_file():saved.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,saved);saved.chmod(0o600)
             previous.append((relative,metadata,path.is_dir()))
         try:
-            if game!='lac':receipt=update(root,app,env=env,validate=True,required=required,platform=platform)
+            if game!='lac':
+                receipt=update(root,app,env=env,validate=True,required=required,platform=platform)
+                if game=='onset' and platform=='linux':onset_compat(root,provision=True)
+                if game=='jc3' and not any(str(relative)=='config.json' for relative,_,_ in previous):configure(root,game,env)
             else:
                 identity=lac_identity(env)
                 with tempfile.TemporaryDirectory(prefix='publisher-',dir=state) as download:
@@ -174,13 +183,26 @@ def install(root,game,env):
 
 def launch(root,game,env):
     root=Path(root).resolve();env=dict(env)
-    if game!='lac' and boolean(env.get('AUTO_UPDATE','1')):install(root,game,env)
+    if game!='lac' and boolean(env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','1'))):install(root,game,env)
     if env.get('WINDOWS_INSTALL','0')=='1':raise ValueError('Windows payload acquisition is retained; runtime needs a separately verified Windows/Wine stack')
     configure(root,game,env)
-    binary={'onset':'OnsetServer','jc3':'Server','lac':'LAC_Linux_v'+lac_version(env)+'.x86_64'}[game]
+    binary='LAC_Linux_v'+lac_version(env)+'.x86_64' if game=='lac' else {'onset':'OnsetServer','jc3':'Server'}[game]
     child=dict(env);child['HOME']=str(root);child['XDG_CONFIG_HOME']=str(root/'.config');child['LD_LIBRARY_PATH']=':'.join([str(root),str(root/'linux64'),env.get('LD_LIBRARY_PATH','.')])
+    if game=='jc3':
+        # The private Python launcher carries its own OpenSSL. Native JC3's
+        # current libcurl must resolve against the selected system runtime,
+        # never that interpreter's older private library directory.
+        child['LD_LIBRARY_PATH']=':'.join(str(root/path) for path in ('lib','linux64','.steam/sdk64','.'))
     for key in ('PYTHONHOME','PYTHONPATH','STEAM_USER','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS'):child.pop(key,None)
+    if game=='onset':child['LD_LIBRARY_PATH']=str(onset_compat(root))+':'+child['LD_LIBRARY_PATH']
     argv=[str(confined(root,binary))]+(['--noinput'] if game=='onset' else [])
+    if game=='lac':
+        console=load('open_world_native_console','native-console.py')
+        credentials=[env.get(key,'') for key in ('SERVER_PASSWORD','ADMIN_CODE','STEAM_USER','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')]
+        # Native1.9.7 catches SIGINT without finishing shutdown. Actual bounded
+        # SIGTERM acceptance exited0 with Unity teardown. Keep the Panel ^C
+        # control while translating only this publisher's native signal.
+        return console.run(root,argv,child,'^C',credentials=credentials,ready_marker=b'[NetworkManager] Server Started.',stop_signal=signal.SIGTERM)
     # Replace the wrapper, retaining original native stdin and Wings SIGINT
     # (^C) stop semantics. Passwords remain in native config, never process argv.
     os.chdir(root);os.execvpe(argv[0],argv,child)
@@ -189,5 +211,5 @@ def launch(root,game,env):
 if __name__=='__main__':
     action,game=sys.argv[1:3]
     if action=='install':install(Path.cwd(),game,dict(os.environ))
-    elif action=='run':launch(Path.cwd(),game,dict(os.environ))
+    elif action=='run':sys.exit(launch(Path.cwd(),game,dict(os.environ)))
     else:raise ValueError('Unknown reviewed open-world operation')

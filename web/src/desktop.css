@@ -22,6 +22,8 @@
 .desktop-window-controls .desktop-window-close:hover{background:#c42b1c;color:#fff}
 .desktop-window-controls button:focus-visible,.desktop-bar .button:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
 .desktop-window-controls svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.2;pointer-events:none}
+/* Override child pointer/text cursors only while the mouse is on a window edge. */
+html[data-desktop-resize-edge],html[data-desktop-resize-edge] *,html[data-desktop-resize-edge] dialog::backdrop{cursor:var(--desktop-resize-cursor)!important}
 body.voltra-desktop .app-shell{height:calc(100dvh - 40px);margin-top:40px}
 .desktop-banner{position:fixed;top:44px;left:25%;z-index:201}
 @media(max-width:1050px){.desktop-panel-address,.desktop-update-message{display:none}.desktop-bar{gap:8px}.desktop-title-actions,.desktop-updates{gap:3px}}

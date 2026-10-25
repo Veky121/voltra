@@ -1,0 +1,4 @@
+import fs from 'node:fs';import {api} from './openttd-compat-node.mjs';
+const dir='.local/jc3-native',s=JSON.parse(fs.readFileSync(dir+'/private.json')),command=process.argv[2];if(!['perf'].includes(command))throw Error('Only publisher-documented bounded console probe');
+const v=(await api('/api/application/servers/'+s.internal_id)).attributes;if(v.uuid!==s.uuid||v.egg!==s.egg_id||s.owner!=='game_batch_inventory')throw Error('Foreign fixture');
+await api('/api/client/servers/'+s.identifier+'/command','POST',{command});fs.appendFileSync(dir+'/commands.jsonl',JSON.stringify({command,at:new Date().toISOString(),primary_source:'https://just-cause.mp/docs/developing/server-packages'})+'\n');console.log({command,submitted:true});

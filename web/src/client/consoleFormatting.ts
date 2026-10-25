@@ -3,7 +3,7 @@ export type ConsoleStyle = {
   fontStyle?: 'italic'; textDecoration?: string;
 };
 export type ConsoleSegment = {text: string; style: ConsoleStyle};
-export type ConsoleLevel = 'error' | 'warning' | 'debug' | 'info' | 'success' | 'daemon' | 'normal';
+export type ConsoleLevel = 'error' | 'warning' | 'debug' | 'info' | 'success' | 'daemon' | 'command' | 'normal';
 
 const palette = ['#8b90a0','#ff808e','#86dba0','#f4cf83','#89b4ff','#d6a1ed','#80d4df','#e5e7ef',
   '#a0a4b3','#ff9ca7','#a3edb9','#ffe2a3','#accbff','#e5bdf7','#a5e7ed','#ffffff'];
@@ -30,6 +30,7 @@ export function detectConsoleLevel(text: string): ConsoleLevel {
   const direct = body.match(/^(?:Log[\w]+:\s*)?(FATAL|SEVERE|CRITICAL|ERROR|ERR|WARNING|WARN|DEBUG|TRACE|INFO)(?=\s|:|\[|$)/i);
   const level = severity(direct?.[1] ?? tokens?.at(-1) ?? '');
   if (level && level !== 'info') return level;
+  if (/^container@voltra~(?:\s|$)/.test(body)) return 'command';
   if (/^(?:Done \([\d.]+s\)!|Server (?:is )?(?:ready|started|listening)\b|Game server (?:connected|initialized)\b|Listening on\b)/i.test(body)) return 'success';
   if (level) return level;
   return text.startsWith('[Voltra]') ? 'daemon' : 'normal';
@@ -41,9 +42,13 @@ function severity(value: string): ConsoleLevel | undefined {
   if (/^info$/i.test(value)) return 'info';
 }
 
-export function formatConsoleLines(lines: string[]): {level: ConsoleLevel; segments: ConsoleSegment[]}[] {
-  let style: ConsoleStyle = {};
-  return lines.map(line => {
+export type FormattedConsoleLine = {level: ConsoleLevel; segments: ConsoleSegment[]};
+export function formatConsoleLines(lines: string[]): FormattedConsoleLine[] {
+  return formatConsoleBatch(lines).lines;
+}
+export function formatConsoleBatch(lines: string[], initialStyle: ConsoleStyle = {}): {lines: FormattedConsoleLine[]; endStyle: ConsoleStyle} {
+  let style: ConsoleStyle = {...initialStyle};
+  const formatted = lines.map(line => {
     const segments: ConsoleSegment[] = [];
     let position = 0;
     for (const match of line.matchAll(/\x1b\[([\d;]*)m/g)) {
@@ -80,4 +85,5 @@ export function formatConsoleLines(lines: string[]): {level: ConsoleLevel; segme
     if (position < line.length) segments.push({text: line.slice(position), style: {...style}});
     return {level: detectConsoleLevel(segments.map(s => s.text).join('')), segments};
   });
+  return {lines: formatted, endStyle: {...style}};
 }

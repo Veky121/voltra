@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import type {ButtonHTMLAttributes,InputHTMLAttributes,SelectHTMLAttributes,TextareaHTMLAttributes,HTMLAttributes,ReactNode} from 'react';
+import {Card as ShadcnCard} from './components/ui/card';
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
   const headers=new Headers(options.headers);
   headers.set('Accept','application/json');
@@ -25,10 +26,10 @@ export function useTranslation(namespace:string){const account=useAPI('/api/clie
 type ButtonProps=ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'default'|'secondary'|'danger'};
 export function Button({variant='default',className='',children,...props}:ButtonProps){return <button type="button" className={`button ${variant==='default'?'':variant} ${className}`} {...props}>{children}</button>}
 export function Input(props:InputHTMLAttributes<HTMLInputElement>){return <input {...props}/>}
-export function Select(props:SelectHTMLAttributes<HTMLSelectElement>){return <select {...props}/>}
+export {Select} from './ui/Select';
 export function Textarea(props:TextareaHTMLAttributes<HTMLTextAreaElement>){return <textarea {...props}/>}
 export function Field({label,hint,children}: {label:string,hint?:string,children:ReactNode}){return <label className="field"><span>{label}</span>{children}{hint&&<small className="muted">{hint}</small>}</label>}
-export function Card({children,className='',...props}:HTMLAttributes<HTMLElement>){return <section className={`card ${className}`} {...props}>{children}</section>}
+export function Card({children,className='',...props}:HTMLAttributes<HTMLElement>){return <ShadcnCard as="section" data-ui="card" className={`card legacy-card scn:gap-0 scn:[--card-spacing:var(--ui-card-padding)] ${className}`} {...props}>{children}</ShadcnCard>}
 export function ErrorBox({children}: {children?:ReactNode}){return children?<div className="error" role="alert">{children}</div>:null}
 export function Loading(){return <div className="loading" role="status"><span className="spinner"/>Loading…</div>}
 export function Empty({children}: {children?:ReactNode}){return <div className="empty">{children||'Nothing here yet.'}</div>}

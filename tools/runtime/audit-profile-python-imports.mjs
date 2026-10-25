@@ -2,14 +2,14 @@
 // This covers ordinary imports, not dynamic importlib paths or external packages.
 import fs from 'node:fs';
 import path from 'node:path';
+import {embeddedPython} from './embedded-python.mjs';
 const known=new Set(fs.readdirSync('internal/panel/game_library/scripts').filter(name=>name.endsWith('.py')).map(name=>name.slice(0,-3).replaceAll('-','_')));
 const profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
 const findings=[],conditional=[];let checked=0,modules=0;
 for(const [recipe,profile]of Object.entries(profiles)){
  const script=profile.egg.scripts.installation.script;
  const embedded=[];
- const pattern=/cat\s+>\s*([^\s]+\.py)\s+<<'([^']+)'\r?\n([\s\S]*?)\r?\n\2(?:\r?\n|$)/g;
- for(const match of script.matchAll(pattern))embedded.push({name:path.posix.basename(match[1]).slice(0,-3),source:match[3]});
+ for(const match of embeddedPython(script))embedded.push({name:path.posix.basename(match.file).slice(0,-3).replaceAll('-','_'),source:match.source});
  if(!embedded.length)continue;
  checked++;modules+=embedded.length;
  const available=new Set(embedded.map(module=>module.name));

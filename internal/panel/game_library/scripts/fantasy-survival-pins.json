@@ -1,0 +1,11 @@
+{
+  "wine_runtime": "ghcr.io/ptero-eggs/yolks@sha256:eedeb0ff1684592ee0f28119d7111f7ba14488dfa9537c99689dfe7a33ba2553",
+  "mono": {
+    "version": "9.1.0",
+    "url": "https://dl.winehq.org/wine/wine-mono/9.1.0/wine-mono-9.1.0-x86.msi",
+    "bytes": 84623872,
+    "sha256": "8a0a1e6837b494df49927e5d759b1c6908e89b8a2f8e3ad025e1c2881882476e",
+    "digest_provenance": "https://github.com/wine-mirror/wine/blob/wine-9.8/dlls/appwiz.cpl/addons.c",
+    "license": "Wine Mono and bundled components retain respective upstream licenses"
+  }
+}

@@ -25,7 +25,7 @@ const result=JSON.parse(output);
 const secrets=[state.console_password,state.game_admin_password,state.game_token,...(state.previous_console_passwords??[])].filter(Boolean).flatMap(secret=>[secret,secret.trim(),JSON.stringify(secret).slice(1,-1)]).filter(Boolean);
 function containsSecret(value){if(typeof value==='string')return secrets.some(secret=>value.includes(secret));if(Array.isArray(value))return value.some(containsSecret);if(value&&typeof value==='object')return Object.values(value).some(containsSecret);return false;}
 if(containsSecret(result))throw Error('Native evidence unexpectedly contains a private credential');
-result.container={uuid:state.uuid,image_id:info.Image,runtime_image:info.Config.Image,user:info.Config.User,state:{running:info.State.Running,exit_code:info.State.ExitCode,oom:info.State.OOMKilled},ports:info.HostConfig.PortBindings};
+result.container={uuid:state.uuid,image_id:info.Image,runtime_image:info.Config.Image,user:info.Config.User,state:{running:info.State.Running,exit_code:info.State.ExitCode,oom:info.State.OOMKilled,started_at:info.State.StartedAt,finished_at:info.State.FinishedAt},ports:info.HostConfig.PortBindings};
 const name=process.argv.find(argument=>argument.startsWith('--save='))?.slice('--save='.length);
 if(name){if(!/^[a-zA-Z0-9_-]{1,64}$/.test(name))throw Error('Use a bounded evidence label');fs.writeFileSync(join(runtime.directory,name+'.json'),JSON.stringify(result,null,2)+'\n',{mode:0o600});}
 console.log(JSON.stringify(result));

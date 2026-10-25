@@ -10,6 +10,16 @@ import (
 var templatePortEnvironmentName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func validateTemplatePortRuleMetadata(rule templatePortRule) error {
+	if len(rule.ExcludePorts) > 0 && !rule.AllocatedValue {
+		return bad("Absolute port exclusions require an allocated port role.")
+	}
+	seenPorts := map[int]bool{}
+	for _, port := range rule.ExcludePorts {
+		if port < 1 || port > 65535 || seenPorts[port] {
+			return bad("This recipe has invalid absolute port exclusions.")
+		}
+		seenPorts[port] = true
+	}
 	if len(rule.AllocatedOffsets) > 0 && (!rule.AllocatedValue || len(rule.AllocatedOffsets)+2 > rule.Count) {
 		return bad("This recipe has invalid service-relative port metadata.")
 	}
@@ -76,6 +86,18 @@ func normalizeTemplatePortEnvironment(entry gameTemplate, environment M, primary
 		active = append(active, rule)
 		hasAuto = hasAuto || rule.AutoAllocate || len(rule.AllocatedOffsets) > 0
 	}
+	for _, rule := range active {
+		for _, excluded := range rule.ExcludePorts {
+			if num(primary["port"]) == int64(excluded) {
+				return nil, bad("The game port is excluded by this recipe.")
+			}
+			for _, allocation := range additional {
+				if num(allocation["port"]) == int64(excluded) {
+					return nil, bad("A selected port is excluded by this recipe.")
+				}
+			}
+		}
+	}
 	if !hasAuto {
 		return result, nil
 	}
@@ -114,6 +136,11 @@ func normalizeTemplatePortEnvironment(entry gameTemplate, environment M, primary
 		for _, port := range group(rule, base) {
 			if !available[port] || reserved[port] || port < int64(rule.Minimum) || port > int64(rule.Maximum) {
 				return false
+			}
+			for _, excluded := range rule.ExcludePorts {
+				if port == int64(excluded) {
+					return false
+				}
 			}
 			for _, offset := range rule.ExcludeOffsets {
 				if port == primaryPort+int64(offset) {

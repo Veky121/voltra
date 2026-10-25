@@ -1,4 +1,5 @@
-import {NavLink, Route, Routes, useParams} from 'react-router-dom';
+import {Route, Routes, useParams} from 'react-router-dom';
+import {SectionTabs} from '../ui/SectionTabs';
 import type {ReactNode} from 'react';
 import {can, useServer} from './common';
 import {Network, Settings} from './Operations';
@@ -15,10 +16,8 @@ export default function ServerSettings() {
   const {permissions}=useServer();
   const root=`/server/${id}/settings`;
   const tabs=[['','General',''],['network','Network','allocation.read'],['startup','Startup & runtime','startup.read'],['databases','Databases','database.read']];
-  return <>
-    <nav className="tabs" aria-label="Server settings">
-      {tabs.filter(([, ,permission])=>!permission||can(permissions,permission)).map(([path,label])=><NavLink key={path} to={`${root}${path?`/${path}`:''}`} end={!path}>{label}</NavLink>)}
-    </nav>
+  return <div className="server-settings-shell">
+    <SectionTabs label="Server settings" items={tabs.filter(([, ,permission])=>!permission||can(permissions,permission)).map(([path,label])=>({id:path,label,to:`${root}${path?`/${path}`:''}`,end:!path}))}/>
     <Routes>
       <Route index element={<Settings/>}/>
       <Route path="network" element={<Permitted permission="allocation.read"><Network/></Permitted>}/>
@@ -26,5 +25,5 @@ export default function ServerSettings() {
       <Route path="databases" element={<Permitted permission="database.read"><Databases/></Permitted>}/>
       <Route path="*" element={<p>Settings page not found.</p>}/>
     </Routes>
-  </>;
+  </div>;
 }

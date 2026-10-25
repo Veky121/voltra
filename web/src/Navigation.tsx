@@ -1,7 +1,8 @@
 import {Children,cloneElement,createContext,isValidElement,useContext,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
-import {Link,NavLink,useLocation} from 'react-router-dom';
+import {Link,NavLink,useLocation,type NavLinkRenderProps,type To} from 'react-router-dom';
 import {NavIcon,type IconName} from './Icons';
+import {SidebarGroup,SidebarGroupContent,SidebarGroupLabel,SidebarMenu,SidebarMenuButton,SidebarMenuItem} from './components/ui/sidebar';
 
 export const SidebarTarget=createContext<HTMLDivElement|null>(null);
 
@@ -23,13 +24,23 @@ export function NavigationGroup({label,description,children,detail=false,classNa
     const icon:IconName=({overview:'dashboard',details:'info',build:'cpu',startup:'startup',databases:'databases',mounts:'mounts',manage:'wrench',delete:'trash',configuration:'settings',java:'startup',variables:'settings',installation:'download',import:'upload'} as Record<string,IconName>)[text]||'settings';
     return cloneElement(child,{title:text},<><NavIcon name={icon}/><span>{text.charAt(0).toUpperCase()+text.slice(1)}</span></>);
   }):children;
-  return <section className={`sidebar-section${detail?' sidebar-detail':''} ${className}`}>
-    <div className="sidebar-section-heading">
-      <p className="eyebrow">{label}</p>
-      {description&&<p className="sidebar-description">{description}</p>}
-    </div>
-    <nav className="sidebar-nav" aria-label={label}>{links}</nav>
-  </section>;
+  return <SidebarGroup className={`voltra-nav-group ${className}`}>
+    <SidebarGroupLabel>{label}</SidebarGroupLabel>
+    <SidebarGroupContent><nav aria-label={label}><SidebarMenu>{Children.map(links,child=><NavigationItem>{child}</NavigationItem>)}</SidebarMenu></nav></SidebarGroupContent>
+  </SidebarGroup>;
+}
+
+type LinkChild={to?:To;end?:boolean;title?:string;children?:ReactNode;className?:string|((state:NavLinkRenderProps)=>string|undefined)};
+function NavigationItem({children}:{children:ReactNode}){
+  const {pathname}=useLocation();
+  if(!isValidElement<LinkChild>(children)||(!children.props.to&&children.type!=='button'))return children;
+  const props=children.props,to=typeof props.to==='string'?props.to:props.to?.pathname||'';
+  const path=to.split(/[?#]/)[0].replace(/\/$/,'')||'/';
+  const matches=!!props.to&&(pathname===path||(!props.end&&path!=='/'&&pathname.startsWith(path+'/')));
+  const className=typeof props.className==='function'?props.className({isActive:matches,isPending:false,isTransitioning:false}):props.className;
+  const active=matches||!!className?.split(/\s+/).includes('active');
+  const render=cloneElement(children,{className});
+  return <SidebarMenuItem><SidebarMenuButton render={render} isActive={active} tooltip={props.title} className="voltra-nav-link">{props.children}</SidebarMenuButton></SidebarMenuItem>;
 }
 
 export function AdminNavigation(){
@@ -48,13 +59,13 @@ export function AdminNavigation(){
   return <div className="sidebar-admin-groups">{groups.map(group=><NavigationGroup key={group.label} label={group.label} description={group.description}>
     {group.links.map(([to,label])=><NavLink key={to} to={to} title={label} end={to==='/admin'} className={({isActive})=>isActive||(to==='/admin/nests'&&pathname.startsWith('/admin/eggs/'))?'active':''}><NavIcon name={({'/admin/proxy-gateways':'network','/admin':'dashboard','/admin/settings':'settings','/admin/integrations':'key','/admin/api-keys':'key','/admin/servers':'server','/admin/users':'users','/admin/nodes':'nodes','/admin/locations':'locations','/admin/database-hosts':'databases','/admin/nests':'eggs','/admin/java-runtimes':'startup','/admin/mounts':'mounts'} as Record<string,IconName>)[to]}/><span>{label}</span></NavLink>)}
   </NavigationGroup>)}
-    <details className="sidebar-section" open={pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations')}>
-      <summary className="eyebrow" style={{cursor:'pointer',padding:'8px 0'}}>Advanced</summary>
-      <nav className="sidebar-nav" aria-label="Advanced administration">
+    <details className="voltra-sidebar-advanced" open={pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations')}>
+      <summary title="Advanced administration">Advanced</summary>
+      <NavigationGroup label="Advanced" className="voltra-advanced-group">
         <NavLink to="/admin/locations" title="Groups" className={({isActive})=>isActive?'active':''}><NavIcon name="locations"/><span>Groups</span></NavLink>
         <NavLink to="/admin/api-keys" title="Application API" className={({isActive})=>isActive?'active':''}><NavIcon name="key"/><span>Application API</span></NavLink>
         <NavLink to="/admin/mounts" title="Mounts" className={({isActive})=>isActive?'active':''}><NavIcon name="mounts"/><span>Mounts</span></NavLink>
-      </nav>
+      </NavigationGroup>
     </details>
   </div>;
 }

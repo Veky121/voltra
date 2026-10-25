@@ -1,0 +1,14 @@
+﻿import fs from 'node:fs';import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const d='.local/reforger-native',{receipt:s,node,image}=await ownedStoppedServer(d+'/private.json');const profile=JSON.parse(fs.readFileSync(d+'/source-profile-current.json'));
+const code=`from pathlib import Path
+import hashlib,json,base64,stat
+r=Path('/v');binary=r/'ArmaReforgerServer';st=binary.stat();assert stat.S_ISREG(st.st_mode) and not binary.is_symlink();assert binary.open('rb').read(4)==b'\\x7fELF';terms={}
+for p in r.rglob('*'):
+ if not p.is_file() or p.is_symlink() or p.stat().st_size>2*1024**2:continue
+ rel=str(p.relative_to(r))
+ if rel.startswith(('.voltra/','.steam/','Steam/')):continue
+ if p.suffix.lower() in ('.txt','.md','.html') and (any(k in p.name.lower() for k in ('eula','license','agreement','readme','legal')) or any(part.lower() in ('eula','eulas','license','licenses','terms','agreement','agreements','legal') for part in p.relative_to(r).parts[:-1])):
+  b=p.read_bytes();terms[rel]={'sha256':hashlib.sha256(b).hexdigest(),'bytes':len(b),'mode':oct(p.stat().st_mode&0o777),'uid':p.stat().st_uid,'gid':p.stat().st_gid,'body':base64.b64encode(b).decode()}
+print(json.dumps({'binary':{'bytes':st.st_size,'mode':oct(st.st_mode&0o777),'uid':st.st_uid,'gid':st.st_gid},'terms':terms,'profile_files':[str(p.relative_to(r))for p in (r/'profile').rglob('*')if p.is_file()],'config_json_present':(r/'config.json').is_file(),'release':json.loads((r/'.voltra/steam-template-release.json').read_text())}))`;
+const r=spawnSync('docker',['run','--rm','--pull','never','--network','none','--memory','256m','--mount',`type=bind,source=${node.volume_root}/${s.uuid},target=/v,readonly`,image,'python3','-B','-c',code],{windowsHide:true,encoding:'utf8',maxBuffer:20e6});assert.equal(r.status,0,r.stderr);const j=JSON.parse(r.stdout);fs.mkdirSync(d+'/packaged-terms',{recursive:true});for(const[path,x]of Object.entries(j.terms)){fs.writeFileSync(d+'/packaged-terms/'+path.replaceAll('/','__'),Buffer.from(x.body,'base64'));delete x.body;}
+const ldd=spawnSync('docker',['run','--rm','--pull','never','--network','none','--memory','256m','--read-only','--user','988:988','--mount',`type=bind,source=${node.volume_root}/${s.uuid},target=/payload,readonly`,'--entrypoint','/bin/bash',Object.values(profile.egg.docker_images)[0],'-c','exec env -u LD_LIBRARY_PATH ldd /payload/ArmaReforgerServer'],{windowsHide:true,encoding:'utf8'});fs.writeFileSync(d+'/runtime-ldd.txt',(ldd.stdout??'')+(ldd.stderr??''));j.dependencies={exit:ldd.status,missing:(ldd.stdout??'').includes('not found')};fs.writeFileSync(d+'/preboot.json',JSON.stringify(j,null,2)+'\n',{flag:'wx'});console.log({binary:j.binary,terms:j.terms,dependencies:j.dependencies,profile_files:j.profile_files,config_present:j.config_json_present});

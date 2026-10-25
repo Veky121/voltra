@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Field, Input, Select, Textarea, api } from "../lib";
 import { ErrorMessage, Panel } from "./shared";
+import { SettingsRow, Switch } from "../ui/Settings";
 
 type JavaEggConfig = {
   enabled: boolean;
@@ -40,7 +41,7 @@ export function JavaEgg({ eggID, config, onSaved }: {
     setSaved(false);
   };
   return (
-    <Panel title="Java settings">
+    <Panel title="Java settings" className="admin-java-settings">
       <p className="muted">Enable Java controls for servers using this egg. Existing eggs stay unchanged until Java is enabled.</p>
       <form onSubmit={async (event) => {
         event.preventDefault();
@@ -62,11 +63,11 @@ export function JavaEgg({ eggID, config, onSaved }: {
       }}>
         <ErrorMessage error={error} />
         {saved && <p className="success" role="status">Java settings saved.</p>}
-        <fieldset disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
-          <Field label="Enable Java controls">
-            <input type="checkbox" checked={draft.enabled} onChange={(e) => change("enabled", e.target.checked)} />
-          </Field>
-          <fieldset disabled={!draft.enabled} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+        <fieldset disabled={busy} className="admin-fieldset">
+          <SettingsRow className="admin-toggle-row" label="Enable Java controls" control={
+            <Switch aria-label="Enable Java controls" checked={draft.enabled} onCheckedChange={checked => change("enabled", checked)} />
+          } />
+          <fieldset disabled={!draft.enabled} className="admin-fieldset">
             <div className="form-grid">
               <Field label="Minimum Java major" hint="Use 0 for the server or platform default.">
                 <Input type="number" min={0} max={999} step={1} required value={Number.isNaN(draft.required_major) ? "" : draft.required_major} onChange={(e) => change("required_major", e.target.valueAsNumber)} />
@@ -99,11 +100,11 @@ export function JavaEgg({ eggID, config, onSaved }: {
               )}
             </div>
             <Field label="Default JVM arguments" hint="Heap flags are generated from the server's memory settings. Leave -Xms and -Xmx out of these arguments.">
-              <Textarea rows={3} maxLength={16384} spellCheck={false} value={draft.jvm_args} onChange={(e) => change("jvm_args", e.target.value)} />
+              <Textarea className="admin-code-input" rows={3} maxLength={16384} spellCheck={false} value={draft.jvm_args} onChange={(e) => change("jvm_args", e.target.value)} />
             </Field>
             <p className="muted">Command mode applies flags to a Java startup command. For a custom startup script, use an argument file that the script reads.</p>
           </fieldset>
-          <Button type="submit">{busy ? "Saving..." : "Save Java settings"}</Button>
+          <div className="actions admin-form-actions"><Button type="submit">{busy ? "Saving..." : "Save Java settings"}</Button></div>
         </fieldset>
       </form>
     </Panel>

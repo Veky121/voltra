@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Loading } from "../lib";
+import { SettingsSection } from "../ui/Settings";
 import { NodeConnection, NodeList } from "./node-pairing";
+import "./infrastructure-ui.css";
 import {
   Action,
   DataTable,
@@ -10,8 +13,8 @@ import {
   Heading,
   JsonView,
   Panel,
-  ResourceEditor,
-  ResourceList,
+  ResourceEditor as SharedResourceEditor,
+  ResourceList as SharedResourceList,
   api,
   f,
   rows,
@@ -19,13 +22,23 @@ import {
   useAPI,
 } from "./shared";
 
+function ResourceList(props: ComponentProps<typeof SharedResourceList>) {
+  return <div className="admin-infrastructure"><SharedResourceList {...props} /></div>;
+}
+function ResourceEditor(props: ComponentProps<typeof SharedResourceEditor>) {
+  return <div className="admin-infrastructure"><SharedResourceEditor {...props} /></div>;
+}
+function SettingsEditor({ title, ...props }: ComponentProps<typeof Editor>) {
+  return <SettingsSection title={title ?? "Settings"} plain className="infrastructure-settings-editor"><Editor {...props} /></SettingsSection>;
+}
+
 const locations = "/api/application/locations",
   nodes = "/api/application/nodes";
 export function Locations() {
   return (
     <ResourceList
       title="Groups"
-      description="Organize nodes into groups such as Home or EU. Each node belongs to one group, which can also be used when choosing where to create servers."
+      description="Organize nodes into groups such as Home or EU. Use groups to choose where new servers are created."
       endpoint={locations}
       base="/admin/locations"
       columns={["short", "long"]}
@@ -117,16 +130,17 @@ function NodeExtras({ node }: { node: any }) {
           credential.
         </p>
         <ErrorMessage error={config.error} />
+        {config.loading && <Loading />}
         {config.data && (
           <>
             <JsonView value={rotated ?? config.data} />
-            <DownloadJSON
+            <div className="actions"><DownloadJSON
               value={rotated ?? config.data}
               name={`wings-${node.id}.json`}
-            />
+            /></div>
           </>
         )}
-        <Action
+        <div className="infrastructure-token-action"><Action
           path={`/api/admin/nodes/${node.id}/reset-token`}
           confirm="Rotate the Wings token? Update the daemon configuration afterwards."
           onDone={(r) => {
@@ -135,11 +149,13 @@ function NodeExtras({ node }: { node: any }) {
           }}
         >
           Rotate daemon token
-        </Action>
+        </Action></div>
       </Panel>
       <Panel title="Allocations">
         <ErrorMessage error={a.error} />
+        {a.loading ? <Loading /> : <>
         <DataTable
+          empty={a.error ? "Allocations could not be loaded. Refresh the page to try again." : "No allocations. Create an address and port range below."}
           data={a.data ? rows(a.data) : []}
           columns={[
             {
@@ -214,6 +230,7 @@ function NodeExtras({ node }: { node: any }) {
             Delete selected allocations
           </Action>
         )}
+        </>}
       </Panel>
       <Editor
         title="Create allocations"
@@ -232,7 +249,8 @@ function NodeExtras({ node }: { node: any }) {
       />
       <Panel title="Servers on this node">
         <ErrorMessage error={servers.error} />
-        <DataTable
+        {servers.loading ? <Loading /> : <DataTable
+          empty={servers.error ? "Servers could not be loaded. Refresh the page to try again." : "No servers on this node."}
           data={
             servers.data
               ? rows(servers.data).filter(
@@ -253,7 +271,7 @@ function NodeExtras({ node }: { node: any }) {
             },
             { label: "Status", render: (x) => x.status ?? "Ready" },
           ]}
-        />
+        />}
       </Panel>
     </>
   );
@@ -311,7 +329,7 @@ function AllocationAlias({
   );
   const [err, setErr] = useState("");
   return (
-    <form
+    <form className="infrastructure-allocation-alias"
       onSubmit={async (e) => {
         e.preventDefault();
         try {
@@ -389,7 +407,8 @@ function MountAssignments({
     <>
       <Panel title={`Assigned ${relation}`}>
         <ErrorMessage error={q.error} />
-        <DataTable
+        {q.loading ? <Loading /> : <DataTable
+          empty={q.error ? "Assignments could not be loaded. Refresh the page to try again." : `No ${relation} assigned.`}
           data={q.data ? rows(q.data) : []}
           columns={[
             { label: "Name", render: (x) => x.name },
@@ -408,7 +427,7 @@ function MountAssignments({
               ),
             },
           ]}
-        />
+        />}
       </Panel>
       <Editor
         title={`Assign ${relation}`}
@@ -471,14 +490,14 @@ export function Settings() {
   const q = useAPI("/api/admin/settings");
   const initial = q.data ? q.data.attributes ?? q.data : undefined;
   return (
-    <>
+    <div className="admin-infrastructure infrastructure-settings">
       <Heading title="Panel settings" />
       <ErrorMessage error={q.error} />
       {q.loading ? (
-        <p>Loading…</p>
+        <Loading />
       ) : (
         <>
-          <Editor
+          <SettingsEditor
             title="General"
             endpoint="/api/admin/settings"
             initial={initial}
@@ -492,7 +511,7 @@ export function Settings() {
               }),
             ]}
           />
-          <Editor
+          <SettingsEditor
             title="Wings and allocation settings"
             endpoint="/api/admin/settings"
             initial={initial}
@@ -553,46 +572,16 @@ export function Settings() {
           />
           <details className="card"><summary>Optional panel artwork pack</summary><p>Set <code>ARTWORK_DIRECTORY</code> on the panel host to a private directory outside the web root, containing a <code>manifest.json</code> that maps server and library IDs to JPG, PNG or WebP files. Restart the panel during maintenance to apply pack changes. Web and desktop load the pack after sign-in and keep original SVG tiles as fallbacks. See <code>SERVER_ARTWORK.md</code> for the manifest format. Operators are responsible for permission to host their chosen artwork.</p></details>
           <BackupSettings initial={initial} />
-          <Editor
-            title="Mail delivery"
-            endpoint="/api/admin/settings"
-            initial={initial}
-            fields={[
-              f("mail:host", "SMTP host"),
-              f("mail:port", "SMTP port", "number", { default: 587 }),
-              f("mail:username", "SMTP username"),
-              f("mail:password", "SMTP password", "password"),
-              f("mail:encryption", "Encryption", "select", {
-                default: "tls",
-                options: [
-                  { value: "tls", label: "STARTTLS" },
-                  { value: "ssl", label: "TLS" },
-                  { value: "none", label: "None" },
-                ],
-              }),
-              f("mail:from:address", "Sender address", "email"),
-              f("mail:from:name", "Sender name"),
-            ]}
-          />
-          <Editor
-            title="Send test email"
-            endpoint="/api/admin/settings/mail/test"
-            method="POST"
-            fields={[
-              f("email", "Recipient email", "email", { required: true }),
-            ]}
-            submit="Send test email"
-          />
-          <Editor
+          <details className="infrastructure-advanced-settings"><summary>Advanced settings</summary><SettingsEditor
             title="All settings"
             endpoint="/api/admin/settings"
             initial={{ settings: initial ?? {} }}
             fields={[f("settings", "Settings JSON", "json")]}
             transform={(v) => cleanSettings(v.settings)}
-          />
+          /></details>
         </>
       )}
-    </>
+    </div>
   );
 }
 function cleanSettings(settings: any): any {
@@ -607,7 +596,7 @@ function cleanSettings(settings: any): any {
 function BackupSettings({ initial }: { initial: any }) {
   return (
     <>
-      <Editor
+      <SettingsEditor
         title="Backup storage"
         endpoint="/api/admin/settings"
         initial={initial}
@@ -621,7 +610,7 @@ function BackupSettings({ initial }: { initial: any }) {
           }),
         ]}
       />
-      <Editor
+      <SettingsEditor
         title="S3 connection"
         endpoint="/api/admin/settings"
         initial={initial?.["backups.s3"]}

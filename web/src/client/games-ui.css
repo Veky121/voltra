@@ -1,0 +1,49 @@
+/* Game-family primitives only. Entry styles keep their existing page layouts. */
+.games-ui{--game-warning:var(--amber,#d7ae68);--game-success:var(--green,#77d4a6);min-width:0;color:var(--text)}
+.games-ui .card,.games-ui.card{border-color:var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-surface);box-shadow:0 1px 2px #00000008}
+.games-ui .card{padding:var(--ui-card-padding)}
+.games-ui .page-header h1,.games-ui>.page-header h2,.games-ui .startup-heading h2{font-size:calc(22px * var(--ui-font-scale,1));font-weight:550;letter-spacing:-.025em;line-height:1.35}
+.games-ui .page-header p,.games-ui .muted{color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.games-ui .eyebrow{font-size:calc(11px * var(--ui-font-scale,1));font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+.games-ui .card h2,.games-ui .card h3{font-size:calc(13px * var(--ui-font-scale,1));font-weight:550;letter-spacing:0}
+.games-ui .field{gap:7px;margin-bottom:16px;font-size:calc(12px * var(--ui-font-scale,1))}
+.games-ui .field>span{font-size:calc(12px * var(--ui-font-scale,1));font-weight:500}
+.games-ui .field small{font-size:calc(11px * var(--ui-font-scale,1));line-height:1.6}
+.games-ui .button,.games-ui .mc-search-row>button{min-height:var(--ui-control-height);padding:6px 12px;border-radius:var(--ui-control-radius);font-size:calc(12px * var(--ui-font-scale,1));font-weight:500}
+.games-ui .button:focus-visible,.games-ui summary:focus-visible,.games-ui a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.games-ui .badge{font-size:calc(10px * var(--ui-font-scale,1));line-height:1.5;color:var(--muted);border-color:var(--ui-border);border-radius:6px;background:var(--ui-hover)}
+.games-ui .success{color:var(--game-success);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.games-ui .error{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;border-radius:var(--ui-control-radius)}
+.games-ui .spinner{border-color:var(--ui-border);border-top-color:var(--accent)}
+.games-ui .modal{border-color:var(--ui-border);background:var(--ui-surface)}
+.games-ui .modal>p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;overflow-wrap:anywhere}
+.games-ui .check{gap:10px;font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.games-ui summary{color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));font-weight:500;cursor:pointer}
+.games-ui summary:hover{color:var(--text)}
+.games-ui summary::marker{color:var(--muted)}
+.games-ui pre{padding:12px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-input);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.games-ui .game-agreement pre{max-height:18rem;overflow:auto;font:inherit}
+.games-ui .game-agreement>.field{margin-bottom:0}
+.games-ui .steam-setup-layout>aside{padding:4px 0;font-size:calc(12px * var(--ui-font-scale,1));line-height:1.7;color:var(--muted)}
+.games-ui .steam-setup-layout>aside h2{font-size:calc(13px * var(--ui-font-scale,1));font-weight:500;color:var(--text);margin:0 0 10px}
+.games-ui .steam-setup-layout>aside h2:not(:first-child){margin-top:22px}
+.games-ui .steam-setup-layout>aside ol{padding-left:18px}
+.games-ui .steam-setup-layout>aside li+li{margin-top:8px}
+.steam-private-content .steam-fields>.button{margin-bottom:16px}
+.steam-private-content .steam-fields>.actions{margin:4px 0 12px;gap:8px}
+.steam-private-content .steam-save-password{display:flex;align-items:center;gap:10px;font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;margin:0 0 16px}
+.steam-private-content .steam-authorization>form{margin-top:16px}
+.steam-private-content .steam-job form{margin:14px 0;padding-top:14px;border-top:1px solid var(--ui-divider)}
+.steam-private-content .steam-job .button+.button{margin-left:8px}
+.games-ui .java-settings-fields{border:0;padding:0;margin:0;min-width:0}
+.java-settings-group{border-top:1px solid var(--ui-divider);margin-top:16px}
+.java-settings-group>.settings-row{border-bottom:1px solid var(--ui-divider)}
+.java-settings-group .settings-row-layout{padding:14px 0;gap:20px}
+.java-settings-group .settings-row-description{font-size:calc(11px * var(--ui-font-scale,1))}
+.java-settings-group textarea{resize:vertical}
+.java-settings-actions{display:flex;justify-content:flex-end;margin-top:16px}
+.java-settings-preview{margin-top:20px;padding-top:16px;border-top:1px solid var(--ui-divider)}
+.java-settings-preview>p{margin-bottom:10px}
+.java-settings-preview pre{margin:0}
+.java-settings-runtime{overflow-wrap:anywhere}
+@media(max-width:600px){.games-ui .page-header h1,.games-ui>.page-header h2,.games-ui .startup-heading h2{font-size:calc(20px * var(--ui-font-scale,1))}.games-ui .form-grid{grid-template-columns:minmax(0,1fr)}.steam-private-content .steam-job .button+.button{margin-left:0}.steam-private-content .steam-job .button{margin:8px 6px 0 0}.java-settings-actions{justify-content:flex-start}}

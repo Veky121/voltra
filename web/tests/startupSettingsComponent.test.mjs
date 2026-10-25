@@ -16,7 +16,7 @@ const secretVariable = {env_variable:'RCON_PASSWORD',name:'Console password',rul
 function load({react = React,variables = [baseVariable,secretVariable],meta = {},permissions = ['*'],account = {},accountLoading = false,accountError = ''} = {}) {
   const context = {base:'/api/client/servers/fixture',server:{image:'runtime:v1',limits:{memory:4096}},permissions,reload(){}};
   const module = {exports:{}};
-  const modules = {
+  const modules = {'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
     react,
     'react-router-dom':{Link:({to,children,...props})=>React.createElement('a',{href:to,...props},children)},
     '../lib':{
@@ -186,4 +186,12 @@ test('secret starts blank, blank submit does nothing, clear is explicit, and fai
   assert.doesNotMatch(all(tree).find(node=>node.props?.role==='alert').props.children,/private-input/);
   button(tree,'Clear value').props.onClick();await tick();
   assert.deepEqual(writes[1],{key:'RCON_PASSWORD',value:''});
+});
+
+
+test('actual startup boolean enum renders an accessible switch',()=>{
+ const html=renderToStaticMarkup(React.createElement(load().StartupVariableField,{variable:{...baseVariable,env_variable:'ENABLE_PVP',name:'Enable PVP',rules:'required|in:0,1',server_value:'1'},permitted:true,onSave(){},onDirty(){}}));
+ assert.match(html,/role="switch"/);
+ assert.match(html,/type="checkbox"/);
+ assert.doesNotMatch(html,/<select/);
 });

@@ -58,7 +58,7 @@ migration_assert($activity['actor_id'] === 1 && $activity['server_id'] === 1, 'A
 migration_assert($activity['properties']->_ptero_go_legacy === 'existing-user-data', 'User activity metadata overwritten');
 migration_assert(count($activity['properties']->_ptero_go_legacy_->subjects ?? $activity['properties']->_ptero_go_legacy_['subjects'] ?? []) === 2, 'Polymorphic subjects not preserved');
 $settings = array_column($snapshot['tables']['settings'], 'value', 'key');
-migration_assert($settings['mail:password'] === 'smtp-secret' && $settings['mail:port'] === 587, 'SMTP settings not normalized');
+migration_assert(!isset($settings['mail:password']) && !isset($settings['mail:port']), 'Obsolete SMTP settings exported');
 migration_assert($settings['pterodactyl:client_features:allocations:enabled'] === true, 'Boolean settings not normalized');
 migration_assert(isset($settings['legacy.migration.archive']['deleted_user_ssh_keys']), 'Deleted credentials not archived');
 $json = json_encode($snapshot, JSON_THROW_ON_ERROR);

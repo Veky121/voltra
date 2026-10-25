@@ -306,3 +306,13 @@ The panel uses golang.org/x/image v0.47.0, copyright 2009 The Go Authors,
 under the BSD 3-Clause license. Source: https://cs.opensource.google/go/x/image
 The complete copyright, redistribution conditions and disclaimer are retained
 in web/public/licenses/go-x-image-LICENSE.txt.
+
+Shadcn UI component migration
+- shadcn/ui base-mira source components, MIT, Copyright (c) 2023 shadcn.
+  Source: https://github.com/shadcn-ui/ui; license: web/public/licenses/shadcn-MIT.txt.
+- Lucide React icons, ISC with Feather MIT notices: web/public/licenses/Lucide-ISC-MIT.txt.
+- Base UI React, MIT: web/public/licenses/Base-UI-MIT.txt.
+- Tailwind CSS, MIT: web/public/licenses/Tailwind-MIT.txt.
+- class-variance-authority, Apache-2.0: web/public/licenses/CVA-Apache-2.0.txt.
+- clsx and tailwind-merge, MIT: web/public/licenses/clsx-MIT.txt and
+  web/public/licenses/tailwind-merge-MIT.txt.

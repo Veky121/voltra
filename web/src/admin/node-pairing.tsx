@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Button, Field, Modal } from "../lib";
+import {Select,  Button, Field, Loading, Modal } from "../lib";
 import { Icon } from "../Icons";
 import { DataTable, ErrorMessage, Heading, Panel, api, rows, useAPI } from "./shared";
 import "./node-pairing.css";
+import "./infrastructure-ui.css";
 
 type Enrollment = {
   id: string;
@@ -152,14 +153,14 @@ export function NodeList() {
   const [open, setOpen] = useState(false);
   const list = nodes.data ? rows(nodes.data) : [];
   return (
-    <>
+    <div className="admin-infrastructure infrastructure-nodes">
       <Heading title="Nodes">
         <Button onClick={() => setOpen(true)}><Icon name="nodes" />Add nodes</Button>
         <Link className="button secondary" to="/admin/nodes/new">Advanced manual setup</Link>
         <Button variant="secondary" onClick={nodes.reload}>Refresh</Button>
       </Heading>
       <ErrorMessage error={nodes.error} />
-      {nodes.loading && !nodes.data ? <p role="status">Loading nodes...</p> : (
+      {nodes.loading && !nodes.data ? <Loading /> : (
         <Panel>
           {!list.length && !nodes.error ? (
             <div className="node-pairing-empty">
@@ -183,7 +184,7 @@ export function NodeList() {
         </Panel>
       )}
       {open && <NodePairingWizard onClose={() => { setOpen(false); nodes.reload(); }} onNodesChanged={nodes.reload} />}
-    </>
+    </div>
   );
 }
 
@@ -324,15 +325,15 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
             <Field label="Maximum approved nodes" hint="0 means unlimited."><input form="node-pairing-create" required type="number" min="0" max={Number.MAX_SAFE_INTEGER} step="1" value={maxNodes} onChange={(event) => setMaxNodes(event.target.value)} /></Field>
             <Field label="Expires after, in minutes"><input form="node-pairing-create" required type="number" min="1" max="1440" step="1" value={expiresMinutes} onChange={(event) => setExpiresMinutes(event.target.value)} /></Field>
           </div>
-          <Field label="Group"><select form="node-pairing-create" value={locationId} onChange={(event) => setLocationId(event.target.value)}><option value="">Automatic group</option>{(locations.data ? rows(locations.data) : []).map((location) => <option key={location.id} value={location.id}>{location.short}{location.long ? ` · ${location.long}` : ""}</option>)}</select></Field>
+          <Field label="Group"><Select form="node-pairing-create" value={locationId} onChange={(event) => setLocationId(event.target.value)}><option value="">Automatic group</option>{(locations.data ? rows(locations.data) : []).map((location) => <option key={location.id} value={location.id}>{location.short}{location.long ? ` · ${location.long}` : ""}</option>)}</Select></Field>
           <ErrorMessage error={locations.error} />
         </>
       )}
       {!initialEnrollment && sessions.length > 0 && <div className="node-pairing-history">
-        <label className="field"><span>Enrollment history</span><select value={activeId ?? ""} onChange={(event) => { if (event.target.value) { setActiveId(event.target.value); setSearch(""); } }}>
+        <label className="field"><span>Enrollment history</span><Select value={activeId ?? ""} onChange={(event) => { if (event.target.value) { setActiveId(event.target.value); setSearch(""); } }}>
           <option value="">Select enrollment</option>
           {sessions.map((item) => <option key={item.id} value={item.id}>{item.recovery_node_id ? `Reconnect ${item.recovery_node_name || `node #${item.recovery_node_id}`}` : `#${item.id.slice(0, 8)}`} · {enrollmentState(item, now)} · {item.approved_count} approved</option>)}
-        </select></label>
+        </Select></label>
       </div>}
       <p className="muted">Only approve codes you recognize. Game ports and optional SFTP need separate network access.</p>
       <p className="muted">Connection strings disappear when this window closes. Enrollment requests remain available here.</p>
@@ -381,9 +382,15 @@ function InstallInstructions({ enrollment, mode, inactive }: { enrollment: Creat
   const [external, setExternal] = useState(enrollment.connection_strings.external);
   const selected = mode === "local" ? local : external;
   const installer = installCommand(enrollment, mode, selected);
+  const installerBase = installer.error ? "" : new URL(selected.slice(0, selected.lastIndexOf("#")).trim()).origin;
+  const latest = useAPI(!enrollment.recovery_node_id && installerBase ? `/api/admin/node-installer?panel_url=${encodeURIComponent(installerBase)}` : null);
+  const candidate = latest.data as {version:string; source:string; channel:string; panel_url:string; release_url:string; installer_url:string; install_command:string} | null;
+  const release = candidate?.panel_url === installerBase ? candidate : null;
+  const command = enrollment.recovery_node_id ? installer.command : release?.install_command ?? "";
+  const unavailable = !!installer.error || (!enrollment.recovery_node_id && (latest.loading || !!latest.error || !release));
   return (
     <><ol className="node-pairing-commands">
-      <li><CopyValue label="Run installer" value={installer.command} disabled={!!installer.error} /><small className="muted">{enrollment.recovery_node_id ? "Recovery setup opens automatically using the installed connector." : "Requires Linux, systemd, Docker, curl and sha256sum. Downloads a pinned release and verifies checksums. Existing installations require a separate maintenance step."}</small>{enrollment.release_url && <a className="node-pairing-release" href={enrollment.release_url} target="_blank" rel="noreferrer">Download release</a>}</li>
+      <li>{latest.loading && <p role="status">Finding the latest Linux node installer...</p>}<CopyValue label="Run installer" value={command} disabled={unavailable} /><small className="muted">{enrollment.recovery_node_id ? "Recovery setup opens automatically using the installed connector." : "Paste this command into the Linux terminal. It installs matching Wings and connector binaries, verifies checksums, and opens setup. Requires systemd, Docker, curl and sha256sum."}</small>{release && <small className="muted">{release.source === "pinned" ? "Configured release" : `Latest complete ${release.channel} release`}: {release.version} · Linux amd64 / arm64</small>}{release && <a className="node-pairing-release" href={release.installer_url} target="_blank" rel="noreferrer">Download Linux installer</a>}{latest.error && <><ErrorMessage error={latest.error}/><Button variant="secondary" onClick={latest.reload}>Check release again</Button></>}</li>
       <li><CopyValue label="Paste connection string" value={selected} onChange={mode === "local" ? setLocal : setExternal} disabled={inactive || !!installer.error} sensitive /></li>
     </ol>{!enrollment.recovery_node_id && <p className="muted">Setup opens automatically. Approve the matching code here to create and enable the node services. After approval, check <code>sudo systemctl status voltra-wings voltra-node</code>. Enable boot startup with <code>sudo systemctl enable voltra-wings voltra-node</code>.</p>}<ErrorMessage error={installer.error} /></>
   );

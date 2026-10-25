@@ -1,0 +1,15 @@
+# Romestead native acceptance boundary
+
+Source-only preparation, before parent acknowledgement: no acquisition or resources.
+
+Exact canonical `romestead/egg-romestead.json`, `crafting-native-v1`, Steam app4763510 Linux, native `dotnet Server.dll` with Microsoft.NETCore.App8. Original six controls: WORLD_NAME, WORLD_SIZE, PASSWORD, MAX_PLAYERS, CHEATS, hidden SRCDS_APPID. Five runtime JSON values include primary port; installer-only CHEATS and hidden seed remain operator-owned after creation. Unknown JSON survives.
+
+Normal protected receipt nodeID/UUID validation, exact owned namespace/name/externalID, temporary dashboard name `Voltra isolated Romestead acceptance`. Normal queue4096MiB/8192MiB/one loopback port under unchanged20GiB pool, no implicit resize. Start WORLD_SIZE1 and MAX_PLAYERS2, generated private password, cheatsfalse. Public anonymous acquisition only; app metadata/manifest/build/native payload must prove acquisition. The community wiki claims account ownership while imported original says anonymous: keep first actual entitlement result; no credentials/fallback.
+
+Prepared create/install/observe/read/source drivers derive protected current node receipt, never202/249 constants. Stage existing public SteamCMD cache only once installed bootstrap container is authoritatively stopped; actual APIReinstall with authenticated WS output; snapshot all exact emitted helpers before first native boot. Require actual .NET8 inspection, Serverready and primary UDPsocket. Read actual publisher payload/help before command claims. Only allow documented no-player list/save/quicksave via normal commandAPI; ordinary PanelStop must send literal native stop, fully save and exit with rawstatus/noOOM. Preserve initial failures.
+
+Native generated world location must be inspected. Wiki says saved_worlds: coordinate conservative preserve addition to Romestead family before any reinstall if actual. Capture full save/config/operator state SHA256/bytes/modeUIDGID, including original XDG/Mods/BepInEx paths and actual generated saves. Native stop/restart must load same world and new container generation. Modify original name/password/playerlimit after first proof; check native/config and keep installer-only cheats/seed and unknown values. Strict before/after actual APIReinstall requires exact all rows and fresh manifest. No invented UDPquery protocol or gameplay claim. Preserve CR normalized/redacted latest.log behavior and verify password absent from public logs.
+
+Clean exact owned server/allocations/egg/nest/container/installer/volume through identity-guarded normal APIs; verify all absent before normal lease release. No operatorassets/privatebeta/global image/productionPanel/DB/remote147 changes. Source fixes only scoped crafting helper after root approval and canonical merge.
+
+References: imported catalog exact source; official egg https://eggs.pterodactyl.io/egg/games-romestead/ ; community wiki https://romestead.wiki.gg/wiki/Romestead_Dedicated_Server_Setup_Guide (secondary, not independent publisher verification). Publisher/Steam metadata and actual native payload remain authoritative for live claims.

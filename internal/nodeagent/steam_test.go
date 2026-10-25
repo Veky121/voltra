@@ -66,7 +66,11 @@ func TestSteamStreamFlushesBeforeCompletionAndClosesAfterOneRequest(t *testing.T
 	defer client.Close()
 	progressRead := make(chan struct{})
 	runner := testSteamRunner(func(ctx context.Context, r steamapi.Request, emit func(steamapi.Event) error) {
-		if r != steamRequest() {
+		expected := steamRequest()
+		// Older panels omit platform; the node normalizes their wire request
+		// to Linux before handing it to the executor.
+		expected.Platform = "linux"
+		if r != expected {
 			t.Error("wrong request", r)
 		}
 		_ = emit(steamapi.Event{Type: "progress", Stage: "metadata", Detail: "loading"})
@@ -241,6 +245,7 @@ func TestConnectorAdvertisesAndRoutesSteamWithoutWings(t *testing.T) {
 		if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
 			want = steamapi.Capabilities()
 		}
+		want = append(want, NetworkCapability)
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("capabilities %v want %v", got, want)
 		}

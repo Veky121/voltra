@@ -1,0 +1,11 @@
+import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';import {spawnSync} from 'node:child_process';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/romestead-native',{receipt:s,node}=await ownedStoppedServer(dir+'/private.json'),info=JSON.parse(spawnSync('docker',['inspect',s.uuid],{windowsHide:true,encoding:'utf8'}).stdout)[0],out=dir+'/diagnostic-exceptions-private.json';
+if(fs.existsSync(out))throw Error('Immutable diagnostic result already exists');
+const r=spawnSync('docker',['run','--rm','--pull','never','--network','none','--memory','256m','--user','0:0','--cap-drop','ALL','--cap-add','DAC_OVERRIDE','--security-opt','no-new-privileges','--mount',`type=bind,source=${node.volume_root}/${s.uuid},target=/fixture,readonly`,'--mount',`type=bind,source=${path.resolve(dir+'/trace-parser/bin/Release/net8.0')},target=/parser,readonly`,'--entrypoint','dotnet',info.Image,'/parser/TraceParser.dll','/fixture/.voltra/diagnostics/romestead-fifo-repair.nettrace'],{windowsHide:true,encoding:'utf8',timeout:30000,maxBuffer:2000000});
+if(r.status)throw Error('Private exception parser failed; raw output withheld');
+const events=JSON.parse(r.stdout);fs.writeFileSync(out,JSON.stringify(events,null,2)+'\n',{flag:'wx',mode:0o600});
+const trace=dir+'/diagnostic-trace-private.nettrace';if(fs.existsSync(trace))throw Error('Immutable private trace exists');
+const copy=spawnSync('docker',['cp',s.uuid+':/home/container/.voltra/diagnostics/romestead-fifo-repair.nettrace',path.resolve(trace)],{windowsHide:true,encoding:'utf8'});if(copy.status)throw Error('Private trace archive failed');fs.chmodSync(trace,0o600);
+const hash=createHash('sha256');for await(const block of fs.createReadStream(trace))hash.update(block);
+const sanitized=events.map(e=>({type:e.type,message:String(e.message??'').replaceAll(s.test_password,'[REDACTED]').slice(0,512),time_ms:e.time_ms}));
+const report={trace_bytes:fs.statSync(trace).size,trace_sha256:hash.digest('hex'),trace_private:true,events:sanitized};fs.writeFileSync(dir+'/diagnostic-exceptions-sanitized.json',JSON.stringify(report,null,2)+'\n',{flag:'wx'});console.log(report);

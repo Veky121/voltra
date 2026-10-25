@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const key='citadel/egg-citadel-forged-with-fire.json';
+const report=JSON.parse(fs.readFileSync('artifacts/citadel-native-partial-acceptance.json'));
+if(report.recommended_classification!=='runtime_partial'||report.rows.length<20)throw Error('Acceptance receipt missing');
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[key]);
+profile.verification='runtime_partial';
+profile.detail='Anonymous Linux build6394339 installed with exact current helpers and managed SDK receipt. Two generations reached native UWorks readiness and allocated gameplay/query UDP listeners; generated configuration and SDK state retained exact22-file SHA/bytes/mode/UID/GID through real API Reinstall. Both normal Stops returned130 without OOM, with native engine shutdown markers. No natural world save files appeared, so world persistence, client gameplay, administrator authentication and public listing remain unverified. See artifacts/citadel-native-partial-acceptance.json.';
+fs.mkdirSync('.local/citadel-native-stage',{recursive:true});
+fs.writeFileSync('.local/citadel-native-stage/profiles.json',JSON.stringify({[key]:profile},null,2)+'\n');
+console.log('Staged Citadel verification/detail only; canonical untouched.');

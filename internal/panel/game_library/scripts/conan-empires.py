@@ -92,7 +92,9 @@ def configure_plan(root, game, env):
         if enabled and not rcon:
             raise ValueError('Choose an actual RCON_PASSWORD before enabling RCON')
         args = ['-Port=' + str(selected['SERVER_PORT']), '-QueryPort=' + str(selected['QUERY_PORT']),
-                '-ServerName=' + quoted(name), '-ServerPassword=' + quoted(password), '-console', '-log']
+                '-ServerName=' + quoted(name), '-console', '-log']
+        if game == 'conan' or password:
+            args += ['-ServerPassword=' + quoted(password)]
         if 'RCON_PORT' in selected:
             args += ['-RconPort=' + str(selected['RCON_PORT'])]
         if game == 'enhanced':
@@ -101,9 +103,9 @@ def configure_plan(root, game, env):
         prefix = 'ConanSandbox/Saved/Config/' + ('WindowsServer' if game == 'conan' else 'LinuxServer') + '/'
         plan['configs'][prefix + 'Engine.ini'] = {
             'URL': {'Port': str(selected['SERVER_PORT'])},
-            'OnlineSubsystem': {'ServerName': name, 'ServerPassword': password},
+            'OnlineSubsystem': {'ServerName': name, **({'ServerPassword': password} if game == 'conan' or password else {})},
             'OnlineSubsystemNull': {'GameServerQueryPort': str(selected['QUERY_PORT'])}}
-        plan['configs'][prefix + 'ServerSettings.ini'] = {'ServerSettings': {'AdminPassword': admin, 'ServerPassword': password}}
+        plan['configs'][prefix + 'ServerSettings.ini'] = {'ServerSettings': {'AdminPassword': admin, **({'ServerPassword': password} if game == 'conan' or password else {})}}
         plan['configs'][prefix + 'Game.ini'] = {'RconPlugin': {'RconEnabled': 'True' if enabled else 'False', 'RconPassword': rcon,
                                              'RconPort': str(selected.get('RCON_PORT', 0))}}
         if game == 'enhanced':
@@ -121,7 +123,7 @@ def configure_plan(root, game, env):
         admins = text(env, 'ADMIN_IDS', '', 128)
         if admins and not re.fullmatch('[0-9]{17}(?:;[0-9]{17})*', admins):
             raise ValueError('MoE GM accounts must be semicolon-separated real SteamID64 values')
-        address = text(env, 'OUT_ADDRESS', env.get('SERVER_IP', ''), 64)
+        address = text(env, 'OUT_ADDRESS', '', 64) or text(env, 'SERVER_IP', '', 64)
         if not address or ipaddress.ip_address(address).version != 4:
             raise ValueError('Set OUT_ADDRESS to the real reachable LAN/Tailscale/public IPv4')
         server_id = integer(env, 'SERVER_ID', 100, 1, 2147483647)
@@ -140,6 +142,10 @@ def configure_plan(root, game, env):
                 '-PrivateServer', '-MultiHome=0.0.0.0', '-UseACE', *('-' + key + '=' + value for key, value in values.items()), *extra]
         plan.update(args=args, credentials=[key], log=confined(root, 'MOE/Saved/Logs/MOE.log'),
                     ready=re.compile(rb'ServerId\s*[:=]\s*' + str(server_id).encode() + rb'\b.*SERVER_STATE_OPENED'))
+        for arg in extra:
+            key, separator, value = arg.partition('=')
+            if separator and any(word in key.lower() for word in ('pass', 'token', 'auth', 'secret', 'key')):
+                plan['credentials'].append(value)
     plan['credentials'] += [env.get(key, '') for key in ('STEAM_PASS', 'STEAM_AUTH', 'SRCDS_BETAPASS')]
     return plan
 
@@ -149,6 +155,8 @@ def configure(root, game, env):
     for name, sections in plan['configs'].items():
         path = confined(root, name)
         before = path.read_text(encoding='utf-8-sig') if path.exists() else ''
+        for match in re.finditer(r'(?mi)^\s*(?:ServerPassword|AdminPassword|RconPassword)\s*=\s*([^\r\n]+)', before):
+            plan['credentials'] += [match[1], match[1].strip('"')]
         after = native.patch_ini(before, sections)
         if after != before:
             if before:
@@ -177,6 +185,7 @@ def download_mods(root, env, selected):
     for identifier in selected:
         argv += ['+workshop_download_item', '440900', identifier, 'validate']
     argv += ['+quit']
+    steam.bootstrap(root)
     child_env = dict(os.environ)
     for key in ('PYTHONHOME', 'PYTHONPATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH'):
         child_env.pop(key, None)
@@ -208,6 +217,41 @@ def digest(path):
         for block in iter(lambda: source.read(1048576), b''):
             hasher.update(block)
     return hasher.hexdigest()
+
+
+def cache_snapshot(root):
+    folder = confined(root, 'ConanSandbox/Saved/ExtractedMods')
+    if not folder.exists():
+        return {}
+    result = {}
+    for path in folder.iterdir():
+        path = confined(root, str(path.relative_to(root)))
+        if path.is_file():
+            result[path.name] = digest(path)
+        if len(result) > 30000:
+            raise ValueError('Conan extracted mod cache exceeds its file limit')
+    return result
+
+
+def record_mod_cache(root, before):
+    """Claim only cache files created/changed during this owned native run."""
+    state = confined(root, '.voltra/conan-empires/mods.json')
+    if not state.exists():
+        return
+    record = json.loads(state.read_text())
+    after = cache_snapshot(root)
+    owners = {}
+    for identifier, entry in record.get('managed', {}).items():
+        for name in entry.get('files', {}):
+            if Path(name).suffix.lower() == '.pak':
+                owners.setdefault(Path(name).stem, set()).add(identifier)
+    extracted = record.setdefault('extracted', {})
+    for name, checksum in after.items():
+        matches = set().union(*(owners[base] for base in owners if name.startswith((base + '.', base + '-'))))
+        if len(matches) == 1 and before.get(name) != checksum:
+            identifier, = matches
+            extracted.setdefault(identifier, {})[name] = checksum
+    native.private_write(state, json.dumps(record, indent=2) + '\n')
 
 
 def sync_mods(root, env):
@@ -303,14 +347,24 @@ def sync_mods(root, env):
     after = '\n'.join(output) + ('\n' if output else '')
     if after != before:
         native.private_write(modlist, after)
-    native.private_write(state, json.dumps({'workshop_app': 440900, 'managed': current}, indent=2) + '\n')
+    extracted = {}
+    for identifier, entries in previous.get('extracted', {}).items():
+        if identifier in current:
+            extracted[identifier] = entries
+            continue
+        for name, checksum in entries.items():
+            cache = confined(root, 'ConanSandbox/Saved/ExtractedMods/' + name)
+            if cache.is_file() and digest(cache) == checksum:
+                archive = confined(root, '.voltra/conan-empires/retired-mod-cache/' + str(time.time_ns()) + '/' + name)
+                archive.parent.mkdir(parents=True, exist_ok=True);os.replace(cache, archive)
+    native.private_write(state, json.dumps({'workshop_app': 440900, 'managed': current, 'extracted': extracted}, indent=2) + '\n')
 
 
 def install(root, game, env):
     app, platform, binary, options = steam_options(root, game, env)
     saved = confined(root, ('MOE' if game == 'empires' else 'ConanSandbox') + '/Saved')
     protected = [path for path in saved.rglob('*.ini') if path.is_file()] if saved.exists() else []
-    with tempfile.TemporaryDirectory(prefix='voltra-conan-retention-') as directory:
+    with tempfile.TemporaryDirectory(prefix='voltra-conan-retention-', dir=confined(root, '.')) as directory:
         backups = []
         for index, path in enumerate(protected):
             path = confined(root, str(path.relative_to(root)));backup = Path(directory) / str(index)
@@ -335,14 +389,14 @@ def environment(root, game, env):
             raise ValueError('Conan typed prerequisites allow only original vcrun2022/corefonts, never arbitrary Winetricks commands')
         prefix = confined(root, '.voltra/conan-empires/wine-prefix')
         if choices:
-            if not boolean(env, 'WINE_PREREQUISITES_READY') or not (prefix / 'system.reg').is_file():
+            if not boolean(env, 'WINE_PREREQUISITES_READY') or not confined(root, str((prefix / 'system.reg').relative_to(root))).is_file():
                 raise ValueError('Prepare the confined Conan Wine prefix with legitimate original vcrun2022/corefonts prerequisites, then explicitly set WINE_PREREQUISITES_READY=1; no external installer agreement is accepted automatically')
             for name in ('drive_c/windows/system32/vcruntime140.dll', 'drive_c/windows/system32/msvcp140.dll') if 'vcrun2022' in choices else ():
                 if not confined(root, str((prefix / name).relative_to(root))).is_file():
                     raise ValueError('Requested Conan VC runtime is absent from the prepared private prefix')
             if 'corefonts' in choices:
                 fonts = confined(root, str((prefix / 'drive_c/windows/Fonts').relative_to(root)))
-                if not fonts.is_dir() or not any(path.is_file() and path.name.lower() == 'arial.ttf' for path in fonts.iterdir()):
+                if not fonts.is_dir() or not any(confined(root, str(path.relative_to(root))).is_file() and path.name.lower() == 'arial.ttf' for path in fonts.iterdir()):
                     raise ValueError('Requested Conan core font is absent from the prepared private prefix')
         prefix.mkdir(parents=True, exist_ok=True)
         result.update(WINEPREFIX=str(prefix), WINEDEBUG=text(env, 'WINEDEBUG', '-all'), WINEPATH=text(env, 'WINEPATH', '/home/container'))
@@ -480,6 +534,11 @@ def run(root, game, plan, env):
                 pass
         for thread in threads[:2]:
             thread.join(timeout=2)
+        if child is not None:
+            if child.stdin:
+                child.stdin.close()
+            if child.stdout:
+                child.stdout.close()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
 
@@ -499,7 +558,12 @@ def main():
         if boolean(env, 'UPDATE_MODS', True):
             download_mods(root, env, ids(text(env, 'MOD_IDS')))
         sync_mods(root, env)
-    return run(root, game, configure(root, game, env), child_env)
+    before = cache_snapshot(root) if game == 'enhanced' else {}
+    try:
+        return run(root, game, configure(root, game, env), child_env)
+    finally:
+        if game == 'enhanced':
+            record_mod_cache(root, before)
 
 
 if __name__ == '__main__':

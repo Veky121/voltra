@@ -26,5 +26,15 @@ test('stale stages cannot erase reviewed evidence or promote unreviewed native r
   assert.equal(run({...profile,verification:'runtime_partial'},['--apply','--allow-verification-downgrade']).status,0);
   const promotion=run(profile,['--apply']);
   assert.notEqual(promotion.status,0);assert.match(promotion.stderr,/Native evidence must be reviewed/);
+  // Native eggs permit duplicate environment records, including the two
+  // WINDOWS_INSTALL records in the imported Mordhau Wine recipe.
+  fs.writeFileSync(path.join(root,'upstream/catalog.json'),JSON.stringify({entries:[{
+    path:'recipe',sha256:'fixture',egg:{...profile.egg,variables:[{env_variable:'ORIGINAL'},{env_variable:'ORIGINAL'}]},
+  }]}));
+  const beforeDuplicateCheck=fs.readFileSync(target,'utf8');
+  const missingDuplicate=run({...profile,verification:'runtime_partial'},['--apply']);
+  assert.notEqual(missingDuplicate.status,0);assert.match(missingDuplicate.stderr,/Missing duplicate original variable ORIGINAL/);
+  assert.equal(fs.readFileSync(target,'utf8'),beforeDuplicateCheck);
+  assert.equal(run({...profile,verification:'runtime_partial',egg:{...profile.egg,variables:[{env_variable:'ORIGINAL'},{env_variable:'ORIGINAL'}]}},['--apply']).status,0);
  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });

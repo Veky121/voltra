@@ -1,0 +1,10 @@
+{
+  "available": true,
+  "context_schema": 2,
+  "context_sha256": "75cbf1670388d9c65ad451b136f844034c00c186d5ec4c06d4e38d9fb8dbed33",
+  "bundle_sha256": "78188d4718c2ba92cab828c8a599bc5b11bbd31c286a4079cc67167519e68cd7",
+  "bundle_bytes": 39323650,
+  "jar_sha256": "6c9a21d4d430df419417d82a1249bd97578b93370157cf0ef709b396c6b409b8",
+  "origin": "locally built modified OSS source output; not publisher release",
+  "native_verified": false
+}

@@ -1,0 +1,28 @@
+/* Shadcn Base UI controls share the current user's theme tokens. */
+.ui-switch[data-slot=switch]{display:inline-flex;position:relative;flex:0 0 28px;align-items:center;justify-content:flex-start;gap:0;width:28px;height:17px;min-height:17px;margin:0;padding:0;border:1px solid transparent;border-radius:999px;background:var(--line-strong);color:var(--text);cursor:pointer;box-shadow:none;filter:none;vertical-align:middle;touch-action:manipulation;transition:background 150ms}
+.ui-switch[data-slot=switch][data-checked]{background:var(--primary)}
+.ui-switch[data-slot=switch] [data-slot=switch-thumb]{display:block;flex:none;width:14px;height:14px;border-radius:999px;background:var(--text);translate:none;transform:translateX(0);transition:transform 150ms;pointer-events:none}
+.ui-switch[data-slot=switch][data-checked] [data-slot=switch-thumb]{transform:translateX(12px);background:var(--theme-primary-ink,#fff)}
+.ui-switch[data-slot=switch]:disabled,.ui-switch[data-slot=switch][data-disabled]{opacity:.45;cursor:not-allowed}
+.ui-switch[data-slot=switch]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.ui-select-field{position:relative;display:inline-flex;min-width:0;width:100%;vertical-align:middle}
+.ui-select[data-slot=select-trigger]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;min-height:var(--ui-control-height,36px);height:auto;padding:8px 11px;border:1px solid var(--line-strong);border-radius:var(--ui-control-radius,7px);background:var(--ui-input,var(--surface-muted));color:var(--text);font-size:calc(13px * var(--ui-font-scale,1));font-weight:400;line-height:1.4;text-align:left;box-shadow:none;filter:none;cursor:pointer}
+.ui-select[data-slot=select-trigger]:hover{background:var(--ui-input,var(--surface-muted));border-color:color-mix(in srgb,var(--accent) 45%,var(--line-strong))}
+.ui-select[data-slot=select-trigger]:focus-visible,.ui-select[data-slot=select-trigger][data-popup-open]{outline:2px solid color-mix(in srgb,var(--accent) 30%,transparent);outline-offset:1px;border-color:var(--accent)}
+.ui-select[data-slot=select-trigger]:disabled{opacity:.5;cursor:not-allowed}
+.ui-select[data-slot=select-trigger][aria-invalid=true]{border-color:var(--red)}
+.ui-select [data-slot=select-value]{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ui-select>svg{flex-shrink:0;width:15px;height:15px;color:var(--muted)}
+.ui-select-popup[data-slot=select-content]{z-index:280;min-width:var(--anchor-width);max-width:calc(100vw - 24px);max-height:min(var(--available-height),340px);padding:4px;border:1px solid var(--line-strong);border-radius:9px;background:var(--scn-popover,var(--surface));color:var(--text);box-shadow:0 12px 32px #0005;animation:none}
+.ui-select-popup [data-slot=select-item]{position:relative;display:flex;align-items:center;min-height:32px;padding:7px 28px 7px 9px;border-radius:5px;font-size:calc(13px * var(--ui-font-scale,1));line-height:1.4;color:var(--text);cursor:pointer;outline:none}
+.ui-select-popup [data-slot=select-item][data-highlighted],.ui-select-popup [data-slot=select-item]:focus{background:var(--ui-hover,color-mix(in srgb,var(--accent) 10%,transparent));color:var(--text)}
+.ui-select-popup [data-slot=select-item][data-disabled]{opacity:.4;cursor:not-allowed}
+.ui-select-popup [data-slot=select-item] svg{width:14px;height:14px;color:var(--accent)}
+.ui-select-popup [data-slot=select-label]{padding:7px 9px;font-size:calc(11px * var(--ui-font-scale,1));color:var(--muted)}
+.ui-select-field>select.ui-select-native{position:absolute!important;left:0!important;bottom:0!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;clip-path:inset(50%)!important}
+.toolbar>.ui-select-field{max-width:360px}
+.mc-content-search>.ui-select-field{flex:0 1 230px;width:auto;min-width:150px}
+.desktop-updates .ui-select-field{--wails-draggable:no-drag;width:100px}
+.desktop-updates .ui-select{min-height:26px;padding:3px 6px;font-size:11px}
+@media(max-width:600px){.mc-content-search>.ui-select-field{order:3;flex-basis:100%}}
+@media(prefers-reduced-motion:reduce){.ui-switch[data-slot=switch],.ui-switch[data-slot=switch] [data-slot=switch-thumb]{transition:none}}

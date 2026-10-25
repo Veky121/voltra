@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+for(const part of ['create','install','observe','source','cleanup']){
+ let body=fs.readFileSync('tools/runtime/romestead-native-'+part+'.mjs','utf8').replaceAll('romestead-native','fortress-native').replaceAll('Romestead','FortressCraft').replaceAll('unreal_survival','game_batch_inventory').replaceAll('crafting-native-v1','fortress-typed-automation-v1');
+ if(part==='create')body=body.replace("path='romestead/egg-romestead.json'","path='fortresscraft_evolved/egg-fortresscraft-evolved.json'").replace('profile.required_ports!==1','profile.required_ports!==2').replace('ports:1','ports:2').replace("game:'romestead'","game:'fortress'").replace('randomBytes(18)','randomBytes(8)').replaceAll('disk_mib:8192','disk_mib:16384').replace('disk:8192','disk:16384').replace("{WORLD_NAME:'Voltra FortressCraft native',WORLD_SIZE:'1',MAX_PLAYERS:'2',CHEATS:'false',PASSWORD:s.test_password}","{SERVER_NAME:'Voltra private Fortress',WORLDNAME:'VoltraAcceptance',MAX_PLAYERS:'3',PUBLIC:'false',AUTO_PAUSE:'false',AUTO_UPDATE:'0',RCON_PORT:String(s.ports[1]),RCON_PASSWORD:s.test_password}").replace('additional:[]','additional:s.allocation_ids.slice(1)').replace('allocations:0','allocations:1');
+ if(part==='install')body=body.replace("!profile.egg.startup.endsWith('crafting_runtime.py')","!profile.egg.startup.endsWith('automation-sims.py run fortress')");
+ fs.writeFileSync('tools/runtime/fortress-native-'+part+'.mjs',body,{flag:'wx'});
+}
+fs.writeFileSync('tools/runtime/fortress-native-power.mjs',fs.readFileSync('tools/runtime/solace-native-power.mjs','utf8').replaceAll('solace-native','fortress-native'),{flag:'wx'});
+fs.writeFileSync('tools/runtime/fortress-native-preflight.mjs',fs.readFileSync('tools/runtime/jc3-native-preflight.mjs','utf8').replaceAll('jc3-native','fortress-native').replaceAll('just_cause/just_cause_3/egg-j-c3-m-p.json','fortresscraft_evolved/egg-fortresscraft-evolved.json').replaceAll('619960','443600'),{flag:'wx'});
+console.log('Prepared7 scoped drivers; no resource mutations.');

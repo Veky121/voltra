@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+for(const part of ['create','install','observe','source','cleanup']){
+ let body=fs.readFileSync('tools/runtime/romestead-native-'+part+'.mjs','utf8').replaceAll('romestead-native','wurm-native').replaceAll('Romestead','Wurm').replaceAll('unreal_survival','game_batch_inventory').replaceAll('crafting-native-v1','wurm-native-v1');
+ if(part==='create')body=body.replace("path='romestead/egg-romestead.json'","path='wurm_unlimited/egg-wurm-unlimited.json'").replace('profile.required_ports!==1','profile.required_ports!==2').replace('ports:1','ports:2').replace("game:'romestead'","game:'wurm'").replace("s.test_password=randomBytes(18).toString('hex');save();","s.test_password=randomBytes(18).toString('hex');s.admin_password=randomBytes(8).toString('hex');save();").replace("{WORLD_NAME:'Voltra Wurm native',WORLD_SIZE:'1',MAX_PLAYERS:'2',CHEATS:'false',PASSWORD:s.test_password}","{SERVERNAME:'Voltra private Wurm',MAX_PLAYERS:'2',PVP:'false',AUTO_UPDATE:'0',QUERY_PORT:String(s.ports[1]),SERVERPWD:s.test_password,ADMINPWD:s.admin_password}").replace('additional:[]','additional:s.allocation_ids.slice(1)').replace('allocations:0','allocations:1');
+ if(part==='install')body=body.replace("!profile.egg.startup.endsWith('crafting_runtime.py')","!profile.egg.startup.endsWith('stationeers_wurm_starbound_runtime.py')");
+ fs.writeFileSync('tools/runtime/wurm-native-'+part+'.mjs',body,{flag:'wx'});
+}
+for(const part of ['power'])fs.writeFileSync('tools/runtime/wurm-native-'+part+'.mjs',fs.readFileSync('tools/runtime/solace-native-'+part+'.mjs','utf8').replaceAll('solace-native','wurm-native'),{flag:'wx'});
+fs.writeFileSync('tools/runtime/wurm-native-preflight.mjs',fs.readFileSync('tools/runtime/jc3-native-preflight.mjs','utf8').replaceAll('jc3-native','wurm-native').replaceAll('just_cause/just_cause_3/egg-j-c3-m-p.json','wurm_unlimited/egg-wurm-unlimited.json').replaceAll('619960','402370'),{flag:'wx'});
+console.log('Prepared7 scoped drivers; no resource mutations.');

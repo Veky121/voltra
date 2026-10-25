@@ -1,3 +1,45 @@
-﻿.proxy-gateways{display:grid;gap:1rem}.proxy-gateways__fieldset{display:grid;gap:1rem;border:0;padding:0;margin:0;min-width:0}.proxy-gateways__row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--border,#303846);overflow-wrap:anywhere}.proxy-gateways form{display:grid;gap:1rem}.proxy-gateways .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.proxy-gateways input,.proxy-gateways select{max-width:100%}.proxy-gateways__steps{padding-left:1.5rem}.proxy-gateways__steps li{margin:.4rem 0}@media(max-width:700px){.proxy-gateways .form-grid{grid-template-columns:1fr}.proxy-gateways__row{align-items:flex-start;flex-direction:column}.proxy-gateways .actions{flex-wrap:wrap}}
-.proxy-gateways__command{min-width:0;margin:1rem 0}.proxy-gateways__command pre{overflow:auto;max-width:100%;padding:1rem;background:var(--surface-inset,#121722);border-radius:.5rem;font-size:.8rem}.proxy-gateways details{padding:.8rem 0}.proxy-gateways summary{cursor:pointer;font-weight:600}
-
+﻿.proxy-gateways{display:grid;gap:20px;min-width:0}
+.proxy-gateways__fieldset{display:grid;gap:20px;border:0;padding:0;margin:0;min-width:0}
+.proxy-gateways__fieldset>.card{margin-bottom:0}
+.proxy-gateways__selector{max-width:420px;min-width:0}
+.proxy-gateways__selector>.field{margin-bottom:0}
+.proxy-gateways__row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:18px 0;border-bottom:1px solid var(--ui-divider);overflow-wrap:anywhere;min-width:0}
+.proxy-gateways__row>div:first-child{flex:1;min-width:0}
+.proxy-gateways__row strong{font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}
+.proxy-gateways__row p{margin:6px 0;line-height:1.6;font-size:calc(12px * var(--ui-font-scale,1));color:var(--muted)}
+.proxy-gateways__row>.actions{justify-content:flex-end;flex:0 1 50%;gap:6px}
+.proxy-gateways__row .error{margin:8px 0 0}
+.proxy-gateways__row .badge.is-ready,.proxy-gateways__row .badge[data-status=applied]{color:#77d4a6;border-color:#77d4a633;background:#77d4a60b}
+.proxy-gateways__row .badge:is([data-status=error],[data-status=failed]){color:var(--red);border-color:color-mix(in srgb,var(--red) 24%,transparent);background:color-mix(in srgb,var(--red) 6%,transparent)}
+.proxy-gateways__row .badge[data-status=removal_pending]{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 24%,transparent);background:color-mix(in srgb,var(--amber) 6%,transparent)}
+.proxy-gateways form,.proxy-gateways__wizard form{display:grid;gap:16px;min-width:0}
+.proxy-gateways .form-grid,.proxy-gateways__wizard .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.proxy-gateways :is(input,select),.proxy-gateways__wizard :is(input,select){max-width:100%}
+.proxy-gateways form>button,.proxy-gateways__wizard form>button{justify-self:start}
+.proxy-gateways form>h3{margin:4px 0 0;font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}
+.proxy-gateways form>p{margin:0}
+.proxy-gateways .card>form:not(:first-child){padding-top:20px;margin-top:20px;border-top:1px solid var(--ui-divider)}
+.proxy-gateways__wizard-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}
+.proxy-gateways__progress{display:flex;gap:20px;flex-wrap:wrap;list-style:none;padding:0;margin:0}
+.proxy-gateways__progress>li{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));white-space:nowrap}
+.proxy-gateways__progress>li>span{display:grid;place-items:center;width:22px;height:22px;border:1px solid var(--ui-border);border-radius:6px;background:var(--ui-input);font-size:calc(11px * var(--ui-font-scale,1))}
+.proxy-gateways__progress>li[aria-current=step]{color:var(--text)}
+.proxy-gateways__progress>li[aria-current=step]>span{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.proxy-gateways__progress>li[data-complete=true]>span{color:#77d4a6;border-color:#77d4a633}
+.proxy-gateways__wizard .card>h2{margin-bottom:20px}
+.proxy-gateways__wizard .proxy-gateways__wizard-note{padding-top:16px;margin:20px 0 0;border-top:1px solid var(--ui-divider);font-size:calc(12px * var(--ui-font-scale,1))}
+.proxy-gateways__status{margin:0;padding:10px 14px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-hover);color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1))}
+.proxy-gateways details,.proxy-install-guide details{padding:14px 0;border-bottom:1px solid var(--ui-divider);min-width:0}
+.proxy-gateways summary,.proxy-install-guide summary{cursor:pointer;font-size:calc(12px * var(--ui-font-scale,1));font-weight:500;color:var(--muted)}
+.proxy-gateways details[open]>summary,.proxy-install-guide details[open]>summary{margin-bottom:16px;color:var(--text)}
+.proxy-install-guide{min-width:0;margin-top:16px}
+.proxy-install-guide>p,.proxy-install-guide details>p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.65;color:var(--muted)}
+.proxy-install-guide>p:last-child{margin:16px 0 0}
+.proxy-gateways__command{min-width:0;margin:20px 0}
+.proxy-gateways__command>.actions{justify-content:space-between;gap:12px}
+.proxy-gateways__command strong{font-size:calc(12px * var(--ui-font-scale,1));font-weight:500}
+.proxy-gateways__command pre{overflow:auto;max-width:100%;max-height:320px;margin:10px 0 0;padding:14px 16px;border:1px solid var(--ui-border);background:var(--ui-input);border-radius:var(--ui-control-radius);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.proxy-gateways__command pre>code{font-size:inherit}
+.proxy-gateways__command .error{margin-top:10px}
+@media(max-width:900px){.proxy-gateways__row{flex-direction:column;gap:12px}.proxy-gateways__row>.actions{flex-basis:auto;justify-content:flex-start}.proxy-gateways__wizard-heading{align-items:flex-start;flex-direction:column;gap:16px}.proxy-gateways__progress{gap:12px}}
+@media(max-width:700px){.proxy-gateways .form-grid,.proxy-gateways__wizard .form-grid{grid-template-columns:minmax(0,1fr)}.proxy-gateways .actions{flex-wrap:wrap}.proxy-gateways__selector{max-width:none}.proxy-gateways__progress{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:10px}.proxy-gateways__command pre{padding:12px}}

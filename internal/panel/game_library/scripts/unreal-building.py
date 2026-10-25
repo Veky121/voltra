@@ -6,10 +6,11 @@ import os
 from pathlib import Path
 import re
 import shutil
+import secrets
 import sys
 import tempfile
 import urllib.request
-from steam_template import update, _publish
+from steam_template import update, _publish, _publication_parent, _publication_leaf
 from native_config import patch_ini
 from native_console import run
 
@@ -34,6 +35,77 @@ def default_config(release):
         content=response.read(65537)
     if len(content)>65536 or hashlib.sha256(content).hexdigest()!=release['sha256']:raise ValueError('Publisher default configuration integrity failed')
     content.decode('utf-8');return content
+
+
+def longvinter_config_snapshot(root,name):
+    with _publication_parent(root,name) as (parent,leaf,volume):
+        if parent is None:raise ValueError('Longvinter configuration parent is missing')
+        metadata=_publication_leaf(parent,leaf)
+        if metadata is None:raise ValueError('Longvinter configuration is missing')
+        descriptor=os.open(leaf,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=parent)
+        with os.fdopen(descriptor,'rb') as source:
+            actual=os.fstat(source.fileno());data=source.read(8*1024*1024+1);after=os.fstat(source.fileno())
+        if len(data)>8*1024*1024:raise ValueError('Longvinter configuration exceeds8MiB')
+        signature=lambda value:(value.st_dev,value.st_ino,value.st_size,value.st_mtime_ns,value.st_ctime_ns,value.st_mode,value.st_uid,value.st_gid)
+        if signature(actual)!=signature(metadata) or signature(after)!=signature(actual):raise ValueError('Longvinter configuration changed during capture')
+        return {'name':name,'data':data,'metadata':actual}
+
+
+def longvinter_restore_config(root,snapshot):
+    name=snapshot['name'];before=snapshot['metadata'];backup_name=name+'.backup'
+    with _publication_parent(root,name) as (parent,leaf,volume):
+        if parent is None:return 'parent-missing'
+        if _publication_leaf(parent,leaf) is not None:return 'current-file-retained'
+        with _publication_parent(root,backup_name) as (backup_parent,backup_leaf,_):
+            if backup_parent is None:return 'backup-missing'
+            backup=_publication_leaf(backup_parent,backup_leaf)
+            if backup is None:return 'backup-missing'
+            if (backup.st_uid,backup.st_gid)!=(before.st_uid,before.st_gid):return 'backup-owner-conflict'
+            descriptor=os.open(backup_leaf,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=backup_parent)
+            with os.fdopen(descriptor,'rb') as source:
+                actual=os.fstat(source.fileno());data=source.read(8*1024*1024+1)
+            signature=lambda value:(value.st_dev,value.st_ino,value.st_size,value.st_mtime_ns,value.st_ctime_ns,value.st_uid,value.st_gid)
+            if signature(actual)!=signature(backup) or data!=snapshot['data']:return 'backup-content-conflict'
+            # Publish with an exclusive hard-link operation: a concurrently
+            # created operator/native file wins, even after our absence check.
+            temporary='.voltra-longvinter-'+secrets.token_hex(16)
+            descriptor=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=parent)
+            identity=os.fstat(descriptor)
+            try:
+                with os.fdopen(os.dup(descriptor),'wb') as output:output.write(snapshot['data']);output.flush()
+                current=os.fstat(descriptor)
+                if (current.st_uid,current.st_gid)!=(before.st_uid,before.st_gid):os.fchown(descriptor,before.st_uid,before.st_gid)
+                os.fchmod(descriptor,before.st_mode&0o777);os.fsync(descriptor)
+                latest=_publication_leaf(backup_parent,backup_leaf)
+                if latest is None or signature(latest)!=signature(backup):return 'backup-content-conflict'
+                with _publication_parent(root,name) as (current_parent,current_leaf,_):
+                    if current_parent is None or (os.fstat(current_parent).st_dev,os.fstat(current_parent).st_ino)!=(os.fstat(parent).st_dev,os.fstat(parent).st_ino):raise ValueError('Longvinter configuration parent changed')
+                    try:os.link(temporary,current_leaf,src_dir_fd=parent,dst_dir_fd=current_parent,follow_symlinks=False)
+                    except FileExistsError:return 'current-file-retained'
+                    os.fsync(current_parent)
+                return 'restored-matching-native-backup'
+            finally:
+                os.close(descriptor)
+                latest=os.stat(temporary,dir_fd=parent,follow_symlinks=False)
+                if (latest.st_dev,latest.st_ino)==(identity.st_dev,identity.st_ino):os.unlink(temporary,dir_fd=parent)
+
+
+def native_run(root,game,argv,child,credentials,ready):
+    snapshot=longvinter_config_snapshot(root,metadata()[game]['config']) if game=='longvinter' else None
+    result=None
+    try:
+        result=run(root,argv,child,'exit' if game=='brickadia' else '\x03',credentials=credentials,ready_marker=ready,terminal_input=True)
+        return result
+    finally:
+        if snapshot is not None:
+            try:status=longvinter_restore_config(root,snapshot)
+            except (OSError,ValueError) as error:
+                status='restore-error';print('Longvinter configuration retention failed: '+type(error).__name__,file=sys.stderr)
+            # A retention failure must never turn the actual native exit into
+            # success (or replace its original nonzero/exception semantics).
+            try:publish(root,'.voltra/longvinter-config-retention.json',(json.dumps({'status':status,'native_exit':result})+'\n').encode())
+            except (OSError,ValueError):print('Longvinter configuration retention receipt failed',file=sys.stderr)
+            print('Longvinter configuration retention: '+status,file=sys.stderr)
 
 
 def install(root,game,environment):
@@ -121,7 +193,7 @@ def main():
     automatic=env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE',defaults.get('AUTO_UPDATE','0')))
     if automatic=='1' and (game!='frozen' or env.get('SRCDS_APPID',defaults['SRCDS_APPID'])):install(root,game,env)
     argv,child,secrets,ready=configure(root,game,env)
-    return run(root,argv,child,'exit' if game=='brickadia' else '\x03',credentials=secrets,ready_marker=ready,terminal_input=True)
+    return native_run(root,game,argv,child,secrets,ready)
 
 
 if __name__=='__main__':sys.exit(main())

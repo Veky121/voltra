@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -231,8 +232,9 @@ func (a *App) server(r *http.Request, permission string) (M, error) {
 	steamStatus := r.Method == http.MethodGet && r.URL.Path == base+"/steam"
 	navigation := r.URL.Path == base+"/navigation" && (r.Method == http.MethodPost || r.Method == http.MethodPut)
 	adminSocket := boolean(u["root_admin"]) && (r.URL.Path == base+"/websocket" || r.URL.Path == base+"/ws")
+	consoleHistory := r.Method == http.MethodGet && r.URL.Path == base+"/console-history"
 	status := str(s["status"])
-	if ((status != "" && status != "reinstall_failed") || boolean(s["node_maintenance"]) || boolean(s["transferring"])) && !view && !adminSocket && !steamStatus && !navigation {
+	if ((status != "" && status != "reinstall_failed") || boolean(s["node_maintenance"]) || boolean(s["transferring"])) && !view && !adminSocket && !steamStatus && !navigation && !consoleHistory {
 		if status == "" {
 			status = "unavailable during installation, maintenance, or transfer"
 		}
@@ -284,6 +286,8 @@ func (a *App) registerAccounts(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("GET /api/client/account", a.accountGet)
 	mux.HandleFunc("PATCH /api/client/account", a.accountUpdate)
+	mux.HandleFunc("PUT /api/client/account/sftp-password", a.accountSFTPPassword)
+	mux.HandleFunc("PUT /api/admin/users/{user}/sftp-password", a.adminSFTPPassword)
 	mux.HandleFunc("GET /api/client/account/api-keys", a.apiKeysList)
 	mux.HandleFunc("POST /api/client/account/api-keys", a.apiKeysCreate)
 	mux.HandleFunc("DELETE /api/client/account/api-keys/{identifier}", a.apiKeysDelete)
@@ -308,10 +312,20 @@ func accountAttributes(u M) M {
 	if str(u["password_hash"]) != "" {
 		provider = "password"
 	}
-	return M{"id": u["id"], "uuid": u["uuid"], "admin": u["root_admin"], "root_admin": u["root_admin"], "username": u["username"], "email": u["email"], "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "auth_provider": provider, "cloudflare_pending": provider == "development"}
+	return M{"sftp_password_set": str(u["sftp_password_hash"]) != "", "id": u["id"], "uuid": u["uuid"], "admin": u["root_admin"], "root_admin": u["root_admin"], "username": u["username"], "nickname": accountNickname(u), "email": u["email"], "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "auth_provider": provider, "cloudflare_pending": provider == "development"}
+}
+
+func accountNickname(u M) string {
+	if nickname := strings.TrimSpace(str(u["nickname"])); nickname != "" {
+		return nickname
+	}
+	if local, _, ok := strings.Cut(str(u["email"]), "@"); ok && strings.TrimSpace(local) != "" {
+		return local
+	}
+	return str(u["username"])
 }
 func userAttributes(u M) M {
-	return M{"id": u["id"], "uuid": u["uuid"], "external_id": u["external_id"], "username": u["username"], "email": u["email"], "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "root_admin": u["root_admin"], "disabled": u["disabled"], "created_at": u["created_at"], "updated_at": u["updated_at"]}
+	return M{"sftp_password_set": str(u["sftp_password_hash"]) != "", "id": u["id"], "uuid": u["uuid"], "external_id": u["external_id"], "username": u["username"], "email": u["email"], "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "root_admin": u["root_admin"], "disabled": u["disabled"], "created_at": u["created_at"], "updated_at": u["updated_at"]}
 }
 
 func (a *App) accountGet(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +348,7 @@ func (a *App) accountUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fields := M{}
-	for _, key := range []string{"first_name", "last_name", "language"} {
+	for _, key := range []string{"nickname", "first_name", "last_name", "language"} {
 		if v, ok := d[key]; ok {
 			fields[key] = v
 		}
@@ -513,7 +527,7 @@ func accountUserData(d M, create bool) (M, error) {
 
 func accountUserDataWithLocales(d M, create bool, localesDir string) (M, error) {
 	data := M{}
-	for _, key := range []string{"username", "email", "first_name", "last_name", "language", "external_id", "root_admin", "disabled"} {
+	for _, key := range []string{"username", "email", "nickname", "first_name", "last_name", "language", "external_id", "root_admin", "disabled"} {
 		v, ok := d[key]
 		if !ok {
 			continue
@@ -526,6 +540,13 @@ func accountUserDataWithLocales(d M, create bool, localesDir string) (M, error) 
 			column = "name_last"
 		}
 		switch key {
+		case "nickname":
+			nickname, ok := v.(string)
+			nickname = strings.TrimSpace(nickname)
+			if !ok || nickname == "" || utf8.RuneCountInString(nickname) > 64 || strings.ContainsFunc(nickname, unicode.IsControl) {
+				return nil, bad("Nickname must contain 1 to 64 characters without control characters.")
+			}
+			data[column] = nickname
 		case "root_admin", "disabled":
 			b, ok := v.(bool)
 			if !ok {

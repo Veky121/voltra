@@ -1,11 +1,12 @@
 import fs from 'node:fs';
+import {ensureRuntimeUpdateControl} from './runtime-update-control.mjs';
 import crypto from 'node:crypto';
 const base='internal/panel/game_library/scripts/';
 const catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));
 const games={aloft:'aloft/egg-aloft.json',astro:'astro_colony/egg-astro-colony.json',aska:'Aska/egg-aska.json'};
 const release={},profiles={};
 for(const [game,path] of Object.entries(games)){
- const entry=catalog.entries.find(e=>e.path===path),egg=structuredClone(entry.egg);
+ const entry=catalog.entries.find(e=>e.path===path),egg=structuredClone(entry.egg);ensureRuntimeUpdateControl(egg);
  const defaults=Object.fromEntries(egg.variables.map(v=>[v.env_variable,String(v.default_value)]));
  const info={app:Number(defaults.SRCDS_APPID),platform:game==='astro'?'linux':'windows',defaults,binary:game==='astro'?'AstroColony/Binaries/Linux/AstroColonyServer':game==='aloft'?'Aloft.exe':'AskaServer.exe',ready:JSON.parse(egg.config.startup).done,types:{}};
  for(const v of egg.variables){if(/boolean/.test(v.rules))info.types[v.env_variable]='boolean';else if(/numeric|integer/.test(v.rules))info.types[v.env_variable]='number';}

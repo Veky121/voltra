@@ -1,0 +1,3 @@
+import fs from 'node:fs';import {api} from './openttd-compat-node.mjs';import {ownedStoppedServer} from './cache-owned-server.mjs';
+const dir='.local/wurm-native',{receipt:s}=await ownedStoppedServer(dir+'/private.json');if(s.owner!=='game_batch_inventory'||s.path!=='wurm_unlimited/egg-wurm-unlimited.json')throw Error('Foreign fixture');
+const environment={AUTO_UPDATE:'1',MAX_PLAYERS:'3',SERVER_CLEAN_LOGS_ON_START:'false'},file=dir+'/startup-controls.json';if(fs.existsSync(file))throw Error('Controls already submitted');await api('/api/application/servers/'+s.internal_id+'/startup','PATCH',{environment});fs.writeFileSync(file,JSON.stringify({uuid:s.uuid,environment,at:new Date().toISOString()},null,2)+'\n',{flag:'wx'});console.log({controls_submitted:environment});

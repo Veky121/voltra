@@ -1,0 +1,8 @@
+// Metadata-only stage: never regenerate canonical source heredocs here.
+import fs from 'node:fs';import assert from 'node:assert/strict';import {createHash} from 'node:crypto';
+const key='romestead/egg-romestead.json',before=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[key],after=structuredClone(before),dir='.local/romestead-native-metadata';
+after.defaults.memory=8192;
+after.setup_steps=after.setup_steps.map(text=>text.replace('Unknown JSON fields survive.','Unknown JSON is retained by installer/reinstall; publisher native startup may discard unsupported fields.'));
+after.setup_steps[after.setup_steps.length-1]='Romestead keeps redirected stdin/stdout, the already-redacted CR-to-newline latest.log tee, literal stop and raw native exit status. The 8192 MiB default is a tested recommendation for WORLD_SIZE=1, not a minimum; larger worlds and player loads may need more memory. Client joining and gameplay remain unverified.';
+assert.deepEqual(after.egg,before.egg);assert.equal(after.verification,before.verification);assert.equal(after.detail,before.detail);assert(!after.setup_steps.some(text=>text.includes('Unknown JSON fields survive.')));assert.equal(after.defaults.memory,8192);
+fs.mkdirSync(dir,{recursive:true});const bytes=Buffer.from(JSON.stringify({[key]:after},null,2)+'\n');fs.writeFileSync(dir+'/profiles.json',bytes);fs.writeFileSync(dir+'/manifest.json',JSON.stringify({metadata_only:true,path:key,sha256:createHash('sha256').update(bytes).digest('hex'),changed:['defaults.memory','setup_steps'],egg_unchanged:true,status_unchanged:true,original_controls_unchanged:true},null,2)+'\n');console.log({stage:dir+'/profiles.json',sha256:createHash('sha256').update(bytes).digest('hex'),metadata_only:true});

@@ -52,8 +52,21 @@ Publisher INI examples seed missing files only. Lua-style annotations are cleane
 only in newly copied publisher examples; operator comments and unknown settings
 remain. Native Unity output stays in `unity.log`, prior logs are archived rather
 than deleted, and the supervised bridge preserves original noise filtering,
-literal Unicode, credential redaction and final log draining. Original Ctrl-C
-is forwarded. Native headless readiness and persistence remain untested.
+literal Unicode, credential redaction and final log draining. Fortress alone now
+uses `automation-fortress-console.py`: dashboard lines authenticate against the
+allocated loopback RCON socket; Stop submits the native `quit` supported by actual
+publisher help. Original PTY Ctrl-C produced raw130; authenticated quit produced
+raw0 and native world/thread/Steam shutdown markers. Both observations remain.
+Canonical bridge installation and full lifecycle acceptance are separate steps.
+
+The bridge retains exact native argv, removes bundled Python library environment
+and the RCON secret before native exec, and inherits the outer supervisor's PTY
+and redaction. Private credentials never enter argv. It bounds frame/command size,
+authentication/readiness wait and shutdown time, rejects invalid UTF-8 and frame
+IDs, and never replays a command after sending begins. A missing acknowledgement
+is explicitly unconfirmed. Timeout cleanup targets only its separate native
+process group and preserves actual exit/signal results; it does not claim a save.
+Eco and Foundry still use their existing supervisor/Stop arguments unchanged.
 
 Proprietary game binaries are fetched directly through Steam, not redistributed.
 Referenced runtime images retain their own Wine/Mono/.NET/Python notices. New

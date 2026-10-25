@@ -27,10 +27,11 @@ type Executor struct {
 	// Test seams remain package private, never protocol or Config settings.
 	pollInterval, timeLimit time.Duration
 	owner                   func(os.FileInfo) (uint32, uint32, bool)
+	modSpace                func(string) (uint64, error)
 }
 
 func New() *Executor {
-	return &Executor{docker: localDocker{}, wingsConfig: "/etc/voltra/wings.yml", journal: "/var/lib/voltra/steam-jobs", supported: Supported(), active: map[string]bool{}, slots: make(chan struct{}, 2), pollInterval: time.Second, timeLimit: 2 * time.Hour, owner: fileOwner}
+	return &Executor{docker: localDocker{}, wingsConfig: "/etc/voltra/wings.yml", journal: "/var/lib/voltra/steam-jobs", supported: Supported(), active: map[string]bool{}, slots: make(chan struct{}, 2), pollInterval: time.Second, timeLimit: 2 * time.Hour, owner: fileOwner, modSpace: palworldDiskAvailable}
 }
 
 type record struct {
@@ -38,6 +39,7 @@ type record struct {
 	Terminal       *steamapi.Event
 	Mutating       bool
 	RecoveryNeeded bool
+	PalworldMods   bool `json:",omitempty"`
 }
 
 func phaseID(r steamapi.Request) string { return r.JobID + "-" + r.Operation }
@@ -57,22 +59,12 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 		fail(errors.New("Steam maintenance requires a native Linux amd64 node"))
 		return
 	}
-	e.mu.Lock()
-	if e.active[r.ServerUUID] {
-		e.mu.Unlock()
-		fail(errors.New("Steam maintenance already active for this server"))
+	releaseReservation, err := e.reserveMaintenance(r.ServerUUID)
+	if err != nil {
+		fail(err)
 		return
 	}
-	select {
-	case e.slots <- struct{}{}:
-	default:
-		e.mu.Unlock()
-		fail(errors.New("node Steam maintenance capacity reached; retry later"))
-		return
-	}
-	e.active[r.ServerUUID] = true
-	e.mu.Unlock()
-	defer func() { e.mu.Lock(); delete(e.active, r.ServerUUID); e.mu.Unlock(); <-e.slots }()
+	defer releaseReservation()
 	ctx, cancel := context.WithTimeout(ctx, e.timeLimit)
 	defer cancel()
 	if err := os.MkdirAll(e.journal, 0700); err != nil {
@@ -127,6 +119,12 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 				fail(err)
 				return
 			}
+			if old.PalworldMods {
+				if err = restorePalworldMods(dir, filepath.Join(e.journal, phaseID(r)+".palworld-mods")); err != nil {
+					fail(err)
+					return
+				}
+			}
 		}
 		terminal.Error = "previous execution interrupted; use a new job ID to check or repair while stopped"
 		terminal.Detail = terminal.Error
@@ -135,6 +133,9 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 		if err := writePrivate(journal, old); err != nil {
 			fail(err)
 			return
+		}
+		if old.PalworldMods {
+			removePalworldModBackup(filepath.Join(e.journal, phaseID(r)+".palworld-mods"))
 		}
 		_ = emit(terminal)
 		return
@@ -184,6 +185,7 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 			terminal.Detail = err.Error()
 		} else if !rec.RecoveryNeeded {
 			_ = os.Remove(backup)
+			removePalworldModBackup(filepath.Join(e.journal, phaseID(r)+".palworld-mods"))
 		}
 		_ = emit(terminal)
 	}()
@@ -216,7 +218,14 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 			return
 		}
 	}
-	installed, readErr := readInstalled(dir, r.AppID)
+	var palworldPaths palworldProtectedPaths
+	if mutation && windowsPalworld(r) {
+		if palworldPaths, err = e.palworldLoader(ctx, r, dir, "preflight"); err != nil {
+			finishError(err)
+			return
+		}
+	}
+	installed, readErr := readInstalledRequest(dir, r)
 	if readErr != nil && r.Operation == "check" {
 		finishError(readErr)
 		return
@@ -262,6 +271,13 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 	if err = backupConfigs(dir, backup, r.AppID); err != nil {
 		finishError(err)
 		return
+	}
+	if windowsPalworld(r) {
+		if err = backupPalworldMods(dir, filepath.Join(e.journal, phaseID(r)+".palworld-mods"), palworldPaths, e.modSpace); err != nil {
+			finishError(err)
+			return
+		}
+		rec.PalworldMods = true
 	}
 	rec.Mutating = true
 	rec.RecoveryNeeded = true
@@ -321,16 +337,43 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 		finishError(restoreErr)
 		return
 	}
-	rec.RecoveryNeeded = false
+	if rec.PalworldMods {
+		if restoreErr := restorePalworldMods(dir, filepath.Join(e.journal, phaseID(r)+".palworld-mods")); restoreErr != nil {
+			finishError(restoreErr)
+			return
+		}
+	}
 	if err != nil {
+		rec.RecoveryNeeded = false
 		finishError(err)
 		return
 	}
 	if monitorErr != nil {
+		rec.RecoveryNeeded = false
 		finishError(monitorErr)
 		return
 	}
-	installed, err = readInstalled(dir, r.AppID)
+	if windowsPalworld(r) {
+		_, loaderErr := e.palworldLoader(ctx, r, dir, "install")
+		cleanup, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		current, stateErr := e.inspect(cleanup, r.ServerUUID)
+		cleanupCancel()
+		if stateErr != nil || running(current) {
+			finishError(errors.New("stop the game to recover protected Palworld mods after loader maintenance"))
+			return
+		}
+		if restoreErr := restorePalworldMods(dir, filepath.Join(e.journal, phaseID(r)+".palworld-mods")); restoreErr != nil {
+			finishError(restoreErr)
+			return
+		}
+		rec.RecoveryNeeded = false
+		if loaderErr != nil {
+			finishError(loaderErr)
+			return
+		}
+	}
+	rec.RecoveryNeeded = false
+	installed, err = readInstalledRequest(dir, r)
 	if err != nil || installed == "" {
 		finishError(errors.New("SteamCMD did not produce a complete installed manifest; run verify while stopped"))
 		return

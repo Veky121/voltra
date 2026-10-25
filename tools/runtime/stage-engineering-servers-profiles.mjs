@@ -1,6 +1,7 @@
 import fs from 'node:fs';const base='internal/panel/game_library/scripts/';const c=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));const current=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));const pins=JSON.parse(fs.readFileSync(base+'engineering-servers-pins.json'));const profiles={};
 for(const [path,game]of [['space_engineers/default/egg-space-engineers.json','space'],['space_engineers/torch/egg-space-engineers--torch-server.json','torch'],['subnautica_nitrox_mod/egg-subnautica.json','nitrox']]){
  const e=c.entries.find(e=>e.path===path);if(!e)throw Error(path);const egg=structuredClone(e.egg),nitrox=game==='nitrox';
+ ensureRuntimeUpdateControl(egg);
  const add=(name,env,def,rules,description)=>egg.variables.push({name,env_variable:env,default_value:def,rules,description,user_viewable:true,user_editable:true});
  add('Installation source','INSTALL_MODE','steam','required|string|in:steam,operator_files','steam preserves original acquisition. operator_files requires licensed original game content and structurally validates binaries/content without claiming authenticity or runtime. No license bypass or private Steam parser is supplied.');
  if(nitrox)add('Nitrox source','NITROX_INSTALL_MODE','publisher','required|string|in:publisher,operator_files','After licensed base game upload, publisher installs exact verified official Linux Nitrox release. operator_files retains a supplied compatible Nitrox server; structural hashes do not establish its declared version. latest resolves reviewed1.8.1.0; missing explicit versions never fall back.');
@@ -11,7 +12,7 @@ for(const [path,game]of [['space_engineers/default/egg-space-engineers.json','sp
  egg.startup=nitrox?'exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/engineering-servers.py run nitrox':`exec /usr/bin/python3 .voltra/engineering-servers.py run ${game}`;
  egg.config={...egg.config,files:'{}',stop:'^SIGTERM'};
  let script='#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\ncd /mnt/server\napt-get update\napt-get install -y --no-install-recommends python3 ca-certificates lib32gcc-s1 lib32stdc++6\nmkdir -p .voltra\n';
- for(const name of ['engineering-servers.py','engineering-servers-pins.json','engineering-space-default.xml','steam-native-next.py','steam-template.py','native-config.py','native-release.py','native-console.py','source-install.py',...(nitrox?['bundle-debian-python.py']:[])])script+=`cat > .voltra/${name==='steam-template.py'?'steam_template.py':name} <<'VOLTRA_ENGINEERING_SOURCE'\n${fs.readFileSync(base+name,'utf8').replaceAll('\r\n','\n')}\nVOLTRA_ENGINEERING_SOURCE\n`;
+ for(const name of ['engineering-servers.py','private-wine-prerequisites.py','engineering-servers-pins.json','engineering-space-default.xml','steam-native-next.py','steam-template.py','native-config.py','native-release.py','native-console.py','source-install.py',...(nitrox?['bundle-debian-python.py']:[])])script+=`cat > .voltra/${name==='steam-template.py'?'steam_template.py':name} <<'VOLTRA_ENGINEERING_SOURCE'\n${fs.readFileSync(base+name,'utf8').replaceAll('\r\n','\n')}\nVOLTRA_ENGINEERING_SOURCE\n`;
  if(nitrox)script+='python3 .voltra/bundle-debian-python.py\n';script+=`python3 .voltra/engineering-servers.py install ${game}\n`;
  egg.scripts.installation={container:'debian:bookworm-slim',entrypoint:'bash',script};
  profiles[path]={upstream_sha256:e.sha256,revision:game+'-typed-engineering-v1',platforms:['linux/amd64'],required_ports:nitrox?1:3,defaults:{memory:nitrox?4096:6144,disk:nitrox?20480:24576},verification:current[path]?.verification||'not_verified',detail:current[path]?.detail||'Original typed controls and explicit Wine/license/Steam boundaries implemented; source fixtures only, native acceptance pending.',egg,setup_steps:[
@@ -24,3 +25,4 @@ for(const [path,game]of [['space_engineers/default/egg-space-engineers.json','sp
  ]};
 }
 fs.mkdirSync('.local/engineering-servers',{recursive:true});fs.writeFileSync('.local/engineering-servers/profiles.json',JSON.stringify(profiles,null,2)+'\n');console.log('Staged original SE/Torch/Nitrox source profiles.');
+import {ensureRuntimeUpdateControl} from './runtime-update-control.mjs';

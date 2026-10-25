@@ -10,7 +10,7 @@ export function consoleOutput(text: string, event: string, preserveColor = false
     // Only hide our demo process signal. Wings already consumes it before the UI.
     return event !== 'console output' || !/^(?:VOLTRA|PTEROCLONE)_READY$/.test(stripConsoleControls(line).trim());
   }).map(line => {
-    const branded = line.replace(/^((?:\x1b\[[\d;]*m)*)\[(?:Pterodactyl Daemon|Voltra Daemon)\]/, '$1[Voltra]');
+    const branded = line.replace(/^((?:\x1b\[[\d;]*m)*)container@pterodactyl~/, '$1container@voltra~').replace(/^((?:\x1b\[[\d;]*m)*)\[(?:Pterodactyl Daemon|Voltra Daemon)\]/, '$1[Voltra]');
     if (event === 'daemon message' && stripConsoleControls(branded) && !stripConsoleControls(branded).startsWith('[Voltra]')) {
       return `[Voltra] ${branded}`;
     }

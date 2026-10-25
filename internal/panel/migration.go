@@ -55,7 +55,7 @@ func (e *LegacyImportError) Error() string { return e.Detail }
 
 // All names are fixed here; a snapshot can never inject a SQL identifier. Egg
 // parent links and the server/allocation cycle are restored after the inserts.
-var migrationTables = []string{"users", "api_keys", "ssh_keys", "locations", "nodes", "daemon_revocations", "nests", "eggs", "egg_variables", "servers", "notification_jobs", "allocations", "server_variables", "subusers", "backups", "schedules", "tasks", "schedule_runs", "database_hosts", "databases", "mounts", "mount_nodes", "mount_eggs", "mount_servers", "activity_logs", "settings", "server_transfers", "integrations", "server_integration_secrets"}
+var migrationTables = []string{"users", "api_keys", "ssh_keys", "locations", "nodes", "daemon_revocations", "nests", "eggs", "egg_variables", "servers", "allocations", "server_variables", "subusers", "backups", "schedules", "tasks", "schedule_runs", "database_hosts", "databases", "mounts", "mount_nodes", "mount_eggs", "mount_servers", "activity_logs", "settings", "server_transfers", "integrations", "server_integration_secrets"}
 var migrationSecrets = map[string]string{"nodes": "daemon_token", "database_hosts": "password", "databases": "password", "integrations": "credentials", "server_integration_secrets": "value"}
 var migrationNoID = map[string]bool{"settings": true, "mount_nodes": true, "mount_eggs": true, "mount_servers": true, "server_integration_secrets": true}
 
@@ -119,7 +119,7 @@ func (a *App) ImportLegacyWithOptions(ctx context.Context, reader io.Reader, opt
 		report.Counts[table] = len(rows)
 	}
 	for table := range snapshot.Tables {
-		if !known[table] {
+		if !known[table] && table != "notification_jobs" {
 			return reject("Snapshot contains unsupported table " + table)
 		}
 	}
@@ -158,6 +158,9 @@ func (a *App) ImportLegacyWithOptions(ctx context.Context, reader io.Reader, opt
 	links := map[string][]M{"eggs": {}, "servers": {}}
 	for _, table := range migrationTables {
 		for index, original := range snapshot.Tables[table] {
+			if table == "settings" && outboundMailSetting(str(original["key"])) {
+				continue
+			}
 			row := M{}
 			for key, value := range original {
 				column, ok := columns[table][key]
@@ -348,11 +351,6 @@ func migrationValidateStateAt(s LegacySnapshot, report *LegacyImportReport, at t
 			block("schedule_runs", row, "A native schedule run is in flight; finish it before exporting")
 		}
 	}
-	for _, row := range s.Tables["notification_jobs"] {
-		if str(row["status"]) == "sending" {
-			block("notification_jobs", row, "A notification delivery is in flight; finish sending before export to avoid duplicate email delivery")
-		}
-	}
 	for _, row := range s.Tables["servers"] {
 		if status := str(row["status"]); status == "installing" || status == "restoring_backup" {
 			block("servers", row, "A daemon installation or backup restore is in flight; finish it before exporting")
@@ -524,6 +522,15 @@ func (a *App) ExportSnapshot(ctx context.Context, writer io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("Could not export table %s", table)
 		}
+		if table == "settings" {
+			filtered := make([]M, 0, len(rows))
+			for _, row := range rows {
+				if !outboundMailSetting(str(row["key"])) {
+					filtered = append(filtered, row)
+				}
+			}
+			rows = filtered
+		}
 		for _, row := range rows {
 			if secret, ok := migrationSecrets[table]; ok {
 				raw := str(row[secret])
@@ -585,4 +592,8 @@ func migrationSnapshotRows(ctx context.Context, tx pgx.Tx, table string) ([]M, e
 		out = append(out, row)
 	}
 	return out, rows.Err()
+}
+
+func outboundMailSetting(key string) bool {
+	return strings.HasPrefix(key, "mail:") || strings.HasPrefix(key, "pterodactyl:email:")
 }

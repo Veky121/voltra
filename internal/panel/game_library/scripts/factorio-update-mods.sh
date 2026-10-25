@@ -6,6 +6,7 @@ set -eou pipefail
 
 FACTORIO_VERSION=$1
 MOD_DIR=$2
+INSTALL_ROOT="${MOD_DIR%/*}"
 USERNAME=${SERVER_USERNAME:-}
 TOKEN=${SERVER_TOKEN:-}
 UPDATE_IGNORE=${MOD_UPDATE_IGNORE:-}
@@ -13,6 +14,18 @@ declare -A VISITED SELECTED CONFLICTS
 COUNT=0
 
 MOD_BASE_URL="https://mods.factorio.com"
+
+# Recycler became a publisher builtin in 2.1. Its name alone is not proof
+# that this installed game provides it. Never send it to the mod portal.
+validate_recycler_builtin() {
+  local info="$INSTALL_ROOT/data/recycler/info.json"
+  [[ $(check_dependency_version 'recycler >= 2.1.0' "$FACTORIO_VERSION") == 1 ]] &&
+    [[ -f "$info" && ! -L "$info" ]] &&
+    jq -e --arg version "$FACTORIO_VERSION" --arg branch "${FACTORIO_VERSION%.*}" '.name == "recycler" and .version == $version and .factorio_version == $branch' "$info" >/dev/null || {
+      print_failure 'Recycler requires the matching publisher builtin from Factorio 2.1 or newer; installed mods preserved.'
+      return 1
+    }
+}
 
 print_step()
 {
@@ -233,7 +246,8 @@ update_mod()
     dependency="${dependency#~ }"
     if [[ "$dependency" =~ ^([A-Za-z0-9_-]+)([[:space:]]+((\>=|\<=|\>|\<|=)[[:space:]]+[0-9]+(\.[0-9]+)*))?$ ]]; then dep_name="${BASH_REMATCH[1]}"; else print_failure 'Invalid dependency metadata.'; return 1; fi
     case "$dep_name" in
-      base|space-age|quality|elevated-rails)
+      base|space-age|quality|elevated-rails|recycler)
+        if [[ "$dep_name" == recycler ]]; then validate_recycler_builtin || return 1; fi
         [[ $(check_dependency_version "$dependency" "$FACTORIO_VERSION") == 1 ]] || { print_failure 'Builtin dependency version cannot be satisfied.'; return 1; } ;;
       *) update_mod "$dep_name" "$dependency" || return 1 ;;
     esac
@@ -297,7 +311,8 @@ MOD_DIR="$STAGE"
 if [[ -f $MOD_DIR/mod-list.json ]]; then
   jq -r ".mods|map(select(.enabled))|.[].name" "$MOD_DIR/mod-list.json" | { while read -r mod; do
     # Skip base mod and DLC built-in mods
-    if [[ $mod != base ]] && [[ $mod != elevated-rails ]] && [[ $mod != quality ]] && [[ $mod != space-age ]]; then
+    if [[ $mod == recycler ]]; then validate_recycler_builtin || exit 1; fi
+    if [[ $mod != base ]] && [[ $mod != elevated-rails ]] && [[ $mod != quality ]] && [[ $mod != space-age ]] && [[ $mod != recycler ]]; then
       if is_mod_ignored "$mod"; then
         print_success "Skipping mod $mod (listed in UPDATE_IGNORE)"
       else

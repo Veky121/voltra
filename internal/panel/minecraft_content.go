@@ -237,7 +237,14 @@ func (p mcContentProvider) request(ctx context.Context, endpoint string, target 
 		return APIError{502, "ContentProviderUnavailable", fmt.Sprintf("The content provider returned HTTP %d. Check its availability and the global credential.", res.StatusCode)}
 	}
 	data, e := io.ReadAll(io.LimitReader(res.Body, (4<<20)+1))
-	if e != nil || len(data) > 4<<20 || json.Unmarshal(data, target) != nil {
+	if e != nil || len(data) > 4<<20 {
+		return APIError{502, "ContentProviderMetadata", "The content provider returned invalid or oversized metadata."}
+	}
+	// CurseForge file/project IDs exceed the float formatting threshold. Keep
+	// their decimal representation intact for identity checks and follow-up URLs.
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if decoder.Decode(target) != nil || decoder.Decode(new(any)) != io.EOF {
 		return APIError{502, "ContentProviderMetadata", "The content provider returned invalid or oversized metadata."}
 	}
 	return nil
@@ -390,7 +397,12 @@ func (p mcContentProvider) search(ctx context.Context, info mcContentInfo, query
 		return out, nil
 	}
 	if p.name == "modrinth" {
-		// Paper plugins are categorized as mods in Modrinth API v2. The loader facet identifies plugins.
+		// API v2 returns legacy "mod" project types for plugins, while the
+		// search index now also categorizes them as "plugin". Query both.
+		projectTypes := []string{"project_type:mod"}
+		if info.Kind == "plugin" {
+			projectTypes = append(projectTypes, "project_type:plugin")
+		}
 		environments := []string{}
 		for _, environment := range mcContentServerEnvironments {
 			if info.Compatibility != "server_only" || mcContentIndependentEnvironment(environment) {
@@ -400,7 +412,7 @@ func (p mcContentProvider) search(ctx context.Context, info mcContentInfo, query
 		// Older projects still report unknown here; require their legacy server
 		// declaration in the response filter instead of hiding them outright.
 		environments = append(environments, "environment:unknown")
-		facets, _ := json.Marshal([][]string{{"project_type:mod"}, {"versions:" + info.Version}, {"categories:" + info.Loader}, environments})
+		facets, _ := json.Marshal([][]string{projectTypes, {"versions:" + info.Version}, {"categories:" + info.Loader}, environments})
 		var response struct {
 			Hits []M `json:"hits"`
 		}
@@ -1077,6 +1089,10 @@ func (a *App) mcContentInstall(w http.ResponseWriter, r *http.Request) {
 	for i, v := range plan {
 		downloads[i], e = p.download(ctx, v)
 		if e != nil {
+			fail(w, e)
+			return
+		}
+		if e = mcContentValidateLoaderConstraints(downloads[i], info); e != nil {
 			fail(w, e)
 			return
 		}

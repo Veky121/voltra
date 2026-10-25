@@ -1,0 +1,41 @@
+{
+  "nova": {
+    "serverName": "",
+    "serverListName": "A Pterodactyl server",
+    "serverSlot": 25,
+    "serverPort": 7777,
+    "isPublicServer": false,
+    "useAdminPinAuth": false,
+    "tabletUrl": "",
+    "isWhitelisted": false,
+    "useWhitelistProtection": false,
+    "whitelist": {
+      "intro": "",
+      "questions": [],
+      "date": ""
+    },
+    "autoSaveIntervalSeconds": 1800,
+    "disconnectClientsBeforeStop": true,
+    "mapId": 0,
+    "serverFramerate": 60,
+    "hasShop": false
+  },
+  "modiverse": {
+    "version": 1,
+    "pin": "0000",
+    "motdURL": "http://test.com/motd.html",
+    "motdDelay": 5,
+    "rconPassword": "cHangeRC0nPasswOrD",
+    "mapCycle": [
+      {
+        "gameMode": "2285067974",
+        "comment": "Deathrun, Deathrun Example Map, ",
+        "map": "2286680373",
+        "assets": [
+          "2229481041"
+        ],
+        "duration": 1800
+      }
+    ]
+  }
+}

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -19,12 +18,15 @@ func nodeInstallCommand(base string, recovery bool) string {
 	if recovery {
 		return "sudo voltra-node setup --reconnect"
 	}
-	quote := func(v string) string { return "'" + strings.ReplaceAll(v, "'", "'\\''") + "'" }
 	version := os.Getenv("NODE_RELEASE_VERSION")
 	if version == "" {
 		version = NodeReleaseVersion
 	}
-	if !regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$`).MatchString(version) {
+	return nodeInstallVersionCommand(base, version)
+}
+func nodeInstallVersionCommand(base, version string) string {
+	quote := func(v string) string { return "'" + strings.ReplaceAll(v, "'", "'\\''") + "'" }
+	if !nodeReleaseTag.MatchString(version) {
 		return "printf '%s\\n' 'Node release is not configured. Set NODE_RELEASE_VERSION on the Panel to a published vMAJOR.MINOR.PATCH release, then reopen this wizard.'"
 	}
 	url := "https://github.com/Veky121/voltra/releases/download/" + version

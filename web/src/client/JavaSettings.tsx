@@ -1,5 +1,7 @@
+import './games-ui.css';
+import {SettingsRow, Switch} from '../ui/Settings';
 import { useEffect, useState } from "react";
-import { Button, Card, Field, Input, Select, Textarea, api, unwrap, useAPI } from "../lib";
+import { Button, Card, Input, Select, Textarea, api, unwrap, useAPI } from "../lib";
 import { Notice, PageError, useAction } from "./common";
 
 type JavaConfig = {
@@ -65,7 +67,7 @@ export function JavaSettings({ base, memoryMiB, canChangeRuntime = true, onSaved
     setDraft((old) => ({ ...old, [key]: next }));
     action.setSuccess("");
   };
-  if (query.error) return <Card><h3>Java settings</h3><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry Java settings</Button></Card>;
+  if (query.error) return <Card className="games-ui java-settings"><h3>Java settings</h3><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry Java settings</Button></Card>;
   if (!data || (!data.config?.enabled && !data.egg?.enabled)) return null;
 
   const effective = data.effective || {};
@@ -86,7 +88,7 @@ export function JavaSettings({ base, memoryMiB, canChangeRuntime = true, onSaved
     draft.extra_args.trim(),
   ].filter(Boolean).join(" ") : "Set valid heap sizes to preview JVM flags.";
   return (
-    <Card>
+    <Card className="games-ui java-settings">
       <h3>Java runtime and memory</h3>
       <Notice action={action} />
       <PageError error={data.effective_error || ""} />
@@ -123,40 +125,34 @@ export function JavaSettings({ base, memoryMiB, canChangeRuntime = true, onSaved
           onSaved();
         });
       }}>
-        <fieldset disabled={!editable} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
-          <div className="form-grid">
-            <Field label="Java runtime" hint={runtimeEditable ? "Automatic selects a registered runtime matching the required version and distribution." : "Changing the runtime image also requires Docker image permission."}>
-              <Select value={draft.runtime_id} disabled={!runtimeEditable} onChange={(e) => change("runtime_id", e.target.value)}>
+        <fieldset disabled={!editable} className="java-settings-fields">
+          <div className="java-settings-group">
+            <SettingsRow label="Java runtime" description={runtimeEditable ? "Automatic selects a registered runtime matching the required version and distribution." : "Changing the runtime image also requires Docker image permission."} control={
+              <Select aria-label="Java runtime" value={draft.runtime_id} disabled={!runtimeEditable} onChange={(e) => change("runtime_id", e.target.value)}>
                 <option value="auto">Automatic</option>
                 {draft.runtime_id !== "auto" && (!selected || !selected.enabled) && <option value={draft.runtime_id}>{selected?.name || draft.runtime_id} / unavailable</option>}
                 {runtimeList.filter((runtime) => runtime.enabled).map((runtime) => <option key={runtime.id} value={runtime.id}>{runtime.name} / Java {runtime.major} / {runtime.distribution}</option>)}
-              </Select>
-            </Field>
-            <Field label="Required Java major" hint={`Use 0 for the automatic default${data.egg?.default_major || data.egg?.required_major ? `, Java ${data.egg.default_major || data.egg.required_major}` : ""}. Automatic selection uses this exact version.${data.egg?.default_major && data.egg?.required_major ? ` Explicit runtime choices must meet the Java ${data.egg.required_major} minimum.` : ""}`}>
-              <Input type="number" min={0} max={999} step={1} required value={draft.required_major} onChange={(e) => change("required_major", e.target.value)} />
-            </Field>
-            <Field label="Required distribution" hint={data.egg?.required_distribution ? `Leave empty to use ${data.egg.required_distribution} from the egg.` : "Leave empty to allow any registered distribution."}>
-              <Input maxLength={80} value={draft.required_distribution} onChange={(e) => change("required_distribution", e.target.value)} />
-            </Field>
-            <Field label="Initial heap / GiB" hint="Sets -Xms. Steps of 0.25 GiB equal 256 MiB.">
-              <Input type="number" min={0.25} step={0.25} required value={draft.xms} onChange={(e) => change("xms", e.target.value)} />
-            </Field>
-            <Field label="Automatic maximum heap" hint="The panel reserves memory outside the heap. Unlimited containers need an explicit maximum.">
-              <input type="checkbox" checked={draft.automatic} onChange={(e) => change("automatic", e.target.checked)} />
-            </Field>
-            {!draft.automatic && <Field label="Maximum heap / GiB" hint="Sets -Xmx. The backend checks the container limit and memory reserve.">
-              <Input type="number" min={0.25} step={0.25} required value={draft.xmx} onChange={(e) => change("xmx", e.target.value)} />
-            </Field>}
+              </Select>}/>
+            <SettingsRow label="Required Java major" description={`Use 0 for the automatic default${data.egg?.default_major || data.egg?.required_major ? `, Java ${data.egg.default_major || data.egg.required_major}` : ""}. Automatic selection uses this exact version.${data.egg?.default_major && data.egg?.required_major ? ` Explicit runtime choices must meet the Java ${data.egg.required_major} minimum.` : ""}`} control={
+              <Input aria-label="Required Java major" type="number" min={0} max={999} step={1} required value={draft.required_major} onChange={(e) => change("required_major", e.target.value)} />}/>
+            <SettingsRow label="Required distribution" description={data.egg?.required_distribution ? `Leave empty to use ${data.egg.required_distribution} from the egg.` : "Leave empty to allow any registered distribution."} control={
+              <Input aria-label="Required distribution" maxLength={80} value={draft.required_distribution} onChange={(e) => change("required_distribution", e.target.value)} />}/>
+            <SettingsRow label="Initial heap / GiB" description="Sets -Xms. Steps of 0.25 GiB equal 256 MiB." control={
+              <Input aria-label="Initial heap / GiB" type="number" min={0.25} step={0.25} required value={draft.xms} onChange={(e) => change("xms", e.target.value)} />}/>
+            <SettingsRow label="Automatic maximum heap" description="The panel reserves memory outside the heap. Unlimited containers need an explicit maximum." control={
+              <Switch aria-label="Automatic maximum heap" checked={draft.automatic} onCheckedChange={checked => change("automatic", checked)} />}/>
+            {!draft.automatic && <SettingsRow label="Maximum heap / GiB" description="Sets -Xmx. The backend checks the container limit and memory reserve." control={
+              <Input aria-label="Maximum heap / GiB" type="number" min={0.25} step={0.25} required value={draft.xmx} onChange={(e) => change("xmx", e.target.value)} />}/>}
+            <SettingsRow label="Extra JVM arguments" description="Heap sizes are managed above. Do not add heap or memory percentage flags here." control={
+              <Textarea aria-label="Extra JVM arguments" rows={3} maxLength={16384} spellCheck={false} value={draft.extra_args} onChange={(e) => change("extra_args", e.target.value)} />}/>
           </div>
-          <Field label="Extra JVM arguments" hint="Heap sizes are managed above. Do not add heap or memory percentage flags here.">
-            <Textarea rows={3} maxLength={16384} spellCheck={false} value={draft.extra_args} onChange={(e) => change("extra_args", e.target.value)} />
-          </Field>
-          {data.can_update && <Button type="submit">{action.busy ? "Saving..." : "Save Java settings"}</Button>}
+          {data.can_update && <div className="java-settings-actions"><Button type="submit">{action.busy ? "Saving..." : "Save Java settings"}</Button></div>}
         </fieldset>
       </form>
-      <p className="muted">Generated flags preview{data.egg?.memory_mode === "argfile" ? effective.major != null && effective.major <= 8 && data.egg.legacy_startup ? " for the direct Java startup" : ` for ${data.egg.args_file || "the JVM argument file"}` : ""}</p>
-      <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{flags}</pre>
-      {effective.image && <p className="muted">Saved runtime: Java {effective.major}, <code>{effective.runtime_id}</code><br /><code>{effective.image}</code></p>}
+      <div className="java-settings-preview"><p className="muted">Generated flags preview{data.egg?.memory_mode === "argfile" ? effective.major != null && effective.major <= 8 && data.egg.legacy_startup ? " for the direct Java startup" : ` for ${data.egg.args_file || "the JVM argument file"}` : ""}</p>
+      <pre>{flags}</pre></div>
+      {effective.image && <p className="muted java-settings-runtime">Saved runtime: Java {effective.major}, <code>{effective.runtime_id}</code><br /><code>{effective.image}</code></p>}
     </Card>
   );
 }
+

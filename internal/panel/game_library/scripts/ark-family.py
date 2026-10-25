@@ -301,7 +301,7 @@ def install(root, game, env):
     steam.arguments(root, app, options, platform=platform, force_platform=True)
     saved = confined(root, 'ShooterGame/Saved')
     configs = [path for path in saved.rglob('*.ini') if path.is_file()] if saved.exists() else []
-    with tempfile.TemporaryDirectory(prefix='voltra-ark-config-') as directory:
+    with tempfile.TemporaryDirectory(prefix='voltra-ark-config-', dir=confined(root, '.')) as directory:
         backups = []
         for index, path in enumerate(configs):
             path = confined(root, path.relative_to(root))

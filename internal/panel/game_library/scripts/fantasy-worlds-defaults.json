@@ -1,0 +1,57 @@
+{
+  "citadel_game_ini": "[UWorks]\nConnectionPort=7777\nQueryPort=27015\n\n[/Script/Citadel.SocialManager]\nPassword=changeme\n\n[/Script/Citadel.CitadelGameInstance]\nWorldCreationSettings=(ServerName=\"CitadelServer\",Password=\"YourServerPassword\",ServerType=PVP,PlayerLimit=20,bPrivate=true,ExperienceMultiplier=1.000000,InventoryCapacityMultipler=1.000000,KnowledgePointEarnedMultiplier=1.000000,CharacterPointEarnedMultiplier=1.000000,bUnlimitedResources=false,PlayerDamageMultiplier=1.000000,ArmorMultiplier=1.000000,BaseManaRegen=1.000000,bInventoryWeightRestrictions=true,MagicFindMultiplier=1.000000,CraftingMagicFindChanceMultiplier=1.000000,FlyingCostMultiplier=1.000000,FlyingSpeedMultiplier=1.000000,ResourceCollectionMultiplier=1.000000,StructureDamageMultiplier=1.000000,bRespectNoBuildZones=true,MagicStructureManaRegenerationMultiplier=1.000000,MagicStructureManaConsumptionMultiplier=0.000000,bFreeBuildMode=false,TimeOfDayLock=Auto,NPCPopulationMultiplier=1.000000,StructureDecayMultiplier=2.000000,bThronesDecay=true)\n",
+  "solace": {
+    "name": "Solace Crafting Server",
+    "description": "",
+    "port": 27015,
+    "steamQueryPort": 27016,
+    "isPrivate": false,
+    "password": "",
+    "requireSteamID": true,
+    "maxPlayers": 12,
+    "allowAdmin": false,
+    "adminPassword": "password",
+    "allowModerator": false,
+    "moderatorPassword": "password",
+    "worldSaveToUse": "MultiplayerWorld",
+    "autoRestart": 0
+  },
+  "portal": {
+    "basicServerData": {
+      "name": "Servername",
+      "ipv4": "0.0.0.0",
+      "port": 16365,
+      "saveFolderPath": "./savedata"
+    },
+    "universeSize": "Normal",
+    "hideConsoleWindow": false,
+    "admins": {
+      "credentials": {
+        "password": "admin_password_please_change"
+      },
+      "canLogin": true,
+      "canKickPlayers": true,
+      "canModifyWorld": true,
+      "canInteractWithLockables": true
+    },
+    "users": {
+      "credentials": {
+        "password": ""
+      },
+      "canLogin": true,
+      "canKickPlayers": false,
+      "canModifyWorld": true,
+      "canInteractWithLockables": true
+    },
+    "guests": {
+      "credentials": {
+        "password": ""
+      },
+      "canLogin": false,
+      "canKickPlayers": false,
+      "canModifyWorld": false,
+      "canInteractWithLockables": false
+    },
+    "gameplayMode": "Adventure"
+  }
+}

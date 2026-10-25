@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import stat
 import tarfile
 import tempfile
 import time
@@ -17,6 +18,12 @@ def sha256(path):
         for block in iter(lambda: stream.read(1048576), b''):
             digest.update(block)
     return digest.hexdigest()
+
+
+def preserve_identity(prepared, original):
+    identity = original.stat()
+    os.chown(prepared, identity.st_uid, identity.st_gid)
+    prepared.chmod(stat.S_IMODE(identity.st_mode))
 
 
 def download(release, target, cache_root=None):
@@ -122,7 +129,11 @@ def install_release(root, release, target_name, executable, defaults=None):
                 source, destination = ready / name, target / name
                 if not destination.resolve().is_relative_to(root):
                     raise ValueError('Native destination escapes the server volume')
+                if destination.is_symlink():
+                    raise ValueError('Existing native file must not be a symbolic link')
                 if destination.exists():
+                    if not destination.is_file():
+                        raise ValueError('Existing native file must be a regular file')
                     # Configuration and maps always remain operator-owned. Other
                     # modified stock assets remain overrides across updates.
                     preserve = name.endswith('.cfg') or name.startswith(('data/maps/', 'data/maps7/', 'maps/'))
@@ -132,6 +143,11 @@ def install_release(root, release, target_name, executable, defaults=None):
                     saved = backup / name
                     saved.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(destination, saved)
+                    # Installer processes commonly run as root while Wings owns
+                    # existing server files. copy2 retains mode but not owner.
+                    # Prepare both rollback and new content before publication.
+                    for prepared in (saved, source):
+                        preserve_identity(prepared, destination)
                 else:
                     saved = None
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +155,8 @@ def install_release(root, release, target_name, executable, defaults=None):
                 replacements.append((destination, saved))
             staged = stage / 'receipt.json'
             staged.write_text(json.dumps({**release, 'binary_sha256': sha256(binary), 'files': files}, indent=2) + '\n')
+            if receipt.exists():
+                preserve_identity(staged, receipt)
             os.replace(staged, receipt)
         except BaseException:
             for destination, saved in reversed(replacements):

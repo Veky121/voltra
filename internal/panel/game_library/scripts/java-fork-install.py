@@ -216,6 +216,7 @@ def install(kind,root,env):
         jar_check(selected)
         if kind=='krypton' and not target(root,'config.conf').exists():
             with zipfile.ZipFile(selected) as archive:
+                if 'config.conf' not in archive.namelist():raise ValueError('Upload matching config.conf for this existing Krypton JAR; operator-uploaded code is never executed by the installer to generate configuration')
                 member=archive.getinfo('config.conf')
                 if member.file_size>1024**2:raise ValueError('Krypton config resource is oversized')
                 target(root,'config.conf').write_bytes(archive.read(member))
@@ -235,8 +236,11 @@ def install(kind,root,env):
         source_provenance=None
         if release.get('source_build'):
             import krypton_source_build
-            built,source_provenance=krypton_source_build.build(work/'source-build',root,ready,acquire)
+            import krypton_source_cache
+            cached=krypton_source_cache.restore(root,ready)
+            built,source_provenance=cached if cached else krypton_source_build.build(work/'source-build',root,ready,acquire)
             shutil.copy2(built,download);checksum=digest(download)
+            if cached:built.unlink() # Publication uses the operator's original JAR filename.
         else:
             checksum=acquire(release,download,root)
         jar_check(download,runnable=kind!='spongeforge')
@@ -266,10 +270,12 @@ def install(kind,root,env):
                 subprocess.run([java,'-jar',jar,'--generate-config'],cwd=ready,check=True,timeout=180)
                 if not (ready/'config/glowstone.yml').is_file():raise ValueError('Glowstone did not generate its native configuration')
             if kind=='krypton':
-                with zipfile.ZipFile(download) as archive:
-                    config=archive.getinfo('config.conf')
-                    if config.file_size>1024**2:raise ValueError('Krypton config resource is oversized')
-                    (ready/'config.conf').write_bytes(archive.read(config))
+                if not source_provenance:
+                    with zipfile.ZipFile(download) as archive:
+                        if 'config.conf' not in archive.namelist():raise ValueError('Selected publisher Krypton JAR has no bundled config.conf; upload matching configuration with USE_EXISTING_JAR instead')
+                        config=archive.getinfo('config.conf')
+                        if config.file_size>1024**2:raise ValueError('Krypton config resource is oversized')
+                        (ready/'config.conf').write_bytes(archive.read(config))
         identity={'provider':kind,'version':release['version'],'sha256':checksum,'java':release['java']}
         if source_provenance:identity['source_build']=source_provenance
         return publish(ready,root,identity,launch)

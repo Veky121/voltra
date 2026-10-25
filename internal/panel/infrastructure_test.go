@@ -1,7 +1,6 @@
 package panel
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -319,15 +318,6 @@ func TestInfrastructureMountHostAndSettingsGuards(t *testing.T) {
 	}
 	infraExpect(t, handler, user, "POST", fmt.Sprintf("/api/admin/database-hosts/%d/test", hostID), nil, 502)
 	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"pterodactyl:client_features:allocations:range_start": 30000, "pterodactyl:client_features:allocations:range_end": 20000}, 422)
-	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"mail:password": "smtp-secret", "app:name": "Local panel"}, 200)
-	settings := asMap(infraExpect(t, handler, user, "GET", "/api/admin/settings", nil, 200)["attributes"])
-	if _, ok := settings["mail:password"]; ok {
-		t.Fatal("mail password leaked")
-	}
-	if !boolean(settings["mail:password_configured"]) {
-		t.Fatal("mail password configured flag missing")
-	}
-	infraExpect(t, handler, user, "POST", "/api/admin/settings/mail/test", M{"email": "invalid"}, 422)
 	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"backups.throttles.period": 0, "backups.prune_age": 0}, 200)
 	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"backups.default": "s3", "backups.s3": M{"bucket": "local-test", "access_key_id": "test-key", "secret_access_key": "secret-key", "session_token": "session-key", "part_size": 5 * 1024 * 1024}}, 200)
 	s3Settings := asMap(asMap(infraExpect(t, handler, user, "GET", "/api/admin/settings", nil, 200)["attributes"])["backups.s3"])
@@ -447,70 +437,6 @@ func TestInfrastructureMountAssignmentsSyncAndConstraints(t *testing.T) {
 	infraExpect(t, handler, user, "DELETE", base, nil, 204)
 }
 
-func TestInfrastructureSMTPDelivery(t *testing.T) {
-	_, handler, user := infraTestApp(t)
-	listener, e := net.Listen("tcp", "127.0.0.1:0")
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer listener.Close()
-	received := make(chan string, 1)
-	go func() {
-		conn, e := listener.Accept()
-		if e != nil {
-			return
-		}
-		defer conn.Close()
-		_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
-		reader := bufio.NewReader(conn)
-		fmt.Fprint(conn, "220 local test SMTP\r\n")
-		dataMode := false
-		var message strings.Builder
-		for {
-			line, e := reader.ReadString('\n')
-			if e != nil {
-				return
-			}
-			if dataMode {
-				if line == ".\r\n" {
-					dataMode = false
-					received <- message.String()
-					fmt.Fprint(conn, "250 message accepted\r\n")
-				} else {
-					message.WriteString(line)
-				}
-				continue
-			}
-			switch {
-			case strings.HasPrefix(line, "EHLO"), strings.HasPrefix(line, "HELO"):
-				fmt.Fprint(conn, "250 local-test\r\n")
-			case strings.HasPrefix(line, "MAIL FROM:"), strings.HasPrefix(line, "RCPT TO:"):
-				fmt.Fprint(conn, "250 ok\r\n")
-			case strings.HasPrefix(line, "DATA"):
-				dataMode = true
-				fmt.Fprint(conn, "354 end with dot\r\n")
-			case strings.HasPrefix(line, "QUIT"):
-				fmt.Fprint(conn, "221 bye\r\n")
-				return
-			default:
-				fmt.Fprint(conn, "500 unsupported\r\n")
-			}
-		}
-	}()
-	_, portString, _ := net.SplitHostPort(listener.Addr().String())
-	port, _ := strconv.Atoi(portString)
-	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"mail:host": "127.0.0.1", "mail:port": port, "mail:encryption": "none", "mail:from:address": "panel@example.invalid"}, 200)
-	infraExpect(t, handler, user, "POST", "/api/admin/settings/mail/test", M{"email": "recipient@example.invalid"}, 200)
-	select {
-	case message := <-received:
-		if !strings.Contains(message, "To: <recipient@example.invalid>") || !strings.Contains(message, "Voltra mail configuration test") {
-			t.Fatalf("incorrect SMTP message %q", message)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("SMTP server did not receive the message")
-	}
-}
-
 func TestInfrastructureTimezoneSettings(t *testing.T) {
 	a, handler, userID := infraTestApp(t)
 	settings := asMap(infraExpect(t, handler, userID, "GET", "/api/admin/settings", nil, 200)["attributes"])
@@ -548,14 +474,11 @@ func TestInfrastructureOptionalStringsClearing(t *testing.T) {
 	if mount["description"] != "" {
 		t.Fatal("empty mount description was not cleared")
 	}
-	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"mail:host": "smtp.example.invalid", "mail:username": "smtp-user", "backups.s3": M{"endpoint": "http://minio.example.invalid:9000", "daemon_endpoint": "http://minio-daemon.example.invalid:9000"}}, 200)
-	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"mail:host": "", "mail:username": "", "backups.s3": M{"endpoint": "", "daemon_endpoint": ""}}, 200)
+	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"backups.s3": M{"endpoint": "http://minio.example.invalid:9000", "daemon_endpoint": "http://minio-daemon.example.invalid:9000"}}, 200)
+	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"backups.s3": M{"endpoint": "", "daemon_endpoint": ""}}, 200)
 	settings, e := a.infraLoadSettings(ctx)
 	if e != nil {
 		t.Fatal(e)
-	}
-	if settings["mail:host"] != "" || settings["mail:username"] != "" {
-		t.Fatal("optional mail strings were not cleared")
 	}
 	s3 := asMap(settings["backups.s3"])
 	if s3["endpoint"] != "" || s3["daemon_endpoint"] != "" {

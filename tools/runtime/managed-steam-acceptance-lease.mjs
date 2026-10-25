@@ -3,6 +3,8 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const managedNativeGames={
+ 'palworld-native':{path:'palworld/egg-palworld.json',memory_mib:9216,disk_mib:32768,ports:1},
+ 'palworld-proton':{path:'palworld/egg-palworld-proton.json',memory_mib:9216,disk_mib:32768,ports:1},
  '7days':{path:'7_days_to_die/egg-7-days-to-die.json',memory_mib:9216,disk_mib:33280,ports:4},
  'satisfactory':{path:'satisfactory/egg-satisfactory.json',memory_mib:13312,disk_mib:20992,ports:2},
 };

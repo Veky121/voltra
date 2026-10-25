@@ -1,5 +1,7 @@
 import {useEffect, useState} from "react";
 import {api, Button, Card, Field, Input, Select, useAPI, unwrap} from "../lib";
+import {Switch} from "../ui/Settings";
+import "./management-ui.css";
 
 type RuntimeRule = {
   id:string; name:string; enabled:boolean; provider:string; project_id:string;
@@ -22,15 +24,15 @@ export function MinecraftRuntimeRules(){
       setRules(unwrap(result).rules);setSaved(true);
     }catch(err){setError(err instanceof Error?err.message:String(err))}finally{setBusy(false)}
   }
-  return <Card>
-    <div className="page-header"><div><h2>Minecraft runtime rules</h2><p className="muted">Set Java requirements for a pack, loader or game version. Rules apply to new installations.</p></div><Button variant="secondary" disabled={busy||query.loading||!!query.error} onClick={()=>{const rule=emptyRule();setRules(old=>[...old,rule]);setOpenRules(old=>({...old,[rule.id]:true}));setSaved(false)}}>Add rule</Button></div>
+  return <Card className="admin-panel admin-runtime-rules management-ui">
+    <div className="page-header admin-section-header"><div><h2>Minecraft runtime rules</h2><p className="muted">Set Java requirements for a pack, loader or game version. Rules apply to new installations.</p></div><Button variant="secondary" disabled={busy||query.loading||!!query.error} onClick={()=>{const rule=emptyRule();setRules(old=>[...old,rule]);setOpenRules(old=>({...old,[rule.id]:true}));setSaved(false)}}>Add rule</Button></div>
     {(query.error||error)&&<p className="error" role="alert">{query.error||error}</p>}
     {query.loading&&<p role="status">Loading runtime rules...</p>}
     {!query.loading&&!query.error&&rules.length===0&&<p className="muted">No overrides. Minecraft and loader metadata choose Java automatically.</p>}
-    <fieldset disabled={busy||query.loading||!!query.error} style={{border:0,padding:0,margin:0,minWidth:0}}>
-      {rules.map((rule,index)=><details key={rule.id} open={!!openRules[rule.id]} onToggle={e=>{const opened=e.currentTarget.open;setOpenRules(old=>old[rule.id]===opened?old:{...old,[rule.id]:opened})}} style={{borderBottom:"1px solid var(--border)",padding:"16px 0"}}>
-        <summary style={{cursor:"pointer"}}>{rule.name||`New rule ${index+1}`}{!rule.enabled?" · Disabled":""}</summary>
-        <div className="form-grid" style={{marginTop:16}}>
+    <fieldset disabled={busy||query.loading||!!query.error} className="admin-fieldset">
+      {rules.map((rule,index)=><details className="admin-disclosure admin-runtime-rule" key={rule.id} open={!!openRules[rule.id]} onToggle={e=>{const opened=e.currentTarget.open;setOpenRules(old=>old[rule.id]===opened?old:{...old,[rule.id]:opened})}}>
+        <summary><span className="admin-disclosure-title">{rule.name||`New rule ${index+1}`}</span>{!rule.enabled&&<span className="badge">Disabled</span>}</summary>
+        <div className="form-grid">
           <Field label="Rule name"><Input required maxLength={191} value={rule.name} onChange={e=>update(rule.id,{name:e.target.value})}/></Field>
           <Field label="Provider"><Select value={rule.provider} onChange={e=>update(rule.id,{provider:e.target.value,project_id:"",project_version:""})}><option value="">Any provider or custom setup</option><option value="curseforge">CurseForge</option><option value="modrinth">Modrinth</option></Select></Field>
           <Field label="Project ID" hint="Use the provider's project ID. Leave blank to match all projects."><Input disabled={!rule.provider} value={rule.project_id} onChange={e=>update(rule.id,{project_id:e.target.value,project_version:""})}/></Field>
@@ -42,9 +44,9 @@ export function MinecraftRuntimeRules(){
           <Field label="Minimum server memory (GiB)"><Input type="number" min={0} max={1024} step={0.25} value={rule.min_memory_mib/1024} onChange={e=>update(rule.id,{min_memory_mib:Number(e.target.value)*1024})}/></Field>
           <Field label="Additional JVM arguments" hint="Heap size is managed separately. Example: -XX:+UseG1GC"><Input value={rule.jvm_args} maxLength={4096} onChange={e=>update(rule.id,{jvm_args:e.target.value})}/></Field>
         </div>
-        <div className="actions" style={{marginTop:16}}><label className="check"><input type="checkbox" checked={rule.enabled} onChange={e=>update(rule.id,{enabled:e.target.checked})}/>Enabled</label><Button variant="danger" onClick={()=>{setRules(old=>old.filter(x=>x.id!==rule.id));setSaved(false)}}>Remove rule</Button></div>
+        <div className="actions admin-form-actions admin-form-actions-split"><label className="admin-inline-switch"><Switch checked={rule.enabled} onCheckedChange={checked => update(rule.id,{enabled:checked})}/>Enabled</label><Button variant="danger" onClick={()=>{setRules(old=>old.filter(x=>x.id!==rule.id));setSaved(false)}}>Remove rule</Button></div>
       </details>)}
     </fieldset>
-    <div className="actions" style={{marginTop:16}}><Button disabled={busy||query.loading||!!query.error} onClick={save}>{busy?"Saving...":"Save runtime rules"}</Button>{saved&&<span className="success" role="status">Runtime rules saved.</span>}</div>
+    <div className="actions admin-form-actions"><Button disabled={busy||query.loading||!!query.error} onClick={save}>{busy?"Saving...":"Save runtime rules"}</Button>{saved&&<span className="success" role="status">Runtime rules saved.</span>}</div>
   </Card>;
 }

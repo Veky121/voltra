@@ -1,0 +1,47 @@
+@import "tailwindcss/theme.css" layer(theme) prefix(scn);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "./components";
+@source "./App.tsx";
+@source "./Navigation.tsx";
+@source "./client";
+@custom-variant dark (&:is(.dark, .dark *));
+
+/* A scoped preflight for new controls; legacy screens retain their base CSS. */
+@layer base {
+  :where([data-slot="button"],[data-slot="sidebar-menu-button"],[data-slot="sidebar-trigger"],[data-slot="input"],[data-slot="dropdown-menu-trigger"],[data-slot="dropdown-menu-item"]){box-sizing:border-box;font:inherit;color:inherit;background:transparent;border:0 solid;padding:0;margin:0;text-decoration:none;min-height:0;min-width:0}
+}
+:where([data-slot="button"],[data-slot="sidebar-menu-button"],[data-slot="sidebar-trigger"],[data-slot="input"],[data-slot="dropdown-menu-trigger"],[data-slot="dropdown-menu-item"]){all:revert-layer}
+
+@theme inline {
+  --color-background: var(--scn-background);
+  --color-foreground: var(--text);
+  --color-card: var(--ui-surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--scn-popover);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--theme-primary-ink, #ffffff);
+  --color-secondary: var(--surface-raised);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-muted);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--ui-hover);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--red);
+  --color-border: var(--ui-border);
+  --color-input: var(--line-strong);
+  --color-ring: var(--accent);
+  --color-sidebar: var(--scn-sidebar);
+  --color-sidebar-foreground: var(--text);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--theme-primary-ink, #fff);
+  --color-sidebar-accent: var(--scn-sidebar-accent);
+  --color-sidebar-accent-foreground: var(--accent);
+  --color-sidebar-border: var(--ui-border);
+  --color-sidebar-ring: var(--accent);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+:root{--radius:10px;--scn-background:#10141b;--scn-sidebar:#0d1118;--scn-popover:#1b2029;--scn-sidebar-accent:color-mix(in srgb,var(--accent) 10%,transparent);--background:var(--scn-background);--foreground:var(--text);--secondary:var(--surface-raised);--secondary-foreground:var(--text);--input:var(--line-strong)}

@@ -261,6 +261,9 @@ func (e *Executor) helper(ctx context.Context, r steamapi.Request, dir string, m
 	if mutation {
 		args = append(args, "+force_install_dir", "/data")
 	}
+	if r.Platform == "windows" {
+		args = append(args, "+@sSteamCmdForcePlatformType", "windows")
+	}
 	args = append(args, "+login", "anonymous")
 	if mutation {
 		// Metadata was checked in a separate ephemeral helper. Refresh alone

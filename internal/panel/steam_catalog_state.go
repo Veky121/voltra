@@ -71,6 +71,9 @@ func steamCatalogReliableStartup(startup string, port int64) (string, error) {
 }
 
 func steamCatalogHasField(game, key string) bool {
+	if steamPalworldVariant(game) && key == "SRCDS_BETAID" {
+		return true
+	}
 	for _, field := range steamCatalogFields(game) {
 		if field.Key == key {
 			return true
@@ -82,6 +85,10 @@ func steamCatalogSecretColumn(key string) string {
 	switch key {
 	case "PASSWORD":
 		return "console_password_encrypted"
+	case "ADMIN_PASSWORD":
+		return "console_password_encrypted"
+	case "SERVER_PASSWORD":
+		return "join_password_encrypted"
 	case "SRCDS_BETAPASS":
 		return "beta_password_encrypted"
 	}
@@ -143,29 +150,26 @@ func (a *App) steamCatalogLoad(ctx context.Context, server M) (steamCatalogConfi
 		}
 	}
 	// Stored/default variable values never override the encrypted credential store.
-	for _, key := range []string{"PASSWORD", "SRCDS_BETAPASS"} {
-		if steamCatalogHasField(game, key) {
-			values[key] = ""
+	for _, field := range steamCatalogFields(game) {
+		if !field.Secret {
+			continue
 		}
-	}
-	configuration, err := steamCatalogParse(game, values, 0)
-	if err != nil {
-		return configuration, state, err
-	}
-	for _, key := range []string{"PASSWORD", "SRCDS_BETAPASS"} {
+		key := field.Key
+		values[key] = ""
 		if cipher := str(state[steamCatalogSecretColumn(key)]); cipher != "" {
 			secret, e := a.unseal(cipher)
 			if e != nil {
-				return configuration, state, e
+				return steamCatalogConfiguration{}, state, e
 			}
-			configuration.Secrets[key] = secret
+			values[key] = secret
 		}
 	}
-	return configuration, state, nil
+	configuration, err := steamCatalogParse(game, values, 0)
+	return configuration, state, err
 }
 
 func (a *App) steamCatalogMaskVariables(ctx context.Context, server M, variables []M) error {
-	state, err := a.one(ctx, "SELECT game,branch,mode,validate_on_start,beta_password_encrypted,console_password_encrypted FROM steam_servers WHERE server_id=$1", server["id"])
+	state, err := a.one(ctx, "SELECT game,branch,mode,validate_on_start,beta_password_encrypted,console_password_encrypted,join_password_encrypted FROM steam_servers WHERE server_id=$1", server["id"])
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -222,6 +226,10 @@ func (a *App) steamCatalogRuntimeEnvironment(ctx context.Context, server, enviro
 	environment["VALIDATE"] = "0"
 	delete(environment, "PASSWORD")
 	delete(environment, "SRCDS_BETAPASS")
+	if steamPalworldVariant(str(state["game"])) {
+		delete(environment, "ADMIN_PASSWORD")
+		delete(environment, "SERVER_PASSWORD")
+	}
 	return nil
 }
 
@@ -254,6 +262,13 @@ func (a *App) steamCatalogValidateAllocation(ctx context.Context, server M, conf
 			}
 		}
 	}
+	if game == "2394010" {
+		for _, allocation := range allocations {
+			if num(allocation["port"]) == num(configuration.Values["RCON_PORT"]) {
+				return bad("The private console port must differ from published game allocations.")
+			}
+		}
+	}
 	if game == "1690800" && num(configuration.Values["RELIABLE_PORT"]) != 0 {
 		primary, err := a.one(ctx, "SELECT port FROM allocations WHERE id=$1", server["allocation_id"])
 		if err != nil {
@@ -275,12 +290,25 @@ func (a *App) steamCatalogValidateAllocation(ctx context.Context, server M, conf
 // All caller paths hold the normal server mutation lock and confirm stopped
 // state. Backups stay in memory and are used only if a multi-file write fails.
 func (a *App) steamCatalogApplyConfiguration(ctx context.Context, server M, configuration steamCatalogConfiguration, keys []string, undo ...*func() error) error {
+	return a.steamCatalogApplyConfigurationExtra(ctx, server, configuration, keys, nil, undo...)
+}
+
+func (a *App) steamCatalogApplyConfigurationExtra(ctx context.Context, server M, configuration steamCatalogConfiguration, keys []string, extra map[string]string, undo ...*func() error) error {
 	selected := map[string]bool{}
 	for _, key := range keys {
 		selected[key] = true
 	}
-	all := len(keys) == 0
+	all := len(keys) == 0 && extra == nil
 	wanted := map[string][]byte{}
+	if str(configuration.Values["SRCDS_APPID"]) == "2394010" {
+		files, err := a.steamPalworldConfigurationFiles(ctx, server, configuration, selected, all, extra)
+		if err != nil {
+			return err
+		}
+		for file, content := range files {
+			wanted[file] = content
+		}
+	}
 	read := func(file string) ([]byte, error) {
 		content, _, err := a.quickSetupRead(ctx, server, file)
 		return content, err
@@ -319,7 +347,7 @@ func (a *App) steamCatalogApplyConfiguration(ctx context.Context, server M, conf
 			}
 			wanted[file] = patched
 		}
-	} else {
+	} else if str(configuration.Values["SRCDS_APPID"]) == "294420" {
 		patch := map[string]string{}
 		mapping := map[string]string{"MAX_PLAYERS": "ServerMaxPlayerCount", "GAME_DIFFICULTY": "GameDifficulty", "SERVER_DISABLED_NETWORK_PROTOCOLS": "ServerDisabledNetworkProtocols", "TELNET_PORT": "TelnetPort"}
 		for key, property := range mapping {
@@ -415,6 +443,10 @@ func (a *App) steamCatalogApplyConfiguration(ctx context.Context, server M, conf
 }
 
 func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes M, settings ...M) (bool, error) {
+	return a.steamCatalogMutateControls(ctx, server, changes, nil, nil, settings...)
+}
+
+func (a *App) steamCatalogMutateControls(ctx context.Context, server M, changes M, extra map[string]string, guard func(context.Context) error, settings ...M) (bool, error) {
 	configuration, state, err := a.steamCatalogLoad(ctx, server)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
@@ -449,6 +481,11 @@ func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes 
 	if boolean(active["active"]) {
 		return true, APIError{409, "SteamMaintenanceActive", "Wait for Steam maintenance before changing its controls."}
 	}
+	if guard != nil {
+		if err = guard(ctx); err != nil {
+			return true, err
+		}
+	}
 	// Reload after acquiring the shared lock to avoid overwriting another edit.
 	configuration, state, err = a.steamCatalogLoad(ctx, server)
 	if err != nil {
@@ -462,12 +499,15 @@ func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes 
 		cleaned[key] = value
 	}
 	changes = cleaned
-	if len(changes) == 0 && len(settings) == 0 {
+	if len(changes) == 0 && len(settings) == 0 && len(extra) == 0 {
 		return true, nil
 	}
 	values := M{}
 	for name, current := range configuration.Values {
 		values[name] = current
+	}
+	for name, secret := range configuration.Secrets {
+		values[name] = secret
 	}
 	keys := []string{}
 	for key, value := range changes {
@@ -512,7 +552,7 @@ func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes 
 	if err = a.steamCatalogValidateAllocation(ctx, server, next); err != nil {
 		return true, err
 	}
-	consoleCipher, betaCipher := str(state["console_password_encrypted"]), str(state["beta_password_encrypted"])
+	consoleCipher, betaCipher, joinCipher := str(state["console_password_encrypted"]), str(state["beta_password_encrypted"]), str(state["join_password_encrypted"])
 	if value, present := changes["PASSWORD"]; present {
 		consoleCipher = ""
 		if str(value) != "" {
@@ -521,6 +561,17 @@ func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes 
 	}
 	if err != nil {
 		return true, err
+	}
+	for key, target := range map[string]*string{"ADMIN_PASSWORD": &consoleCipher, "SERVER_PASSWORD": &joinCipher} {
+		if value, present := changes[key]; present {
+			*target = ""
+			if str(value) != "" {
+				*target, err = a.seal(str(value))
+				if err != nil {
+					return true, err
+				}
+			}
+		}
 	}
 	if value, present := changes["SRCDS_BETAPASS"]; present {
 		betaCipher = ""
@@ -573,7 +624,7 @@ func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes 
 			return true, err
 		}
 	}
-	if _, err = tx.Exec(ctx, `UPDATE steam_servers SET branch=$2,mode=$3,validate_on_start=$4,beta_password_encrypted=$5,console_password_encrypted=$6,needs_repair=needs_repair OR $7,last_checked_at=CASE WHEN $7 THEN NULL ELSE last_checked_at END,updated_at=now() WHERE server_id=$1`, server["id"], next.Branch, mode, next.Validate, betaCipher, consoleCipher, branchChanged); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE steam_servers SET branch=$2,mode=$3,validate_on_start=$4,beta_password_encrypted=$5,console_password_encrypted=$6,needs_repair=needs_repair OR $7,last_checked_at=CASE WHEN $7 THEN NULL ELSE last_checked_at END,join_password_encrypted=$8,updated_at=now() WHERE server_id=$1`, server["id"], next.Branch, mode, next.Validate, betaCipher, consoleCipher, branchChanged, joinCipher); err != nil {
 		return true, err
 	}
 	if _, err = tx.Exec(ctx, "UPDATE steam_servers SET check_interval_seconds=$2 WHERE server_id=$1", server["id"], interval); err != nil {
@@ -581,7 +632,7 @@ func (a *App) steamCatalogUpdateControls(ctx context.Context, server M, changes 
 	}
 	var undoConfiguration func() error
 	if boolean(state["initialized"]) {
-		if err = a.steamCatalogApplyConfiguration(ctx, server, next, keys, &undoConfiguration); err != nil {
+		if err = a.steamCatalogApplyConfigurationExtra(ctx, server, next, keys, extra, &undoConfiguration); err != nil {
 			if errors.Is(err, errSteamCatalogRestore) {
 				_ = tx.Rollback(ctx)
 				cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -658,10 +709,17 @@ func (a *App) satisfactoryAfterInstall(ctx context.Context, server, settings M) 
 func steamCatalogFieldRows(game string) []M {
 	rows := []M{}
 	for _, field := range steamCatalogFields(game) {
-		if field.Key == "MAX_PLAYERS" || field.Type == "fixed" {
+		if field.Key == "MAX_PLAYERS" || field.Type == "fixed" || steamPalworldVariant(game) && field.Key == "SERVER_PASSWORD" {
 			continue
 		}
 		row := M{"key": field.Key, "label": field.Label, "type": field.Type, "default": field.Default, "secret": field.Secret}
+		row["required"] = field.Required
+		if len(field.Options) > 0 {
+			row["options"] = field.Options
+		}
+		if field.MaxLength > 0 {
+			row["max_length"] = field.MaxLength
+		}
 		if field.Type == "number" || field.Type == "integer" {
 			row["min"] = field.Min
 			row["max"] = field.Max
@@ -731,7 +789,7 @@ func (a *App) steamCatalogProvision(ctx context.Context, server M, configuration
 	if configuration.Automatic {
 		mode = "on_start"
 	}
-	if _, err = tx.Exec(ctx, `UPDATE steam_servers SET mode=$2,validate_on_start=$3,beta_password_encrypted=$4,console_password_encrypted=$5 WHERE server_id=$1`, server["id"], mode, configuration.Validate, str(settings["beta_password_encrypted"]), str(settings["console_password_encrypted"])); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE steam_servers SET mode=$2,validate_on_start=$3,beta_password_encrypted=$4,console_password_encrypted=$5,join_password_encrypted=$6 WHERE server_id=$1`, server["id"], mode, configuration.Validate, str(settings["beta_password_encrypted"]), str(settings["console_password_encrypted"]), str(settings["join_password_encrypted"])); err != nil {
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {

@@ -47,7 +47,7 @@ class SourceThirdTests(unittest.TestCase):
             before = (cfg.read_bytes(), cfg.stat().st_mode, cfg.stat().st_uid, cfg.stat().st_gid)
             argv, _, query = runtime.configure(root, env)
             self.assertTrue(argv[0].endswith('svends_run')); self.assertEqual(argv[argv.index('+maxplayers') + 1], '32')
-            self.assertEqual(query, (28010, 'Sven literal', 'stadium4', True)); self.assertIn('sv_region 3', cfg.with_name('voltra-managed.cfg').read_text())
+            self.assertEqual(query, (28010, 'Sven literal', 'stadium4', True)); self.assertIn('sv_region 3', cfg.with_name('voltra_managed.cfg').read_text())
             self.assertEqual(before, (cfg.read_bytes(), cfg.stat().st_mode, cfg.stat().st_uid, cfg.stat().st_gid))
 
     def test_native_install_preserves_configuration_even_on_publisher_failure(self):
@@ -117,6 +117,18 @@ class SourceThirdTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
             root = Path(directory); env = self.fixture(root, 'sven'); (root / 'svencoop').symlink_to(outside, target_is_directory=True)
             with self.assertRaises(ValueError): runtime.configure(root, env)
+
+    def test_sven_command_values_safe_for_goldsrc_boundary_parser(self):
+        with tempfile.TemporaryDirectory()as directory:
+            root=Path(directory);env=self.fixture(root,'sven');argv,_,_=runtime.configure(root,env)
+            self.assertEqual(argv[argv.index('+servercfgfile')+1],'voltra_server.cfg');self.assertEqual(argv[argv.index('+exec')+1],'voltra_managed.cfg')
+            # GoldSrc command values must not introduce another '-' boundary.
+            for key in('+servercfgfile','+exec'):
+                value=argv[argv.index(key)+1];self.assertRegex(value,r'^[A-Za-z0-9_]+\.cfg$');self.assertNotIn('-',value)
+            wrapper=root/'svencoop/voltra_server.cfg';self.assertEqual(wrapper.read_text(),'exec server.cfg\nexec voltra_managed.cfg\n');self.assertTrue((root/'svencoop/voltra_managed.cfg').is_file())
+        with tempfile.TemporaryDirectory()as directory,tempfile.TemporaryDirectory()as outside:
+            root=Path(directory);env=self.fixture(root,'sven');folder=root/'svencoop';folder.mkdir();(folder/'voltra_managed.cfg').symlink_to(Path(outside)/'external.cfg')
+            with self.assertRaises(ValueError):runtime.configure(root,env)
 
 
 unittest.main()

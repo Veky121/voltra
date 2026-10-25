@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import signal
 import time
 from steam_template import _publish
 from native_console import run
@@ -103,7 +104,27 @@ def switches(value, allocated, roles):
     return tokens, secrets
 
 
+ORIGINAL_CASE_FIELDS = {
+    'squad': ('servername', 'maxplayers', 'reservedslots', 'allowteamchange', 'advertise', 'ptciu', 'teambal', 'recorddemos'),
+    'postscriptum': ('hostname', 'maxplayers', 'reservedslots', 'allowteamchange', 'advertise', 'team_change', 'teambalance', 'demo_recording'),
+}
+
+
+def environment_aliases(env):
+    kind, _, _, _ = selection(env)
+    result = dict(env)
+    # Preserve original API names while accepting the observed uppercase native
+    # environment form. Conflicts name only the key, never either supplied value.
+    for original in ORIGINAL_CASE_FIELDS.get(kind, ()):
+        upper = original.upper()
+        if original in env and upper in env and env[original] != env[upper]:
+            raise ValueError('Conflicting original and uppercase variable ' + original)
+        if upper in env: result[original] = env[upper]
+    return result
+
+
 def configure(root, env):
+    env = environment_aliases(env)
     root = root.resolve(); kind, app, game, executable = selection(env); binary = confined(root, executable)
     if not binary.is_file(): raise ValueError('Publisher dedicated binary is missing')
     main, services, roles, allocated = service_ports(env, kind)
@@ -118,7 +139,10 @@ def configure(root, env):
         tokens = [text(env.get(key, ''), 512) for key in ('GSLTT', 'GST')]
         if any(token and not re.fullmatch(r'[A-Za-z0-9_.-]{1,512}', token) for token in tokens): raise ValueError('Invalid publisher registration token')
         extra, extra_secrets = switches(env.get('ADDSWITCHES', ''), allocated, roles); secrets += extra_secrets
-        argv += [game_map + '?Scenario=' + scenario + '?MaxPlayers=' + str(maximum), '-Port=' + str(main), '-QueryPort=' + str(query), '-log', '-hostname=' + name, '-GSLTToken=' + tokens[0], '-GameStats', '-GameStatsToken=' + tokens[1], *extra]
+        argv += [game_map + '?Scenario=' + scenario + '?MaxPlayers=' + str(maximum), '-Port=' + str(main), '-QueryPort=' + str(query), '-log', '-hostname=' + name]
+        if tokens[0]: argv += ['-GSLTToken=' + tokens[0]]
+        if tokens[1]: argv += ['-GameStats', '-GameStatsToken=' + tokens[1]]
+        argv += extra
         ready = b'LogGameState: Match State Changed from LoadingAssets to WaitingToStart'
     else:
         maximum = integer(env, 'maxplayers', 80, 1, 100); reserved = integer(env, 'reservedslots', 0, 0, maximum)
@@ -148,12 +172,13 @@ def configure(root, env):
 
 
 def main(root, env):
+    env = environment_aliases(env)
     kind, app, game, executable = selection(env)
     automatic = env.get('VOLTRA_STEAM_AUTO_UPDATE', env.get('AUTO_UPDATE', '0'))
     if automatic not in ('0', '1'): raise ValueError('Auto update must be0or1')
     if automatic == '1' and env.get('SRCDS_APPID', str(app)): install(root, env, validate=False)
     argv, child, secrets, ready = configure(root, env)
-    return run(root, argv, child, '\x03', credentials=secrets, ready_marker=ready, terminal_input=True)
+    return run(root, argv, child, '\x03', credentials=secrets, ready_marker=ready, terminal_input=True, stop_signal=signal.SIGINT)
 
 
 if __name__ == '__main__': raise SystemExit(main(Path.cwd(), dict(os.environ)))

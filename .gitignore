@@ -21,6 +21,7 @@ node_modules/
 *.db
 # Generated programs and caches. Keep embedded runtime assets required by Go.
 *.exe
+!/internal/palworldloader/assets/runtime-probe.exe
 *.test
 *.syso
 __pycache__/

@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"voltra/internal/palworldloader"
 )
 
 const steamLaunchImage = "ghcr.io/ptero-eggs/steamcmd:debian"
@@ -29,10 +30,13 @@ type steamGameSpec struct {
 	FixedPlayers                                                bool
 	PasswordMinimum, PasswordMaximum                            int
 	Stop                                                        string
+	UnavailableReason                                           string
 	Prepare                                                     func(*App, context.Context, M, M) error
 }
 
 var steamGameSpecs = []steamGameSpec{
+	{ID: "palworld-native", Name: "Palworld Linux", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb155", AppID: 2394010, Memory: 16384, MinimumMemory: 8192, Players: 32, MaximumPlayers: 32, Disk: 32768, Image: steamLaunchImage, Description: "Native Linux Palworld with imported server controls and private administration console.", AfterSetup: "Join with the allocated game address. Use Console for administrative commands; the console port stays private.", Startup: "bash .voltra/palworld-start.sh", Ready: "VOLTRA_PALWORLD_CONSOLE_READY", Stop: "Shutdown 15", Ports: 1, PasswordMaximum: 30, Prepare: (*App).steamPalworldAfterInstall},
+	{ID: "palworld-proton", Name: "Palworld Proton", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb156", AppID: 2394010, Memory: 16384, MinimumMemory: 8192, Players: 32, MaximumPlayers: 32, Disk: 32768, Image: palworldloader.ProtonImage, Description: "Windows Palworld under Proton with maintained MIT UE4SS for Lua and Blueprint mods.", AfterSetup: "Join with the allocated game address. Existing native DLL mods or competing loaders require compatibility review.", Startup: "bash .voltra/palworld-start.sh", Ready: "VOLTRA_PALWORLD_CONSOLE_READY", Stop: "Shutdown 5", Ports: 1, PasswordMaximum: 30, Prepare: (*App).steamPalworldAfterInstall},
 	{ID: "satisfactory", Name: "Satisfactory", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb151", AppID: 1690800, Memory: 12288, MinimumMemory: 8192, Players: 4, MaximumPlayers: 2147483647, Disk: 20480, Image: steamLaunchImage, Description: "Build a factory with friends.", AfterSetup: "Open Satisfactory's Server Manager, add the server address, claim it and create or load a session.", Startup: "./FactoryServer.sh -Port={{SERVER_PORT}} -ReliablePort=8888 -unattended", Ready: "Engine Initialization", Ports: 2, Prepare: (*App).satisfactoryAfterInstall},
 	{ID: "palworld", Name: "Palworld", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb152", AppID: 2394010, Memory: 16384, MinimumMemory: 8192, Players: 16, MaximumPlayers: 32, Disk: 32768, Image: steamLaunchImage, Description: "Create a persistent world with simple gameplay settings.", AfterSetup: "Join using the server address and game port. Change settings and upload saves from Quick setup.", Startup: "./PalServer.sh -port={{SERVER_PORT}}", Ready: "Setting breakpad minidump AppID = 2394010", Ports: 1, PasswordMaximum: 128},
 	{ID: "valheim", Name: "Valheim", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb153", AppID: 896660, Memory: 4096, MinimumMemory: 2048, Players: 10, MaximumPlayers: 10, Disk: 8192, Image: "ghcr.io/ptero-eggs/games:valheim", Description: "Explore a persistent Viking world with friends.", AfterSetup: "Join by IP using the game port and your server password. The server starts private, with Steam networking. Stop it before replacing world files.", Startup: valheimStartup, Ready: "DungeonDB Start", Ports: 2, ConsecutivePorts: true, FixedPlayers: true, PasswordMinimum: 5, PasswordMaximum: 20, Prepare: (*App).valheimAfterInstall},
@@ -62,6 +66,7 @@ func (a *App) registerSteamGames(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/client/game-library/steam", a.steamGameCatalog)
 	mux.HandleFunc("GET /api/client/game-library/steam/{game}", a.steamGameOptions)
 	mux.HandleFunc("POST /api/client/game-library/steam/{game}/install", a.steamGameInstall)
+	mux.HandleFunc("POST /api/client/game-library/steam/{game}/ports", a.steamGamePorts)
 }
 
 func steamGameSummary(spec steamGameSpec) M {
@@ -81,6 +86,12 @@ func (a *App) steamGameCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 func steamGameHelp(game string) []M {
+	if game == "palworld-proton" {
+		return []M{{"label": "Palworld server settings", "url": "https://docs.palworldgame.com/settings-and-operation/configuration/"}, {"label": "Windows / Proton mods", "text": "Includes maintained UE4SS for Lua and Blueprint mods. Existing native DLL mods or competing loaders require compatibility review."}, {"label": "Administration console", "text": "The RCON port is private inside the game container. Admin credentials stay in private native files."}}
+	}
+	if steamPalworldVariant(game) {
+		return []M{{"label": "Palworld server settings", "url": "https://docs.palworldgame.com/settings-and-operation/configuration/"}, {"label": "Administration console", "text": "The RCON port is private inside the game container. Admin credentials stay in private native files and are excluded from process arguments and environment."}}
+	}
 	if game == "7days" {
 		return []M{{"label": "7 Days to Die dedicated server", "url": "https://7daystodie.wiki.gg/wiki/Server:_serverconfig.xml", "text": "Four consecutive game ports are allocated. The administration console is private inside the container. World data is stored under saves; stop the game before replacing it."}}
 	}
@@ -148,7 +159,13 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 		for _, node := range candidates {
 			if a.steamNativeNode(r.Context(), node, spec.AppID) == nil {
 				reason := ""
-				if _, e := a.steamGameAllocations(r.Context(), node, spec, spec.MinimumMemory); e != nil {
+				if steamPalworldVariant(spec.ID) && !a.steamPalworldNodeAvailable(num(node["id"]), spec.ID) {
+					reason = "Upgrade and reconnect the node for this Palworld runtime variant."
+				}
+				if spec.UnavailableReason != "" {
+					reason = spec.UnavailableReason
+				}
+				if e := a.gameNodeResources(r.Context(), node, spec.Disk, spec.MinimumMemory); e != nil {
 					var apiErr APIError
 					if !errors.As(e, &apiErr) {
 						fail(w, e)
@@ -165,7 +182,7 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 				if num(node["memory_overallocate"]) != -1 {
 					budget = num(node["memory"])*(100+num(node["memory_overallocate"]))/100 - num(used["memory"])
 				}
-				nodes = append(nodes, M{"id": node["id"], "name": node["name"], "setup_available": reason == "", "unavailable_reason": reason, "available_memory": budget})
+				nodes = append(nodes, M{"id": node["id"], "name": node["name"], "automatic_ports": true, "setup_available": reason == "", "unavailable_reason": reason, "available_memory": budget})
 			}
 		}
 	}
@@ -178,6 +195,10 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 		options[key] = value
 	}
 	options["advanced_fields"] = steamCatalogFieldRows(spec.ID)
+	options["supports_install_only"] = true
+	if spec.UnavailableReason != "" {
+		options["setup_unavailable_reason"] = spec.UnavailableReason
+	}
 	writeJSON(w, 200, item("steam_game_options", options))
 }
 
@@ -185,12 +206,35 @@ type steamGameInput struct {
 	Name, RequestID, Password string
 	NodeID, Memory, Players   int64
 	Catalog                   *steamCatalogConfiguration
+	StartOnCompletion         bool `json:"-"`
 }
 
 var steamRequestID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 
+func steamGameProvisionBytes(game string, input steamGameInput) []byte {
+	encoded, _ := json.Marshal(struct {
+		Game        string
+		Input       steamGameInput
+		Credentials map[string]string
+		InstallOnly bool `json:"install_only,omitempty"`
+	}{game, input, func() map[string]string {
+		if input.Catalog != nil {
+			return input.Catalog.Secrets
+		}
+		return nil
+	}(), !input.StartOnCompletion})
+	return encoded
+}
+
 func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
-	v := steamGameInput{Name: strings.TrimSpace(str(in["name"])), RequestID: str(in["request_id"])}
+	v := steamGameInput{Name: strings.TrimSpace(str(in["name"])), RequestID: str(in["request_id"]), StartOnCompletion: true}
+	if raw, exists := in["start_on_completion"]; exists {
+		value, ok := raw.(bool)
+		if !ok {
+			return v, bad("Start on completion must be a boolean.")
+		}
+		v.StartOnCompletion = value
+	}
 	if v.Name == "" || len([]rune(v.Name)) > 100 || !quickSingleLine(v.Name) {
 		return v, bad("Enter a server name of at most 100 characters.")
 	}
@@ -231,6 +275,18 @@ func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
 			}
 		}
 		configuration, err := steamCatalogParse(spec.ID, environment, v.Players)
+		if steamPalworldVariant(spec.ID) && v.Password != "" {
+			copy := M{}
+			for key, value := range environment {
+				copy[key] = value
+			}
+			environment = copy
+			if existing, present := environment["SERVER_PASSWORD"]; present && str(existing) != "" && str(existing) != v.Password {
+				return v, bad("Join password controls must agree.")
+			}
+			environment["SERVER_PASSWORD"] = v.Password
+			configuration, err = steamCatalogParse(spec.ID, environment, v.Players)
+		}
 		if err != nil {
 			return v, err
 		}
@@ -267,6 +323,10 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in, err := decodeRaw(r)
+	if spec.UnavailableReason != "" {
+		fail(w, APIError{409, "GameSetupUnavailable", spec.UnavailableReason})
+		return
+	}
 	if err != nil {
 		fail(w, err)
 		return
@@ -304,19 +364,13 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	encoded, _ := json.Marshal(struct {
-		Game        string
-		Input       steamGameInput
-		Credentials map[string]string
-	}{spec.ID, v, func() map[string]string {
-		if v.Catalog != nil {
-			return v.Catalog.Secrets
-		}
-		return nil
-	}()})
+	encoded := steamGameProvisionBytes(spec.ID, v)
 	sum := sha256.Sum256(encoded)
 	fingerprint := hex.EncodeToString(sum[:])
 	settings := M{"name": v.Name, "max_players": v.Players}
+	if steamPalworldVariant(spec.ID) {
+		settings["managed_variant"] = spec.ID
+	}
 	if v.Catalog != nil {
 		settings["environment"] = v.Catalog.Values
 		for key, secret := range v.Catalog.Secrets {
@@ -361,6 +415,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 	} else {
 		server, err = a.one(ctx, "SELECT * FROM servers WHERE external_id=$1", externalID)
 	}
+	var portPlan gamePortPlan
 	created := false
 	if errors.Is(err, pgx.ErrNoRows) {
 		if stage != "reserved" {
@@ -384,7 +439,24 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
-		allocations, e := a.steamGameAllocations(ctx, node, spec, v.Memory)
+		if e = a.gameNodeResources(ctx, node, spec.Disk, v.Memory); e != nil {
+			fail(w, e)
+			return
+		}
+		portEnvironment := M{}
+		if v.Catalog != nil {
+			portEnvironment = v.Catalog.Values
+		}
+		portPlan, _, e = a.planGamePorts(ctx, node, steamPortTemplate(spec), portEnvironment)
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		allocations, e := a.provisionGamePorts(ctx, node, portPlan)
+		if steamPalworldVariant(spec.ID) && !a.steamPalworldNodeAvailable(v.NodeID, spec.ID) {
+			fail(w, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node for this Palworld runtime variant."})
+			return
+		}
 		if e != nil {
 			fail(w, e)
 			return
@@ -395,16 +467,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if spec.ID == "satisfactory" {
-				available, queryErr := a.query(ctx, "SELECT id,ip,port FROM allocations WHERE node_id=$1 AND server_id IS NULL ORDER BY id", v.NodeID)
-				if queryErr != nil {
-					fail(w, queryErr)
-					return
-				}
-				allocations, e = steamCatalogReliableAllocation(allocations, available, v.Catalog.Values)
-				if e != nil {
-					fail(w, e)
-					return
-				}
+				v.Catalog.Values["RELIABLE_PORT"] = fmt.Sprint(num(allocations[1]["port"]))
 			}
 		}
 		egg, e := a.steamGameEgg(ctx, spec)
@@ -437,6 +500,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
+		portPlan = a.finishGamePortPlan(ctx, u, node, server, steamPortTemplate(spec), portPlan)
 		created = true
 	} else if err != nil {
 		fail(w, err)
@@ -469,7 +533,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		// recording this stage, including a job that has already finished.
 		_, jobErr := a.one(ctx, "SELECT id FROM steam_jobs WHERE server_id=$1 AND operation='install' ORDER BY created_at LIMIT 1", server["id"])
 		if errors.Is(jobErr, pgx.ErrNoRows) {
-			if _, err = a.queueSteamJob(ctx, server, "install", true, true); err != nil {
+			if _, err = a.queueSteamJob(ctx, server, "install", v.StartOnCompletion, true); err != nil {
 				fail(w, err)
 				return
 			}
@@ -487,7 +551,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 	if created {
 		status = 201
 	}
-	writeJSON(w, status, item("game_installation", M{"identifier": server["uuid_short"], "name": server["name"], "status": server["status"]}))
+	writeJSON(w, status, item("game_installation", M{"identifier": server["uuid_short"], "name": server["name"], "status": server["status"], "ports": a.gameInstallPortResponse(ctx, server, steamPortTemplate(spec))}))
 }
 
 func steamGameStartup(spec steamGameSpec, allocations []M) string {
@@ -498,15 +562,8 @@ func steamGameStartup(spec steamGameSpec, allocations []M) string {
 }
 
 func (a *App) steamGameAllocations(ctx context.Context, node M, spec steamGameSpec, memory int64) ([]M, error) {
-	used, err := a.one(ctx, "SELECT COALESCE(SUM(memory),0)::bigint memory,COALESCE(SUM(disk),0)::bigint disk FROM servers WHERE node_id=$1", node["id"])
-	if err != nil {
+	if err := a.gameNodeResources(ctx, node, spec.Disk, memory); err != nil {
 		return nil, err
-	}
-	if over := num(node["memory_overallocate"]); over != -1 && num(used["memory"])+memory > num(node["memory"])*(100+over)/100 {
-		return nil, bad("The node has insufficient available memory.")
-	}
-	if over := num(node["disk_overallocate"]); over != -1 && num(used["disk"])+spec.Disk > num(node["disk"])*(100+over)/100 {
-		return nil, bad("The node has insufficient available disk.")
 	}
 	ports, err := a.query(ctx, "SELECT id,ip,port FROM allocations WHERE node_id=$1 AND server_id IS NULL ORDER BY id", node["id"])
 	if err != nil {
@@ -573,13 +630,17 @@ func (a *App) steamGameEgg(ctx context.Context, spec steamGameSpec) (M, error) {
 		return nil, err
 	}
 	err = tx.QueryRow(ctx, "SELECT id FROM eggs WHERE uuid=$1", spec.EggUUID).Scan(&eggID)
+	imageLabel := "Native Linux"
+	if spec.ID == "palworld-proton" {
+		imageLabel = "Windows / Proton"
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		startup, done := spec.Startup, spec.Ready
 		stop := spec.Stop
 		if stop == "" {
 			stop = "^C"
 		}
-		err = tx.QueryRow(ctx, `INSERT INTO eggs(uuid,nest_id,author,name,description,features,docker_images,startup,config_files,config_startup,config_stop,script_install,script_entry,script_container) VALUES($1,$2,'library@voltra.local',$3,'App-owned Steam installation. Launch only; use the Steam maintenance controls.',$4,$5,$6,'{}',$7,$9,$8,'sh','ghcr.io/ptero-eggs/installers:debian') RETURNING id`, spec.EggUUID, nestID, spec.Name+" (managed Steam)", []string{"steam", "quick_setup"}, M{"Native Linux": spec.Image}, startup, M{"done": done}, steamBootstrapScript, stop).Scan(&eggID)
+		err = tx.QueryRow(ctx, `INSERT INTO eggs(uuid,nest_id,author,name,description,features,docker_images,startup,config_files,config_startup,config_stop,script_install,script_entry,script_container) VALUES($1,$2,'library@voltra.local',$3,'App-owned Steam installation. Launch only; use the Steam maintenance controls.',$4,$5,$6,'{}',$7,$9,$8,'sh','ghcr.io/ptero-eggs/installers:debian') RETURNING id`, spec.EggUUID, nestID, spec.Name+" (managed Steam)", []string{"steam", "quick_setup"}, M{imageLabel: spec.Image}, startup, M{"done": done}, steamBootstrapScript, stop).Scan(&eggID)
 		if err != nil {
 			return nil, err
 		}
@@ -591,6 +652,13 @@ func (a *App) steamGameEgg(ctx context.Context, spec steamGameSpec) (M, error) {
 		}
 	} else if err != nil {
 		return nil, err
+	}
+	if spec.ID == "palworld-proton" {
+		// Correct only the exact previous app-owned metadata, retaining any
+		// operator-supplied image choices and every native Linux label.
+		if _, err = tx.Exec(ctx, "UPDATE eggs SET docker_images=$2 WHERE id=$1 AND docker_images=$3", eggID, M{imageLabel: spec.Image}, M{"Native Linux": spec.Image}); err != nil {
+			return nil, err
+		}
 	}
 	for _, field := range steamCatalogFields(spec.ID) {
 		var variableID int64
@@ -687,4 +755,18 @@ func (a *App) steamGameAfterInstall(ctx context.Context, server M) error {
 		return err
 	}
 	return a.quickSetupWrite(ctx, server, file, []byte(fmt.Sprintf("[/Script/Engine.GameSession]\nMaxPlayers=%d\n", num(settings["max_players"]))))
+}
+
+func (a *App) gameNodeResources(ctx context.Context, node M, disk, memory int64) error {
+	used, err := a.one(ctx, "SELECT COALESCE(SUM(memory),0)::bigint memory,COALESCE(SUM(disk),0)::bigint disk FROM servers WHERE node_id=$1", node["id"])
+	if err != nil {
+		return err
+	}
+	if over := num(node["memory_overallocate"]); over != -1 && num(used["memory"])+memory > num(node["memory"])*(100+over)/100 {
+		return bad("The node has insufficient available memory.")
+	}
+	if over := num(node["disk_overallocate"]); over != -1 && num(used["disk"])+disk > num(node["disk"])*(100+over)/100 {
+		return bad("The node has insufficient available disk.")
+	}
+	return nil
 }

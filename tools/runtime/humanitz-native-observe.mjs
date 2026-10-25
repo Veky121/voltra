@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {api} from './openttd-compat-node.mjs';
+const dir='.local/humanitz-native',s=JSON.parse(fs.readFileSync(dir+'/private.json'));
+const node=JSON.parse(fs.readFileSync(s.node_receipt));
+if(node.node!==s.node||node.node_uuid!==s.node_uuid||node.root!=='/var/lib/voltra-batch-20261023'||s.owner!=='unreal_survival')throw Error('Owned node identity changed');
+const server=(await api('/api/application/servers/'+s.internal_id)).attributes;
+if(server.uuid!==s.uuid||server.node!==s.node||server.egg!==s.egg_id||server.external_id!=='humanitz-native-'+s.request_id)throw Error('Owned HumanitZ identity mismatch');
+const name=server.status==='installing'?s.uuid+'_installer':s.uuid;
+const inspected=spawnSync('docker',['inspect',name],{windowsHide:true,encoding:'utf8'});
+const logs=spawnSync('docker',['logs',...(inspected.status===0?['--since',JSON.parse(inspected.stdout)[0].State.StartedAt]:[]),name],{windowsHide:true,encoding:'utf8',maxBuffer:16*1024*1024});
+const info=inspected.status===0?JSON.parse(inspected.stdout)[0]:null;
+const output={uuid:s.uuid,server_status:server.status,container:name,state:info?.State??null,logs:logs.status===0?logs.stdout+logs.stderr:logs.stderr,at:new Date().toISOString()};
+const tag=process.argv[2]??'current';if(!/^[a-zA-Z0-9_-]+$/.test(tag))throw Error('Invalid observation tag');
+fs.writeFileSync(dir+'/'+tag+'.json',JSON.stringify(output,null,2)+'\n');fs.writeFileSync(dir+'/'+tag+'.log',output.logs);
+const markers=[' OnCreateSessionComplete ','Error','Exception','Shutdown','license','EULA','LogExit'];
+console.log({...output,logs:undefined,observed_markers:markers.filter(marker=>output.logs.includes(marker)),raw_log_saved_privately:true});

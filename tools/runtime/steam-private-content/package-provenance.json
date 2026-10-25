@@ -1,0 +1,130 @@
+{
+  "sdk_version": "10.0.402",
+  "runtime_version": "10.0.13",
+  "package_bytes": 10336040,
+  "packages": [
+    {
+      "package": "protobuf-net",
+      "version": "3.4.30",
+      "bytes": 696908,
+      "sha256": "8710c5cf139baa36abe5110d49b90bb0d157db14dedcb37cb6bedf496cf2d7e7",
+      "archive_sha512_base64": "cULc8ReOo92odEtRZ9ifcF+dI87cokqPZrWfSNvTPNBPislhU3qPsp/nN//tU9ZeRHF+XkQXuiJTRf1p9nIc7w==",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/protobuf-net/protobuf-net",
+        "commit": "f24c4c97bb146d763425a04b6b8dd7fd89219ef3"
+      },
+      "notices": [],
+      "cached_archive_sha512_base64": "cULc8ReOo92odEtRZ9ifcF+dI87cokqPZrWfSNvTPNBPislhU3qPsp/nN//tU9ZeRHF+XkQXuiJTRf1p9nIc7w==",
+      "nugetMetadata": {
+        "version": 2,
+        "contentHash": "N49mhnY5fpWds085lO6ocppox9y4cTb1EmbHAAYVJMl/iYSYyNpz4Ohxnk80qtqv52dNZI+/6hQbaiz3+rTEwA==",
+        "source": "https://api.nuget.org/v3/index.json"
+      }
+    },
+    {
+      "package": "protobuf-net.Core",
+      "version": "3.4.30",
+      "bytes": 1318587,
+      "sha256": "fc3ffa4b7add6f005d8ac828e1fe0f1cd765ccfdbd6caa28c3fb0f88483d25f9",
+      "archive_sha512_base64": "ZsxzL99hyqyq9sh6qAwv4wQoXfYk1OQaBTQAzycQ3uXzaPu0VWt9hGWDeV5dUk/wzi0dVBS1daOO9pBWPtDFKg==",
+      "license": {
+        "type": "expression",
+        "value": "Apache-2.0"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/protobuf-net/protobuf-net",
+        "commit": "f24c4c97bb146d763425a04b6b8dd7fd89219ef3"
+      },
+      "notices": [],
+      "cached_archive_sha512_base64": "ZsxzL99hyqyq9sh6qAwv4wQoXfYk1OQaBTQAzycQ3uXzaPu0VWt9hGWDeV5dUk/wzi0dVBS1daOO9pBWPtDFKg==",
+      "nugetMetadata": {
+        "version": 2,
+        "contentHash": "CZf8U6eON9OBtcPyOiXJ6Oq3Opi/lWtEiireyLCy43iof1A2oA0GEOrEHZISzmQ46s61iOC06Sa4Cs+D41t1DA==",
+        "source": "https://api.nuget.org/v3/index.json"
+      }
+    },
+    {
+      "package": "SteamKit2",
+      "version": "3.5.0",
+      "bytes": 6725204,
+      "sha256": "68826f736e93299142cd0e38f6e4e60bc91148a6fa65e9a8359a81952ddab87f",
+      "archive_sha512_base64": "Tb0GN/xxwetSrl0b6d7sd34Pm/7Q7pHGUXP3Cj/GMcmRcWGGrmtUoIWYnCAf222TCxEKwAKLyS0q/BoiKF3Ulg==",
+      "license": {
+        "type": "expression",
+        "value": "LGPL-2.1-only"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/SteamRE/SteamKit",
+        "commit": "49387aec55c24104946af7a7b160148358e538b4"
+      },
+      "notices": [
+        "SteamKit2-3.5.0-license.txt"
+      ],
+      "cached_archive_sha512_base64": "Tb0GN/xxwetSrl0b6d7sd34Pm/7Q7pHGUXP3Cj/GMcmRcWGGrmtUoIWYnCAf222TCxEKwAKLyS0q/BoiKF3Ulg==",
+      "nugetMetadata": {
+        "version": 2,
+        "contentHash": "QqTMwFxBNRTxx5RzLT+N0DkRPxHpkZIJFb2rUsDaXXDLL1uTRkt7g+6Zm6lwYAIu7YX3tw09Nd8+N6MOjNuQhg==",
+        "source": "https://api.nuget.org/v3/index.json"
+      }
+    },
+    {
+      "package": "System.IO.Hashing",
+      "version": "10.0.12",
+      "bytes": 206319,
+      "sha256": "d918de044168a48e148a73e84c6db6f8fea570963848dc4c03631aad97958dd1",
+      "archive_sha512_base64": "ajmM3Pqdt5DORxLvDrTqIZUk2/bKW4Sk3NBZJp2ZPlE9vk3v2pWP4MDaEVfXQZv1OH1YdTkcwO9Ci+4dWp13Bw==",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/dotnet/dotnet",
+        "commit": "95017c711e6afc1085133d440e42b4bd78155701"
+      },
+      "notices": [
+        "System.IO.Hashing-10.0.12-THIRD-PARTY-NOTICES.TXT"
+      ],
+      "cached_archive_sha512_base64": "ajmM3Pqdt5DORxLvDrTqIZUk2/bKW4Sk3NBZJp2ZPlE9vk3v2pWP4MDaEVfXQZv1OH1YdTkcwO9Ci+4dWp13Bw==",
+      "nugetMetadata": {
+        "version": 2,
+        "contentHash": "jDix4bBMYnpZdSPcnY+KDV6ik3SRMzpMKby/bZl/XUwIiflwRNAFZ0oOl61R/pSaveIJ8t1gs2BUlrGsPs/bcg==",
+        "source": "https://api.nuget.org/v3/index.json"
+      }
+    },
+    {
+      "package": "ZstdSharp.Port",
+      "version": "0.8.8",
+      "bytes": 1389022,
+      "sha256": "f6797192deebf4535f0601c2273e750da0c02062e30a3e4a3c4011b9ac22403a",
+      "archive_sha512_base64": "i6O1GP8E6Mh0frx9gryhb6s2sOWiOAi2h4aB4TDOof+39OE5aWTKiyU37vE6YXDvHM4MkNbIU2untq2W+g4m+w==",
+      "license": {
+        "type": "expression",
+        "value": "MIT"
+      },
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/oleg-st/ZstdSharp.git",
+        "branch": "refs/heads/master",
+        "commit": "2cd0c019693bc786a5fe5c3be94e107b24e7267e"
+      },
+      "notices": [],
+      "cached_archive_sha512_base64": "i6O1GP8E6Mh0frx9gryhb6s2sOWiOAi2h4aB4TDOof+39OE5aWTKiyU37vE6YXDvHM4MkNbIU2untq2W+g4m+w==",
+      "nugetMetadata": {
+        "version": 2,
+        "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ==",
+        "source": "https://api.nuget.org/v3/index.json"
+      }
+    }
+  ],
+  "nuget_lock_matches_restored_content_metadata": true,
+  "archive_sha512_matches_cache_hash_file": true,
+  "auth_or_content_requests_performed": false
+}

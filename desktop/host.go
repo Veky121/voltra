@@ -26,6 +26,7 @@ import (
 
 type desktopHost struct {
 	mu                                sync.RWMutex
+	themeMu                           sync.Mutex
 	session                           session
 	dir, origin, launch, storageError string
 	assets                            fs.FS
@@ -152,6 +153,10 @@ func (h *desktopHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.FS(h.assets)).ServeHTTP(w, clone)
 }
 func (h *desktopHost) desktop(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/desktop/theme" {
+		h.serveTheme(w, r)
+		return
+	}
 	if r.URL.Path == "/desktop/window" || strings.HasPrefix(r.URL.Path, "/desktop/window/") {
 		h.serveWindow(w, r)
 		return

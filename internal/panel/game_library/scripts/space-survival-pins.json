@@ -1,0 +1,39 @@
+{
+  "upstream_revision": "c637a6d1e0449b167efeff81bb9a0177aa3df6c2",
+  "wine_runtime": "ghcr.io/ptero-eggs/yolks@sha256:db48c30fc50104a43d951200174d33e2b9200f80b03b3ded9c106586450dbcf8",
+  "icarus_config": {
+    "url": "https://raw.githubusercontent.com/RocketWerkz/IcarusDedicatedServer/0a794a8c2c2f9dc80642075be3fc77e99d182dfd/ServerSettings.ini",
+    "sha256": "b287d7df3acf72dffae4eae0a7e449176d4dbfe533ac3d171c0fe83808f84e75",
+    "bytes": 317,
+    "commit": "0a794a8c2c2f9dc80642075be3fc77e99d182dfd"
+  },
+  "pyyaml": {
+    "version": "6.0.3",
+    "url": "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz",
+    "sha256": "d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f",
+    "bytes": 130960,
+    "prefix": "pyyaml-6.0.3",
+    "license": "MIT",
+    "source": "https://github.com/yaml/pyyaml"
+  },
+  "astroneer": {
+    "appid": 728470,
+    "binary": "Astro/Binaries/Win64/AstroServer-Win64-Shipping.exe",
+    "ports": 1,
+    "reference": "https://astroneer.space/dedicatedserver/"
+  },
+  "icarus": {
+    "appid": 2089300,
+    "binary": "Icarus/Binaries/Win64/IcarusServer-Win64-Shipping.exe",
+    "ports": 2,
+    "reference": "https://github.com/RocketWerkz/IcarusDedicatedServer/wiki/Server-Config-&-Launch-Parameters"
+  },
+  "empyrion": {
+    "appid": 530870,
+    "binary": "DedicatedServer/EmpyrionDedicated.exe",
+    "ports": 5,
+    "reference": "https://empyriongame.com/dedicatedservers/",
+    "guide": "https://empyrion.fandom.com/wiki/Guide/Setting_Up_Dedicated_Server",
+    "console": "Original raw loopback Telnet, unexposed port1030, saveandexit0"
+  }
+}

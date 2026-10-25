@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -41,43 +42,110 @@ type templatePortRule struct {
 	AllocatedOffsets []int  `json:"allocated_offsets,omitempty"`
 	ExcludePrimary   bool   `json:"exclude_primary,omitempty"`
 	ExcludeOffsets   []int  `json:"exclude_offsets,omitempty"`
+	ExcludePorts     []int  `json:"exclude_ports,omitempty"`
 	AutoAllocate     bool   `json:"auto_allocate,omitempty"`
 	WhenEnvironment  string `json:"when_environment,omitempty"`
 	WhenValue        string `json:"when_value,omitempty"`
 }
 
+type templateAgreement struct {
+	Environment   string `json:"environment"`
+	Title         string `json:"title"`
+	Text          string `json:"text"`
+	EffectiveDate string `json:"effective_date"`
+	ReviewedDate  string `json:"reviewed_date,omitempty"`
+	AcceptValue   string `json:"accept_value"`
+}
+
+// Agreements bind explicit consent to the exact reviewed publisher text, never a
+// generated file or an earlier boolean setting. No request can replace the text.
+func validateTemplateAgreements(entry gameTemplate) error {
+	seen := map[string]bool{}
+	for _, agreement := range entry.Agreements {
+		validKey := agreement.Environment != ""
+		for i, c := range agreement.Environment {
+			if !(c == '_' || c >= 'A' && c <= 'Z' || i > 0 && c >= '0' && c <= '9') {
+				validKey = false
+			}
+		}
+		sum := sha256.Sum256([]byte(agreement.Text))
+		validDate := func(value string) bool {
+			date, err := time.Parse("2006-01-02", value)
+			return err == nil && date.Format("2006-01-02") == value
+		}
+		validDates := (agreement.EffectiveDate != "" || agreement.ReviewedDate != "") &&
+			(agreement.EffectiveDate == "" || validDate(agreement.EffectiveDate)) &&
+			(agreement.ReviewedDate == "" || validDate(agreement.ReviewedDate))
+		if !validKey || len(agreement.Environment) > 100 || seen[agreement.Environment] || strings.TrimSpace(agreement.Title) == "" || len(agreement.Title) > 512 || !utf8.ValidString(agreement.Title) || strings.TrimSpace(agreement.Text) == "" || len(agreement.Text) > 1024*1024 || !utf8.ValidString(agreement.Text) || strings.ContainsRune(agreement.Text, 0) || !validDates || agreement.AcceptValue != hex.EncodeToString(sum[:]) {
+			return APIError{409, "GameAgreementMetadataInvalid", "This template's reviewed publisher agreement needs a compatibility review."}
+		}
+		seen[agreement.Environment] = true
+		matches := 0
+		for _, raw := range asSlice(entry.Egg["variables"]) {
+			v := asMap(raw)
+			if str(v["env_variable"]) == agreement.Environment {
+				matches++
+				if v["default_value"] != "0" || str(v["rules"]) != "required|string|in:0,"+agreement.AcceptValue {
+					return APIError{409, "GameAgreementMetadataInvalid", "This template's agreement control needs a compatibility review."}
+				}
+			}
+		}
+		if matches != 1 {
+			return APIError{409, "GameAgreementMetadataInvalid", "This template's agreement control needs a compatibility review."}
+		}
+	}
+	return nil
+}
+
+func requireTemplateAgreements(entry gameTemplate, supplied any) error {
+	if err := validateTemplateAgreements(entry); err != nil {
+		return err
+	}
+	provided, _ := supplied.(map[string]any)
+	for _, agreement := range entry.Agreements {
+		if value, ok := provided[agreement.Environment].(string); !ok || value != agreement.AcceptValue {
+			return APIError{422, "PublisherAgreementRequired", "Explicitly accept the current publisher agreement: " + agreement.Title + "."}
+		}
+	}
+	return nil
+}
+
 type gameTemplateOverride struct {
-	UpstreamSHA256           string             `json:"upstream_sha256"`
-	Revision                 string             `json:"revision"`
-	Defaults                 M                  `json:"defaults"`
-	Egg                      M                  `json:"egg"`
-	Verification             string             `json:"verification,omitempty"`
-	Detail                   string             `json:"detail,omitempty"`
-	SetupSteps               []string           `json:"setup_steps,omitempty"`
-	Platforms                []string           `json:"platforms,omitempty"`
-	RequiredPorts            int                `json:"required_ports,omitempty"`
-	ConsecutivePorts         bool               `json:"consecutive_ports,omitempty"`
-	ConsecutivePortsCount    int                `json:"consecutive_ports_count,omitempty"`
-	ConsecutivePrimaryOffset int                `json:"consecutive_primary_offset,omitempty"`
-	PortRules                []templatePortRule `json:"port_rules,omitempty"`
+	SetupUnavailableReason   string              `json:"setup_unavailable_reason,omitempty"`
+	Agreements               []templateAgreement `json:"agreements,omitempty"`
+	UpstreamSHA256           string              `json:"upstream_sha256"`
+	Revision                 string              `json:"revision"`
+	Defaults                 M                   `json:"defaults"`
+	Egg                      M                   `json:"egg"`
+	Verification             string              `json:"verification,omitempty"`
+	Detail                   string              `json:"detail,omitempty"`
+	SetupSteps               []string            `json:"setup_steps,omitempty"`
+	Platforms                []string            `json:"platforms,omitempty"`
+	RequiredPorts            int                 `json:"required_ports,omitempty"`
+	ConsecutivePorts         bool                `json:"consecutive_ports,omitempty"`
+	ConsecutivePortsCount    int                 `json:"consecutive_ports_count,omitempty"`
+	ConsecutivePrimaryOffset int                 `json:"consecutive_primary_offset,omitempty"`
+	PortRules                []templatePortRule  `json:"port_rules,omitempty"`
 }
 
 type gameTemplate struct {
-	Path                     string             `json:"path"`
-	SHA256                   string             `json:"sha256"`
-	Egg                      M                  `json:"egg"`
-	ID                       string             `json:"id"`
-	Profile                  string             `json:"profile,omitempty"`
-	Defaults                 M                  `json:"defaults,omitempty"`
-	Verification             string             `json:"verification,omitempty"`
-	Detail                   string             `json:"detail,omitempty"`
-	SetupSteps               []string           `json:"setup_steps,omitempty"`
-	Platforms                []string           `json:"platforms,omitempty"`
-	RequiredPorts            int                `json:"required_ports,omitempty"`
-	ConsecutivePorts         bool               `json:"consecutive_ports,omitempty"`
-	ConsecutivePortsCount    int                `json:"consecutive_ports_count,omitempty"`
-	ConsecutivePrimaryOffset int                `json:"consecutive_primary_offset,omitempty"`
-	PortRules                []templatePortRule `json:"port_rules,omitempty"`
+	SetupUnavailableReason   string              `json:"setup_unavailable_reason,omitempty"`
+	Agreements               []templateAgreement `json:"agreements,omitempty"`
+	Path                     string              `json:"path"`
+	SHA256                   string              `json:"sha256"`
+	Egg                      M                   `json:"egg"`
+	ID                       string              `json:"id"`
+	Profile                  string              `json:"profile,omitempty"`
+	Defaults                 M                   `json:"defaults,omitempty"`
+	Verification             string              `json:"verification,omitempty"`
+	Detail                   string              `json:"detail,omitempty"`
+	SetupSteps               []string            `json:"setup_steps,omitempty"`
+	Platforms                []string            `json:"platforms,omitempty"`
+	RequiredPorts            int                 `json:"required_ports,omitempty"`
+	ConsecutivePorts         bool                `json:"consecutive_ports,omitempty"`
+	ConsecutivePortsCount    int                 `json:"consecutive_ports_count,omitempty"`
+	ConsecutivePrimaryOffset int                 `json:"consecutive_primary_offset,omitempty"`
+	PortRules                []templatePortRule  `json:"port_rules,omitempty"`
 }
 type templateCatalog struct {
 	Repository string         `json:"repository"`
@@ -120,11 +188,17 @@ func gameTemplates() templateCatalog {
 				entry.ConsecutivePortsCount = override.ConsecutivePortsCount
 				entry.ConsecutivePrimaryOffset = override.ConsecutivePrimaryOffset
 				entry.PortRules = override.PortRules
+				entry.Agreements = override.Agreements
+				entry.SetupUnavailableReason = override.SetupUnavailableReason
 				entry.SHA256 = gameTemplateOverrideDigest(override)
+			}
+			if detail := steamCatalogVerifiedDetail(entry.Path); detail != "" {
+				entry.Verification = "runtime_verified"
+				entry.Detail = detail
 			}
 			valid = append(valid, entry)
 		}
-		templates.Entries = valid
+		templates.Entries = append(valid, farmingSimulatorTemplate())
 	})
 	return templates
 }
@@ -152,15 +226,28 @@ func gameTemplateFor(id string) (gameTemplate, bool) {
 func templateSummary(entry gameTemplate) M {
 	_, _, err := parseEggDocument(entry.Egg)
 	available := err == nil
+	if agreementErr := validateTemplateAgreements(entry); agreementErr != nil {
+		err = agreementErr
+		available = false
+	}
 	detail := entry.Detail
 	if err != nil {
 		detail = "This upstream recipe needs a compatibility fix before setup."
+	}
+	if reason := gameTemplateSetupUnavailable(entry); reason != "" {
+		available, detail = false, reason
 	}
 	verification := entry.Verification
 	if verification == "" {
 		verification = "not_verified"
 	}
 	out := M{"id": entry.ID, "name": entry.Egg["name"], "description": entry.Egg["description"], "category": strings.Split(entry.Path, "/")[0], "source": gameTemplates().Repository + "/blob/" + gameTemplates().Revision + "/" + entry.Path, "available": available, "detail": detail, "verification": verification, "profile": entry.Profile, "setup_steps": entry.SetupSteps, "platforms": entry.Platforms, "required_ports": max(1, entry.RequiredPorts), "consecutive_ports": entry.ConsecutivePorts, "consecutive_ports_count": entry.ConsecutivePortsCount, "consecutive_primary_offset": entry.ConsecutivePrimaryOffset, "port_rules": entry.PortRules}
+	if entry.Path == fs25Path {
+		out["source"] = fs25Source
+	}
+	if descriptor := templateSteamMetadata(entry); descriptor != nil {
+		out["steam_installation"] = descriptor
+	}
 	if managed := steamCatalogBridgeID(entry.Path); managed != "" {
 		out["managed_game"] = managed
 		out["managed_options_url"] = "/api/client/game-library/steam/" + managed
@@ -222,6 +309,7 @@ func (a *App) registerGameTemplates(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/client/game-library/templates", a.gameTemplateList)
 	mux.HandleFunc("GET /api/client/game-library/templates/{template}", a.gameTemplateOptions)
 	mux.HandleFunc("POST /api/client/game-library/templates/{template}/install", a.gameTemplateInstall)
+	mux.HandleFunc("POST /api/client/game-library/templates/{template}/ports", a.gameTemplatePorts)
 }
 
 func (a *App) gameTemplateList(w http.ResponseWriter, r *http.Request) {
@@ -247,12 +335,20 @@ func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {
 		fail(w, notFound())
 		return
 	}
+	if err := validateTemplateAgreements(entry); err != nil {
+		fail(w, err)
+		return
+	}
 	egg, variables, err := parseEggDocument(entry.Egg)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	nodes, err := a.query(r.Context(), "SELECT id,name,memory,disk FROM nodes WHERE public AND NOT maintenance_mode ORDER BY name,id")
+	nodes, err := a.query(r.Context(), `SELECT n.id,n.name,n.memory,n.disk,
+ CASE WHEN n.memory_overallocate=-1 THEN 1048576 ELSE GREATEST(0,n.memory::bigint*(100+n.memory_overallocate)/100-COALESCE(s.memory,0)) END available_memory,
+ CASE WHEN n.disk_overallocate=-1 THEN 16777216 ELSE GREATEST(0,n.disk::bigint*(100+n.disk_overallocate)/100-COALESCE(s.disk,0)) END available_disk
+ FROM nodes n LEFT JOIN (SELECT node_id,SUM(memory)::bigint memory,SUM(disk)::bigint disk FROM servers GROUP BY node_id) s ON s.node_id=n.id
+ WHERE n.public AND NOT n.maintenance_mode ORDER BY n.name,n.id`)
 	if err != nil {
 		fail(w, err)
 		return
@@ -289,6 +385,17 @@ func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {
 		nodes = filtered
 	}
 	for _, node := range nodes {
+		if app := privateTemplateApp(entry); app != 0 {
+			node["private_content_ready"] = a.privateReady(r.Context(), num(node["id"]), app)
+		}
+		node["automatic_ports"] = true
+		node["setup_available"] = num(node["available_memory"]) >= 128 && num(node["available_disk"]) >= 128
+		node["unavailable_reason"] = ""
+		if num(node["available_memory"]) < 128 {
+			node["unavailable_reason"] = "The node has insufficient available memory."
+		} else if num(node["available_disk"]) < 128 {
+			node["unavailable_reason"] = "The node has insufficient available disk."
+		}
 		allocations, e := a.query(r.Context(), "SELECT id,ip,port FROM allocations WHERE node_id=$1 AND server_id IS NULL ORDER BY ip,port", node["id"])
 		if e != nil {
 			fail(w, e)
@@ -303,9 +410,27 @@ func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(images, func(i, j int) bool { return str(images[i]["label"]) < str(images[j]["label"]) })
 	out := templateSummary(entry)
 	out["nodes"] = nodes
+	out["automatic_ports"] = true
 	out["images"] = images
 	out["variables"] = variables
+	if entry.Path == fs25Path {
+		imported, e := a.ensureGameTemplateEgg(r.Context(), entry, egg, variables)
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		_, sources, e := a.integrationEnvironment(r.Context(), num(imported["id"]))
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		out["egg_id"], out["saved_license"] = imported["id"], sources["GAME_SERIAL"] != nil
+	}
+	if len(entry.Agreements) > 0 {
+		out["agreements"] = entry.Agreements
+	}
 	out["startup"] = egg["startup"]
+	out["private_content_supported"] = privateTemplateApp(entry) != 0
 	out["defaults"] = M{"memory": 2048, "disk": 10240}
 	if len(entry.Defaults) > 0 {
 		out["defaults"] = entry.Defaults
@@ -352,6 +477,14 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		fail(w, notFound())
 		return
 	}
+	if reason := gameTemplateSetupUnavailable(entry); reason != "" {
+		fail(w, APIError{409, "GameSetupUnavailable", reason})
+		return
+	}
+	if err := validateTemplateAgreements(entry); err != nil {
+		fail(w, err)
+		return
+	}
 	egg, variables, err := parseEggDocument(entry.Egg)
 	if err != nil {
 		fail(w, err)
@@ -361,6 +494,38 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail(w, err)
 		return
+	}
+	if err := requireTemplateAgreements(entry, input["environment"]); err != nil {
+		fail(w, err)
+		return
+	}
+	if err = guardTemplateSteamEnvironment(asMap(input["environment"]), entry); err != nil {
+		fail(w, err)
+		return
+	}
+	privateContent := false
+	if raw, exists := input["private_content"]; exists {
+		var valid bool
+		privateContent, valid = raw.(bool)
+		if !valid {
+			fail(w, bad("private_content must be a boolean."))
+			return
+		}
+	}
+	if privateContent && privateTemplateApp(entry) == 0 {
+		fail(w, APIError{409, "PrivateSteamProfileNotReady", "Private Steam installation for this recipe is pending reviewed worker and publication policy support."})
+		return
+	}
+	importEntry := entry
+	if privateContent {
+		importEntry, err = privatePreparationEntry(entry)
+		if err == nil {
+			egg, variables, err = parseEggDocument(importEntry.Egg)
+		}
+		if err != nil {
+			fail(w, err)
+			return
+		}
 	}
 	name, ok := input["name"].(string)
 	if !ok || strings.TrimSpace(name) == "" || len([]rune(name)) > 100 || !quickSingleLine(name) {
@@ -394,8 +559,24 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if err = guardTemplateSteamEnvironment(env, entry); err != nil {
+		fail(w, err)
+		return
+	}
+	if privateContent {
+		if _, err = privatePreparationEnvironment(env); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	primary, validPrimary := applicationInteger(input["allocation_id"])
-	if !validPrimary || primary < 1 {
+	automatic := boolean(input["automatic_ports"])
+	selectedNode, validNode := applicationInteger(input["node_id"])
+	if automatic && (!validNode || selectedNode < 1 || input["allocation_id"] != nil || input["allocation_additional"] != nil) {
+		fail(w, bad("Automatic ports require a node and no explicit allocations."))
+		return
+	}
+	if !automatic && (!validPrimary || primary < 1) {
 		fail(w, bad("Choose an available game port."))
 		return
 	}
@@ -429,7 +610,15 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	encoded, _ := json.Marshal(M{"template": entry.ID, "name": name, "memory": memory, "disk": disk, "image": image, "environment": env, "primary": primary, "additional": additional})
+	digest := M{"template": entry.ID, "name": name, "memory": memory, "disk": disk, "image": image, "environment": env, "primary": primary, "additional": additional}
+	if privateContent {
+		digest["private_content"] = true
+	}
+	if automatic {
+		digest["automatic_ports"] = true
+		digest["node_id"] = selectedNode
+	}
+	encoded, _ := json.Marshal(digest)
 	sum := sha256.Sum256(encoded)
 	externalID := prefix + hex.EncodeToString(sum[:])
 	existing, err := a.one(ctx, "SELECT * FROM servers WHERE external_id LIKE $1", prefix+"%")
@@ -438,31 +627,73 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 			fail(w, APIError{409, "InstallationRequestConflict", "This request was already used for different settings."})
 			return
 		}
-		writeJSON(w, 200, item("game_installation", M{"identifier": existing["uuid_short"], "name": existing["name"], "status": existing["status"]}))
+		writeJSON(w, 200, item("game_installation", M{"identifier": existing["uuid_short"], "name": existing["name"], "status": existing["status"], "ports": a.gameInstallPortResponse(ctx, existing, entry)}))
 		return
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		fail(w, err)
 		return
 	}
-	allocation, err := a.one(ctx, "SELECT a.*,n.public,n.maintenance_mode FROM allocations a JOIN nodes n ON n.id=a.node_id WHERE a.id=$1 AND a.server_id IS NULL", primary)
+	var portPlan gamePortPlan
+	var allocation M
+	additionalAllocations := []M{}
+	nodeID := selectedNode
+	if !automatic {
+		selected, e := a.one(ctx, "SELECT node_id FROM allocations WHERE id=$1", primary)
+		if e != nil {
+			fail(w, bad("The game port is no longer available."))
+			return
+		}
+		nodeID = num(selected["node_id"])
+	}
+	node, err := a.node(ctx, nodeID)
 	if err != nil {
-		fail(w, bad("The game port is no longer available."))
+		fail(w, err)
 		return
 	}
-	if !boolean(allocation["public"]) || boolean(allocation["maintenance_mode"]) {
+	if !boolean(node["public"]) || boolean(node["maintenance_mode"]) {
 		fail(w, bad("Choose an available node."))
 		return
 	}
-	nodeID := num(allocation["node_id"])
-	additionalAllocations := []M{}
-	for _, id := range additional {
-		extra, allocationErr := a.one(ctx, "SELECT id,ip,port FROM allocations WHERE id=$1 AND node_id=$2 AND server_id IS NULL", id, nodeID)
-		if allocationErr != nil {
-			fail(w, bad("All ports must be available on the same node."))
+	if privateContent && !a.privateReady(ctx, nodeID, privateTemplateApp(entry)) {
+		fail(w, APIError{409, "PrivateSteamNodeNotReady", "Private Steam installation is not enabled on this node."})
+		return
+	}
+	if err = steamSessionLock(ctx, conn, fmt.Sprintf("voltra:steam-node-provision:%d", nodeID)); err != nil {
+		fail(w, err)
+		return
+	}
+	if automatic {
+		portPlan, env, err = a.planGamePorts(ctx, node, entry, env)
+		if err != nil {
+			fail(w, err)
 			return
 		}
-		additionalAllocations = append(additionalAllocations, extra)
+		allocations, e := a.provisionGamePorts(ctx, node, portPlan)
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		allocation = allocations[0]
+		primary = num(allocation["id"])
+		additionalAllocations = allocations[1:]
+		for _, extra := range additionalAllocations {
+			additional = append(additional, extra["id"])
+		}
+	} else {
+		allocation, err = a.one(ctx, "SELECT * FROM allocations WHERE id=$1 AND server_id IS NULL", primary)
+		if err != nil {
+			fail(w, bad("The game port is no longer available."))
+			return
+		}
+		for _, id := range additional {
+			extra, e := a.one(ctx, "SELECT id,ip,port FROM allocations WHERE id=$1 AND node_id=$2 AND server_id IS NULL", id, nodeID)
+			if e != nil {
+				fail(w, bad("All ports must be available on the same node."))
+				return
+			}
+			additionalAllocations = append(additionalAllocations, extra)
+		}
 	}
 	// The idempotency digest above intentionally uses the operator's raw values.
 	// Resolve automatic ports only after reading the exact selected allocations,
@@ -480,16 +711,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	node, err := a.node(ctx, nodeID)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	if err = steamSessionLock(ctx, conn, fmt.Sprintf("voltra:steam-node-provision:%d", nodeID)); err != nil {
-		fail(w, err)
-		return
-	}
-	if _, err = a.steamGameAllocations(ctx, node, steamGameSpec{Ports: 1, Disk: disk}, memory); err != nil {
+	if err = a.gameNodeResources(ctx, node, disk, memory); err != nil {
 		fail(w, err)
 		return
 	}
@@ -515,26 +737,46 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 	} else {
 		probe.Body.Close()
 	}
-	imported, err := a.ensureGameTemplateEgg(ctx, entry, egg, variables)
+	if privateContent {
+		env, err = privatePreparationEnvironment(env)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	imported, err := a.ensureGameTemplateEgg(ctx, importEntry, egg, variables)
 	if err != nil {
 		fail(w, err)
 		return
+	}
+	if entry.Path == fs25Path && str(env["GAME_SERIAL"]) == "" {
+		global, _, e := a.integrationEnvironment(ctx, num(imported["id"]))
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		if str(global["GAME_SERIAL"]) != "" {
+			delete(env, "GAME_SERIAL")
+		}
+		if str(global["GAME_SERIAL"]) == "" && str(env["AUTO_DOWNLOAD"]) == "true" {
+			fail(w, bad("Enter a GIANTS server licence or configure one in Admin integrations for this egg."))
+			return
+		}
 	}
 	server, err := a.createServer(ctx, M{"name": name, "description": str(entry.Egg["description"]), "owner_id": user["id"], "egg_id": imported["id"], "external_id": externalID, "image": image, "startup": egg["startup"], "node_id": nodeID, "allocation_id": primary, "allocation_additional": additional, "allocation_limit": len(additional), "memory": memory, "swap": 0, "disk": disk, "io": 500, "cpu": 0, "backup_limit": 1, "start_on_completion": false, "environment": env})
 	if err != nil {
 		fail(w, err)
 		return
 	}
+	portPlan = a.finishGamePortPlan(ctx, user, node, server, entry, portPlan)
 	_ = a.audit(ctx, num(user["id"]), num(server["id"]), "server:game-library.template-install", M{"template": entry.ID, "revision": gameTemplates().Revision})
-	writeJSON(w, 201, item("game_installation", M{"identifier": server["uuid_short"], "name": server["name"], "status": server["status"]}))
+	writeJSON(w, 201, item("game_installation", M{"identifier": server["uuid_short"], "name": server["name"], "status": server["status"], "ports": portPlan}))
 }
 
 func (a *App) ensureGameTemplateEgg(ctx context.Context, entry gameTemplate, egg M, variables []M) (M, error) {
 	// Pin identity to recipe content so a later catalog update cannot silently
 	// replace an installed egg or change an existing server's behavior.
-	sum := sha256.Sum256([]byte(entry.Path + ":" + entry.SHA256))
-	h := hex.EncodeToString(sum[:16])
-	uuid := h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
+	uuid := gameTemplateEggUUID(entry)
 	conn, err := a.DB.Acquire(ctx)
 	if err != nil {
 		return nil, err
@@ -558,4 +800,10 @@ func (a *App) ensureGameTemplateEgg(ctx context.Context, entry gameTemplate, egg
 	egg["uuid"] = uuid
 	egg["nest_id"] = nestID
 	return a.importEggRecord(ctx, 0, egg, variables)
+}
+
+func gameTemplateEggUUID(entry gameTemplate) string {
+	sum := sha256.Sum256([]byte(entry.Path + ":" + entry.SHA256))
+	h := hex.EncodeToString(sum[:16])
+	return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
 }

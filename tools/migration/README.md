@@ -14,7 +14,7 @@ php tools/migration/export-laravel.php \
 
 The output file must not exist. The exporter opens it exclusively with mode `0600`, writes the snapshot directly to the file, and prints only counts. On Windows mounted storage, use a directory restricted to the account by its Windows ACL; POSIX mode bits are not enforced on every mount.
 
-The file contains decrypted Wings, database and configured SMTP/S3 credentials. Keep it outside source control. `.local/` is ignored by this repository. Existing API keys are exported as SHA256 hashes of the full bearer token, which preserves existing key use without storing raw API tokens. Password hashes, TOTP secrets, recovery tokens, sessions and password-reset tokens are excluded.
+The file contains decrypted Wings, database and configured S3 credentials. Keep it outside source control. `.local/` is ignored by this repository. Existing API keys are exported as SHA256 hashes of the full bearer token, which preserves existing key use without storing raw API tokens. Password hashes, TOTP secrets, recovery tokens, sessions and password-reset tokens are excluded.
 
 The database read uses a repeatable-read, read-only transaction. Connection-local UTC timestamps prevent timezone shifts. No source rows, daemon configuration or server files are changed.
 
@@ -35,13 +35,13 @@ Running containers and backup/game files remain on their existing Wings nodes. A
 
 ## Coverage
 
-The portable version-1 snapshot includes accounts, application/client API keys with scopes/IP restrictions/expiry, active SSH keys, locations, nodes, nests, eggs and duplicate variable definitions, server ownership/build/startup/status/environment, allocations, subusers and permissions, schedules/tasks, backup metadata, database hosts/game database credentials, mounts and their assignments, activity, settings and completed transfer history. Native Go snapshots also preserve completed schedule-run records and pending/sent durable notification jobs. Finish any active email delivery before migration. Laravel serialized jobs cannot become Go notification jobs, so the legacy exporter starts that queue empty and reports the exception.
+The portable version-1 snapshot includes accounts, application/client API keys with scopes/IP restrictions/expiry, active SSH keys, locations, nodes, nests, eggs and duplicate variable definitions, server ownership/build/startup/status/environment, allocations, subusers and permissions, schedules/tasks, backup metadata, database hosts/game database credentials, mounts and their assignments, activity, settings and completed transfer history. Native Go snapshots also preserve completed schedule-run records. Outbound email is removed; imports discard legacy mail settings and notification jobs.
 
 Native durable daemon revocations are preserved with their UUIDs, generations, attempts, retry deadlines and completion state. A pending revocation with a lease later than import time blocks migration. Stop the source worker and finish the operation or wait for its lease to expire. Expired leases, including their timestamps, are retained so the destination worker can reclaim them using its normal `lease_until <= now()` rule. Laravel `RevokeSftpAccessJob` payloads are not portable; drain PHP jobs first. The native revocation queue starts empty for legacy exports, with an explicit conversion notice.
 
 The internal `panel_schema_versions` table belongs to the destination runtime. Snapshots omit it, and its checksum records do not make an otherwise empty product database count as occupied.
 
-SMTP keys are renamed to the native settings names. Effective SMTP and S3 configuration supplied by `.env` is included. Known credentials are decrypted through the original Laravel encrypter and sealed on destination import.
+Legacy SMTP settings are excluded. Effective S3 configuration supplied by `.env` is included. Known credentials are decrypted through the original Laravel encrypter and sealed on destination import.
 
 Legacy polymorphic activity links are retained in activity properties. The first existing server subject is indexed as the native `server_id`; all subjects, actor types and API-key references remain in metadata. Older audit/API/task logs are converted into activity entries with their original records intact.
 

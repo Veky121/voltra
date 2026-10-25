@@ -207,9 +207,10 @@ func TestNodeConnectorHTTPStreamingWebsocketReconnectRevocation(t *testing.T) {
 	ctx := context.Background()
 	payload := bytes.Repeat([]byte("streamed-data-"), 100000)
 	sum := sha256.Sum256(payload)
+	var expectedOrigin string
 	wings := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/ws" {
-			ws, e := (&websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}).Upgrade(w, r, nil)
+			ws, e := (&websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return r.Header.Get("Origin") == expectedOrigin }}).Upgrade(w, r, nil)
 			if e != nil {
 				return
 			}
@@ -247,6 +248,7 @@ func TestNodeConnectorHTTPStreamingWebsocketReconnectRevocation(t *testing.T) {
 	defer wings.Close()
 	panel := httptest.NewServer(h)
 	defer panel.Close()
+	expectedOrigin = panel.URL
 	a.Config.PublicURL = panel.URL
 	s := pairSession(t, h, u, 0)
 	request := pairNodeRequest(t, h, s)
@@ -275,6 +277,16 @@ func TestNodeConnectorHTTPStreamingWebsocketReconnectRevocation(t *testing.T) {
 		}
 	}()
 	waitConnector(t, a, id, nil)
+	// Node-local tunnel URL differs from the browser-facing Panel URL. Wings
+	// must receive the node's configured origin without trusting browser input.
+	a.Config.PublicURL = "https://browser-facing.example"
+	deadline := time.Now().Add(3 * time.Second)
+	for a.consoleUpstreamOrigin(ctx, n) != expectedOrigin && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := a.consoleUpstreamOrigin(ctx, n); got != expectedOrigin {
+		t.Fatalf("node origin %q, want %q", got, expectedOrigin)
+	}
 	response, e := a.daemon(ctx, n, "GET", "/large", nil)
 	if e != nil {
 		t.Fatal(e)
@@ -290,7 +302,7 @@ func TestNodeConnectorHTTPStreamingWebsocketReconnectRevocation(t *testing.T) {
 	}
 	response.Body.Close()
 	dialer := websocket.Dialer{NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) { return a.dialNodeConnector(ctx, id) }}
-	ws, resp, e := dialer.DialContext(ctx, "ws://127.0.0.1/ws", nil)
+	ws, resp, e := dialer.DialContext(ctx, "ws://127.0.0.1/ws", http.Header{"Origin": []string{a.consoleUpstreamOrigin(ctx, n)}})
 	if resp != nil && resp.Body != nil {
 		resp.Body.Close()
 	}

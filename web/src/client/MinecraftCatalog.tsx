@@ -1,3 +1,6 @@
+import "./minecraftSetup.css";
+import {GameSwitch} from './GameSwitch';
+import './games-ui.css';
 import {useEffect, useState} from "react";
 import {Button, ErrorBox, Field, Input, Select} from "../lib";
 import {MinecraftDialog} from "./MinecraftDialog";
@@ -29,7 +32,7 @@ export function MinecraftCatalog({options, initialQuery, onSelect}: {options: Mi
   const pendingSearch = query !== search.trim();
   const data = request.data;
   const changeProvider = (next: PackProvider) => {setProvider(next); setOffset(0); setProject(null);};
-  return <section className="mc-catalog" aria-label="Modpack catalog">
+  return <section className="mc-catalog games-ui" aria-label="Modpack catalog">
     <div className="mc-catalog-top"><h2>Modpacks</h2><MinecraftSegments label="Modpack provider" value={provider} options={[{id: "curseforge", name: "CurseForge"}, {id: "modrinth", name: "Modrinth"}]} onChange={changeProvider}/></div>
     <form className="mc-catalog-filters" role="search" onSubmit={e => {e.preventDefault(); setQuery(search.trim()); setOffset(0);}}>
       <Field label="Search"><Input type="search" placeholder={`Search ${provider === "curseforge" ? "CurseForge" : "Modrinth"} modpacks`} value={search} onChange={e => setSearch(e.target.value)}/></Field>
@@ -63,7 +66,7 @@ function PackVersions({provider, project, filterVersion, filterLoader, onClose, 
     <ErrorBox>{request.error}</ErrorBox>
     {request.error && <Button variant="secondary" onClick={request.reload}>Retry versions</Button>}
     {request.loading ? <div className="mc-state" role="status">Loading pack versions...</div> : request.data && <>
-      {(filterVersion || filterLoader) && <label className="check mc-pack-filter"><input type="checkbox" checked={compatibleOnly} onChange={e => {setCompatibleOnly(e.target.checked); setSelected("");}}/>Match catalog filters</label>}
+      {(filterVersion || filterLoader) && <label className="check mc-pack-filter"><GameSwitch checked={compatibleOnly} onCheckedChange={checked => {setCompatibleOnly(checked); setSelected("");}}/>Match catalog filters</label>}
       {filtered.length ? <Field label="Pack version"><Select value={selectedVersion ? String(selectedVersion.id) : ""} onChange={e => setSelected(e.target.value)} disabled={!filtered.some(version => version.server_supported === true)}>
         {!selectedVersion && <option value="">No server version available</option>}
         {filtered.map(version => <option key={version.id} value={String(version.id)} disabled={version.server_supported !== true}>{version.name}{version.server_supported !== true ? " · Client only" : ""}</option>)}
@@ -74,3 +77,4 @@ function PackVersions({provider, project, filterVersion, filterLoader, onClose, 
     </>}
   </MinecraftDialog>;
 }
+

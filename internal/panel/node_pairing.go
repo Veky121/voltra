@@ -29,6 +29,7 @@ func pairingBearer(r *http.Request) string {
 	return fields[1]
 }
 func (a *App) registerNodePairing(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/admin/node-installer", a.latestNodeInstaller)
 	mux.HandleFunc("POST /api/admin/node-enrollments", a.createNodeEnrollment)
 	mux.HandleFunc("GET /api/admin/node-enrollments", a.listNodeEnrollments)
 	mux.HandleFunc("POST /api/admin/node-enrollments/{session}/close", a.closeNodeEnrollment)

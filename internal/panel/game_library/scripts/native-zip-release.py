@@ -8,7 +8,7 @@ import stat
 import tempfile
 import time
 import zipfile
-from native_release import download, sha256
+from native_release import download, sha256, preserve_identity
 
 
 def extract(archive, target, prefix, paths=None):
@@ -30,14 +30,19 @@ def extract(archive, target, prefix, paths=None):
             relative = PurePosixPath(*parts)
             name = relative.as_posix()
             kind = stat.S_IFMT(mode)
-            if kind not in (0, stat.S_IFDIR, stat.S_IFREG) or str(relative) in seen:
-                raise ValueError('ZIP links, special files or duplicate paths are unsupported')
+            if str(relative) in seen:
+                raise ValueError('Duplicate ZIP paths are unsupported')
             seen.add(str(relative))
             total += member.file_size
             if len(seen) > 100000 or total > 4 * 1024**3:
                 raise ValueError('ZIP release exceeds extraction limits')
             if paths is not None and not any(name == selected or selected.endswith('/') and name.startswith(selected) for selected in paths):
                 continue
+            # Multi-platform publisher bundles can contain links for another OS.
+            # A trusted path allowlist never extracts them; selected links and
+            # every traversal/duplicate path still fail before publication.
+            if kind not in (0, stat.S_IFDIR, stat.S_IFREG):
+                raise ValueError('ZIP links and special files are unsupported')
             path = target.joinpath(*relative.parts)
             if member.is_dir():
                 path.mkdir(parents=True, exist_ok=True)
@@ -55,6 +60,8 @@ def install_release(root, release, target_name, executable):
         raise ValueError('Native ZIP state or destination escapes the server volume')
     state.mkdir(parents=True, exist_ok=True)
     receipt = state / 'release.json'
+    if receipt.is_symlink():
+        raise ValueError('Native ZIP receipt must not be a symbolic link')
     old = json.loads(receipt.read_text()) if receipt.is_file() else {}
     binary = target / executable
     if old.get('sha256') == release['sha256'] and binary.is_file() and sha256(binary) == old.get('binary_sha256') and os.access(binary, os.X_OK) and all((target / name).is_file() for name in old.get('files', {})):
@@ -77,12 +84,18 @@ def install_release(root, release, target_name, executable):
                 source, destination = ready / name, target / name
                 if not destination.resolve().is_relative_to(root):
                     raise ValueError('ZIP destination escapes the server volume')
+                if destination.is_symlink():
+                    raise ValueError('Existing native ZIP file must not be a symbolic link')
                 if destination.exists():
+                    if not destination.is_file():
+                        raise ValueError('Existing native ZIP file must be a regular file')
                     if name != executable and (name.endswith('.cfg') or name not in old.get('files', {}) or sha256(destination) != old['files'][name]):
                         continue
                     saved = backup / name
                     saved.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(destination, saved)
+                    for prepared in (saved, source):
+                        preserve_identity(prepared, destination)
                 else:
                     saved = None
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +103,8 @@ def install_release(root, release, target_name, executable):
                 replacements.append((destination, saved))
             staged = stage / 'receipt.json'
             staged.write_text(json.dumps({**release, 'binary_sha256': sha256(binary), 'files': files}, indent=2) + '\n')
+            if receipt.exists():
+                preserve_identity(staged, receipt)
             os.replace(staged, receipt)
         except BaseException:
             for destination, saved in reversed(replacements):

@@ -1,0 +1,130 @@
+{
+  "paper": {
+    "title": "PaperMC",
+    "src": "/game-icons/paper-official.png",
+    "sourcePage": "https://docs.papermc.io/misc/assets/",
+    "imageUrl": "https://assets.papermc.io/brand/papermc_logo.256.png",
+    "credit": "PaperMC project official artwork",
+    "fit": "contain"
+  },
+  "fabric": {
+    "title": "Fabric",
+    "src": "/game-icons/fabric-official.png",
+    "sourcePage": "https://fabricmc.net/",
+    "imageUrl": "https://fabricmc.net/assets/logo.png",
+    "credit": "Fabric project official artwork",
+    "fit": "contain"
+  },
+  "velocity": {
+    "title": "Velocity",
+    "src": "https://assets.papermc.io/brand/velocity_logo_blue.min.svg",
+    "sourcePage": "https://docs.papermc.io/misc/assets/",
+    "imageUrl": "https://assets.papermc.io/brand/velocity_logo_blue.min.svg",
+    "credit": "Velocity project official artwork",
+    "fit": "contain"
+  },
+  "forge": {
+    "title": "Forge",
+    "src": "/game-icons/forge-official.jpg",
+    "sourcePage": "https://github.com/MinecraftForge",
+    "imageUrl": "https://github.com/MinecraftForge.png?size=256",
+    "credit": "Forge project official artwork",
+    "fit": "contain"
+  },
+  "neoforge": {
+    "title": "NeoForge",
+    "src": "/game-icons/neoforge-official.png",
+    "sourcePage": "https://github.com/neoforged",
+    "imageUrl": "https://github.com/neoforged.png?size=256",
+    "credit": "NeoForge project official artwork",
+    "fit": "contain"
+  },
+  "quilt": {
+    "title": "Quilt",
+    "src": "/game-icons/quilt-official.png",
+    "sourcePage": "https://github.com/QuiltMC",
+    "imageUrl": "https://github.com/QuiltMC.png?size=256",
+    "credit": "Quilt project official artwork",
+    "fit": "contain"
+  },
+  "purpur": {
+    "title": "Purpur",
+    "src": "https://github.com/PurpurMC.png?size=256",
+    "sourcePage": "https://github.com/PurpurMC",
+    "imageUrl": "https://github.com/PurpurMC.png?size=256",
+    "credit": "Purpur project official artwork",
+    "fit": "contain"
+  },
+  "arclight": {
+    "title": "Arclight",
+    "src": "https://github.com/IzzelAliz.png?size=256",
+    "sourcePage": "https://github.com/IzzelAliz/Arclight",
+    "imageUrl": "https://github.com/IzzelAliz.png?size=256",
+    "credit": "Arclight project official artwork",
+    "fit": "contain"
+  },
+  "cuberite": {
+    "title": "Cuberite",
+    "src": "https://github.com/cuberite.png?size=256",
+    "sourcePage": "https://github.com/cuberite",
+    "imageUrl": "https://github.com/cuberite.png?size=256",
+    "credit": "Cuberite project official artwork",
+    "fit": "contain"
+  },
+  "glowstone": {
+    "title": "Glowstone",
+    "src": "https://github.com/GlowstoneMC.png?size=256",
+    "sourcePage": "https://github.com/GlowstoneMC",
+    "imageUrl": "https://github.com/GlowstoneMC.png?size=256",
+    "credit": "Glowstone project official artwork",
+    "fit": "contain"
+  },
+  "mohist": {
+    "title": "MohistMC",
+    "src": "https://github.com/MohistMC.png?size=256",
+    "sourcePage": "https://github.com/MohistMC",
+    "imageUrl": "https://github.com/MohistMC.png?size=256",
+    "credit": "MohistMC project official artwork",
+    "fit": "contain"
+  },
+  "nukkit": {
+    "title": "Nukkit",
+    "src": "https://github.com/CloudburstMC.png?size=256",
+    "sourcePage": "https://github.com/CloudburstMC",
+    "imageUrl": "https://github.com/CloudburstMC.png?size=256",
+    "credit": "Nukkit project official artwork",
+    "fit": "contain"
+  },
+  "pocketmine_mp": {
+    "title": "PocketMine-MP",
+    "src": "https://github.com/pmmp.png?size=256",
+    "sourcePage": "https://github.com/pmmp",
+    "imageUrl": "https://github.com/pmmp.png?size=256",
+    "credit": "PocketMine-MP project official artwork",
+    "fit": "contain"
+  },
+  "PowerNukkitX": {
+    "title": "PowerNukkitX",
+    "src": "https://github.com/PowerNukkitX.png?size=256",
+    "sourcePage": "https://github.com/PowerNukkitX",
+    "imageUrl": "https://github.com/PowerNukkitX.png?size=256",
+    "credit": "PowerNukkitX project official artwork",
+    "fit": "contain"
+  },
+  "spongeforge": {
+    "title": "Sponge",
+    "src": "https://github.com/SpongePowered.png?size=256",
+    "sourcePage": "https://github.com/SpongePowered",
+    "imageUrl": "https://github.com/SpongePowered.png?size=256",
+    "credit": "Sponge project official artwork",
+    "fit": "contain"
+  },
+  "spongevanilla": {
+    "title": "Sponge",
+    "src": "https://github.com/SpongePowered.png?size=256",
+    "sourcePage": "https://github.com/SpongePowered",
+    "imageUrl": "https://github.com/SpongePowered.png?size=256",
+    "credit": "Sponge project official artwork",
+    "fit": "contain"
+  }
+}

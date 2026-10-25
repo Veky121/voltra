@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {activeSteamJob, checkDue, managedSteamServer, memoryMiB, gameMemoryBudget, gameInitialNode, quickSettings, safeFolderLink, steamJobLabel, steamMemoryWarning, stoppedServer} from '../src/client/gameSetupModel.ts';
+import {activeSteamJob, checkDue, managedSteamServer, memoryMiB, gameMemoryBudget, gameResourceBudget, gameInitialNode, quickSettings, safeFolderLink, steamJobLabel, steamMemoryWarning, stoppedServer} from '../src/client/gameSetupModel.ts';
+
+test('shared resource budgets handle exhausted, unlimited and legacy node responses', () => {
+  assert.equal(gameResourceBudget(16777216, -1024), 0);
+  assert.equal(gameResourceBudget(16777216, 1024.9), 1024);
+  assert.equal(gameResourceBudget(16777216, 16777216), 16777216);
+  assert.equal(gameResourceBudget(16777216), 16777216);
+  assert.equal(gameResourceBudget(4096, Infinity), 4096);
+  const nodes = [{id:1,name:'Full',setup_available:false,automatic_ports:true},{id:2,name:'Small but available',setup_available:true,automatic_ports:true,available_memory:512,available_disk:1024}];
+  assert.equal(gameInitialNode(nodes).id, 2);
+  assert.equal(gameMemoryBudget(1048576, nodes[1]), 512);
+  assert.equal(gameResourceBudget(16777216, nodes[1].available_disk), 1024);
+});
 
 test('setup selects a viable node and caps memory to available capacity', () => {
   const nodes=[{id:1,name:'Missing ports',setup_available:false,available_memory:32768},{id:2,name:'Ready',setup_available:true,available_memory:8192}];
@@ -99,4 +111,12 @@ test('managed Steam navigation follows backend capabilities without a second gam
   assert.equal(managedSteamServer({game:'custom',egg_features:['steam'],steam_managed:false}),false);
   assert.equal(managedSteamServer({game:'minecraft'}),false);
   assert.equal(managedSteamServer({}),false);
+});
+
+
+test('masked Quick setup secrets remain untouched unless explicitly replaced or cleared', () => {
+ const fields=[{key:'AdminPassword',label:'Admin',type:'text',value:null,secret:true,configured:true,required:true},{key:'ServerPassword',label:'Join',type:'text',value:null,secret:true,configured:true},{key:'ServerName',label:'Name',type:'text',value:'Before'}];
+ assert.deepEqual(quickSettings(fields,{AdminPassword:null,ServerPassword:null,ServerName:'After'}),{ServerName:'After'});
+ assert.deepEqual(quickSettings(fields,{ServerPassword:''}),{ServerPassword:''});
+ assert.deepEqual(quickSettings(fields,{AdminPassword:'replacement'}),{AdminPassword:'replacement'});
 });

@@ -1,3 +1,5 @@
+import "./minecraftSetup.css";
+import './games-ui.css';
 import {useEffect, useId, useRef} from "react";
 import type {ReactNode} from "react";
 import {Button} from "../lib";
@@ -11,7 +13,7 @@ export function MinecraftDialog({title, onClose, children}: {title: string; onCl
     dialog?.showModal();
     return () => {dialog?.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus();};
   }, []);
-  return <dialog ref={ref} className="mc-dialog" aria-labelledby={heading} onCancel={e => {e.preventDefault(); onClose();}} onClick={e => {
+  return <dialog ref={ref} className="mc-dialog games-ui" aria-labelledby={heading} onCancel={e => {e.preventDefault(); onClose();}} onClick={e => {
     if (e.target !== e.currentTarget) return;
     const bounds = e.currentTarget.getBoundingClientRect();
     if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) onClose();

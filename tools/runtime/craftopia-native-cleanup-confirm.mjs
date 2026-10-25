@@ -1,0 +1,13 @@
+import fs from 'node:fs';import {spawnSync,execFileSync} from 'node:child_process';import {api,rows} from './openttd-compat-node.mjs';import {validateBatchReceipt} from './cache-owned-server.mjs';
+const d='.local/craftopia-native',s=JSON.parse(fs.readFileSync(d+'/private.json')),n=JSON.parse(fs.readFileSync(s.node_receipt));validateBatchReceipt(s,n);
+if(s.owner!=='unreal_survival'||(await api('/api/application/nodes/'+n.node)).attributes.uuid!==n.node_uuid)throw Error('Exact owner/node mismatch');
+const absent=async p=>{const r=await fetch('http://127.0.0.1:8088'+p);await r.text();return r.status===404;};
+const checks={server:await absent('/api/application/servers/'+s.internal_id),egg:await absent('/api/admin/eggs/'+s.egg_id),nest:await absent('/api/admin/nests/'+s.nest_id),allocations:!rows(await api('/api/admin/nodes/'+n.node+'/allocations')).some(a=>s.allocation_ids.includes(a.id))};
+for(const[name,k]of [[s.uuid,'container'],[s.uuid+'_installer','installer'],['voltra-craftopia-metadata-'+s.uuid.slice(0,8),'metadata_utility']])checks[k]=spawnSync('docker',['inspect',name],{windowsHide:true,encoding:'utf8'}).status!==0;
+const result=spawnSync('docker',['run','--rm','--pull','never','--network','none','--memory','256m','--mount',`type=bind,source=${n.volume_root},target=/volumes,readonly`,'python:3.13-slim','python3','-B','-c',`from pathlib import Path\np=Path('/volumes/${s.uuid}')\nassert not p.exists()\nprint('Owned volume absent')`],{windowsHide:true,encoding:'utf8'});
+checks.volume=result.status===0;
+fs.writeFileSync(d+'/cleanup-confirm-observation.json',JSON.stringify({checks,volume_status:result.status,volume_stderr:result.stderr,at:new Date().toISOString()},null,2));
+if(!Object.values(checks).every(Boolean))throw Error('Read-only absence not established: '+JSON.stringify(checks)+' '+result.stderr);
+fs.writeFileSync(d+'/cleanup.json',JSON.stringify({uuid:s.uuid,node:n.node,checks,first_immediate_volume_check_failed:true,at:new Date().toISOString()},null,2)+'\n');
+execFileSync(process.execPath,['tools/runtime/batch-queue.mjs','release',JSON.stringify({lease_id:s.lease_id,owner:s.owner,outcome:'tested',resources_removed:true})],{windowsHide:true,stdio:'pipe'});
+console.log({checks,lease_released:true});

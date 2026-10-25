@@ -242,7 +242,11 @@ func steamGamesInput(game string, node M) M {
 	if spec.PasswordMinimum > 0 {
 		password = "test-pass"
 	}
-	return M{"server_password": password, "name": spec.Name + " fixture", "node_id": node["id"], "memory": spec.Memory, "max_players": spec.Players, "request_id": newUUID()}
+	input := M{"server_password": password, "name": spec.Name + " fixture", "node_id": node["id"], "memory": spec.Memory, "max_players": spec.Players, "request_id": newUUID()}
+	if steamPalworldVariant(game) {
+		input["environment"] = M{"ADMIN_PASSWORD": "fixture_admin"}
+	}
+	return input
 }
 
 func TestSteamGameInputAndLaunchContract(t *testing.T) {
@@ -448,6 +452,9 @@ func TestSteamGamePlatformAndCapacityGates(t *testing.T) {
 	f.Architecture = "amd64"
 	f.mu.Unlock()
 	if err := a.exec(context.Background(), "DELETE FROM allocations WHERE node_id=$1 AND port<>7777", node["id"]); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.exec(context.Background(), "UPDATE nodes SET memory=1024 WHERE id=$1", node["id"]); err != nil {
 		t.Fatal(err)
 	}
 	infraExpect(t, mux, admin, "POST", "/api/client/game-library/steam/satisfactory/install", input, 422)

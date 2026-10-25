@@ -1,9 +1,106 @@
 # Game setup rollout
 
+Before claiming current-source native acceptance, compare the installed helper
+bytes with the canonical installer, not just the running panel's cached egg.
+A source build does not update an already-running panel. Preserve the original
+attempt when those versions differ, coordinate any fixture-only egg update,
+and verify the next stopped installation before starting it. Never update an
+egg used by operator servers to repair an acceptance fixture.
+
+Renown remains partially verified. Its original 4 GiB setting was OOM-killed;
+the default now starts at 8 GiB. Current-source 7 GiB and 8 GiB runs completed
+bounded native startup and normal API Stop with exit 130 and no OOM. Reinstall
+and reload retained configuration and save identities. Native save processing
+still reports 100 building-restoration failures, including on the first world
+creation, so complete world restoration is unproven. Query, RCON authentication
+and player gameplay were not tested. The fixture is cleaned up; private saves
+and receipts remain. See `artifacts/renown-default-native-stopped-handoff.json`,
+`artifacts/renown-default-native-live-root-review.json` and
+`artifacts/renown-save-load-context-assessment.json`.
+
 Current progress is recorded in `artifacts/game-progress-current.json`; older
 acceptance paragraphs below describe their specific tested snapshots. A recipe
 implementation is separate from native verification. Native verification does
 not imply a player joined or gameplay was tested.
+
+Citadel is partially verified on native Linux. The installer now tracks the
+Steam SDK file it owns and rejects untracked or modified replacements before
+updating game content. Its transaction preserves the prior SDK and ownership
+receipt if publication fails. Native startup, assigned UDP binds, normal API
+Stop and a second startup passed without OOM; both Stops returned exit 130.
+Reinstall retained all 22 captured state/configuration files with their bytes,
+modes and ownership. No world save files appeared, including after the second
+Stop, so world persistence remains unproven. Query responses, public listing and
+player gameplay were not tested. All disposable resources are removed. See
+`artifacts/citadel-native-partial-acceptance.json`,
+`artifacts/citadel-reload-live-root-review.json` and
+`artifacts/citadel-disposable-cleanup-live-root-review.json`.
+
+America's Army: Proving Grounds has native Linux startup, local A2S query and
+normal Stop evidence. The first query exposed a truncated multiword server name;
+restoring the original egg's engine value quotes made the exact requested name
+appear in A2S. The failed query is retained. The installer now preserves the
+observed `AAGame/Config`, `AAGame/Cloud` and `AAGame/Logs` directories alongside
+the legacy paths. Reinstall retained all 45 captured files exactly, and a later
+reinstall retained the expanded 49-file baseline. Three native runs stopped
+with exit 0 and no OOM. The configured authentication port had no observed
+listener; the bundled TeamSpeak listener on 8765 was not forwarded. Online
+authentication, client gameplay, public listing and embedded quote/backslash
+name encoding remain unverified. See
+`artifacts/aapg-reinstall-retention-live-root-review.json`,
+`artifacts/aapg-third-native-live-root-review.json` and
+`artifacts/aapg-name-source-integration.json`. The disposable server, exclusive
+egg/nest, allocations, containers and volume are removed; its lease is released.
+Cleanup was independently checked in
+`artifacts/aapg-disposable-cleanup-live-root-review.json`.
+
+Nightingale now checks existing settings before Steam updates and validates the
+downloaded publisher example before copying it. The preflight uses the same INI
+parser as startup, including duplicate managed section/key rejection, without
+writing settings or disclosing their values. This is source/fixture validation;
+the current publisher example and native behavior remain unverified. Public
+metadata reports an 11.13 GB Linux payload. A conservative two-payload staging
+estimate exceeds the current 16 GiB disk default, so native acceptance still
+needs a reviewed storage plan. See
+`artifacts/nightingale-readiness-root-integration.json` and
+`artifacts/nightingale-public-metadata-root-review.json`.
+
+Open Fortress validates its pinned archive, safe member listing and gameinfo
+mount layout before updating Steam content. Full extraction now follows the
+updates and fresh archive validation, reducing overlapping staging space.
+This preserves the early validation gate; it does not guarantee a fixed bound
+on Steam's internal temporary storage. The disposable reinstall therefore
+monitors both its volume and installer writable layer. See
+`artifacts/openfortress-stage-headroom-root-integration.json`.
+
+Plains of Pain is partially verified after the user's explicit approval of the
+packaged March 3, 2026 agreement. The default agreement control remains off.
+Native readiness, normal Stop with exit 0, reinstall retention and selection of
+the existing world on reload passed. The installer now retains the observed
+`.config/unity3d/CobraByteDigital/PlainsOfPain` save directory alongside legacy
+locations. All 15 natural state/config/log files retained their bytes, modes and
+ownership through reinstall; modification times changed. Reload updated native
+runtime state normally. Headless audio warnings remain, and query responses,
+player joins and gameplay were not tested. The first collector-path error is
+retained separately from the successful native run. Disposable resources are
+removed; private archives and the approved terms are retained. See
+`artifacts/plains-approved-native-acceptance.json`,
+`artifacts/plains-reload-native-live-root-review.json` and
+`artifacts/plains-approved-cleanup-live-root-review.json`.
+
+Operation: Harsh Doorstop is partially verified on native Linux. Normal API
+installation and reinstall retained native configuration, permissions and
+ownership. Explicit stdout logging and flushing expose live game initialization;
+the Panel startup rule now uses the actual map's WaitingToStart message instead
+of an RCON category that remained buffered until shutdown. Live Panel readiness
+stayed running for 34 seconds before normal Stop, exit 130 without OOM.
+Publisher session-update warnings remain. Authenticated RCON, query responses,
+public listing and player gameplay are unverified. See
+`artifacts/ohd-readiness-native-stopped-handoff.json` and
+`artifacts/ohd-readiness-boot-live-root-review.json`. Its disposable server,
+containers, volume, allocations and exclusive egg/nest are removed; configs and
+logs are archived privately. Cleanup was independently verified in
+`artifacts/ohd-disposable-cleanup-live-root-review.json`.
 
 Each new native acceptance must retain the exact helper files and staged egg,
 not only their hashes. Capture installed helper bytes before the first controlled
@@ -289,7 +386,7 @@ gameplay, ARM64 and nightly remain unverified. See
 Temporary acceptance resources were removed and the original 11 containers and
 Wings configuration were preserved. The dashboard refresh remains pending.
 
-The Game Library ships 241 setup recipes from the pinned Pterodactyl game-eggs catalog at c637a6d1e0449b167efeff81bb9a0177aa3df6c2, excluding thirteen dedicated Minecraft modpack eggs. Custom server variants remain. Recipe counts are not a count of distinct playable games.
+The Game Library ships 240 setup recipes from the pinned Pterodactyl game-eggs catalog at c637a6d1e0449b167efeff81bb9a0177aa3df6c2, excluding thirteen dedicated Minecraft modpack eggs and NWN, which the user cancelled. Custom server variants remain. Recipe counts are not a count of distinct playable games.
 
 All recipes use one React setup form for name, node, memory, storage, runtime, allocations and egg-defined variables. Search and category filters work on the complete catalog. Recipes are local embedded data; setup does not fetch executable definitions from a moving GitHub branch. Recipe imports retain their upstream installation, startup and configuration unless a reviewed override is present. A changed executable recipe hash gets a distinct egg identity and never replaces existing operator edits. Review status, notes and setup instructions do not change that identity.
 
@@ -661,3 +758,28 @@ retains its original Windows/Wine/Xvfb/Mono path. No native leases or game
 acceptance were attempted while the heavy queue is active; these remain
 not_verified. See tools/runtime/automation-sims.md and
 artifacts/automation-sims-source-fixtures.json.
+
+
+### Managed Satisfactory: source-integrated reinstall acceptance
+
+The final isolated compiled-source fixture exercised both native Reinstall APIs: client returned 202 and application returned 204. Each ran the real public Steam install/validation helper, retained all 18 tracked files with exact bytes, mode, owner and group, and left power off. Explicit subsequent start restored the original world and admin access with the six-player limit. Native save/load, rotating autosaves, reliable/game sockets and timeout configuration were also checked.
+
+Normal shutdown returned 130 without OOM; it is not reported as exit 0. No game client or gameplay test was performed. Temporary processes, schemas and Linux files were removed and the 13 GiB reservation released. Exact source and helper bytes, file manifests and limitations are recorded in `artifacts/managed-steam-satisfactory-root-review.json` and its linked acceptance report.
+
+### Current source coverage and remaining acceptance
+
+The current catalog has 236 recipe adapters and four separate managed Steam mappings. Together they cover all 240 catalog paths at source level. This does not establish complete native support or original-feature parity. Palworld Proton remains unavailable pending loader integration and native verification. Run `node tools/runtime/game-source-coverage.mjs` to regenerate the path inventory from the current catalog, overrides and managed mapping.
+
+Archean has bounded native acceptance on Linux. All 12 typed configuration checks passed, TCP and UDP bound the assigned port, and both normal stops saved the selected world with raw exit 0 and no OOM. A normal API reinstall preserved all 12 state/config files exactly, including mode and ownership. The second generation explicitly loaded the existing world's spawn configuration. Root independently reviewed the stopped file inventories and final archive, then verified disposable resource removal and released the lease. No game-client or public-connectivity test was performed. See `artifacts/archean-bounded-verification-root-integration.json` and `artifacts/archean-disposable-cleanup-live-root-review.json`.
+
+Killing Floor 2 has partial native acceptance. Anonymous installation and a later normal API reinstall exited 0. Reinstall preserved all 58 Config files with exact bytes, modes and ownership, including an edited publisher default and an unknown mod INI. Two native generations reached readiness; the second answered a standard A2S name/map query. Both normal stops returned 254 without OOM or an observed shutdown-save marker. The game logged automatic Steam port selection at game port +12783, but that companion listener was not observed. Private Steam support remains pending. Disposable resources are independently confirmed removed. See `artifacts/kf2-native-acceptance.json` and `artifacts/kf2-disposable-cleanup-live-root-review.json`.
+
+Swords now uses the six native environment settings documented in the actual publisher README. All 13 original controls are retained; ten offline fixtures cover preservation and both port modes. Its Windows server, Wine runtime, shutdown and save behavior remain unverified. See `artifacts/swords-server-source-fixtures.json`.
+
+Onset has partial native acceptance. Its default MariaDB plugin executed SQL and retained a counter across three boots. Four normal stops exited 0, and two API reinstalls preserved 296 and 302 file records exactly. A2S query still times out with public listing disabled; no player gameplay or native world-save claim is made. The separate auto-update interval includes a publisher-owned Zeus data-file change, so it is not reported as exact preservation of every file. See `artifacts/onset-root-review.json`.
+
+Managed Palworld native acceptance covers both reinstall routes, 61 exact protected file records per reinstall, the original world, authenticated Info/Save commands and corrected normal shutdown. The failed first stop remains in the evidence. Later QuickSetup password masking was verified separately and is not attributed to the older native fixture binary. No game-client, admission-limit, crossplay or successful A2S proof is claimed. See `artifacts/managed-steam-palworld-root-review.json`.
+
+Smalland has partial native acceptance. Corrected EOS environment aliases and typed URL arguments preserve the original spaced server name and named world. Two bounded native generations created `World.wld`, then reused and saved that same named file. Both reached Panel running and stopped normally with raw exit 130, without OOM or escalation. Earlier random GUID worlds were preserved. Normal API reinstalls retained saved contents, modes and ownership; timestamp changes are reported separately. Client joining, gameplay and public listing remain unverified. Disposable resources are independently confirmed removed. See `artifacts/smalland-native-root-assessment.json` and `artifacts/smalland-disposable-cleanup-live-root-review.json`.
+
+Reforger setup requires separate, default-off agreements to the exact reviewed stable-server EULA and packaged BattlEye EULA before download or launch. Experimental-server, online Services and Workshop terms are not covered by those agreements. Unknown publisher effective dates remain blank; the UI shows the review date separately. Eighteen offline Arma fixtures, four process-level shutdown regressions and focused PostgreSQL setup/agreement checks pass. The first native test reached local RPL readiness and Panel running, then completed its native shutdown save before the Python console wrapper aborted with exit 134. The wrapper defect is fixed offline; its repaired native shutdown and world reload remain unverified. BattlEye initialized during that first test after a preflight scanner missed terms beneath an EULA directory. The scanner and consent gate are corrected; the server remains stopped pending explicit BattlEye approval. See `artifacts/reforger-first-native-held.json` and `artifacts/reforger-battleye-root-integration.json`.
