@@ -8,3 +8,6 @@
 *.woff2 binary
 *.wasm binary
 console-linux-* binary
+# These reviewed bundle members and probe sources are pinned by byte hashes.
+internal/palworldloader/assets/* -text
+tools/runtime/palworld-runtime-probe/* -text
