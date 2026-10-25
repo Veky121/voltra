@@ -23,7 +23,7 @@ jobs:
       - run: npm ci --prefix web
       - run: npm run build --prefix web
       - run: node --experimental-strip-types --test web/tests/*.test.mjs
-      - run: go test ./...
+      - run: bash tools/ci/test-linux.sh ./...
       - run: go build ./cmd/panel ./cmd/node
   desktop:
     runs-on: windows-2025
