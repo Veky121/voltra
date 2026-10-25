@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -65,9 +66,21 @@ func releaseChannel(v string) string {
 	return ""
 }
 func (p *channelProvider) endpoint() (*endpoint.Provider, error) {
-	return endpoint.New(endpoint.Config{URL: strings.ReplaceAll(p.base, "{{channel}}", p.channel), Channel: p.channel})
+	feed, err := url.Parse(strings.ReplaceAll(p.base, "{{channel}}", p.channel))
+	if err != nil {
+		return nil, err
+	}
+	query := feed.Query()
+	query.Set("check", strconv.FormatInt(time.Now().UnixNano(), 10))
+	feed.RawQuery = query.Encode()
+	return endpoint.New(endpoint.Config{URL: feed.String(), Channel: p.channel, Headers: map[string]string{"Cache-Control": "no-cache", "Pragma": "no-cache"}})
 }
 func (p *channelProvider) Check(ctx context.Context, req updater.CheckRequest) (*updater.Release, error) {
+	// Development labels do not represent a published release. In SemVer,
+	// 0.1.0-dev sorts after 0.1.0-beta, which otherwise hides beta offers.
+	if pre := semver.Prerelease("v" + strings.TrimPrefix(req.CurrentVersion, "v")); pre == "-dev" || strings.HasPrefix(pre, "-dev.") {
+		req.CurrentVersion = "0.0.0"
+	}
 	ep, err := p.endpoint()
 	if err != nil {
 		return nil, err

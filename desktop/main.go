@@ -19,8 +19,12 @@ var frontend embed.FS
 var appIcon []byte
 
 var version = "0.1.0-dev"
-var updateManifestURL string
-var updatePublicKey string
+
+// Public trust anchor for official releases. Release builds may override both
+// values through linker flags. Local builds keep update checks usable too.
+var updateManifestURL = "https://github.com/Veky121/voltra/releases/download/update-{{channel}}/manifest.json"
+var updatePublicKey = "y8rFHtqICd2gOO0yeuowfzeqfQcBILEEEu180ZNykCI="
+var webviewTestArguments []string
 
 func main() {
 	dir, err := configDirectory()
@@ -41,7 +45,7 @@ func main() {
 	app = application.New(application.Options{
 		Name: "Voltra", Description: "Game servers on your hardware, with friends",
 		Icon:       appIcon,
-		Windows:    application.WindowsOptions{WebviewUserDataPath: filepath.Join(dir, "WebView2")},
+		Windows:    application.WindowsOptions{WebviewUserDataPath: filepath.Join(dir, "WebView2"), AdditionalBrowserArgs: webviewTestArguments},
 		Mac:        application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
 		OnShutdown: closeHost,
 		SingleInstance: &application.SingleInstanceOptions{

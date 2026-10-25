@@ -69,26 +69,26 @@ configure tunnels or bypass Cloudflare Access.
 
 ## Updates and GitHub setup later
 
-This development build has updates disabled. It does not contact a placeholder
-repository. Wails' built-in updater is already integrated, including its update
-window, download verification, binary replacement, and restart flow.
+Local builds include the official GitHub channel feed and pinned Ed25519 public
+key. Use `build.ps1 -DisableUpdates` only for deliberately offline builds.
 
-When the GitHub repository is ready, publish a signed Wails update manifest as
-a release asset. Configure the app to read it from an address such as
-`https://github.com/OWNER/REPO/releases/latest/download/voltra-updates.json`.
-The signing public key is pinned into the executable at build time.
+Channels are Release, Beta and Nightly. Release uses the stable feed and never
+offers prereleases. A release on Beta or Nightly does not appear on Release.
+Local `-dev` builds can adopt a signed published build even when their development
+label would sort above it under SemVer. Checks run on launch and hourly; Check
+now ignores that timer and refreshes the feed. Check, Install and Restart remain
+separate actions. An update is never installed by an automatic check.
 
 ```powershell
 .\desktop\build.ps1 -Version 0.1.0 `
-  -UpdateManifestURL 'https://github.com/OWNER/REPO/releases/latest/download/voltra-updates.json' `
+  -UpdateManifestURL 'https://github.com/Veky121/voltra/releases/download/update-{{channel}}/manifest.json' `
   -UpdatePublicKey 'BASE64_RAW_ED25519_PUBLIC_KEY'
 ```
 
 Both update parameters are required together. A configured public key makes
 signatures mandatory. Unsigned artifacts cannot downgrade verification to
-checksum-only mode. Update checks run every six hours and can also be started
-from the desktop toolbar. Native code signing and GitHub publishing remain
-separate release tasks. No release keys or repositories were created here.
+checksum-only mode. Feed checks bypass HTTP caches. Native code signing and
+GitHub publishing remain separate release tasks.
 
 Use the pinned Wails CLI for publishing tools:
 
@@ -106,8 +106,7 @@ manifest and executable. Preserve the signing key across versions.
 The manifest provider uses Wails' standard update protocol and can also point
 at a static HTTPS host. GitHub's generic Releases provider does not attach
 artifact signatures, so this app uses a signed manifest hosted on Releases.
-The first update-enabled build must be distributed manually because this
-development build does not have a repository or trust key configured.
+Old executables without a feed or trust key need a one-time manual replacement.
 
 ## Checks
 

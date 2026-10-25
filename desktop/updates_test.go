@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/wailsapp/wails/v3/pkg/updater"
@@ -77,6 +79,69 @@ func TestUpdateCheckFailureClearsOffer(t *testing.T) {
 	f.fail = true
 	if c.action("check") == nil || c.snapshot().AvailableVersion != "" || c.action("install") == nil {
 		t.Fatal("failed check retained offer")
+	}
+}
+
+func TestDevelopmentBuildCanFindBetaAndManualChecksRefreshFeed(t *testing.T) {
+	requests := 0
+	var previous string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Query().Get("version") != "0.0.0" {
+			t.Error("development build hid published beta")
+		}
+		fresh := r.URL.Query().Get("check")
+		if fresh == "" || fresh == previous {
+			t.Error("feed check was cached")
+		}
+		previous = fresh
+		if r.Header.Get("Cache-Control") != "no-cache" {
+			t.Error("missing cache bypass")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"schemaVersion": 1, "version": "0.1.0-beta.2", "channel": "beta", "artifacts": []any{map[string]any{"platform": "windows", "arch": "amd64", "url": "https://github.com/Veky121/voltra/releases/download/v0.1.0-beta.2/Voltra-windows-amd64.exe", "filename": "Voltra-windows-amd64.exe", "filetype": "exe", "digestAlgo": "sha256", "digest": base64.StdEncoding.EncodeToString(make([]byte, 32)), "signatureAlgo": "ed25519", "signature": base64.StdEncoding.EncodeToString(make([]byte, 64))}}})
+	}))
+	defer server.Close()
+	provider := &channelProvider{base: server.URL, channel: "beta"}
+	for range 2 {
+		release, err := provider.Check(context.Background(), updater.CheckRequest{CurrentVersion: "0.1.0-dev", Platform: "windows", Arch: "amd64"})
+		if err != nil || release == nil || release.Version != "0.1.0-beta.2" {
+			t.Fatal("development beta offer missing", err)
+		}
+	}
+	if requests != 2 {
+		t.Fatal("manual check did not refresh")
+	}
+}
+
+func TestOfficialSignedUpdateDefaults(t *testing.T) {
+	key, err := base64.StdEncoding.DecodeString(updatePublicKey)
+	if err != nil || len(key) != ed25519.PublicKeySize || updateManifestURL != "https://github.com/Veky121/voltra/releases/download/update-{{channel}}/manifest.json" {
+		t.Fatal("local builds must include official signed updates")
+	}
+}
+
+func TestLiveOfficialUpdateFeeds(t *testing.T) {
+	if os.Getenv("VOLTRA_LIVE_UPDATE_CHECK") != "true" {
+		t.Skip("opt-in public feed check")
+	}
+	key, err := base64.StdEncoding.DecodeString(updatePublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, channel := range []string{"stable", "beta", "nightly"} {
+		provider := &channelProvider{base: updateManifestURL, channel: channel}
+		release, err := provider.Check(context.Background(), updater.CheckRequest{CurrentVersion: "0.1.0-dev", Platform: "windows", Arch: "amd64"})
+		if err != nil {
+			t.Fatal(channel, err)
+		}
+		if release == nil {
+			t.Log(channel + ": no published/newer build")
+			continue
+		}
+		if !ed25519.Verify(key, release.Verification.Digest, release.Verification.Signature) {
+			t.Fatal("release signature does not match embedded trust anchor", channel)
+		}
+		t.Logf("%s: %s, valid Ed25519 signature", channel, release.Version)
 	}
 }
 func TestEndpointSchemaAndChannelIsolation(t *testing.T) {

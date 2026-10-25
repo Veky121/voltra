@@ -6,14 +6,15 @@ const listeners=new Set<()=>void>();
 const publish=(value:Partial<Snapshot>)=>{snapshot={...snapshot,...value};listeners.forEach(listener=>listener());};
 export function useDesktopUpdates(){return useSyncExternalStore(listener=>{listeners.add(listener);return()=>{listeners.delete(listener)}},()=>snapshot,()=>snapshot);}
 export async function updateAction(path:string,body:unknown={},automatic=false){
- if(snapshot.busy)return;
- if(automatic&&(snapshot.status?.state==='ready'||snapshot.status?.state==='available'||(snapshot.checkedAt!==null&&Date.now()-snapshot.checkedAt<60*60*1000)))return;
+ if(snapshot.busy)return false;
+ if(automatic&&(snapshot.status?.state==='ready'||snapshot.status?.state==='available'||(snapshot.checkedAt!==null&&Date.now()-snapshot.checkedAt<60*60*1000)))return false;
  publish({busy:true,error:''});
  try{
   const response=await fetch(`/desktop/${path}`,{method:path==='update-status'?'GET':'POST',headers:{'Content-Type':'application/json'},body:path==='update-status'?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json();if(!response.ok)throw new Error(data.error||'Update request failed.');
   publish({status:data,...(path==='updates'?{checkedAt:Date.now()}:{}),...(path==='update-channel'?{checkedAt:null}:{})});
- }catch(error){publish({error:(error as Error).message,...(path==='updates'?{checkedAt:Date.now()}: {})});}
+  return true;
+ }catch(error){publish({error:(error as Error).message,...(path==='updates'?{checkedAt:Date.now()}: {})});return false;}
  finally{publish({busy:false});}
 }
 export function startUpdateChecks(){
