@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -65,13 +66,16 @@ func releaseChannel(v string) string {
 	}
 	return ""
 }
+
+var updateCheckSequence atomic.Uint64
+
 func (p *channelProvider) endpoint() (*endpoint.Provider, error) {
 	feed, err := url.Parse(strings.ReplaceAll(p.base, "{{channel}}", p.channel))
 	if err != nil {
 		return nil, err
 	}
 	query := feed.Query()
-	query.Set("check", strconv.FormatInt(time.Now().UnixNano(), 10))
+	query.Set("check", strconv.FormatInt(time.Now().UnixNano(), 10)+"-"+strconv.FormatUint(updateCheckSequence.Add(1), 10))
 	feed.RawQuery = query.Encode()
 	return endpoint.New(endpoint.Config{URL: feed.String(), Channel: p.channel, Headers: map[string]string{"Cache-Control": "no-cache", "Pragma": "no-cache"}})
 }
