@@ -70,6 +70,15 @@ let the panel authenticate desktop exchange/API/socket requests itself, or use
 a panel origin reachable directly over HTTPS. This client does not create or
 configure tunnels or bypass Cloudflare Access.
 
+An operator may set the JSON string setting `desktop.public_url` to a separate
+HTTPS base URL for native traffic. New pairing codes advertise that origin;
+browser sign-in and node enrollment keep the panel's public URL. The native
+origin must reach the same panel and retain pairing-code and device-token
+authentication. Reject browser login, setup mutations and daemon callback
+routes there. Leave the setting absent to use the normal panel URL. Invalid
+configured URLs fail pairing-code creation instead of sending credentials to
+an unintended origin.
+
 ## Updates and GitHub setup later
 
 Local builds include the official GitHub channel feed and pinned Ed25519 public

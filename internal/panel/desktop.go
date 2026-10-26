@@ -56,7 +56,7 @@ func (a *App) createDesktopPairing(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	panelURL, err := pairingPanelURL(a.panelPublicURL(r.Context()))
+	panelURL, err := a.desktopPairingPublicURL(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
