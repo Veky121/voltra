@@ -102,7 +102,11 @@ func (a *App) clientServers(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	rows, err := a.query(r.Context(), `SELECT s.* FROM servers s WHERE ($2 AND $3='admin-all') OR ($2 AND $3='admin' AND s.owner_id<>$1 AND NOT EXISTS(SELECT 1 FROM subusers su WHERE su.server_id=s.id AND su.user_id=$1)) OR ($3='owner' AND s.owner_id=$1) OR ($3 NOT IN ('admin','admin-all','owner') AND (s.owner_id=$1 OR EXISTS(SELECT 1 FROM subusers su WHERE su.server_id=s.id AND su.user_id=$1))) ORDER BY s.id`, num(u["id"]), boolean(u["root_admin"]), r.URL.Query().Get("type"))
+	listType := r.URL.Query().Get("type")
+	if listType == "" && boolean(u["root_admin"]) {
+		listType = "admin-all"
+	}
+	rows, err := a.query(r.Context(), `SELECT s.* FROM servers s WHERE ($2 AND $3='admin-all') OR ($2 AND $3='admin' AND s.owner_id<>$1 AND NOT EXISTS(SELECT 1 FROM subusers su WHERE su.server_id=s.id AND su.user_id=$1)) OR ($3='owner' AND s.owner_id=$1) OR ($3 NOT IN ('admin','admin-all','owner') AND (s.owner_id=$1 OR EXISTS(SELECT 1 FROM subusers su WHERE su.server_id=s.id AND su.user_id=$1))) ORDER BY s.id`, num(u["id"]), boolean(u["root_admin"]), listType)
 	if err != nil {
 		fail(w, err)
 		return
