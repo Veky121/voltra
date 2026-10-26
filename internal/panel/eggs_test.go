@@ -341,6 +341,48 @@ func TestEggPostgresCorpusRoundtrip(t *testing.T) {
 	}
 	root := filepath.Join("..", "..", "..", "pterodactyl-vite", "upstream")
 	count := 0
+	roundtrip := func(name string, d M) {
+		count++
+		t.Run(name, func(t *testing.T) {
+			egg, vars, err := parseEggDocument(d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			egg["nest_id"] = nest["id"]
+			row, err := a.importEggRecord(ctx, 0, egg, vars)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := a.eggExport(ctx, num(row["id"]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			actual, actualVars, err := parseEggDocument(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{"name", "author", "description", "features", "docker_images", "file_denylist", "startup", "config_files", "config_startup", "config_logs", "config_stop", "script_install", "script_entry", "script_container", "update_url"} {
+				if !reflect.DeepEqual(egg[key], actual[key]) {
+					t.Errorf("%s changed in PostgreSQL export roundtrip: before=%#v after=%#v", key, egg[key], actual[key])
+				}
+			}
+			if !reflect.DeepEqual(vars, actualVars) {
+				t.Errorf("variable definitions changed: before=%#v after=%#v", vars, actualVars)
+			}
+		})
+	}
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		for _, entry := range gameTemplates().Entries {
+			roundtrip(entry.Path, entry.Egg)
+		}
+		if count < 200 {
+			t.Fatalf("incomplete bundled corpus: %d", count)
+		}
+		t.Logf("Imported, exported and compared %d bundled eggs through real PostgreSQL", count)
+		return
+	} else if err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"game-eggs", "application-eggs", "generic-eggs"} {
 		err := filepath.WalkDir(filepath.Join(root, name), func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
@@ -357,34 +399,7 @@ func TestEggPostgresCorpusRoundtrip(t *testing.T) {
 			if json.Unmarshal(b, &d) != nil || !strings.HasPrefix(str(asMap(d["meta"])["version"]), "PTDL_") {
 				return nil
 			}
-			count++
-			t.Run(filepath.ToSlash(strings.TrimPrefix(path, root)), func(t *testing.T) {
-				e, vars, err := parseEggDocument(d)
-				if err != nil {
-					t.Fatal(err)
-				}
-				e["nest_id"] = nest["id"]
-				row, err := a.importEggRecord(ctx, 0, e, vars)
-				if err != nil {
-					t.Fatal(err)
-				}
-				out, err := a.eggExport(ctx, num(row["id"]))
-				if err != nil {
-					t.Fatal(err)
-				}
-				roundtrip, roundVars, err := parseEggDocument(out)
-				if err != nil {
-					t.Fatal(err)
-				}
-				for _, key := range []string{"name", "author", "description", "features", "docker_images", "file_denylist", "startup", "config_files", "config_startup", "config_logs", "config_stop", "script_install", "script_entry", "script_container", "update_url"} {
-					if !reflect.DeepEqual(e[key], roundtrip[key]) {
-						t.Errorf("%s changed in PostgreSQL export roundtrip: before=%#v after=%#v", key, e[key], roundtrip[key])
-					}
-				}
-				if !reflect.DeepEqual(vars, roundVars) {
-					t.Errorf("variable definitions changed: before=%#v after=%#v", vars, roundVars)
-				}
-			})
+			roundtrip(filepath.ToSlash(strings.TrimPrefix(path, root)), d)
 			return nil
 		})
 		if err != nil {

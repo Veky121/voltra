@@ -10,14 +10,17 @@ import (
 
 // Real API handler + isolated PostgreSQL schema + explicit fixture Wings; no live node/game.
 func TestExiledStagedConsentAPI(t *testing.T) {
+	data, err := os.ReadFile("../../.local/exiled-eula-source-fix/profiles.json")
+	if os.IsNotExist(err) {
+		t.Skip("Optional EXILED profile stage is absent")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, value := range []string{"default", "0", "1"} {
 		t.Run(value, func(t *testing.T) {
 			a, _, admin, node, _ := steamGamesFixture(t)
 			ctx := context.Background()
-			data, err := os.ReadFile("../../.local/exiled-eula-source-fix/profiles.json")
-			if err != nil {
-				t.Fatal(err)
-			}
 			var staged map[string]struct {
 				Egg M `json:"egg"`
 			}
