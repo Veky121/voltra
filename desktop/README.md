@@ -38,6 +38,9 @@ checked by the panel on every request.
 Sessions last 90 days. Revoke a device from Account → Desktop apps, or use
 Unlink in the desktop toolbar. Unlink removes the local credential and attempts
 remote revocation. When offline, revoke the device separately from the web app.
+Unlink panel is available in the title bar and on the Panel unavailable screen.
+App & updates also opens locally while a saved panel is offline, so update and
+connection controls remain available without contacting that panel.
 Revocation rejects new API requests and socket connections. An already open
 console connection is closed when the desktop unlinks or exits, or when its
 upstream connection ends. It is not forcibly terminated by remote revocation.

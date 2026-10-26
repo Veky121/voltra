@@ -1,5 +1,6 @@
 .desktop-connect{min-height:100vh;display:grid;place-items:center;padding:32px;background:var(--bg,#111214)}
 .desktop-connect>.card{width:min(100%,540px);padding:36px}
+.desktop-connect>.desktop-app-info{width:min(100%,720px);min-width:0}
 .desktop-connect h1{margin:24px 0 12px;font-size:28px}
 .desktop-connect form{display:grid;gap:16px;margin-top:28px}
 .desktop-brand{display:flex;align-items:center;gap:12px;font-weight:650}

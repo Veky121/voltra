@@ -1,5 +1,5 @@
 import {useEffect,useState,type ReactNode} from 'react';
-import {Button,Card,ErrorBox,Field,Input,Loading,Select} from './lib';
+import {Button,Card,ErrorBox,Field,Input,Loading,Modal,Select} from './lib';
 import './desktop.css';
 import BrandMark from './BrandMark';
 import {parseDesktopPairing} from './desktopPairing';
@@ -27,14 +27,10 @@ function DesktopUpdates({enabled}:{enabled:boolean}){
 }
 
 export function DesktopAppInfo(){
-  const [app,setApp]=useState<Status|null>(null),[error,setError]=useState(''),[unlinking,setUnlinking]=useState(false);
+  const [app,setApp]=useState<Status|null>(null),[error,setError]=useState('');
   const {status,busy,error:updateError,checkedAt}=useDesktopUpdates();
   useEffect(()=>{void local('status').then(setApp).catch(e=>setError(e.message))},[]);
   if(import.meta.env.VITE_DESKTOP!=='true')return null;
-  async function unlink(){
-    if(!confirm('Unlink this desktop? You can pair it again from your web account.'))return;
-    setUnlinking(true);try{await local('unlink',{});window.location.assign('/')}catch(e){setError((e as Error).message);setUnlinking(false)}
-  }
   return <section className="desktop-app-info settings-page">
     {app&&!app.linked&&<Link to="/">Back to connection</Link>}
     <ErrorBox>{error||updateError||status?.error}</ErrorBox>
@@ -48,9 +44,16 @@ export function DesktopAppInfo(){
     </>:<><SettingsRow label="Update channel" control={<Select aria-label="Update channel" disabled value="stable"><option value="stable">Release</option><option value="beta">Beta</option><option value="nightly">Nightly</option></Select>}/><SettingsRow label="Updates" description="This executable was built without signed updates. Replace it once with an updater-enabled build." control={<a href="https://github.com/Veky121/voltra/releases" target="_blank" rel="noreferrer">Download Voltra</a>}/></>}
     </SettingsSection>
     <SettingsSection title="Connection"><SettingsRow label="Panel" control={<span className="settings-value desktop-app-panel">{app?.panel_url||'Not connected'}</span>}/>
-    {app?.linked&&<SettingsRow label="This computer" control={<Button variant="danger" disabled={unlinking} onClick={()=>void unlink()}>{unlinking?'Unlinking…':'Unlink'}</Button>}/>}
+    {app?.linked&&<SettingsRow label="This computer" control={<Button variant="danger" onClick={requestDesktopUnlink}>Unlink panel</Button>}/>}
     </SettingsSection>
   </section>;
+}
+
+function requestDesktopUnlink(){window.dispatchEvent(new Event('desktop-unlink-requested'));}
+
+export function DesktopRecoveryActions(){
+  if(import.meta.env.VITE_DESKTOP!=='true')return null;
+  return <Button variant="secondary" onClick={requestDesktopUnlink}>Unlink panel</Button>;
 }
 
 function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaximizedChange:(value:boolean)=>void}){
@@ -71,10 +74,10 @@ function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaxim
   </div>;
 }
 
-function DesktopTitlebar({status,maximized,onMaximizedChange}:{status:Status|null;maximized:boolean;onMaximizedChange:(value:boolean)=>void}){
+function DesktopTitlebar({status,maximized,onMaximizedChange,onUnlink,unlinking}:{status:Status|null;maximized:boolean;onMaximizedChange:(value:boolean)=>void;onUnlink:()=>void;unlinking:boolean}){
   return <header className="desktop-bar">
     <div className="desktop-title"><BrandMark/><span>Voltra</span>{status&&<span className="desktop-version-label">v{status.version}</span>}{status?.linked&&<span className="desktop-panel-address" title={status.panel_url}>{status.panel_url}</span>}</div>
-    <div className="desktop-title-actions">{status&&<DesktopUpdates enabled={status.updates_enabled}/>} <Link className="button secondary" to="/account/app">App &amp; updates</Link></div>
+    <div className="desktop-title-actions">{status&&<DesktopUpdates enabled={status.updates_enabled}/>} {status?.linked&&<Button variant="secondary" disabled={unlinking} onClick={onUnlink}>{unlinking?'Unlinking…':'Unlink panel'}</Button>}<Link className="button secondary" to="/account/app">App &amp; updates</Link></div>
     <WindowControls maximized={maximized} onMaximizedChange={onMaximizedChange}/>
   </header>;
 }
@@ -89,14 +92,16 @@ export default function DesktopGate({children}:{children:ReactNode}){
   const [status,setStatus]=useState<Status|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [connection,setConnection]=useState(''),[name,setName]=useState('My computer');
   const [disconnected,setDisconnected]=useState(false);
+  const [confirmUnlink,setConfirmUnlink]=useState(false);
   const refresh=()=>{setError('');local('status').then(s=>{setStatus(s);setName(s.device_name||'My computer')}).catch(e=>setError(e.message))};
-  useEffect(()=>{refresh();const rejected=()=>setDisconnected(true);window.addEventListener('desktop-session-rejected',rejected);window.addEventListener('panel-auth-changed',refresh);return()=>{window.removeEventListener('desktop-session-rejected',rejected);window.removeEventListener('panel-auth-changed',refresh)}},[]);
+  useEffect(()=>{refresh();const rejected=()=>setDisconnected(true),requestUnlink=()=>setConfirmUnlink(true);window.addEventListener('desktop-session-rejected',rejected);window.addEventListener('panel-auth-changed',refresh);window.addEventListener('desktop-unlink-requested',requestUnlink);return()=>{window.removeEventListener('desktop-session-rejected',rejected);window.removeEventListener('panel-auth-changed',refresh);window.removeEventListener('desktop-unlink-requested',requestUnlink)}},[]);
   async function unlink(){setBusy(true);setError('');try{await local('unlink',{});window.location.assign('/')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
-  const titlebar=<DesktopTitlebar status={status} maximized={maximized} onMaximizedChange={setMaximized}/>;
-  if(!status)return <>{titlebar}<main className="desktop-connect"><Card><h1>Opening Voltra</h1>{error?<><ErrorBox>{error}</ErrorBox><Button onClick={refresh}>Retry</Button></>:<Loading/>}</Card></main></>;
-  if(!status.linked&&location.pathname==='/account/app')return <>{titlebar}<main className="desktop-connect"><DesktopAppInfo/></main></>;
-  if(status.linked&&!disconnected)return <>{titlebar}{error&&<div className="desktop-banner"><ErrorBox>{error}</ErrorBox></div>}{children}</>;
-  return <>{titlebar}<main className="desktop-connect"><Card>
+  const unlinkDialog=confirmUnlink&&<Modal title="Unlink panel?" onClose={()=>{if(!busy)setConfirmUnlink(false)}}><p>This removes the saved connection from this computer. You can connect to another panel with a new connection string.</p><p className="muted">{status?.panel_url}</p><ErrorBox>{error}</ErrorBox><div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setConfirmUnlink(false)}>Cancel</Button><Button variant="danger" disabled={busy} onClick={()=>void unlink()}>{busy?'Unlinking…':'Unlink panel'}</Button></div></Modal>;
+  const titlebar=<DesktopTitlebar status={status} maximized={maximized} onMaximizedChange={setMaximized} onUnlink={()=>setConfirmUnlink(true)} unlinking={busy}/>;
+  if(!status)return <>{titlebar}{unlinkDialog}<main className="desktop-connect"><Card><h1>Opening Voltra</h1>{error?<><ErrorBox>{error}</ErrorBox><Button onClick={refresh}>Retry</Button></>:<Loading/>}</Card></main></>;
+  if(location.pathname.replace(/\/+$/,'')==='/account/app')return <>{titlebar}{unlinkDialog}<main className="desktop-connect"><DesktopAppInfo/></main></>;
+  if(status.linked&&!disconnected)return <>{titlebar}{unlinkDialog}{error&&<div className="desktop-banner"><ErrorBox>{error}</ErrorBox></div>}{children}</>;
+  return <>{titlebar}{unlinkDialog}<main className="desktop-connect"><Card>
     <div className="desktop-brand"><BrandMark/><span>Voltra desktop</span></div>
     <h1>{disconnected?'Link this computer again':'Connect your account'}</h1>
     <p className="muted">Create a connection string in Account → Desktop apps.</p>
@@ -106,7 +111,7 @@ export default function DesktopGate({children}:{children:ReactNode}){
       <Field label="Connection string"><Input required autoComplete="off" spellCheck={false} placeholder="Paste connection string" value={connection} onChange={e=>setConnection(e.target.value)} disabled={busy}/></Field>
       <Field label="Computer name"><Input required maxLength={100} value={name} onChange={e=>setName(e.target.value)} disabled={busy}/></Field>
       <Button type="submit" disabled={busy}>{busy?'Connecting...':'Connect account'}</Button>
-      {status.linked&&<Button variant="secondary" disabled={busy} onClick={()=>void unlink()}>Forget this connection</Button>}
+      {status.linked&&<Button variant="secondary" disabled={busy} onClick={()=>setConfirmUnlink(true)}>Forget this connection</Button>}
     </form>
 
   </Card></main></>;

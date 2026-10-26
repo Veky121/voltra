@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {Select,  api, Button, Card, ErrorBox, Field, Loading } from "./lib";
 import "./setup.css";
 import BrandMark from "./BrandMark";
+import {DesktopRecoveryActions} from './desktop';
 
 type SetupStatus = {
   needs_setup: boolean;
@@ -62,7 +63,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
     const timer = setInterval(reload, 60000);
     return () => { window.removeEventListener("focus", reload); window.removeEventListener("panel-auth-changed", reload); clearInterval(timer); };
   }, [reload]);
-  if (error) return <SetupFrame title="Panel unavailable"><ErrorBox>{error}</ErrorBox><Button onClick={reload}>Retry</Button></SetupFrame>;
+  if (error) return <SetupFrame title="Panel unavailable"><ErrorBox>{error}</ErrorBox><div className="actions"><Button onClick={reload}>Retry</Button><DesktopRecoveryActions/></div></SetupFrame>;
   if (!state) return <SetupFrame title="Opening panel"><Loading /></SetupFrame>;
   const { status, session } = state;
   const explicitSetup = location.pathname.replace(/\/+$/, "") === "/setup";
