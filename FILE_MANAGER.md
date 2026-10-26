@@ -70,6 +70,18 @@ Pending uploads therefore need their full file size on the panel's staging disk.
 caps reserved bytes; zero leaves capacity to the filesystem. The default directory
 is under the OS user cache and scoped to panel database/public URL.
 
+For a sandboxed systemd service, explicitly set `VOLTRA_UPLOAD_DIR` to a
+persistent directory owned by the panel user inside its `ReadWritePaths` or
+`StateDirectory`. For example, a service restricted to
+`/var/lib/voltra-panel/production` can use
+`VOLTRA_UPLOAD_DIR=/var/lib/voltra-panel/production/upload-staging` with mode0700.
+The default user cache is outside that write boundary and causes upload routes
+to return503 `UploadStorageUnavailable` until the path is corrected and the
+panel service restarted. Preserve existing staging files when changing releases.
+
+Upload creation returns a relative `Location` so subsequent tus requests stay
+on the browser's HTTPS origin or the desktop app's authenticated local proxy.
+
 Paused/incomplete uploads expire after seven days, refreshed by HEAD/PATCH. Cleanup
 runs when another upload is created. Interrupted commit journals are retained for
 explicit recovery rather than discarding a potentially important overwrite backup.

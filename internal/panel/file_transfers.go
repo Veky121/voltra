@@ -315,7 +315,24 @@ func (m *fileTransferManager) serve(w http.ResponseWriter, r *http.Request, scop
 		}
 		clone.Body = http.MaxBytesReader(w, r.Body, transferChunkSize)
 	}
-	h.ServeHTTP(w, clone)
+	h.ServeHTTP(&transferLocationWriter{ResponseWriter: w, base: base}, clone)
+}
+
+// Keep tus follow-up requests on the origin that created the upload. The native
+// app supplies its credential through a local proxy, and HTTPS reverse proxies
+// can expose a different scheme/hostname from the panel's internal listener.
+type transferLocationWriter struct {
+	http.ResponseWriter
+	base string
+}
+
+func (w *transferLocationWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w *transferLocationWriter) WriteHeader(status int) {
+	if location, err := url.Parse(w.Header().Get("Location")); err == nil && strings.HasPrefix(location.Path, w.base) {
+		w.Header().Set("Location", location.RequestURI())
+	}
+	w.ResponseWriter.WriteHeader(status)
 }
 
 func (m *fileTransferManager) receiptPath(id string) string {

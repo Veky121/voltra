@@ -68,7 +68,29 @@ func transferTestCreate(t *testing.T, m *fileTransferManager, s transferScope, n
 	if !strings.HasPrefix(u.Path, "/api/client/servers/server-9/files/transfers/") {
 		t.Fatalf("bad Location: %s", u)
 	}
+	if u.IsAbs() || u.Host != "" {
+		t.Fatalf("upload Location escaped its browser/native proxy origin: %s", u)
+	}
 	return path.Base(u.Path)
+}
+
+func TestFileTransferLocationStaysOnRequestOrigin(t *testing.T) {
+	m := transferTestManager(t)
+	scope := transferTestScope()
+	for _, host := range []string{"http://internal-panel:18088", "https://public.example.test", "http://127.0.0.1:49123"} {
+		r := httptest.NewRequest(http.MethodPost, host+"/api/client/servers/server-9/files/transfers", nil)
+		r.SetPathValue("server", "server-9")
+		r.Header.Set("Tus-Resumable", "1.0.0")
+		r.Header.Set("Upload-Length", "1")
+		r.Header.Set("Upload-Metadata", "filename "+base64.StdEncoding.EncodeToString([]byte("check.bin")))
+		r.Header.Set("X-Forwarded-Host", "other.example.test")
+		r.Header.Set("X-Forwarded-Proto", "https")
+		w := httptest.NewRecorder()
+		m.serve(w, r, scope)
+		if w.Code != http.StatusCreated || !strings.HasPrefix(w.Header().Get("Location"), "/api/client/servers/server-9/files/transfers/") {
+			t.Fatalf("unsafe upload response: %d %q", w.Code, w.Header().Get("Location"))
+		}
+	}
 }
 
 func transferTestPatch(m *fileTransferManager, s transferScope, id string, offset int64, data string) *httptest.ResponseRecorder {
