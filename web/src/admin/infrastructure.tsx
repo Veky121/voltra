@@ -498,20 +498,6 @@ export function Settings() {
       ) : (
         <>
           <SettingsEditor
-            title="General"
-            endpoint="/api/admin/settings"
-            initial={initial}
-            fields={[
-              f("app:name", "Panel name", undefined, { default: "Voltra" }),
-              f("app:locale", "Default language", undefined, { default: "en" }),
-              f("app:timezone", "Panel timezone", undefined, {
-                default: "UTC",
-                required: true,
-                hint: "IANA timezone, such as UTC or Europe/Berlin. Schedules use the panel timezone.",
-              }),
-            ]}
-          />
-          <SettingsEditor
             title="Wings and allocation settings"
             endpoint="/api/admin/settings"
             initial={initial}
@@ -575,7 +561,7 @@ export function Settings() {
           <details className="infrastructure-advanced-settings"><summary>Advanced settings</summary><SettingsEditor
             title="All settings"
             endpoint="/api/admin/settings"
-            initial={{ settings: initial ?? {} }}
+            initial={{ settings: cleanSettings(initial ?? {}) }}
             fields={[f("settings", "Settings JSON", "json")]}
             transform={(v) => cleanSettings(v.settings)}
           /></details>
@@ -589,7 +575,7 @@ function cleanSettings(settings: any): any {
     return settings;
   return Object.fromEntries(
     Object.entries(settings)
-      .filter(([key]) => !key.endsWith("_configured"))
+      .filter(([key]) => !key.endsWith("_configured") && !["app:name", "app:locale", "app:timezone"].includes(key))
       .map(([key, value]) => [key, cleanSettings(value)])
   );
 }

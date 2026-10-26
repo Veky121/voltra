@@ -23,6 +23,7 @@ type gameSettingsDocument struct {
 type gameSetting struct {
 	key, value, kind, on, off string
 	node                      *yaml.Node
+	structured                bool
 }
 type gameSettingsParsed struct {
 	fields []gameSetting
@@ -211,6 +212,9 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := M{"game": "native", "documents": docs, "file": file, "fields": []M{}, "folders": folders, "help": []M{}, "requires_stop": true, "revision": ""}
+	if game := steamGameID(egg); game != "" {
+		result["game"] = game
+	}
 	if javaMinecraftEgg(egg) {
 		result["game"] = "minecraft"
 	}
@@ -378,6 +382,9 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func gameSettingManaged(egg M, file, key string) bool {
+	if i := strings.LastIndex(key, "/"); i >= 0 {
+		key = key[i+1:]
+	}
 	normalized := strings.ToLower(strings.NewReplacer("-", "", "_", "", ".", "", "/", "").Replace(key))
 	if map[string]bool{"serverport": true, "rconport": true, "queryport": true, "restapiport": true, "publicport": true, "gameport": true, "serverip": true, "publicip": true, "bindaddress": true, "listenaddress": true}[normalized] {
 		return true
@@ -474,7 +481,7 @@ func gameSettingType(key, value string) gameSetting {
 		}
 	}
 	if f.kind == "text" && value != "" {
-		if n, e := strconv.ParseFloat(value, 64); e == nil && !math.IsNaN(n) && !math.IsInf(n, 0) && !strings.HasPrefix(value, "0") {
+		if n, e := strconv.ParseFloat(value, 64); e == nil && !math.IsNaN(n) && !math.IsInf(n, 0) && (value == "0" || !strings.HasPrefix(value, "0") || strings.HasPrefix(value, "0.")) {
 			f.kind = "number"
 		}
 	}
@@ -502,7 +509,7 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 		out.patch = func(changes map[string]string) ([]byte, error) { return valheimPatch(data, changes) }
 		return out, nil
 	}
-	if path.Base(file) == "PalWorldSettings.ini" {
+	if gameSettingsFormat(file) == "ini" && (strings.EqualFold(path.Base(file), "PalWorldSettings.ini") || strings.Contains(string(data), "[/Script/Pal.PalGameWorldSettings]")) {
 		tuple, values, err := quickPalworldOptions(data)
 		if err != nil {
 			return out, err
@@ -512,6 +519,9 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 		for _, segment := range tuple.Segments {
 			key, raw, _ := strings.Cut(strings.TrimSpace(segment), "=")
 			key = strings.TrimSpace(key)
+			if _, duplicate := quoted[key]; duplicate {
+				return out, bad("Duplicate structured settings cannot be edited here.")
+			}
 			raw = strings.TrimSpace(raw)
 			quoted[key] = strings.HasPrefix(raw, "\"")
 			complex[key] = strings.HasPrefix(raw, "(")
@@ -676,7 +686,11 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 			return quickPatchXMLProperties(data, "ServerSettings", changes)
 		}
 	case "ini":
-		return parseGameSettingsLines(file, data)
+		parsed, err := parseGameSettingsLines(file, data)
+		if err != nil {
+			return out, err
+		}
+		return expandGameSettingsStructs(parsed)
 	default:
 		return out, bad("This configuration format does not have a settings editor yet.")
 	}
@@ -695,6 +709,7 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 	type span struct {
 		line, start, end int
 		quote            byte
+		structured       bool
 	}
 	spans := map[string]span{}
 	section := ""
@@ -786,7 +801,8 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 		} else if toml && f.kind == "text" {
 			f.kind = "readonly"
 		}
-		spans[key] = span{index, start, end, quote}
+		f.structured = !toml && quote == 0 && strings.HasPrefix(value, "(") && strings.HasSuffix(value, ")")
+		spans[key] = span{index, start, end, quote, f.structured}
 		out.fields = append(out.fields, f)
 		if len(out.fields) > 4000 {
 			return out, bad("This configuration has too many settings to edit here.")
@@ -807,7 +823,7 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 					return nil, bad("This literal value cannot contain a quote.")
 				}
 				value = "'" + value + "'"
-			} else if strings.ContainsAny(value, "#;\r\n") {
+			} else if !s.structured && strings.ContainsAny(value, "#;\r\n") {
 				return nil, bad("This unquoted value cannot contain comment delimiters.")
 			}
 			line := updated[s.line]

@@ -28,10 +28,11 @@ type Executor struct {
 	pollInterval, timeLimit time.Duration
 	owner                   func(os.FileInfo) (uint32, uint32, bool)
 	modSpace                func(string) (uint64, error)
+	cacheOwner              func(string, uint32, uint32, bool) error
 }
 
 func New() *Executor {
-	return &Executor{docker: localDocker{}, wingsConfig: "/etc/voltra/wings.yml", journal: "/var/lib/voltra/steam-jobs", supported: Supported(), active: map[string]bool{}, slots: make(chan struct{}, 2), pollInterval: time.Second, timeLimit: 2 * time.Hour, owner: fileOwner, modSpace: palworldDiskAvailable}
+	return &Executor{docker: localDocker{}, wingsConfig: "/etc/voltra/wings.yml", journal: "/var/lib/voltra/steam-jobs", supported: Supported(), active: map[string]bool{}, slots: make(chan struct{}, 2), pollInterval: time.Second, timeLimit: 2 * time.Hour, owner: fileOwner, modSpace: palworldDiskAvailable, cacheOwner: prepareClientCacheOwner}
 }
 
 type record struct {
@@ -236,7 +237,19 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 		return
 	}
 	meta := &cappedOutput{max: 4 << 20}
-	if err = e.helper(ctx, r, "", false, meta); err != nil {
+	var metadataWriter io.Writer = meta
+	var metadataStream *consoleOutput
+	if r.StreamOutput {
+		metadataStream = &consoleOutput{captured: meta, emit: emit, metadata: true}
+		metadataWriter = metadataStream
+	}
+	err = e.helper(ctx, r, "", false, metadataWriter)
+	if metadataStream != nil {
+		if streamErr := metadataStream.finish(); err == nil && streamErr != nil {
+			err = errors.New("Steam console stream disconnected")
+		}
+	}
+	if err != nil {
 		finishError(err)
 		return
 	}
@@ -256,6 +269,11 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 		terminal.Type = "result"
 		terminal.Stage = "complete"
 		terminal.Detail = "Steam build check complete."
+		if installed == latest {
+			terminal.Detail = "Game is up to date (build " + installed + ")."
+		} else {
+			terminal.Detail = "Game update available (installed " + installed + ", latest " + latest + ")."
+		}
 		return
 	}
 	// State may have changed during the metadata network request.
@@ -314,10 +332,19 @@ func (e *Executor) Run(ctx context.Context, r steamapi.Request, emit func(steama
 			}
 		}
 	}()
-	// Raw Steam output can contain configuration and host information. Drain a
-	// bounded buffer; expose only fixed stages and periodic liveness messages.
 	output := &cappedOutput{max: 64 << 10}
-	err = e.helper(runCtx, r, dir, true, output)
+	var writer io.Writer = output
+	var stream *consoleOutput
+	if r.StreamOutput {
+		stream = &consoleOutput{captured: output, emit: emit}
+		writer = stream
+	}
+	err = e.helper(runCtx, r, dir, true, writer)
+	if stream != nil {
+		if streamErr := stream.finish(); err == nil && streamErr != nil {
+			err = errors.New("Steam console stream disconnected")
+		}
+	}
 	close(monitorDone)
 	monitorErr := <-monitorExit
 	stop()

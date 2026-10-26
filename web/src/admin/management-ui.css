@@ -1,7 +1,7 @@
 /* Administration primitives and management pages. Never target the app shell. */
 .admin-management-page{min-width:0;color:var(--text);font-size:calc(13px * var(--ui-font-scale,1))}
 .management-ui :is(button,.button):not([data-slot]):not([role=tab]):not(.text-button){min-height:var(--ui-control-height);padding:6px 12px;border-radius:var(--ui-control-radius);font-size:calc(13px * var(--ui-font-scale,1));font-weight:500;line-height:1.4;box-shadow:none}
-.management-ui :is(button,.button):not([data-slot]):not(.secondary):not(.danger):not([role=tab]):not(.text-button){background:var(--theme-primary,var(--primary));border-color:var(--primary);color:var(--theme-primary-ink,var(--accent-ink))}
+.management-ui :is(button,.button):not([data-slot]):not(.secondary):not(.danger):not([role=tab]):not(.text-button){background:var(--theme-button,var(--primary));border-color:var(--primary);color:var(--theme-button-ink,var(--accent-ink))}
 .management-ui :is(button,.button):not([data-slot]).secondary{background:color-mix(in srgb,var(--text) 3%,transparent);border-color:var(--ui-border);color:var(--text)}
 .management-ui :is(button,.button):not([data-slot]).secondary:hover{background:var(--ui-hover);border-color:var(--line-strong);filter:none}
 .management-ui :is(button,.button):not([data-slot]).danger{background:color-mix(in srgb,var(--red) 9%,transparent);border-color:color-mix(in srgb,var(--red) 27%,transparent);color:var(--red)}
@@ -34,8 +34,8 @@
 .management-ui select[multiple] option{padding:5px 7px;border-radius:4px}
 .management-ui textarea{min-height:96px;line-height:1.65;resize:vertical}
 .management-ui :is(input,select,textarea):disabled{opacity:.55;cursor:not-allowed}
-.management-ui .field:has(>.ui-switch){display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px 12px;min-height:var(--ui-control-height);padding:10px 12px;border:1px solid var(--ui-divider);border-radius:var(--ui-control-radius);align-self:start}
-.management-ui .field:has(>.ui-switch)>small{grid-column:1/-1}
+.management-ui .admin-field-switch{align-self:stretch}
+.admin-switch-control{display:flex;align-items:center;min-height:var(--ui-control-height);min-width:0}
 .management-ui .ui-switch{margin:0;box-shadow:none;accent-color:var(--accent)}
 .admin-inline-switch{display:inline-flex;align-items:center;gap:9px;font-size:calc(12px * var(--ui-font-scale,1));color:var(--muted)}
 .admin-fieldset{border:0;margin:0;padding:0;min-width:0}

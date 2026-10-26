@@ -2,6 +2,7 @@ package panel
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 )
@@ -18,10 +19,25 @@ func TestMinecraftManagedInstallerUpgradePreservesCustomizations(t *testing.T) {
 	if previous == current {
 		t.Fatal("historical staging fixture was not constructed")
 	}
+	old, err := os.ReadFile("testdata/minecraft-install-pre-streaming.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	preStreaming := string(old)
+	preStreamingScratch := strings.Replace(preStreaming, "    # Wings mounts /tmp as a small tmpfs. Pack archives plus the Java bootstrap\n    # must use the server disk budget, not exhaust that tmpfs during extraction.\n    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory or root) as temporary:", "    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory) as temporary:", 1)
+	if !minecraftKnownHistoricalInstaller(preStreaming) || !minecraftKnownHistoricalInstaller(preStreamingScratch) || preStreaming == preStreamingScratch || strings.Contains(preStreaming, "def verified_archive(") {
+		t.Fatal("historical installer identities do not match the published fixture")
+	}
 	for _, tc := range []struct{ name, image, script, want, wantScript string }{
 		{"legacy_default", "ghcr.io/pterodactyl/installers:debian", current, minecraftInstallerImage, current},
 		{"legacy_staging", "ghcr.io/pterodactyl/installers:debian", previous, minecraftInstallerImage, current},
 		{"legacy_crlf", "ghcr.io/pterodactyl/installers:debian", strings.ReplaceAll(previous, "\n", "\r\n"), minecraftInstallerImage, current},
+		{"pre_streaming_disk", minecraftInstallerImage, preStreaming, minecraftInstallerImage, current},
+		{"pre_streaming_missing_final_newline", minecraftInstallerImage, strings.TrimRight(preStreaming, "\n"), minecraftInstallerImage, current},
+		{"pre_streaming_crlf", minecraftInstallerImage, strings.ReplaceAll(preStreaming, "\n", "\r\n"), minecraftInstallerImage, current},
+		{"pre_streaming_tmp", "ghcr.io/pterodactyl/installers:debian", preStreamingScratch, minecraftInstallerImage, current},
+		{"historical_custom_script", minecraftInstallerImage, preStreaming + "\necho administrator-owned\n", minecraftInstallerImage, preStreaming + "\necho administrator-owned\n"},
+		{"historical_custom_image", "example.invalid/custom:latest", preStreaming, "example.invalid/custom:latest", preStreaming},
 		{"custom_image", "example.invalid/custom:latest", current, "example.invalid/custom:latest", current},
 		{"custom_script", "ghcr.io/pterodactyl/installers:debian", "echo administrator-owned", "ghcr.io/pterodactyl/installers:debian", "echo administrator-owned"},
 	} {

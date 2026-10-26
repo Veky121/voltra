@@ -223,6 +223,10 @@ func steamRuntime(t *testing.T) *steamTestRuntime {
 					event.Error = "Fixture Steam unavailable."
 				}
 				data, _ := json.Marshal(event)
+				if request.StreamOutput && request.Operation != "check" {
+					output, _ := json.Marshal(steamapi.Event{Type: "output", Stage: "executing", Lines: []string{"Update state (0x61) downloading, progress: 42.00", "Success! App fully installed."}})
+					data = append(append(output, '\n'), data...)
+				}
 				data = append(data, '\n')
 				_, _ = fmt.Fprintf(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", len(data))
 				_, _ = stream.Write(data)
@@ -252,7 +256,7 @@ func (rt *steamTestRuntime) run(t *testing.T) {
 	}
 }
 
-func TestSteamStartChecksOnceAndUpdatesBeforeLaunch(t *testing.T) {
+func TestSteamStartAndRestartLaunchWithoutSteamMaintenance(t *testing.T) {
 	rt := steamRuntime(t)
 	ctx := context.Background()
 	response, err := rt.app.daemonServer(ctx, rt.server, "POST", "/power", M{"action": "start"})
@@ -265,7 +269,7 @@ func TestSteamStartChecksOnceAndUpdatesBeforeLaunch(t *testing.T) {
 	gotOps := strings.Join(rt.operations, ",")
 	gotPower := strings.Join(rt.powers, ",")
 	rt.mu.Unlock()
-	if gotOps != "check,update" || gotPower != "start" {
+	if gotOps != "" || gotPower != "start" {
 		t.Fatalf("operations=%s power=%s", gotOps, gotPower)
 	}
 	for range 3 {
@@ -278,7 +282,7 @@ func TestSteamStartChecksOnceAndUpdatesBeforeLaunch(t *testing.T) {
 	}
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	if len(rt.operations) != 2 {
+	if len(rt.operations) != 0 {
 		t.Fatalf("rapid restarts ran Steam again: %v", rt.operations)
 	}
 	if strings.Join(rt.powers, ",") != "start,stop,start,stop,start,stop,start" {
@@ -301,14 +305,14 @@ func TestSteamFailureBackoffStartsInstalledAndManualCheckOverrides(t *testing.T)
 	rt.mu.Lock()
 	count := len(rt.operations)
 	rt.mu.Unlock()
-	if count != 1 {
-		t.Fatalf("failed checks were repeated: %d", count)
+	if count != 0 {
+		t.Fatalf("startup contacted Steam: %d", count)
 	}
 	rt.request(t, "check", 202)
 	rt.run(t)
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	if len(rt.operations) != 2 {
+	if len(rt.operations) != 1 {
 		t.Fatal("manual check did not bypass cooldown")
 	}
 }
@@ -416,8 +420,8 @@ func TestSteamSocketPowerUsesSharedRules(t *testing.T) {
 	rt.run(t)
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	if strings.Join(rt.operations, ",") != "check,update" {
-		t.Fatalf("websocket bypassed maintenance: %v", rt.operations)
+	if len(rt.operations) != 0 || strings.Join(rt.powers, ",") != "start" {
+		t.Fatalf("websocket startup did not use launch-only rules: Steam=%v power=%v", rt.operations, rt.powers)
 	}
 }
 

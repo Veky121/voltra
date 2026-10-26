@@ -168,6 +168,13 @@ func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string,
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended(current_schema()||$1,0))", "proxy-wizard-"+strconv.FormatInt(gid, 10)); err != nil {
 		return nil, err
 	}
+	reservations, err := readGamePortReservations(ctx, tx, true)
+	if err != nil {
+		return nil, err
+	}
+	if reservedGamePort(reservations.nodePorts(num(node["id"])), port) {
+		return nil, fmt.Errorf("FRP local port is reserved for another service")
+	}
 	var aid int64
 	if err = tx.QueryRow(ctx, `SELECT id FROM allocations WHERE node_id=$1 AND server_id=$2 AND ip=$3 AND port=$4 FOR SHARE`, num(node["id"]), num(server["id"]), ip, port).Scan(&aid); err != nil {
 		return nil, fmt.Errorf("allocation is not assigned to this server on this node")
@@ -187,6 +194,9 @@ func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string,
 		if !desired {
 			return nil, fmt.Errorf("mapping is awaiting removal; reconcile it before retry")
 		}
+		if reservedGamePort(reservations.gatewayPorts(gid), public) {
+			return nil, fmt.Errorf("Existing FRP public port conflicts with an operator reservation; existing mapping preserved")
+		}
 	} else {
 		existing.Close()
 		start := max(port, num(c["public_port_start"]))
@@ -194,7 +204,7 @@ func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string,
 		if start > end {
 			return nil, fmt.Errorf("manual forwarding required: preferred public port exceeds configured FRP pool")
 		}
-		err = tx.QueryRow(ctx, `SELECT p FROM generate_series($1::int,$2::int) p WHERE NOT EXISTS(SELECT 1 FROM proxy_routes WHERE gateway_id=$3 AND protocol=$4 AND public_port=p) AND NOT EXISTS(SELECT 1 FROM proxy_node_clients WHERE gateway_id=$3 AND test_public_port=p) ORDER BY p LIMIT 1`, start, end, gid, proto).Scan(&public)
+		err = tx.QueryRow(ctx, `SELECT p FROM generate_series($1::int,$2::int) p WHERE NOT (p=ANY($5::bigint[])) AND NOT EXISTS(SELECT 1 FROM proxy_routes WHERE gateway_id=$3 AND protocol=$4 AND public_port=p) AND NOT EXISTS(SELECT 1 FROM proxy_node_clients WHERE gateway_id=$3 AND test_public_port=p) ORDER BY p LIMIT 1`, start, end, gid, proto, reservations.gatewayPorts(gid)).Scan(&public)
 		if err != nil {
 			return nil, fmt.Errorf("FRP public port conflict: no free port in bounded upward search of configured pool")
 		}

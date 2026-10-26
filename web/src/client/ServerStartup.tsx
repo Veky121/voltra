@@ -156,23 +156,27 @@ function StartupContent() {
   const updateAllowed = can(permissions, 'startup.update');
   const imageAllowed = can(permissions, 'startup.docker-image');
   const pending = Object.values(dirty).filter(Boolean).length;
+  const farming = variables.some(variable=>variable.env_variable==='GAME_SERIAL') && variables.some(variable=>variable.env_variable==='DLC_PRODUCT_KEY');
+  const licenceFields = new Set(['GAME_SERIAL','DLC_PRODUCT_KEY','AUTO_DOWNLOAD','DOWNLOAD_DLC']);
+  const renderVariable = (variable:StartupVariable) => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
+    const response = await api(`${base}/startup/variable`, json('PUT', payload));
+    const updated = value(response) as StartupVariable;
+    if (!updated || updated.env_variable !== variable.env_variable) throw new Error('The server did not confirm the saved setting. Reload startup settings to verify it.');
+    setSaved(current => ({ ...current, [variable.env_variable]: updated }));
+    if (response.meta) setSavedMeta(response.meta);
+    query.reload();
+    return updated;
+  }}/>;
   return <section className="startup-settings games-ui">
     <header className="startup-heading"><div><h2>Startup</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div>
       {!account.loading && !account.error && value(account.data)?.root_admin === true && <Link className="startup-admin-link" to="../admin-tools">Admin tools</Link>}
     </header>
     <PageError error={query.error} />
     <div className="startup-save-note" role="status">{pending ? `${pending} unsaved ${pending === 1 ? 'field' : 'fields'}. Save each field separately.` : 'Each field saves separately.'}{!updateAllowed && ' You have read-only access to variables.'}</div>
+    {farming && <Card className="startup-variables"><h3>Game licence and DLC</h3><p className="muted">Game and DLC licences are supplied by the administrator. Contact your administrator to add or change a DLC licence.</p><div className="startup-variable-grid">{variables.filter(variable=>licenceFields.has(variable.env_variable)&&!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)).map(renderVariable)}</div></Card>}
     <Card className="startup-variables"><h3>Server variables</h3>
       {!variables.length && <p className="muted">This template has no visible startup variables.</p>}
-      <div className="startup-variable-grid">{variables.map(variable => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
-        const response = await api(`${base}/startup/variable`, json('PUT', payload));
-        const updated = value(response) as StartupVariable;
-        if (!updated || updated.env_variable !== variable.env_variable) throw new Error('The server did not confirm the saved setting. Reload startup settings to verify it.');
-        setSaved(current => ({ ...current, [variable.env_variable]: updated }));
-        if (response.meta) setSavedMeta(response.meta);
-        query.reload();
-        return updated;
-      }} />)}</div>
+      <div className="startup-variable-grid">{variables.filter(variable=>!farming || !licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
     </Card>
     <JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
     {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} onSaved={image => { setSavedImage(image); reload(); }} />}

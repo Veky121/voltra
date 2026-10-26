@@ -9,6 +9,7 @@ import {bytes,can,date,json,PageError,useServer} from './common';
 import FileTransfers,{type FileTransfersHandle} from './FileTransfers';
 import FileDocument from './FileDocument';
 import FileExplorer from './FileExplorer';
+import FileStorageSummary from './FileStorageSummary';
 import FileMenu from './FileMenu';
 import {DropdownMenuItem} from '../components/ui/dropdown-menu';
 import useFileNavigationGuard from './useFileNavigationGuard';
@@ -94,6 +95,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
       <input ref={folderInput} type="file" multiple hidden {...{webkitdirectory:'',directory:''}} aria-label="Choose folder to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),true);e.target.value=''}}/>
     </div>
     </header>
+    <FileStorageSummary/>
     <PageError error={error}/>{notice&&<p className="fm-notice" role="status">{notice}</p>}
     <div className={`fm-file-layout${opened?' is-editing':''}`} onDragOverCapture={event=>{if(allowed('file.create')&&event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(true)}}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false)}} onDropCapture={event=>{if(event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(false);if(allowed('file.create'))void dropFiles(event.dataTransfer)}}}>
       <FileExplorer base={base} activeFile={opened||''} activeDirectory={directory} dirty={documentDirty} permissions={permissions} onOpen={open} onBrowse={()=>navigate(directory)} onDirectory={navigate} refreshKey={epoch} onEntries={rememberEntries} controls={!opened?{selected,onSelect:path=>setSelected(current=>current.includes(path)?current.filter(id=>id!==path):[...current,path]),onMenu:(id,anchor)=>setRowMenu(current=>current?.id===id?null:{id,anchor})}:undefined}/>

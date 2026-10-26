@@ -2087,6 +2087,18 @@
       "sha256": "e60d48e3096af29d8561207d976c32924df6ed596fcd12c8489e97c159d8a8a9",
       "generatedAt": "2026-10-23T00:00:00.000Z",
       "downloadedAt": "2026-10-23T00:00:00.000Z"
+    },
+    "official-farming-simulator-25": {
+      "title": "Farming Simulator 25",
+      "fit": "cover",
+      "src": "/artwork/farming-simulator-25.svg",
+      "sourcePage": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+      "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+      "credit": "Original Voltra SVG typography and geometric artwork. Game names identify compatible software.",
+      "bytes": 1075,
+      "sha256": "e2a7725003da4779d4800722e36d04946e61c7563f59cc81e4926698bccbe097",
+      "generatedAt": "2026-10-23T00:00:00.000Z",
+      "downloadedAt": "2026-10-23T00:00:00.000Z"
     }
   },
   "categories": {
@@ -2514,7 +2526,8 @@
     "9ff2972bd6e8ebab": "official-veloren",
     "1f1d8a19d6050003": "official-vintage-story",
     "279f7c47a50d0db4": "official-wine",
-    "15415556fedd3dc4": "official-xonotic"
+    "15415556fedd3dc4": "official-xonotic",
+    "e534defaeddcb0b6": "official-farming-simulator-25"
   },
   "steam": {
     "satisfactory": "steam-526870",

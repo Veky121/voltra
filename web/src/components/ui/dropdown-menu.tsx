@@ -2,13 +2,16 @@ import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { cn } from "@/lib/utils"
 import { ChevronRightIcon, CheckIcon } from "lucide-react"
+import {useOverlayPortalContainer} from '../../ui/OverlayPortal'
 
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+function DropdownMenu({ modal, ...props }: MenuPrimitive.Root.Props) {
+  const container=useOverlayPortalContainer()
+  return <MenuPrimitive.Root data-slot="dropdown-menu" modal={modal??!container} {...props} />
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
-  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
+  const container=useOverlayPortalContainer()
+  return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" container={container} {...props} />
 }
 
 function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
@@ -29,8 +32,9 @@ function DropdownMenuContent({
     "align" | "alignOffset" | "side" | "sideOffset" | "anchor"
   >) {
   return (
-    <MenuPrimitive.Portal>
+    <DropdownMenuPortal>
       <MenuPrimitive.Positioner
+        collisionBoundary={[]}
         data-slot="dropdown-menu-positioner"
         className="scn:isolate scn:z-[260] scn:outline-none"
         align={align}
@@ -45,7 +49,7 @@ function DropdownMenuContent({
           {...props}
         />
       </MenuPrimitive.Positioner>
-    </MenuPrimitive.Portal>
+    </DropdownMenuPortal>
   )
 }
 

@@ -47,3 +47,14 @@ test('disabled gradients use only the first color while preserving second prefer
  assert.equal(values['--theme-background'],`linear-gradient(155deg,${defaultTheme.backgroundA},${defaultTheme.backgroundA})`);
  assert.equal(defaultTheme.accentB,'#326f73');
 });
+
+test('solid button fill uses the exact first accent independently of the second color and gradient',()=>{
+ const colors=['#000000','#ffffff','#ff0000','#00ff00','#0000ff','#ffff00','#777777','#4d78c9','#326f73'];
+ for(const first of colors)for(const second of colors)for(const gradient of [true,false]){
+  const values=themeVariables({...defaultTheme,accentA:first,accentB:second,accentGradient:gradient});
+  assert.equal(values['--theme-button'],first);
+  assert.equal(values['--primary'],first);
+  assert.equal(values['--accent-ink'],values['--theme-button-ink']);
+  assert.ok(contrast(first,values['--theme-button-ink'])>=4.5);
+ }
+});

@@ -41,7 +41,7 @@
 .file-draft-bar p{margin:0;font-size:calc(14px * var(--ui-font-scale,1));line-height:1.5}
 .file-draft-bar .actions{gap:8px;flex-wrap:nowrap;flex-shrink:0}
 .file-draft-bar .button{min-height:36px;font-size:calc(13px * var(--ui-font-scale,1));padding:8px 12px}
-.file-draft-bar .draft-save{background:var(--theme-primary,var(--primary));border-color:transparent;color:var(--theme-primary-ink,var(--accent-ink))}
+.file-draft-bar .draft-save{background:var(--theme-button,var(--primary));border-color:transparent;color:var(--theme-button-ink,var(--accent-ink))}
 .file-draft-bar .draft-save:hover{filter:brightness(1.08)}
 .file-draft-bar.is-attention{border-color:#edaa68;background:#3b2b25f5;animation:draft-nudge .45s ease-in-out 2;box-shadow:0 0 0 2px #b87a3c35,0 8px 28px #0009}
 .file-draft-bar.is-attention p{color:#ffdcad}

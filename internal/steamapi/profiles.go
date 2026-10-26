@@ -30,7 +30,7 @@ func Profile(appID int64) (AppProfile, bool) {
 	return AppProfile{}, false
 }
 func Capabilities() []string {
-	out := []string{Capability, ProfileCapability, OptionsCapability, WindowsCapability, PalworldBridgeCapability}
+	out := []string{Capability, ProfileCapability, OptionsCapability, ConsoleCapability, WindowsCapability, PalworldBridgeCapability}
 	for _, profile := range appProfiles {
 		out = append(out, AppCapability(profile.AppID))
 	}

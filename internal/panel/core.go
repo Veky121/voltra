@@ -33,6 +33,8 @@ import (
 
 type M = map[string]any
 type Config struct {
+	CloudflareAccessTeamDomain, CloudflareAccessAudience                                   string
+	CloudflareAccessLinkAdminEmails                                                        []string
 	ArtworkDirectory                                                                       string
 	Listen, DatabaseURL, PublicURL, DaemonURL, WebDir, LocalesDir, EncryptionKey, Timezone string
 	DevMode                                                                                bool
@@ -40,6 +42,7 @@ type Config struct {
 	ConsoleHistoryLines                                                                    int
 }
 type App struct {
+	cloudflare         cloudflareAccessState
 	DB                 *pgxpool.Pool
 	Config             Config
 	HTTP               *http.Client
@@ -389,6 +392,9 @@ func developmentHost(r *http.Request) bool {
 var schema string
 
 func New(ctx context.Context, cfg Config) (*App, error) {
+	if _, _, err := cloudflareSettings(cfg); err != nil {
+		return nil, err
+	}
 	if _, err := (&App{Config: cfg}).timezone(ctx); err != nil {
 		return nil, err
 	}
@@ -535,6 +541,16 @@ func (a *App) Handler() http.Handler {
 				}
 			} else if r.Header.Get("Authorization") != "" {
 				r, err = a.AuthenticateAPIKey(r)
+				if err != nil {
+					fail(w, err)
+					return
+				}
+			} else if a.cloudflareBrowserRequest(r) {
+				if !setup.Completed {
+					fail(w, APIError{503, "AccessSetupException", "Complete the panel's local administrator setup before enabling Cloudflare Access login."})
+					return
+				}
+				r, err = a.authenticateCloudflare(r)
 				if err != nil {
 					fail(w, err)
 					return

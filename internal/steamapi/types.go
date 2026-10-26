@@ -9,6 +9,7 @@ import (
 
 const Capability = "steam-v1"
 const OptionsCapability = "steam-options-v1"
+const ConsoleCapability = "steam-console-v1"
 const WindowsCapability = "steam-windows-palworld-v1"
 const PalworldBridgeCapability = "steam-palworld-bridge-v1"
 
@@ -25,17 +26,19 @@ type Request struct {
 	BetaPassword string `json:"beta_password,omitempty"`
 	Validate     bool   `json:"validate,omitempty"`
 	Platform     string `json:"platform,omitempty"`
+	StreamOutput bool   `json:"stream_output,omitempty"`
 }
 
 type Event struct {
-	Type            string `json:"type"`
-	Stage           string `json:"stage"`
-	Detail          string `json:"detail"`
-	InstalledBuild  string `json:"installed_build,omitempty"`
-	LatestBuild     string `json:"latest_build,omitempty"`
-	UpdateAvailable bool   `json:"update_available"`
-	FilesChanged    bool   `json:"files_changed"`
-	Error           string `json:"error,omitempty"`
+	Type            string   `json:"type"`
+	Stage           string   `json:"stage"`
+	Detail          string   `json:"detail"`
+	InstalledBuild  string   `json:"installed_build,omitempty"`
+	LatestBuild     string   `json:"latest_build,omitempty"`
+	UpdateAvailable bool     `json:"update_available"`
+	FilesChanged    bool     `json:"files_changed"`
+	Error           string   `json:"error,omitempty"`
+	Lines           []string `json:"lines,omitempty"`
 }
 
 var uuid = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -74,6 +77,8 @@ func (r *Request) Normalize() error {
 // Credentials are transient transport values, never durable replay identity.
 func (r Request) WithoutCredentials() Request {
 	r.BetaPassword = ""
+	// Output preference is not part of the durable execution identity.
+	r.StreamOutput = false
 	if r.Platform == "" {
 		r.Platform = "linux"
 	}

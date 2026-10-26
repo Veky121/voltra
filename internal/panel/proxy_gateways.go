@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func proxyConflict(s string) error { return &APIError{Status: 409, Code: "ProxyConflict", Detail: s} }
@@ -407,9 +408,9 @@ func (a *App) proxyApply(ctx context.Context, tx pgx.Tx, route M) error {
 	if e = proxyCapability(code, e); e != nil {
 		return e
 	}
-	entries, ok := list["proxies"].([]any)
-	if !ok {
-		return fmt.Errorf("FRPC Store API unsupported response")
+	entries, e := proxyStoreEntries(list)
+	if e != nil {
+		return e
 	}
 	c := M{"admin_url": origin, "credentials_encrypted": sealed}
 	var host string
@@ -443,7 +444,11 @@ func (a *App) proxyApply(ctx context.Context, tx pgx.Tx, route M) error {
 		if e = proxyCapability(code, e); e != nil {
 			return e
 		}
-		for _, v := range asSlice(m["proxies"]) {
+		remaining, err := proxyStoreEntries(m)
+		if err != nil {
+			return err
+		}
+		for _, v := range remaining {
 			if str(asMap(v)["name"]) == name {
 				return fmt.Errorf("FRPC Store removal not confirmed; retry reconcile")
 			}
@@ -470,5 +475,20 @@ func (a *App) proxyApply(ctx context.Context, tx pgx.Tx, route M) error {
 	if e != nil || code < 200 || code >= 300 {
 		return fmt.Errorf("FRPC Store create failed; retry reconcile")
 	}
-	return a.proxyRunning(ctx, c, name, proto, host, num(route["public_port"]))
+	// Store creation returns before FRPC finishes registering the remote proxy.
+	// Poll only this mapping, without reloading FRPC or modifying other routes.
+	wait, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var runtimeErr error
+	for {
+		runtimeErr = a.proxyRunning(wait, c, name, proto, host, num(route["public_port"]))
+		if runtimeErr == nil {
+			return nil
+		}
+		select {
+		case <-wait.Done():
+			return runtimeErr
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
 }

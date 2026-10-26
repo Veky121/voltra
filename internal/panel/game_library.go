@@ -2,7 +2,9 @@ package panel
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
@@ -262,7 +264,15 @@ func (a *App) gameLibraryMinecraftLoaderEgg(ctx context.Context, loader string, 
 	managedScript := strings.ReplaceAll(strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", minecraftInstallPython, 1), "\r\n", "\n")
 	previousPython := strings.Replace(minecraftInstallPython, "    # Wings mounts /tmp as a small tmpfs. Pack archives plus the Java bootstrap\n    # must use the server disk budget, not exhaust that tmpfs during extraction.\n    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory or root) as temporary:", "    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory) as temporary:", 1)
 	previousScript := strings.ReplaceAll(strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", previousPython, 1), "\r\n", "\n")
-	if _, err = tx.Exec(ctx, "UPDATE eggs SET script_container=$2,script_install=$3,updated_at=now() WHERE id=$1 AND author='library@voltra.local' AND script_container IN ('ghcr.io/pterodactyl/installers:debian',$2) AND replace(script_install,chr(13)||chr(10),chr(10)) IN ($3,$4) AND (script_container<>$2 OR script_install<>$3)", eggID, minecraftInstallerImage, managedScript, previousScript); err != nil {
+	var storedScript string
+	if err = tx.QueryRow(ctx, "SELECT script_install FROM eggs WHERE id=$1", eggID).Scan(&storedScript); err != nil {
+		return nil, err
+	}
+	historicalScript := managedScript
+	if minecraftKnownHistoricalInstaller(storedScript) {
+		historicalScript = strings.ReplaceAll(storedScript, "\r\n", "\n")
+	}
+	if _, err = tx.Exec(ctx, "UPDATE eggs SET script_container=$2,script_install=$3,updated_at=now() WHERE id=$1 AND author='library@voltra.local' AND script_container IN ('ghcr.io/pterodactyl/installers:debian',$2) AND replace(script_install,chr(13)||chr(10),chr(10)) IN ($3,$4,$5) AND (script_container<>$2 OR script_install<>$3)", eggID, minecraftInstallerImage, managedScript, previousScript, historicalScript); err != nil {
 		return nil, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -270,6 +280,22 @@ func (a *App) gameLibraryMinecraftLoaderEgg(ctx context.Context, loader string, 
 	}
 	return a.one(ctx, "SELECT * FROM eggs WHERE id=$1", eggID)
 }
+
+// These are the exact published pre-streaming managed installers, with and
+// without the disk-backed scratch fix. Only line endings/final newlines are
+// normalized; administrator modifications never match an approved identity.
+func minecraftKnownHistoricalInstaller(script string) bool {
+	canonical := strings.TrimRight(strings.ReplaceAll(script, "\r\n", "\n"), "\n")
+	sum := sha256.Sum256([]byte(canonical))
+	switch hex.EncodeToString(sum[:]) {
+	case "1e41d423d1818426a110f970464b4baf0e75a54118b084c3a9a4d900140304d5",
+		"efe82ae16ace2afc6e9858b50616feefa34ece3578e64399d0347c4502317d3b":
+		return true
+	default:
+		return false
+	}
+}
+
 func (a *App) gameLibraryInstallMinecraft(w http.ResponseWriter, r *http.Request) {
 	user, err := a.requireAdmin(r)
 	if err != nil {

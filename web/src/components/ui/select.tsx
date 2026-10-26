@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
+import {useOverlayPortalContainer} from '../../ui/OverlayPortal'
 
 import {ChevronDownIcon, ChevronUpIcon, CheckIcon} from "lucide-react"
 
@@ -59,6 +60,7 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
+  portalContainer,
   side = "bottom",
   sideOffset = 4,
   align = "center",
@@ -66,13 +68,19 @@ function SelectContent({
   alignItemWithTrigger = true,
   ...props
 }: SelectPrimitive.Popup.Props &
+  {portalContainer?: SelectPrimitive.Portal.Props["container"]} &
   Pick<
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   >) {
+  const container=useOverlayPortalContainer()
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={portalContainer??container}>
       <SelectPrimitive.Positioner
+        // Dialog portals stay in the top layer, but their menus use viewport
+        // coordinates and must escape the dialog's scrolling overflow.
+        positionMethod={portalContainer || container ? "fixed" : undefined}
+        collisionBoundary={[]}
         side={side}
         sideOffset={sideOffset}
         align={align}

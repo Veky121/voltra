@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"voltra/internal/panel"
@@ -24,6 +25,11 @@ func main() {
 	id, _ := strconv.ParseInt(env("DEV_USER_ID", "1"), 10, 64)
 	cfg := panel.Config{ArtworkDirectory: os.Getenv("ARTWORK_DIRECTORY"), Listen: env("LISTEN", "127.0.0.1:8088"), DatabaseURL: os.Getenv("DATABASE_URL"), PublicURL: env("PUBLIC_URL", "http://127.0.0.1:8088"), DaemonURL: os.Getenv("DAEMON_URL"), WebDir: env("WEB_DIR", "web/dist"), LocalesDir: os.Getenv("LOCALES_DIR"), EncryptionKey: os.Getenv("ENCRYPTION_KEY"), Timezone: env("APP_TIMEZONE", "UTC"), DevMode: os.Getenv("DEV_MODE") == "true", DevUserID: id}
 	cfg.ConsoleHistoryLines, _ = strconv.Atoi(env("CONSOLE_HISTORY_LINES", "5000"))
+	cfg.CloudflareAccessTeamDomain = os.Getenv("CLOUDFLARE_ACCESS_TEAM_DOMAIN")
+	cfg.CloudflareAccessAudience = os.Getenv("CLOUDFLARE_ACCESS_AUDIENCE")
+	if value := strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCESS_LINK_ADMIN_EMAILS")); value != "" {
+		cfg.CloudflareAccessLinkAdminEmails = strings.Split(value, ",")
+	}
 	if cfg.DatabaseURL == "" {
 		slog.Error("DATABASE_URL is required")
 		os.Exit(1)

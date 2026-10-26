@@ -1,6 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {gameNodeAvailable, gamePortAddress, gamePortLabel} from '../src/client/gamePortsModel.ts';
+import {gameNodeAvailable, gamePortAddress, gamePortLabel, refreshInstallationForwarding} from '../src/client/gamePortsModel.ts';
+
+test('installation notice replaces stale proxy errors with current per-server routes',()=>{
+  const plan={ip:'0.0.0.0',ports:[{role:'game',port:8211,preferred_port:8211}],detail:'Assigned',forwarding:{status:'pending',detail:'Old error',routes:[{internal_port:8211,protocol:'udp',status:'pending',detail:'Old error'}]}};
+  const route={local_port:8211,public_port:18211,public_host:'game.example',protocol:'udp',status:'applied'};
+  const refreshed=refreshInstallationForwarding(plan,[route,{...route,local_port:25565}]);
+  assert.equal(refreshed.forwarding.status,'mapped');assert.equal(refreshed.forwarding.routes.length,1);assert.equal(refreshed.forwarding.routes[0].public_port,18211);
+  assert.equal(plan.forwarding.status,'pending');
+  assert.equal(refreshInstallationForwarding(refreshed,[{...route,status:'error'}]).forwarding.status,'pending');
+  assert.equal(refreshInstallationForwarding(refreshed,[]).forwarding.status,'manual');
+});
 
 test('automatic allocation allows empty pools without enabling unavailable nodes', () => {
   assert.equal(gameNodeAvailable({automatic_ports:true,free_allocations:0}),true);

@@ -20,12 +20,22 @@ automatic mode, check interval, job progress and collapsed logs. Updates and
 repair require a stopped game. Verify uses SteamCMD validation and may also
 install the current branch build. Game updates do not update Workshop mods.
 
-Default mode is Before start, with a one-hour interval after a successful build
-check. Successful installs/updates/repairs also refresh that timestamp. Failed
-checks have a separate five-minute retry delay. Manual checks bypass cooldowns.
-Rapid starts and restarts do not repeat Steam checks; Wings crash recovery uses
-the installed files directly. Scheduled mode checks periodically, applies
-updates only while the game is stopped and never stops players automatically.
+Default mode is Background checks, with a one-hour interval after a successful
+build check. SteamCMD checks and updates its own client during these background
+jobs, using the retained client cache. Start and Restart only launch installed
+files; they never initiate SteamCMD, version checks, updates or validation.
+The stored/API mode `on_start` remains compatible but now means background
+checks only. The UI's Background checks + offline updates mode uses `scheduled`
+and can also install available game updates while the server is already stopped.
+Neither mode stops players automatically. Off disables automatic checks.
+
+Successful installs/updates/repairs refresh the check timestamp. Failed checks
+have a separate five-minute retry delay. Manual checks bypass cooldowns. The
+legacy `validate_on_start` setting is retained for API compatibility and controls
+validation during installation/updates, never validation during game launch.
+Verify and repair remains an explicit maintenance operation. A queued check can
+be deferred for launch; an already active job still finishes before launch.
+Starts have claim priority and do not consume the node's SteamCMD worker slots.
 
 Panel power APIs, schedules and proxied WebSocket controls share the same start
 rules. Each server has at most one active maintenance job. Repeated compatible

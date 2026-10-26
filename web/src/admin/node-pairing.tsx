@@ -255,24 +255,6 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const dialog = dialogRef.current?.closest<HTMLElement>("[role=dialog]");
-    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), summary, [tabindex="0"]') ?? []).filter((element) => element.getClientRects().length > 0);
-    focusable()[0]?.focus();
-    function trap(event: KeyboardEvent) {
-      if (event.key !== "Tab") return;
-      const elements = focusable();
-      const first = elements[0], last = elements[elements.length - 1];
-      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) {
-        event.preventDefault(); last?.focus();
-      } else if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) {
-        event.preventDefault(); first?.focus();
-      }
-    }
-    document.addEventListener("keydown", trap);
-    return () => { document.removeEventListener("keydown", trap); previous?.focus(); };
-  }, []);
   const sessions = snapshot.data?.sessions ?? [];
   const created = activeId === null ? undefined : secrets[activeId];
   const latestSession = sessions.find((item) => item.id === activeId) ?? created;

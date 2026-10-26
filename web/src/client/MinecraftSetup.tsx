@@ -97,8 +97,10 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
 
   return <form className="mc-setup-layout" onSubmit={install}>
     <fieldset className="mc-form-fields" disabled={busy}>
-      {pack && <Card className="mc-selected-pack"><MinecraftPackIcon pack={pack.project}/><div><h2>{pack.project.name}</h2><p>{pack.version.name} · {pack.provider === "curseforge" ? "CurseForge" : "Modrinth"}</p></div><Button variant="secondary" onClick={onChangePack}>Change</Button></Card>}
-      <Card className="mc-identity"><GameIcon minecraft/><div><GameNameField value={form.name} onChange={name => set("name", name)}/></div></Card>
+      <Card className={`mc-setup-identity${pack ? ' is-modpack' : ''}`}>
+        {pack && <div className="mc-selected-pack"><MinecraftPackIcon pack={pack.project}/><div><h2>{pack.project.name}</h2><p>{pack.version.name} · {pack.provider === "curseforge" ? "CurseForge" : "Modrinth"}</p></div><Button variant="secondary" onClick={onChangePack}>Change</Button></div>}
+        <div className="mc-identity">{!pack && <GameIcon minecraft/>}<div><GameNameField value={form.name} onChange={name => set("name", name)}/></div></div>
+      </Card>
       <Card className="mc-config-card"><div className="mc-section-heading"><span className="mc-section-number">1</span><h2>Game and loader</h2></div>
         {pack ? <><dl className="mc-version-detail"><div><dt>Minecraft</dt><dd>{pack.version.game_versions.join(", ") || "Determined by pack"}</dd></div><div><dt>Loader</dt><dd>{pack.version.loaders.map(loader => loaders.find(option => option.id === loader)?.name ?? loader).join(", ") || "Determined by pack"}</dd></div></dl><p className="muted mc-full">The pack supplies its game and loader versions.</p></> : <>
           <fieldset className="mc-loader-fieldset"><legend>Loader</legend><div className="mc-loaders">{loaders.map(loader => <label key={loader.id} className={`mc-loader ${form.loader === loader.id ? "is-selected" : ""}`}><input type="radio" name="minecraft-loader" value={loader.id} checked={form.loader === loader.id} onChange={() => setForm(previous => ({...previous, loader: loader.id, loaderChoice: "stable", loaderVersion: ""}))}/><MinecraftLoaderIcon id={loader.id} name={loader.name}/><span>{loader.name}</span></label>)}</div></fieldset>

@@ -24,6 +24,42 @@ def archive(files):
 
 
 class MinecraftInstallerTests(unittest.TestCase):
+    def test_archive_download_streams_verifies_and_extracts_from_disk(self):
+        data = archive({'mods/server.jar': b'content', 'run.sh': b'never execute'})
+        selection = {'url': 'https://edge.forgecdn.net/pack.zip', 'algorithm': 'sha256', 'hash': hashlib.sha256(data).hexdigest()}
+        class Response(io.BytesIO):
+            headers = {'Content-Length': str(len(data))}
+            def read(self, count=-1):
+                if count < 0 or count > 1024**2:
+                    raise AssertionError('Archive must be read in bounded blocks')
+                return super().read(count)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'download.zip'
+            root = Path(directory) / 'server'
+            with mock.patch.object(installer.OPENER, 'open', return_value=Response(data)):
+                installer.verified_archive(selection, path)
+            self.assertEqual(path.read_bytes(), data)
+            installer.unpack(path, root, [''])
+            self.assertEqual((root / 'mods/server.jar').read_bytes(), b'content')
+            self.assertFalse((root / 'run.sh').exists())
+
+    def test_archive_failure_cleanup_and_size_boundary(self):
+        selection = {'url': 'https://cdn.modrinth.com/pack.zip', 'algorithm': 'sha256', 'hash': hashlib.sha256(b'good').hexdigest()}
+        for payload, length, maximum in [(b'bad', None, 100), (b'good', '200', 100), (b'x' * 101, None, 100), (b'good', '5', 100)]:
+            with self.subTest(length=length, maximum=maximum), tempfile.TemporaryDirectory() as directory:
+                response = io.BytesIO(payload)
+                response.headers = {} if length is None else {'Content-Length': length}
+                path = Path(directory) / 'download.zip'
+                with mock.patch.object(installer.OPENER, 'open', return_value=response), self.assertRaises(ValueError):
+                    installer.verified_archive(selection, path, maximum=maximum)
+                self.assertFalse(path.exists())
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'existing.zip'
+            path.write_bytes(b'keep')
+            with mock.patch.object(installer.OPENER, 'open', return_value=io.BytesIO(b'good')), self.assertRaises(FileExistsError):
+                installer.verified_archive(selection, path)
+            self.assertEqual(path.read_bytes(), b'keep')
+
     def test_explicit_disk_scratch_and_cleanup_after_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)/"root";scratch=Path(directory)/"scratch";scratch.mkdir()

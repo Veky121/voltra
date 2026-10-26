@@ -11,6 +11,7 @@
 #   7. Tail the server log to stdout so it shows up in the panel console.
 #   8. On SIGINT/SIGTERM, shut the server down cleanly.
 set -uo pipefail
+export FS25_START_TIME_MS="$(date +%s%3N)"
 
 umask 077
 FS25_LIB="/home/container/.voltra/fs25/lib"
@@ -96,8 +97,8 @@ if [ ! -f "${GAME_DIR}/dedicatedServer.exe" ]; then
     # If no installer was uploaded, fetch it from the official GIANTS portal using
     # the operator's own serial (license-gated; see lib/download-game.sh).
     bash "${FS25_LIB}/download-game.sh" || {
-        err "Automatic download failed. Upload the installer into ${INSTALLER_DIR}/"
-        err "manually, or fix GAME_SERIAL, then restart."
+        err "Automatic download failed. See the download error above."
+        err "Retry later, or upload the GIANTS installer into ${INSTALLER_DIR}/ and restart."
         exit 1
     }
     if ! bash "${FS25_LIB}/install-game.sh"; then
@@ -133,6 +134,11 @@ WINE_LOG="${DEDI_DIR}/dedicatedServer.log"
 mkdir -p "$DEDI_DIR/logs"
 : > "$WINE_LOG"
 
+# Attach before Wine starts. Skip previous sessions, follow newly created logs.
+log "Streaming Game, Server, WebPanel and Wine logs to Console."
+node "${FS25_LIB}/console-logs.mjs" --from-now &
+TAIL_PID=$!
+
 log "Launching dedicatedServer.exe..."
 # Run inside a Wine virtual desktop. The dedicated server spawns the game as a
 # child process, and without a desktop that child cannot create its window
@@ -149,6 +155,7 @@ shutdown() {
     wineserver -k >/dev/null 2>&1 || true
     kill "$WINE_PID"  >/dev/null 2>&1 || true
     [ -z "${TAIL_PID:-}" ] || kill "$TAIL_PID"  >/dev/null 2>&1 || true
+    [ -z "${DLC_VERIFY_PID:-}" ] || kill "$DLC_VERIFY_PID" >/dev/null 2>&1 || true
     kill "$XVFB_PID"  >/dev/null 2>&1 || true
     exit 0
 }
@@ -166,18 +173,15 @@ done
 
 if nc -z "$WEB_HOST" "$WEB_PORT" 2>/dev/null; then
     log "Requesting game session start via web portal..."
+    node "${FS25_LIB}/dlc-state.mjs" &
+    DLC_VERIFY_PID=$!
     node "${FS25_LIB}/start-game.mjs" || warn "Could not auto-start the session; start it manually via the web portal on port ${WEB_PORT}."
 else
     warn "Web portal never came up. Inspect ${WINE_LOG}."
 fi
 
-# ---- 7. Stream the server log to the panel console ----------------------------
-# The rich log is the timestamped session log under dedicated_server/logs/.
+# ---- 7. The follower above streams all log sources to the panel console -------
 log "Web manager ready. Streaming log (web portal: http://${WEB_HOST}:${WEB_PORT}). Check the game log for gameplay readiness."
-SERVER_LOG=$(ls -t "${DEDI_DIR}/logs/"server_*.log 2>/dev/null | head -1)
-[ -z "$SERVER_LOG" ] && SERVER_LOG="$WINE_LOG"
-tail -n +1 -F "$SERVER_LOG" "$WINE_LOG" 2>/dev/null &
-TAIL_PID=$!
 
 # Keep PID1 alive while the Wine process runs; react to signals via the trap.
 wait "$WINE_PID"

@@ -179,6 +179,25 @@ func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, item("game_quick_setup", result))
 			return
 		}
+		if game == "minecraft" {
+			if e = a.minecraftQuickUpdate(ctx, s, file, revision, patch); e != nil {
+				fail(w, e)
+				return
+			}
+			keys := make([]string, 0, len(patch))
+			for key := range patch {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			_ = a.audit(ctx, num(u["id"]), num(s["id"]), "server:quick-setup.update", M{"game": game, "keys": keys})
+			result, viewErr := a.quickSetupView(ctx, r, s, game)
+			if viewErr != nil {
+				fail(w, viewErr)
+				return
+			}
+			writeJSON(w, 200, item("game_quick_setup", result))
+			return
+		}
 		tx, e := a.DB.Begin(ctx)
 		if e != nil {
 			fail(w, e)
@@ -362,7 +381,7 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 		}
 		for _, record := range records {
 			if record.Key != "" {
-				values[record.Key] = record.Value
+				values[record.Key] = minecraftPropertyEnumLabel(record.Key, record.Value)
 			}
 		}
 	}

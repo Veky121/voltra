@@ -164,6 +164,23 @@ func TestCLIAccountsSettingsMaintenancePostgres(t *testing.T) {
 		t.Fatal("last administrator deleted")
 	}
 	cliRunJSON(t, a, "p:environment:setup", "--name=CLI Panel", "--locale=en")
+	settings, e := a.infraLoadSettings(ctx)
+	if e != nil || settings["app:name"] != "CLI Panel" || settings["app:locale"] != "en" {
+		t.Fatalf("CLI identity settings not persisted: %v", e)
+	}
+	for _, args := range [][]string{
+		{"--name=", "--locale=de"},
+		{"--name=Partial update", "--locale=x"},
+		{"--name=Partial update", "--timezone=Not/A-Timezone"},
+	} {
+		if e := a.RunCommand(ctx, append([]string{"p:environment:setup"}, args...), &bytes.Buffer{}); e == nil {
+			t.Fatalf("invalid deployment settings accepted: %v", args)
+		}
+		settings, e = a.infraLoadSettings(ctx)
+		if e != nil || settings["app:name"] != "CLI Panel" || settings["app:locale"] != "en" {
+			t.Fatal("invalid CLI settings partially changed panel identity")
+		}
+	}
 	cliRunJSON(t, a, "p:environment:setup", "--timezone=Europe/Berlin")
 	timezone, e := a.one(ctx, "SELECT value FROM settings WHERE key='app:timezone'")
 	if e != nil || str(timezone["value"]) != "Europe/Berlin" {

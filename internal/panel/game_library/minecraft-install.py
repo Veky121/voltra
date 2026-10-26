@@ -17,6 +17,8 @@ import zipfile
 import zlib
 
 AGENT = "Voltra-GameLibrary/1.0 (https://github.com/voltra-panel/voltra)"
+MAX_PACK_ARCHIVE = 2 * 1024**3
+MAX_PACK_EXPANDED = 4 * 1024**3
 HOSTS = {
     "piston-data.mojang.com", "launcher.mojang.com", "maven.fabricmc.net",
     "maven.quiltmc.org", "maven.minecraftforge.net", "maven.neoforged.net",
@@ -66,6 +68,46 @@ def verified(file, maximum=512 * 1024 * 1024):
     return data
 
 
+def verified_archive(file, destination, maximum=MAX_PACK_ARCHIVE):
+    """Stream large server packs into installer scratch, never into RAM/tmpfs."""
+    if not allowed_url(file['url']):
+        raise ValueError('The plan contains an unsupported download host')
+    algorithm = file['algorithm']
+    expected = file['hash']
+    if algorithm not in {'sha1', 'sha256', 'sha512'}:
+        raise ValueError('The download has no supported checksum')
+    checksum = hashlib.new(algorithm)
+    if not isinstance(expected, str) or len(expected) != checksum.digest_size * 2 or any(c not in '0123456789abcdefABCDEF' for c in expected):
+        raise ValueError('The download has no supported checksum')
+    destination = Path(destination)
+    request = urllib.request.Request(file['url'], headers={'User-Agent': AGENT})
+    output = None
+    try:
+        with OPENER.open(request, timeout=120) as response, destination.open('xb') as output:
+            length = response.headers.get('Content-Length')
+            if length and int(length) > maximum:
+                raise ValueError('The pack download exceeds the supported 2 GiB archive size')
+            size = 0
+            while True:
+                block = response.read(min(1024**2, maximum - size + 1))
+                if not block:
+                    break
+                size += len(block)
+                if size > maximum:
+                    raise ValueError('The pack download exceeds the supported 2 GiB archive size')
+                checksum.update(block)
+                output.write(block)
+            if length and size != int(length):
+                raise ValueError('The pack download was interrupted')
+            if checksum.hexdigest().lower() != expected.lower():
+                raise ValueError('A download did not match its checksum')
+    except BaseException:
+        if output is not None:
+            destination.unlink(missing_ok=True)
+        raise
+    return destination
+
+
 def safe_name(name):
     if (not name or len(name) > 512 or any(c in name for c in "\\\0\r\n:")
             or name.startswith("/")):
@@ -91,9 +133,9 @@ def safe_target(root, name):
 
 
 def unpack(data, root, prefixes):
-    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+    with zipfile.ZipFile(io.BytesIO(data) if isinstance(data, bytes) else data) as archive:
         entries = archive.infolist()
-        if len(entries) > 30000 or sum(f.file_size for f in entries) > 2 * 1024**3:
+        if len(entries) > 30000 or sum(f.file_size for f in entries) > MAX_PACK_EXPANDED:
             raise ValueError("The pack exceeds the supported archive size")
         for entry in entries:
             safe_name(entry.filename)
@@ -177,8 +219,13 @@ def install(plan, root, work_directory=None):
             target = safe_target(staging, file["path"])
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(verified(file))
-        for archive in plan.get("archives", []):
-            unpack(verified(archive["file"], 512 * 1024**2), staging, archive["prefixes"])
+        for index, archive in enumerate(plan.get("archives", [])):
+            downloaded = Path(temporary) / ("pack-" + str(index) + ".zip")
+            try:
+                verified_archive(archive["file"], downloaded)
+                unpack(downloaded, staging, archive["prefixes"])
+            finally:
+                downloaded.unlink(missing_ok=True)
         installer = plan.get("installer")
         if installer:
             java_root = Path(temporary) / "java"

@@ -1,13 +1,12 @@
 import './games-ui.css';
 import {useCallback, useEffect, useRef, useState, type FormEvent} from 'react';
 import {Link, useParams} from 'react-router-dom';
-import {api, Button, Card, ErrorBox, Input, Select, Textarea, unwrap, useAPI} from '../lib';
+import {api, Button, Card, ErrorBox, Input, Select, unwrap, useAPI} from '../lib';
 import {can, items, json, useServer} from './common';
-import {safeFolderLink, stoppedServer, type QuickField, type QuickSetup, type QuickValue} from './gameSetupModel';
+import {safeFolderLink, stoppedServer, type QuickSetup, type QuickValue} from './gameSetupModel';
 import {useGameRequest} from './useGameRequest';
 import {useServerTelemetry} from './ServerDashboard';
-import {GameSwitch} from './GameSwitch';
-import {readableSettingName, settingsGroups} from './gameSettingsLayout';
+import {GameSettingsFields} from './GameSettingsFields';
 import {StartupVariableField} from './ServerStartup';
 import type {StartupVariable, VariableWrite} from './startupSettingsModel';
 import './steamGames.css';
@@ -69,12 +68,10 @@ function QuickSetupContent({data, search, folderRequest, serverID, onSaved, onDi
   }
   function change(key: string, value: QuickValue) {setDraft(previous => ({...previous, [key]: value})); setSuccess('');}
   const folders = [...new Map([...data.folders, ...(folderRequest.data?.folders || [])].map(folder => [folder.path, folder])).values()].map(folder => ({...folder, to: safeFolderLink(serverID, folder.path)})).filter(folder => folder.to);
-  const groups = settingsGroups(saved.fields, data.game, saved.file);
-  const visibleGroups = groups.map(group => ({...group, fields: group.fields.filter(field => `${field.key} ${readableSettingName(field)}`.toLowerCase().includes(search.trim().toLowerCase()))})).filter(group => group.fields.length);
   return <div className="game-quick-layout">
     <Card className="game-settings-card">
       {saved.fields.length ? <form onSubmit={save}>
-        <fieldset className="steam-fields" disabled={blocked || busy}>{visibleGroups.map(group => <section key={group.id} className="game-settings-section" aria-label={group.label}><h4>{group.label}</h4><div className="game-properties-grid">{group.fields.map(field => <QuickSetting key={field.key} field={field} value={Object.hasOwn(draft, field.key) ? draft[field.key] : field.value} onChange={value => change(field.key, value)}/>)}</div></section>)}{!visibleGroups.length && <p className="muted">No matching settings.</p>}<div className="game-settings-save"><Button type="submit" disabled={blocked || !dirty || busy} aria-busy={busy}>{busy ? 'Saving...' : 'Save settings'}</Button>{dirty && <span className="muted">{Object.keys(changes).length} unsaved</span>}</div></fieldset>
+        <fieldset className="steam-fields" disabled={blocked || busy}><GameSettingsFields fields={saved.fields} game={data.game} file={saved.file} search={search} draft={draft} onChange={change}/><div className="game-settings-save"><Button type="submit" disabled={blocked || !dirty || busy} aria-busy={busy}>{busy ? 'Saving...' : 'Save settings'}</Button>{dirty && <span className="muted">{Object.keys(changes).length} unsaved</span>}</div></fieldset>
         <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={() => {if (!dirty || window.confirm('Discard your unsaved settings and reload?')) {onDirty(false); onSaved();}}}>Reload current settings</Button>}{success && <p role="status" className="success">{success}</p>}
       </form> : <p className="muted">No generated server configuration was found. Start the game once to create its settings.</p>}
       <GameStartupSettings onDirty={setStartupDirty}/>
@@ -87,18 +84,6 @@ function QuickSetupContent({data, search, folderRequest, serverID, onSaved, onDi
   </div>;
 }
 
-function QuickSetting({field, value, onChange}: {field: QuickField; value: QuickValue; onChange: (value: string | boolean) => void}) {
-  const disabled = field.readonly || field.type === 'readonly';
-  const label = readableSettingName(field);
-  const id = `game-property-${encodeURIComponent(field.key)}`;
-  return <div className={`game-setting-row${field.type === 'boolean' ? ' is-boolean' : ''}`}><div className="game-setting-identity"><label htmlFor={id} title={field.key}>{label}</label>{disabled && <span className="game-setting-managed" title={field.type === 'readonly' ? 'This structured value needs the file editor.' : 'Managed by the server or template.'}>{field.type === 'readonly' ? 'File editor' : 'Managed'}</span>}</div><div className="game-setting-control">
-    {field.type === 'boolean' ? <GameSwitch id={id} aria-label={label} checked={value === true} disabled={disabled} onCheckedChange={checked => onChange(checked)}/>
-      : field.type === 'list' ? <Textarea id={id} aria-label={label} title="JSON list" rows={2} value={String(value ?? '[]')} onChange={event => onChange(event.target.value)}/>
-      : field.type === 'select' ? <Select id={id} aria-label={label} value={String(value ?? '')} disabled={disabled} onChange={event => onChange(event.target.value)}>{field.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>
-      : <Input id={id} aria-label={label} disabled={disabled} type={field.secret ? 'password' : field.type === 'number' ? 'number' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} step="any" placeholder={field.secret ? field.configured ? 'Configured' : 'Not configured' : undefined} value={value === null ? '' : String(value)} onChange={event => onChange(event.target.value)}/>}
-    {field.secret && field.configured && <button type="button" className="game-setting-clear" disabled={disabled} onClick={() => onChange('')}>Clear</button>}
-  </div></div>;
-}
 
 function GameStartupSettings({onDirty}: {onDirty: (dirty: boolean) => void}) {
   const {base, permissions} = useServer();

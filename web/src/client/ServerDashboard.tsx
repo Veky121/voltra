@@ -1,5 +1,6 @@
 import {requestServerPower} from './serverPower';
 import type {PowerSignal} from './consoleLifecycle';
+import {advancePowerOperation,beginPowerOperation,powerOperationLabel,type PowerOperation} from './powerOperation';
 import {useArtworkLibrary} from './ArtworkProvider';
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useLocation} from 'react-router-dom';
@@ -7,7 +8,7 @@ import {api,Button} from '../lib';
 import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
 import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
 import {Icon,type IconName} from '../Icons';
-import {bytes,can,items,Notice,PageError,useAction,useServer,value} from './common';
+import {bytes,can,items,PageError,useServer,value} from './common';
 import './serverHeader.css';
 import './shadcn-cards.css';
 import './dashboard-ui.css';
@@ -54,28 +55,54 @@ function uptime(ms:number){
   return `${days?`${days}d `:''}${hours}h ${minutes}m ${seconds%60}s`;
 }
 
+const PowerContext=createContext<{pending:PowerOperation|null;busy:boolean;error:string;success:string;power:(signal:PowerSignal)=>Promise<void>}>({pending:null,busy:false,error:'',success:'',power:async()=>{}});
+
+function usePowerOperation(base:string,telemetry:Telemetry){
+  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useState(''),[success,setSuccess]=useState('');
+  const requestInFlight=useRef<PowerOperation|null>(null),operationRef=useRef<PowerOperation|null>(null),active=useRef(true);
+  useEffect(()=>{active.current=true;return()=>{active.current=false}},[]);
+  function update(operation:PowerOperation|null){operationRef.current=operation;setPending(operation)}
+  useEffect(()=>{update(null);setError('');setSuccess('');requestInFlight.current=null},[base]);
+  useEffect(()=>{
+    const operation=operationRef.current;
+    if(!operation||telemetry.error)return;
+    const result=advancePowerOperation(operation,telemetry.state,number(telemetry.resources.uptime),telemetry.updated);
+    if(result.operation!==operation)update(result.operation);
+    if(result.outcome==='success')setSuccess(result.message!);
+    if(result.outcome==='error')setError(result.message!);
+  },[telemetry.state,telemetry.updated,telemetry.error,pending?.accepted]);
+  async function power(signal:PowerSignal){
+    if(requestInFlight.current||(operationRef.current&&signal!=='kill'))return;
+    if(signal==='kill'&&!window.confirm('Force stop this server immediately? Unsaved progress may be lost.'))return;
+    setError('');setSuccess('');
+    const operation=beginPowerOperation(signal,telemetry.updated,number(telemetry.resources.uptime));
+    requestInFlight.current=operation;
+    update(operation);
+    try{
+      await requestServerPower(base,signal);
+      if(active.current&&operationRef.current===operation){update({...operation,accepted:true});telemetry.refresh()}
+    }catch(error){if(active.current&&operationRef.current===operation){update(null);setError(error instanceof Error?error.message:String(error))}}
+    finally{if(requestInFlight.current===operation)requestInFlight.current=null}
+  }
+  return {pending,busy:!!pending&&!pending.accepted,error,success,power};
+}
+
 function PowerControls({compact=false}:{compact?:boolean}){
-  const {base,server,permissions}=useServer();
-  const telemetry=useContext(TelemetryContext),action=useAction();
-  const [pending,setPending]=useState('');
+  const {server,permissions}=useServer();
+  const telemetry=useContext(TelemetryContext),action=useContext(PowerContext),pending=action.pending;
   const running=telemetry.state==='running',starting=telemetry.state==='starting';
   const blocked=!!server.status||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
   const controls:[PowerSignal,string,IconName,string,boolean][]=[
     ['start','Start','play','control.start',running||starting||telemetry.state==='stopping'],
     ['restart','Restart','restart','control.restart',!running],
-    ['stop','Stop','stop','control.stop',!running&&!starting],
+    ['stop','Stop','stop','control.stop',!running],
+    ['kill','Force stop','close','control.stop',!running&&!starting&&telemetry.state!=='stopping'&&!pending],
   ];
-  async function power(signal:PowerSignal){
-    setPending(signal);
-    await action.run(()=>requestServerPower(base,signal),()=>{
-      telemetry.refresh();
-      action.setSuccess(`${signal==='restart'?'Restart':signal==='start'?'Start':'Stop'} requested.`);
-    });
-    setPending('');
-  }
   return <div className="server-power">
-    <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=><Button key={signal} variant={signal==='stop'?'danger':compact||signal==='restart'?'secondary':'default'} aria-label={compact?`${label} server`:undefined} title={compact?`${label} server`:undefined} aria-busy={pending===signal} disabled={blocked||disabled||action.busy} onClick={()=>void power(signal)}><Icon name={icon}/>{!compact&&(pending===signal?'Sending…':label)}</Button>)}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
-    <Notice action={action}/>
+    <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=><Button key={signal} className="server-power-button" data-power={signal} variant="secondary" aria-label={compact?`${label} server`:undefined} title={signal==='kill'?'Immediately terminate the server process':compact?`${label} server`:undefined} aria-busy={pending?.signal===signal} disabled={blocked||disabled||action.busy||!!pending&&(signal!=='kill'||pending.signal==='kill')} onClick={()=>void action.power(signal)}><Icon name={icon}/>{!compact&&(pending?.signal===signal?powerOperationLabel(pending):label)}</Button>)}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
+    {(pending||starting||telemetry.state==='stopping')&&<div className="server-power-progress" role="status"><span>{telemetry.error?'Connection interrupted. Waiting for server status.':pending?powerOperationLabel(pending):starting?'Starting…':'Stopping…'}</span><div className="server-power-progress-track" role="progressbar" aria-label="Server power operation"><span/></div></div>}
+    {action.error&&<div className="error" role="alert">{action.error}</div>}
+    {action.success&&<div className="success" role="status">{action.success}</div>}
   </div>;
 }
 
@@ -101,7 +128,8 @@ export function ServerWorkspace({children}:{children:ReactNode}){
   const pathname=useLocation().pathname;
   const dashboardPage=/^\/server\/[^/]+\/?$/.test(pathname);
   const telemetry=useTelemetry(base,!server.status);
-  return <TelemetryContext.Provider value={telemetry}>
+  const power=usePowerOperation(base,telemetry);
+  return <TelemetryContext.Provider value={telemetry}><PowerContext.Provider value={power}>
     {!dashboardPage?<header className="server-topbar"><div className="server-summary"><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div><ServerStateLine/></div><PowerControls compact/></header>:<header><Card className="server-hero server-hero-with-artwork shadcn-card" data-artwork={art.id}>
       <DashboardArtwork key={art.src} art={art}/>
       <CardHeader className="server-hero-info">
@@ -115,7 +143,7 @@ export function ServerWorkspace({children}:{children:ReactNode}){
     <InstallationPortsNotice key={server.identifier || server.uuid_short} identifier={server.identifier || server.uuid_short}/>
     <PageError error={telemetry.error}/>
     {children}
-  </TelemetryContext.Provider>;
+  </PowerContext.Provider></TelemetryContext.Provider>;
 }
 
 type Series={name:string;color:string;values:number[]};

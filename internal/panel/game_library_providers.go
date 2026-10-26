@@ -25,11 +25,24 @@ var minecraftID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,127}$`)
 // Each request starts without credentials. Redirects stay inside the caller's
 // host set, and API credentials never follow a redirect to another host.
 func (a *App) minecraftProviderBytes(ctx context.Context, address, key string, limit int64, hosts []string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	res, err := a.minecraftProviderResponse(ctx, address, key, hosts, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
+	if err != nil || int64(len(data)) > limit {
+		return nil, APIError{502, "MinecraftProviderInvalid", "The provider response exceeded the supported size or could not be read."}
+	}
+	return data, nil
+}
+
+func (a *App) minecraftProviderResponse(ctx context.Context, address, key string, hosts []string, timeout time.Duration) (*http.Response, error) {
 	if !minecraftOfficialURL(address, hosts...) {
 		return nil, bad("The provider returned an unsupported download address.")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", address, nil)
 	if err != nil {
 		return nil, err
@@ -41,6 +54,9 @@ func (a *App) minecraftProviderBytes(ctx context.Context, address, key string, l
 	client := http.Client{Timeout: 90 * time.Second}
 	if a.HTTP != nil {
 		client = *a.HTTP
+	}
+	if timeout > 0 {
+		client.Timeout = timeout
 	}
 	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
 		if len(via) >= 5 || !minecraftOfficialURL(next.URL.String(), hosts...) {
@@ -55,21 +71,17 @@ func (a *App) minecraftProviderBytes(ctx context.Context, address, key string, l
 	if err != nil {
 		return nil, APIError{502, "MinecraftProviderUnavailable", "The Minecraft provider could not be reached. Try again shortly."}
 	}
-	defer res.Body.Close()
+	if res.StatusCode == 200 {
+		return res, nil
+	}
+	res.Body.Close()
 	if res.StatusCode == 404 {
 		return nil, APIError{422, "MinecraftSelectionUnavailable", "This version is not available from the selected provider. Choose another version."}
 	}
 	if res.StatusCode == 401 || res.StatusCode == 403 {
 		return nil, APIError{422, "ProviderAccessDenied", "The provider denied access. Check the global integration key and the project's download permissions."}
 	}
-	if res.StatusCode != 200 {
-		return nil, APIError{502, "MinecraftProviderUnavailable", "The Minecraft provider returned an error. Try again shortly."}
-	}
-	data, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
-	if err != nil || int64(len(data)) > limit {
-		return nil, APIError{502, "MinecraftProviderInvalid", "The provider response exceeded the supported size or could not be read."}
-	}
-	return data, nil
+	return nil, APIError{502, "MinecraftProviderUnavailable", "The Minecraft provider returned an error. Try again shortly."}
 }
 
 func (a *App) minecraftProviderJSON(ctx context.Context, address, key string, target any) error {
@@ -140,17 +152,6 @@ func minecraftVerify(data []byte, file minecraftDownload) error {
 		return APIError{502, "MinecraftChecksumMismatch", "The provider download did not match its checksum. Try again later."}
 	}
 	return nil
-}
-
-func (a *App) minecraftFetchArchive(ctx context.Context, file minecraftDownload) ([]byte, error) {
-	data, err := a.minecraftProviderBytes(ctx, file.URL, "", 512<<20, minecraftDownloadHosts)
-	if err != nil {
-		return nil, err
-	}
-	if err = minecraftVerify(data, file); err != nil {
-		return nil, err
-	}
-	return data, nil
 }
 
 func minecraftQuery(address string, values url.Values) string { return address + "?" + values.Encode() }

@@ -395,7 +395,11 @@ func (a *App) browserSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, M{"authenticated": false})
 		return
 	}
-	writeJSON(w, 200, M{"authenticated": true, "user": M{"id": u["id"], "username": u["username"], "email": u["email"], "root_admin": u["root_admin"]}})
+	provider := "password"
+	if r.Context().Value(cloudflareIdentityKey{}) == true {
+		provider = "cloudflare"
+	}
+	writeJSON(w, 200, M{"authenticated": true, "auth_provider": provider, "user": M{"id": u["id"], "username": u["username"], "email": u["email"], "root_admin": u["root_admin"]}})
 }
 func (a *App) browserLogin(w http.ResponseWriter, r *http.Request) {
 	s, e := a.setupState(r.Context())
@@ -472,5 +476,9 @@ func (a *App) browserLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteStrictMode, MaxAge: -1})
+	if r.Context().Value(cloudflareIdentityKey{}) == true {
+		writeJSON(w, 200, M{"authenticated": false, "redirect_url": "/cdn-cgi/access/logout"})
+		return
+	}
 	writeJSON(w, 200, M{"authenticated": false})
 }

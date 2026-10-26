@@ -312,6 +312,9 @@ func accountAttributes(u M) M {
 	if str(u["password_hash"]) != "" {
 		provider = "password"
 	}
+	if str(u["access_subject"]) != "" {
+		provider = "cloudflare"
+	}
 	return M{"sftp_password_set": str(u["sftp_password_hash"]) != "", "id": u["id"], "uuid": u["uuid"], "admin": u["root_admin"], "root_admin": u["root_admin"], "username": u["username"], "nickname": accountNickname(u), "email": u["email"], "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "auth_provider": provider, "cloudflare_pending": provider == "development"}
 }
 

@@ -202,3 +202,24 @@ export function templateVariableControl(variable: TemplateVariableDefinition, en
   return {boolean, required: rules.includes('required') || conditionalRequired, secret, numeric, choices: choices ?? booleanChoices, minimum, maximum, step: rules.includes('integer') ? 1 : 'any' as const, excludedValues, pattern};
 }
 
+// Match the supported browser rules without putting entered values in errors.
+// The API remains authoritative for regex, cross-field, and installer checks.
+export function templateVariableProblem(variable:TemplateVariableDefinition, environment:Record<string,string>):string {
+  const control=templateVariableControl(variable,environment), value=environment[variable.env_variable]??'';
+  if(!value.trim())return control.required?'Enter a value.':'';
+  if(control.choices&&!control.choices.includes(value))return 'Choose a supported value.';
+  if(control.excludedValues.includes(value))return 'Enter a different value; this value is not allowed.';
+  if(control.numeric){
+    const number=Number(value);
+    if(!Number.isFinite(number))return 'Enter a number.';
+    if(control.step===1&&!Number.isInteger(number))return 'Enter a whole number.';
+    if(control.minimum!==undefined&&number<control.minimum)return `Enter at least ${control.minimum}.`;
+    if(control.maximum!==undefined&&number>control.maximum)return `Enter no more than ${control.maximum}.`;
+  }else{
+    const length=Array.from(value).length;
+    if(control.minimum!==undefined&&length<control.minimum)return `Use at least ${control.minimum} characters.`;
+    if(control.maximum!==undefined&&length>control.maximum)return `Use no more than ${control.maximum} characters.`;
+  }
+  return '';
+}
+

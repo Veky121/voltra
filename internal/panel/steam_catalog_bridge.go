@@ -77,7 +77,7 @@ func steamCatalogFields(game string) []steamCatalogField {
 		}...)
 	case "satisfactory":
 		return append(common, []steamCatalogField{
-			{Key: "VALIDATE", Label: "Validate files on automatic startup", Type: "boolean", Default: "0"},
+			{Key: "VALIDATE", Label: "Validate files during installation and updates", Type: "boolean", Default: "0"},
 			{Key: "MAX_PLAYERS", Label: "Maximum players", Type: "integer", Default: "4", Min: 1, Max: 2147483647},
 			{Key: "NUM_AUTOSAVES", Label: "Rotating autosaves", Type: "integer", Default: "3", Min: 1, Max: 2147483647},
 			{Key: "INIT_CONNECT_TIMEOUT", Label: "Initial connection timeout (seconds)", Type: "number", Default: "30", Min: 1, Max: math.MaxFloat32},

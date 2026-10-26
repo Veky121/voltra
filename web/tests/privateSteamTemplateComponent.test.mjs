@@ -8,6 +8,7 @@ import ts from 'typescript';
 import * as steamModel from '../src/client/privateSteamTemplateModel.ts';
 import * as templateModel from '../src/client/gameTemplateModel.ts';
 import * as setupModel from '../src/client/gameSetupModel.ts';
+import * as setupValidation from '../src/client/templateSetupValidation.ts';
 const require=createRequire(import.meta.url),source=fs.readFileSync(new URL('../src/client/TemplateGames.tsx',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
 function load(){
@@ -15,7 +16,7 @@ function load(){
   react:React,'react-router-dom':{useNavigate:()=>()=>{},useParams:()=>({}),Link:'a'},
   '../lib':{api(){throw Error('No network in component fixture');},Button:({children,variant,...props})=>React.createElement('button',props,children),Card:'section',ErrorBox:({children})=>React.createElement('div',null,children),Field:({label,hint,children})=>React.createElement('label',null,label,children,hint),Input:'input',Select:'select',unwrap:x=>x},
   './common':{json:()=>{}},'./GameSetupFields':{GameAgreementField:()=>null,GameMemoryField:()=>null,GameNameField:()=>null,GameNodeField:()=>null},
-  './gameSetupModel':setupModel,'./SteamGames':{SteamSetupForm:()=>null},'./useGameRequest':{useGameRequest:()=>({})},'./gameTemplateModel':templateModel,
+  './gameSetupModel':setupModel,'./templateSetupValidation':setupValidation,'./SteamGames':{SteamSetupForm:()=>null},'./useGameRequest':{useGameRequest:()=>({})},'./gameTemplateModel':templateModel,
   './GamePorts':{GamePorts:()=>null,useGamePortPlan:()=>({data:{ports:[]},loading:false,error:''}),rememberInstallationPorts(){}},
   './GameLibraryCard':{GameLibraryCard:()=>null,gameArtwork:()=>null},'./gameLibraryOrder':{compareGamePopularity:()=>0},'./minecraftCommunityModel':{isMinecraftTemplate:()=>false,minecraftProjectKey:()=>''},'./minecraftCommunityArtwork.json':{},'./privateSteamTemplateModel':steamModel,
  };
@@ -39,6 +40,12 @@ test('actual form retains Banana private default/readiness gating without enabli
  assert.match(html,/<button(?=[^>]*disabled)[^>]*>Create server/);
  const pending={...value,private_content_supported:false,steam_installation:{...value.steam_installation,private_supported:false,private_reason:'Publication policy pending review'}};
  const blocked=renderToStaticMarkup(React.createElement(load(),{options:pending}));assert.match(blocked,/Publication policy pending review/);assert.match(blocked,/<button(?=[^>]*disabled)[^>]*>Create server/);
+ const trusted={...value,nodes:value.nodes.map(node=>({...node,private_content_ready:true}))};
+ const allowed=renderToStaticMarkup(React.createElement(load(),{options:trusted}));
+ assert.doesNotMatch(allowed,/<button(?=[^>]*disabled)[^>]*>Create server/);
+ const unsupportedTrusted={...pending,nodes:trusted.nodes};
+ const unsupported=renderToStaticMarkup(React.createElement(load(),{options:unsupportedTrusted}));
+ assert.match(unsupported,/<button(?=[^>]*disabled)[^>]*>Create server/);
 });
 
 

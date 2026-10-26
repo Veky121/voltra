@@ -9,6 +9,7 @@
 // unchanged plus the start (or stop) button. Reading all fields generically keeps
 // this working across game versions that add/rename settings.
 import http from 'http';
+import {pendingDLCs} from './dlc-state.mjs';
 
 // The portal binds to the container network IP, not loopback; start.sh exports it.
 const HOST = `${process.env.WEB_HOST || '127.0.0.1'}:${process.env.WEB_PORT || '7999'}`;
@@ -98,7 +99,7 @@ function scrapeForm(html) {
 
 async function run() {
   const cookie = await login();
-  const page = await request('GET', {}, cookie);
+  let page = await request('GET', {}, cookie);
 
   if (STOP) {
     await request('POST', { stop_server: 'Stop' }, cookie);
@@ -106,6 +107,13 @@ async function run() {
     return;
   }
 
+  const inactive=page.body.match(/<form\b[^>]*name\s*=\s*"InactiveMods"[^>]*>([\s\S]*?)<\/form>/i)?.[1]||'';
+  const activate={};
+  for(const entry of pendingDLCs(process.env.DLC_DIR||'/home/container/dlc'))for(const file of entry.payloads) {
+    const name='modactivate_'+file;
+    if([...inactive.matchAll(/<input\b[^>]*>/gi)].some(([tag])=>new RegExp('name\\s*=\\s*"'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"').test(tag)))activate[name]='on';
+  }
+  if(Object.keys(activate).length) {await request('POST',{...activate,activate_mods:'Activate'},cookie);page=await request('GET',{},cookie);console.log('[fs25] Enabled newly installed DLCs for game validation.');}
   const params = scrapeForm(page.body);
   if (!('game_name' in params)) throw new Error('settings form not found (not logged in?)');
   delete params.save_settings; // do not trigger the "Save" button

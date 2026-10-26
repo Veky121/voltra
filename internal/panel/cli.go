@@ -686,7 +686,7 @@ func (a *App) cliApplySettings(ctx context.Context, data M, out io.Writer) error
 	}
 	r = WithUser(r, num(admin["id"]))
 	capture := &cliHTTPOutput{header: http.Header{}, code: 200}
-	a.infraSettings(capture, r)
+	a.infraApplySettings(capture, r, true)
 	if capture.code >= 400 {
 		var response M
 		_ = json.Unmarshal(capture.body.Bytes(), &response)

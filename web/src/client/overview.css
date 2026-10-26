@@ -30,12 +30,12 @@
 .overview-page .overview-view-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px}
 .overview-page .overview-view-heading h2{margin:0;font-size:calc(15px * var(--ui-font-scale,1));font-weight:550}
 .overview-page .overview-server-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-.overview-page .overview-server-card{position:relative;transition:border-color 160ms,background 160ms}
-.overview-page .overview-server-card:has(.overview-server-link:hover){border-color:color-mix(in srgb,var(--accent) 35%,var(--ui-border))}
+.overview-page .overview-server-card.shadcn-card[data-slot=card]{position:relative;box-shadow:0 6px 34px -10px color-mix(in srgb,var(--artwork-color,var(--accent)) 28%,transparent),0 1px 2px #00000008;transition:border-color 160ms,box-shadow 160ms}
+.overview-page .overview-server-card:has(.overview-server-link:is(:hover,:focus-visible)){border-color:color-mix(in srgb,var(--artwork-color,var(--accent)) 35%,var(--ui-border));box-shadow:0 8px 40px -8px color-mix(in srgb,var(--artwork-color,var(--accent)) 36%,transparent),0 1px 2px #00000008}
 .overview-page .overview-server-card:has(.overview-server-link:focus-visible){outline:2px solid var(--accent);outline-offset:3px}
 .overview-page .overview-server-link{display:flex;flex:1;flex-direction:column;min-width:0;color:var(--text);text-decoration:none}
 .overview-page .overview-server-link:is(:hover,:focus-visible){color:var(--text);text-decoration:none;outline:none}
-.overview-page .overview-server-header{position:relative;isolation:isolate;row-gap:16px;padding:16px;background:radial-gradient(ellipse at 95% 0%,color-mix(in srgb,var(--theme-accent-b,var(--accent)) 11%,transparent),transparent 75%),radial-gradient(ellipse at 0% 0%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 70%)}
+.overview-page .overview-server-header{position:relative;isolation:isolate;row-gap:16px;padding:16px;background:radial-gradient(ellipse at 75% 0%,color-mix(in srgb,var(--artwork-color,var(--accent)) 12%,transparent),transparent 75%)}
 .overview-page .overview-game-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1))}
 .overview-page .overview-state{display:inline-flex;align-items:center;gap:6px;padding:3px 6px;border:1px solid var(--ui-divider);border-radius:5px;background:var(--ui-hover);color:var(--text);font-size:calc(10px * var(--ui-font-scale,1));font-weight:400;line-height:1.5;white-space:nowrap}
 .overview-page .overview-state .status-dot{width:5px;height:5px;background:currentColor;box-shadow:none;animation:none}
@@ -48,8 +48,11 @@
 .overview-page .overview-server-title{flex:1;min-width:0}
 .overview-page .overview-server-title [data-slot=card-title]{font-size:calc(16px * var(--ui-font-scale,1));font-weight:550;line-height:1.5;letter-spacing:-.025em;overflow-wrap:anywhere}
 .overview-page .overview-server-title [data-slot=card-description]{display:block;margin:4px 0 0;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.overview-page .overview-server-art{width:76px;height:48px;flex-shrink:0;overflow:hidden;border:1px solid var(--ui-divider);border-radius:6px;background:var(--ui-hover)}
+.overview-page .overview-server-art{position:relative;width:100%;aspect-ratio:460/180;min-height:128px;max-height:220px;flex-shrink:0;overflow:hidden;border-bottom:1px solid var(--ui-divider);background:var(--ui-hover)}
 .overview-page .overview-server-art>img{display:block;width:100%;height:100%;object-fit:cover}
+.overview-page .overview-software-patch{position:absolute;right:12px;bottom:12px;display:grid;place-items:center;width:48px;height:48px;padding:6px;overflow:hidden;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface);box-shadow:0 2px 8px #0003;visibility:hidden}
+.overview-page .overview-software-patch[data-loaded=true]{visibility:visible}
+.overview-page .overview-software-patch img{display:block;width:100%;height:100%;object-fit:contain;border-radius:4px}
 .overview-page .overview-resources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-top:16px}
 .overview-page .overview-resource{--meter-color:var(--accent);min-width:0}
 .overview-page .resource-memory{--meter-color:var(--theme-accent-b,var(--accent))}
@@ -67,14 +70,14 @@
 .overview-page .workspace-empty-icon{display:grid;place-items:center;width:40px;height:40px;margin:0 auto 6px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-hover);color:var(--muted)}
 .overview-page .workspace-empty-icon>svg{width:18px;height:18px}
 .overview-page .workspace-empty [data-slot=card-title]{font-size:calc(14px * var(--ui-font-scale,1));font-weight:550}
-.overview-page .overview-skeleton{height:224px;padding:18px;border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-surface)}
+.overview-page .overview-skeleton{height:360px;padding:18px;border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-surface)}
 .overview-page .overview-skeleton>span{display:block;width:48%;height:14px;margin-bottom:18px;border-radius:5px;background:var(--ui-hover);animation:overview-skeleton-breathe 1.5s ease-in-out infinite alternate}
-.overview-page .overview-skeleton>span:first-child{width:100%;height:48px;margin-bottom:24px}
+.overview-page .overview-skeleton>span:first-child{width:100%;height:150px;margin-bottom:24px}
 .overview-page .overview-skeleton>span:last-child{width:90%}
 @keyframes overview-skeleton-breathe{to{opacity:.4}}
 @media(min-width:1600px){.overview-page .overview-server-grid{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}}
 @media(max-width:1100px){.overview-page .overview-list-heading{align-items:stretch;flex-direction:column}.overview-page .overview-list-heading .toolbar{width:100%}.overview-page .overview-search{flex:1}.overview-page .overview-list-heading .overview-search>input.overview-search-input[type=search]{width:100%}}
 @media(max-width:800px){.overview-page .overview-server-grid{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:540px){.overview-page .overview-totals{gap:8px;margin-bottom:22px}.overview-page .overview-total{min-height:96px}.overview-page .overview-total [data-slot=card-header]{padding:12px 12px 6px}.overview-page .overview-total [data-slot=card-content]{padding:0 12px 12px}.overview-page .overview-total-icon{display:none}.overview-page .overview-total [data-slot=card-title]{font-size:calc(11px * var(--ui-font-scale,1))}.overview-page .overview-total strong{font-size:calc(26px * var(--ui-font-scale,1))}.overview-page .overview-server-header{padding:14px}.overview-page .overview-server-art{width:60px;height:42px}.overview-page .overview-resources{gap:10px}.overview-page .overview-resource strong{font-size:calc(11px * var(--ui-font-scale,1))}.overview-page .overview-server-footer{padding:10px 14px}.overview-page .overview-server-footer .shadcn-compact-item{gap:5px;font-size:calc(10px * var(--ui-font-scale,1))}.overview-page .overview-filters button{gap:5px;padding:4px 7px;font-size:calc(11px * var(--ui-font-scale,1))}}
+@media(max-width:540px){.overview-page .overview-totals{gap:8px;margin-bottom:22px}.overview-page .overview-total{min-height:96px}.overview-page .overview-total [data-slot=card-header]{padding:12px 12px 6px}.overview-page .overview-total [data-slot=card-content]{padding:0 12px 12px}.overview-page .overview-total-icon{display:none}.overview-page .overview-total [data-slot=card-title]{font-size:calc(11px * var(--ui-font-scale,1))}.overview-page .overview-total strong{font-size:calc(26px * var(--ui-font-scale,1))}.overview-page .overview-server-header{padding:14px}.overview-page .overview-resources{gap:10px}.overview-page .overview-resource strong{font-size:calc(11px * var(--ui-font-scale,1))}.overview-page .overview-server-footer{padding:10px 14px}.overview-page .overview-server-footer .shadcn-compact-item{gap:5px;font-size:calc(10px * var(--ui-font-scale,1))}.overview-page .overview-filters button{gap:5px;padding:4px 7px;font-size:calc(11px * var(--ui-font-scale,1))}}
 @media(pointer:coarse){.overview-page .overview-filters button{min-height:40px}}
 @media(prefers-reduced-motion:reduce){.overview-page .overview-server-card,.overview-page .overview-meter>span{transition:none}.overview-page .overview-skeleton>span,.overview-page .is-refreshing>svg{animation:none}}

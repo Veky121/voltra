@@ -56,8 +56,8 @@
 /* Shared resource fields already expose switch semantics. Selection checkboxes stay native. */
 .admin-infrastructure input[role=switch]{appearance:none;-webkit-appearance:none;position:relative;flex-shrink:0;width:30px;height:18px;min-height:18px;padding:0;margin:0;border:0;border-radius:20px;background:color-mix(in srgb,var(--muted) 30%,transparent);cursor:pointer;transition:background 150ms}
 .admin-infrastructure input[role=switch]::after{content:'';position:absolute;left:3px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--text);transition:transform 150ms}
-.admin-infrastructure input[role=switch]:checked{background:var(--theme-primary,var(--primary))}
-.admin-infrastructure input[role=switch]:checked::after{background:var(--theme-primary-ink,#fff);transform:translateX(12px)}
+.admin-infrastructure input[role=switch]:checked{background:var(--theme-button,var(--primary))}
+.admin-infrastructure input[role=switch]:checked::after{background:var(--theme-button-ink,var(--accent-ink,#fff));transform:translateX(12px)}
 .admin-infrastructure input[role=switch]:focus-visible{outline:2px solid var(--accent);outline-offset:3px;box-shadow:none}
 .admin-infrastructure input[role=switch]:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:760px){
@@ -72,10 +72,12 @@
  .infrastructure-settings-editor .field>input[type=checkbox]{grid-column:2;grid-row:1}
 }
 @media(prefers-reduced-motion:reduce){.admin-infrastructure input[role=switch],.admin-infrastructure input[role=switch]::after{transition:none}}
-/* Use available page width while keeping each panel setting readable. */
-.infrastructure-settings-editor .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:0}
-.infrastructure-settings-editor .form-grid>.field{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;gap:8px;align-content:start;border-top:0;border-bottom:1px solid var(--ui-divider)}
-.infrastructure-settings-editor .form-grid>.field>:is(span,input,select,textarea,small){grid-column:1;grid-row:auto;min-width:0}
-.infrastructure-settings-editor .form-grid>.field:has(textarea){grid-column:1/-1}
-.infrastructure-settings-editor .form-grid>.field:has(input[type=checkbox]){grid-template-columns:minmax(0,1fr) auto}
-.infrastructure-settings-editor .form-grid>.field>input[type=checkbox]{grid-column:2;grid-row:1}
+/* Paired value fields and full-width toggle rows share one consistent grid. */
+.admin-infrastructure .infrastructure-settings-editor .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;padding:0 16px}
+.admin-infrastructure .infrastructure-settings-editor .form-grid>.field{display:flex;flex-direction:column;gap:8px;padding:16px 0;margin:0;min-width:0;align-content:start;align-items:stretch;border:0;border-bottom:1px solid var(--ui-divider);border-radius:0}
+.admin-infrastructure .infrastructure-settings-editor .form-grid>.field>:is(span,input,select,textarea,small,.ui-select-field,.admin-switch-control){grid-column:auto;grid-row:auto;min-width:0}
+.admin-infrastructure .infrastructure-settings-editor .form-grid>.field:has(textarea){grid-column:1/-1}
+.admin-infrastructure .infrastructure-settings-editor .form-grid>.admin-field-switch{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 24px;min-height:64px}
+.admin-infrastructure .infrastructure-settings-editor .admin-field-switch>.admin-switch-control{grid-column:2;grid-row:1;justify-content:flex-end}
+.admin-infrastructure .infrastructure-settings-editor .admin-field-switch>small{grid-column:1;grid-row:2}
+@media(max-width:760px){.admin-infrastructure .infrastructure-settings-editor .form-grid{grid-template-columns:minmax(0,1fr);gap:0}.admin-infrastructure .infrastructure-settings-editor .form-grid>.field{padding:14px 0}}

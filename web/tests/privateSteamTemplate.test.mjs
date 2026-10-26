@@ -50,7 +50,9 @@ test('actual shared form submits sanitized values, hides both credential alias f
  // FS25 adds its display name to the sanitized environment before submission.
  assert.match(source,/environment:\s*(?:safeEnvironment\b|fs25\s*\?\s*\{\s*\.\.\.safeEnvironment,\s*SERVER_NAME:\s*name\.trim\(\)\s*\}\s*:\s*safeEnvironment\b)/);
  assert.match(source,/steamRole && steamRole !== 'branch'/);
- assert.match(source,/options.private_content_supported === true && selectedNode.private_content_ready === true/);
+ // The shared validator owns the gate; component tests exercise both supported
+ // policy and trusted-node requirements with the real validator.
+ assert.match(source,/templateSetupProblems\(\{[^\n]*node:\s*selectedNode[^\n]*privateSupported:\s*options\.private_content_supported\s*===\s*true/);
  assert.match(source,/options.steam_installation\?\.private_reason/);
  assert.match(source,/options\.variables\.filter\(variable => variable\.user_viewable(?: && !\(fs25 && fs25Advanced\.includes\(variable\.env_variable\)\))?\)\.map\(renderVariable\)/);
  const maintenance=fs.readFileSync(new URL('../src/client/PrivateSteamMaintenance.tsx',import.meta.url),'utf8');

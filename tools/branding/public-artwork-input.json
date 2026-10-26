@@ -2278,6 +2278,21 @@
       "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
       "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
       "kind": "game"
+    },
+    {
+      "id": "farming-simulator-25",
+      "name": "Farming Simulator 25",
+      "src": "/artwork/farming-simulator-25.svg",
+      "aliases": [
+        "farming simulator 25",
+        "fs25"
+      ],
+      "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+      "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+      "kind": "game",
+      "appIds": [
+        2300320
+      ]
     }
   ],
   "library": {
@@ -3673,6 +3688,14 @@
         "sourcePage": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
         "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
         "credit": "Original Voltra SVG typography and geometric artwork. Game names identify compatible software."
+      },
+      "official-farming-simulator-25": {
+        "title": "Farming Simulator 25",
+        "fit": "cover",
+        "src": "/artwork/farming-simulator-25.svg",
+        "sourcePage": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+        "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+        "credit": "Original Voltra SVG typography and geometric artwork. Game names identify compatible software."
       }
     },
     "categories": {
@@ -4100,7 +4123,8 @@
       "9ff2972bd6e8ebab": "official-veloren",
       "1f1d8a19d6050003": "official-vintage-story",
       "279f7c47a50d0db4": "official-wine",
-      "15415556fedd3dc4": "official-xonotic"
+      "15415556fedd3dc4": "official-xonotic",
+      "e534defaeddcb0b6": "official-farming-simulator-25"
     },
     "steam": {
       "satisfactory": "steam-526870",

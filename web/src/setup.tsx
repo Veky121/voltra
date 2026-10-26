@@ -16,6 +16,11 @@ type SetupStatus = {
   https_pending?: boolean;
 };
 type Session = { authenticated: boolean; csrf_token?: string; user?: { root_admin: boolean } };
+async function logoutSession(session:Session){
+  const result=await api<{redirect_url?:string}>('/api/auth/logout',{method:'POST',headers:sessionHeaders(session)});
+  if(result.redirect_url==='/cdn-cgi/access/logout'){window.location.assign(result.redirect_url);return false;}
+  return true;
+}
 type Validation = { valid: boolean; checks: { name: string; status: "ok" | "error" | "pending"; detail: string }[]; restart_required: boolean; can_save?: boolean };
 type Completion = { completed: boolean; restart_required: boolean; next_url: string; https_pending?: boolean };
 type HTTPSVerification = Validation & { completed: boolean; https_pending: boolean; next_url: string };
@@ -76,7 +81,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   // Only the server's explicit development mode preserves the existing local
   // workflow. Production never falls through to the application anonymously.
   if (!session.authenticated && !development) return <Login session={session} onAuthenticated={reload} />;
-  return <AccountSessionContext.Provider value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{await api('/api/auth/logout',{method:'POST',headers:sessionHeaders(session)});reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
+  return <AccountSessionContext.Provider value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
 }
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {
@@ -88,7 +93,7 @@ function SessionControls({ session, onSignedOut }: { session: Session; onSignedO
     <Button variant="secondary" disabled={busy} onClick={async () => {
       if (busy) return;
       setBusy(true); setError("");
-      try { await api("/api/auth/logout", { method: "POST", headers: sessionHeaders(session) }); onSignedOut(); }
+      try { if(await logoutSession(session))onSignedOut(); }
       catch (failure) { setError(errorText(failure)); }
       finally { setBusy(false); }
     }}>{busy ? "Signing out..." : "Sign out"}</Button>

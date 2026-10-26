@@ -22,6 +22,40 @@ Generated node units retain ProtectSystem=strict and ProtectHome=true. Their exa
 
 New connectors advertise steam-profiles-v1 and one steam-app:<app_id> capability for each compiled preservation policy. The shared steamapi profile registry supplies both those capabilities and the executor's protected paths. Panel options, job submission and scheduled maintenance check the target game's capability before mutation. A legacy steam-v1-only connector remains compatible with the original Satisfactory and Palworld profiles; newer profiles require upgrading the node. The stream protocol and local-only credential/path rules are unchanged.
 
+## Console output
+
+`steam-console-v1` advertises opt-in `stream_output:true`. New panels request it
+only from nodes that advertise it. Legacy requests still receive progress and
+terminal events only. Streaming does not change durable job identity.
+
+During anonymous checks/install/update/verify, stdout and stderr are framed on newline
+or carriage return into `output` events with a `lines` array. Batches contain at
+most 32 lines and 16 KiB before JSON encoding; individual lines are at most
+8192 UTF-8 bytes. Terminal controls and credential-related lines are stripped
+or redacted before transmission. Partial lines are bounded and flushed at exit.
+Metadata-helper startup output is included; its VDF output remains internal. Private account jobs expose fixed safe
+stages, never raw authenticated worker output or Guard responses.
+
+Output stages are `steamcmd` for client bootstrap/self-updates, `metadata` for
+branch checks after the client is ready, and `executing` for game maintenance.
+Panels preserve and validate this phase instead of classifying generic
+"Downloading update" text as a game download. The console labels these phases
+`SteamCMD`, `Steam check`, and `Steam game`. Older console-capable nodes continue
+to send their existing `metadata` and `executing` stages.
+
+Anonymous helpers retain the Steam client under the node's private Steam job
+directory in `client-cache`. Metadata uses a root-owned cache with no game mount;
+mutations use a separate cache per server UUID and numeric owner. Cache locks
+serialize self-updates and are held until the helper is stopped. Temporary home
+files remain ephemeral; game content stays in the existing `/data` mount.
+
+The panel writes streamed lines and stage/completion events to the existing
+bounded console archive as `steam output`. They remain visible while Wings
+capture is disconnected and after reopening the console. Colors are generated
+by the panel, not accepted from command output. A cancelled or lost job lease
+cannot append streamed output. Existing maintenance controls and job summaries
+remain available.
+
 ## Validation and private branch boundary
 
 `steam-options-v1` advertises the optional typed `validate` request flag. Verify

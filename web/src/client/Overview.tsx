@@ -1,5 +1,5 @@
 import {useArtworkLibrary} from './ArtworkProvider';
-import {useCallback,useEffect,useState} from "react";
+import {useEffect,useState,type CSSProperties} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import {api,Button,Input} from "../lib";
 import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
@@ -8,6 +8,9 @@ import {Icon} from "../Icons";
 import {bytes,items,PageError,value} from "./common";
 import {fallbackArtwork,getServerArtwork,type ServerArtwork} from "./serverArtwork";
 import {ServerIdentityIcon} from './ServerIdentityIcon';
+import {getServerSoftwareArtwork} from './serverSoftwareArtwork';
+import {ServerSoftwarePatch} from './ServerSoftwarePatch';
+import {artworkColor} from './artworkColor';
 import "./workspace.css";
 import './shadcn-cards.css';
 import "./overview.css";
@@ -17,14 +20,12 @@ type ServerRecord=Record<string,any> & {name?:string;liveState:string;resources?
 const labels:Record<string,string>={running:"Running",offline:"Stopped",stopped:"Stopped",unknown:"Checking",unavailable:"Unavailable",installing:"Installing",starting:"Starting",stopping:"Stopping",suspended:"Suspended",install_failed:"Install failed",reinstall_failed:"Reinstall failed",restoring_backup:"Restoring"};
 
 function useOverview(){
-  const [servers,setServers]=useState<ServerRecord[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[updated,setUpdated]=useState(0),[version,setVersion]=useState(0);
-  const reload=useCallback(()=>setVersion(v=>v+1),[]);
+  const [servers,setServers]=useState<ServerRecord[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true);
   useEffect(()=>{
     let active=true;
     let timer:ReturnType<typeof setTimeout>;
     const abort=new AbortController();
     async function poll(){
-      setRefreshing(true);
       try{
         let response=await api("/api/client?per_page=100",{signal:abort.signal});
         const all=items(response);
@@ -52,14 +53,13 @@ function useOverview(){
             if(active)setServers(current=>current.map(s=>s.uuid===server.uuid?updated:s));
           }
         }));
-        if(active)setUpdated(Date.now());
       }catch(err){if(active)setError(err instanceof Error?err.message:String(err));}
-      finally{if(active){setLoading(false);setRefreshing(false);timer=setTimeout(poll,1000);}}
+      finally{if(active){setLoading(false);timer=setTimeout(poll,1000);}}
     }
     void poll();
     return()=>{active=false;clearTimeout(timer);abort.abort();};
-  },[version]);
-  return {servers,error,loading,refreshing,updated,reload};
+  },[]);
+  return {servers,error,loading};
 }
 
 function Meter({label,reading,ratio}:{label:string;reading:string;ratio:number}){
@@ -71,19 +71,21 @@ function storageReading(used:number,limitMiB:number){
   const format=(n:number)=>new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(n);
   return `${format(used/unit)} / ${format(limitMiB*1024**2/unit)} ${unit===1024**3?"GiB":"MiB"}`;
 }
-function Artwork({art,priority}:{art:ServerArtwork;priority:boolean}){
+function Artwork({art,priority,onColor}:{art:ServerArtwork;priority:boolean;onColor:(color:string|undefined)=>void}){
   const [failed,setFailed]=useState(false);
-  return <img src={failed?fallbackArtwork.src:art.src} alt="" loading={priority?'eager':'lazy'} decoding="async" width={460} height={215} onError={failed?undefined:()=>setFailed(true)}/>;
+  return <img src={failed?fallbackArtwork.src:art.src} alt="" loading={priority?'eager':'lazy'} decoding="async" width={460} height={215} onLoad={event=>onColor(artworkColor(event.currentTarget))} onError={failed?undefined:()=>setFailed(true)}/>;
 }
 function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
   useArtworkLibrary();
-  const r=s.resources,art=getServerArtwork(s);
-  return <Card className="overview-server-card shadcn-card" data-state={s.liveState} data-artwork={art.id}>
+  const r=s.resources,art=getServerArtwork(s),software=getServerSoftwareArtwork(s);
+  const [glow,setGlow]=useState<{source:string;color:string|undefined}>();
+  return <Card className="overview-server-card shadcn-card" data-state={s.liveState} data-artwork={art.id} style={{'--artwork-color':glow?.source===art.src?glow.color:undefined} as CSSProperties}>
     <Link className="overview-server-link" to={`/server/${s.identifier||s.uuid}`}>
+    <div className="overview-server-art"><Artwork key={art.src} art={art} priority={priority} onColor={color=>setGlow({source:art.src,color})}/>{software&&<ServerSoftwarePatch key={software.src} artwork={software}/>}</div>
     <CardHeader className="overview-server-header">
       <CardDescription className="overview-game-label">{art.name}</CardDescription>
       <CardAction><span className={`overview-state state-${s.liveState}`}><span className="status-dot"/>{labels[s.liveState]||s.liveState.replaceAll("_"," ")}</span></CardAction>
-      <div className="overview-server-heading"><div className="server-identity-heading"><ServerIdentityIcon artwork={s.artwork} lazy={!priority}/><div className="overview-server-title"><CardTitle><h2>{s.name}</h2></CardTitle>{(s.artwork?.pack_name||s.description)&&<CardDescription title={[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}>{[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}</CardDescription>}</div></div><div className="overview-server-art"><Artwork key={art.src} art={art} priority={priority}/></div></div>
+      <div className="overview-server-heading"><div className="server-identity-heading"><ServerIdentityIcon artwork={s.artwork} lazy={!priority}/><div className="overview-server-title"><CardTitle><h2>{s.name}</h2></CardTitle>{(s.artwork?.pack_name||s.description)&&<CardDescription title={[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}>{[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}</CardDescription>}</div></div></div>
     </CardHeader>
     <CardContent className="overview-resources">
       <Meter label="CPU" reading={r?`${Number(r.cpu_absolute||0).toFixed(1)}%`:"—"} ratio={Number(r?.cpu_absolute||0)/(s.limits?.cpu||100)}/>
@@ -116,7 +118,7 @@ export default function Overview(){
     </div>
     <PageError error={q.error}/>
     {(view==='favorites'||view==='recent')&&<div className="overview-view-heading"><h2>{view==='favorites'?'Favorites':'Recent servers'}</h2><Button variant="secondary" onClick={()=>setParams({})}>Show all servers</Button></div>}
-    <div className="overview-list-heading"><div><h2>Your servers <span className="overview-count">{q.servers.length}</span></h2><p className="muted">{other>0?`${other} ${other===1?"server is":"servers are"} changing state or awaiting status.`:'Select a server to open its workspace.'}</p></div><div className="toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" className="overview-search-input" aria-label="Search servers" placeholder="Find a server or node…" value={search} onChange={e=>setSearch(e.target.value)}/></div><Button className={q.refreshing?'is-refreshing':''} variant="secondary" disabled={q.refreshing} onClick={q.reload} title={q.updated?`Last checked ${new Date(q.updated).toLocaleTimeString()}. Automatically refreshes every second.`:'Refresh server status'}><Icon name="restart"/><span>{q.refreshing?"Updating…":"Refresh"}</span></Button></div></div>
+    <div className="overview-list-heading"><div><h2>Your servers <span className="overview-count">{q.servers.length}</span></h2><p className="muted">{other>0?`${other} ${other===1?"server is":"servers are"} changing state or awaiting status.`:'Select a server to open its workspace.'}</p></div><div className="toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" className="overview-search-input" aria-label="Search servers" placeholder="Find a server or node…" value={search} onChange={e=>setSearch(e.target.value)}/></div></div></div>
     <div className="overview-filters" role="group" aria-label="Filter servers by status">{filters.map(f=><button key={f.id} type="button" aria-pressed={filter===f.id} onClick={()=>setFilter(f.id)}>{f.label}<span>{q.loading?'—':f.count}</span></button>)}</div>
     {q.loading?<div className="overview-server-grid overview-skeletons" role="status" aria-label="Loading servers">{[0,1].map(i=><div className="overview-skeleton" key={i} aria-hidden="true"><span/><span/><span/></div>)}</div>:<div className="overview-server-grid">{filtered.map((s,index)=><ServerCard key={s.uuid} server={s} priority={index<2}/>)}</div>}
     {!q.loading&&!q.error&&!filtered.length&&<Card className="workspace-empty shadcn-card"><CardHeader><span className="workspace-empty-icon"><Icon name={emptySavedView?(view==='favorites'?'star':'clock'):q.servers.length?'search':'server'}/></span><CardTitle><h2>{emptySavedView?(view==='favorites'?'No favorites yet':'No recent servers yet'):q.servers.length?"No servers in this view":"Your first server starts here"}</h2></CardTitle><CardDescription>{emptySavedView?(view==='favorites'?'Star a server to keep it in your favorites.':'Servers you open appear here.'):q.servers.length?'Try a different search or status filter.':'Choose a game from the library to create your first server.'}</CardDescription></CardHeader><CardContent>{emptySavedView?<Button variant="secondary" onClick={()=>{setParams({});setSearch('');setFilter('all')}}>Browse servers</Button>:q.servers.length?<Button variant="secondary" onClick={()=>{setSearch('');setFilter('all')}}>Clear filters</Button>:<Link className="button" to="/game-library">Explore Game Library<Icon name="chevron"/></Link>}</CardContent></Card>}

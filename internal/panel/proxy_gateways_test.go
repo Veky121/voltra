@@ -59,6 +59,7 @@ func TestProxyGatewayIntegration(t *testing.T) {
 	exec(`INSERT INTO allocations(id,node_id,server_id,ip,port) VALUES(9901,9901,9901,'127.0.0.1',25565),(9902,9901,9901,'127.0.0.1',25566),(9903,9901,9901,'127.0.0.1',25567)`)
 	var mu sync.Mutex
 	store := map[string]M{}
+	starting := map[string]int{}
 	writes := 0
 	failDelete := false
 	running := true
@@ -93,6 +94,10 @@ func TestProxyGatewayIntegration(t *testing.T) {
 				if !running {
 					status = "error"
 				}
+				if starting[name] > 0 {
+					status = "starting"
+					starting[name]--
+				}
 				entry := M{"name": name, "type": proto, "status": status, "err": "", "remote_addr": fmt.Sprintf("frps.example.test:%d", num(b["remotePort"]))}
 				if proto == "udp" {
 					udp = append(udp, entry)
@@ -116,6 +121,7 @@ func TestProxyGatewayIntegration(t *testing.T) {
 				return
 			}
 			store[name] = m
+			starting[name] = 2
 			writes++
 			json.NewEncoder(w).Encode(m)
 		case r.Method == "DELETE" && strings.HasPrefix(r.URL.Path, "/api/store/proxies/"):

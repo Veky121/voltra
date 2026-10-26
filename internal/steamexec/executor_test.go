@@ -138,6 +138,7 @@ func fixture(t *testing.T) (*Executor, *fakeDocker) {
 	e.journal = filepath.Join(base, "jobs")
 	e.supported = true
 	e.owner = func(os.FileInfo) (uint32, uint32, bool) { return 1000, 1000, true }
+	e.cacheOwner = func(string, uint32, uint32, bool) error { return nil }
 	e.pollInterval = 5 * time.Millisecond
 	e.timeLimit = 2 * time.Second
 	return e, f
@@ -190,7 +191,7 @@ func TestCheckRunningReadOnlyAndExactBranch(t *testing.T) {
 		}
 	}
 	for _, args := range f.snapshot() {
-		if args[0] == "run" && (contains(args, "--mount") || contains(args, "+app_update") || contains(args, "+force_install_dir")) {
+		if args[0] == "run" && (contains(args, "type=bind,src="+f.dir+",dst=/data") || contains(args, "+app_update") || contains(args, "+force_install_dir")) {
 			t.Fatalf("check can mutate %v", args)
 		}
 	}

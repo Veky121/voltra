@@ -2277,5 +2277,20 @@
     "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
     "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
     "kind": "game"
+  },
+  {
+    "id": "farming-simulator-25",
+    "name": "Farming Simulator 25",
+    "src": "/artwork/farming-simulator-25.svg",
+    "aliases": [
+      "farming simulator 25",
+      "fs25"
+    ],
+    "source": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "imageUrl": "https://github.com/Veky121/voltra/blob/main/tools/branding/generate-public-artwork.mjs",
+    "kind": "game",
+    "appIds": [
+      2300320
+    ]
   }
 ]

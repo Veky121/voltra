@@ -120,11 +120,11 @@ export default function Console() {
         if (saved.truncated) queueLines("\x1b[0m\x1b[93m[Voltra]: Older output expired from the saved buffer while this console was disconnected.\x1b[0m");
         const restored: string[] = [];
         for (const entry of saved.data ?? []) {
-          if (replayedSaved && historyMode === "live" && entry.event !== "panel message") continue;
+          if (replayedSaved && historyMode === "live" && entry.event !== "panel message" && entry.event !== "steam output") continue;
           const text = consoleOutput(String(entry.line ?? ""), entry.event, true);
           if (!text) continue;
           const at = new Date(entry.created_at);
-          const stamp = entry.event === "panel message" && !Number.isNaN(at.getTime()) ? `[${at.toLocaleTimeString([], {hour12:false})}] ` : "";
+          const stamp = (entry.event === "panel message" || entry.event === "steam output") && !Number.isNaN(at.getTime()) ? `[${at.toLocaleTimeString([], {hour12:false})}] ` : "";
           if (!replayedSaved) restored.push(stamp + text);
           else queueLines(stamp + text);
         }

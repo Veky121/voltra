@@ -35,3 +35,18 @@
 @media(max-width:420px){.server-topbar{align-items:flex-start;flex-wrap:wrap}.server-topbar .server-power{margin-left:auto}.server-hero-with-artwork .server-power .actions{flex-wrap:wrap}}
 @media(pointer:coarse){.server-topbar .server-power .button{width:38px;height:38px;min-height:38px}.server-hero-with-artwork .server-power .button{min-height:40px}}
 @media(prefers-reduced-motion:reduce){.server-state-line .server-state{transition:none}}
+
+/* Solid action colors remain distinct from the selected theme's favorite fill. */
+.server-power .button.server-power-button[data-power]{--power-fill:#3fb984;--power-ink:#072b1a;position:relative;overflow:hidden;background:var(--power-fill);border-color:transparent;color:var(--power-ink);filter:none;transition:filter 150ms,opacity 150ms}
+.server-power .button.server-power-button[data-power=restart]{--power-fill:#e5b15b;--power-ink:#352409}
+.server-power .button.server-power-button[data-power=stop]{--power-fill:#e47885;--power-ink:#360c14}
+.server-power .button.server-power-button[data-power=kill]{--power-fill:#b8374d;--power-ink:#fff}
+.server-power .button.server-power-button[data-power]:hover:not(:disabled){background:var(--power-fill);filter:brightness(1.08)}
+.server-power .button.server-power-button[data-power]:disabled{opacity:.45}
+.server-power .button.server-power-button[data-power][aria-busy=true]{opacity:1;cursor:wait}
+.server-power .actions>.button:not([data-power]){background:var(--theme-button,var(--accent));color:var(--theme-button-ink,var(--accent-ink,#fff));border-color:transparent}
+.server-power-progress{min-width:160px;margin-top:10px;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));line-height:1.4}
+.server-power-progress-track{height:3px;margin-top:6px;overflow:hidden;border-radius:999px;background:var(--ui-divider)}
+.server-power-progress-track>span{display:block;width:38%;height:100%;border-radius:inherit;background:var(--accent);animation:server-power-wait 1.25s ease-in-out infinite}
+@keyframes server-power-wait{from{transform:translateX(-110%)}to{transform:translateX(370%)}}
+@media(prefers-reduced-motion:reduce){.server-power-progress-track>span{animation:none;width:100%;opacity:.65}.server-power .button.server-power-button[data-power]{transition:none}}

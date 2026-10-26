@@ -20,7 +20,7 @@
   --color-popover: var(--scn-popover);
   --color-popover-foreground: var(--text);
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--theme-primary-ink, #ffffff);
+  --color-primary-foreground: var(--theme-button-ink, #ffffff);
   --color-secondary: var(--surface-raised);
   --color-secondary-foreground: var(--text);
   --color-muted: var(--surface-muted);
@@ -34,7 +34,7 @@
   --color-sidebar: var(--scn-sidebar);
   --color-sidebar-foreground: var(--text);
   --color-sidebar-primary: var(--primary);
-  --color-sidebar-primary-foreground: var(--theme-primary-ink, #fff);
+  --color-sidebar-primary-foreground: var(--theme-button-ink, #fff);
   --color-sidebar-accent: var(--scn-sidebar-accent);
   --color-sidebar-accent-foreground: var(--accent);
   --color-sidebar-border: var(--ui-border);

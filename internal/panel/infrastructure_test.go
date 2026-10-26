@@ -345,9 +345,9 @@ func TestInfrastructureMountHostAndSettingsGuards(t *testing.T) {
 		t.Fatal("omitted or empty S3 secret changed")
 	}
 	sealedSession := str(asMap(afterS3["backups.s3"])["session_token"])
-	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"app:name": "  Trimmed panel  ", "backups.s3": M{"session_token": ""}}, 200)
+	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"backups.s3": M{"endpoint": "  https://s3.example.invalid  ", "session_token": ""}}, 200)
 	afterS3, e = a.infraLoadSettings(ctx)
-	if e != nil || str(afterS3["app:name"]) != "Trimmed panel" || str(asMap(afterS3["backups.s3"])["session_token"]) != sealedSession {
+	if e != nil || str(asMap(afterS3["backups.s3"])["endpoint"]) != "https://s3.example.invalid" || str(asMap(afterS3["backups.s3"])["session_token"]) != sealedSession {
 		t.Fatal("settings normalization or empty S3 session retention failed")
 	}
 	infraExpect(t, handler, user, "PATCH", "/api/admin/settings", M{"backups.s3": M{"secret_access_key": nil, "session_token": nil}}, 200)
@@ -450,14 +450,19 @@ func TestInfrastructureTimezoneSettings(t *testing.T) {
 	}
 	infraExpect(t, handler, userID, "PATCH", "/api/admin/settings", M{"app:timezone": "Mars/Olympus"}, 422)
 	infraExpect(t, handler, userID, "PATCH", "/api/admin/settings", M{"app:timezone": ""}, 422)
-	infraExpect(t, handler, userID, "PATCH", "/api/admin/settings", M{"app:timezone": "Asia/Tokyo"}, 200)
+	infraExpect(t, handler, userID, "PATCH", "/api/admin/settings", M{"app:timezone": "Asia/Tokyo"}, 422)
 	settings = asMap(infraExpect(t, handler, userID, "GET", "/api/admin/settings", nil, 200)["attributes"])
-	if str(settings["app:timezone"]) != "Asia/Tokyo" {
-		t.Fatal("timezone was not persisted")
+	if str(settings["app:timezone"]) != "Europe/Berlin" {
+		t.Fatal("read-only timezone changed")
 	}
-	stored, e := a.one(context.Background(), "SELECT value FROM settings WHERE key='app:timezone'")
-	if e != nil || str(stored["value"]) != "Asia/Tokyo" {
-		t.Fatal("timezone database value missing")
+	for _, key := range []string{"app:name", "app:locale", "app:timezone"} {
+		for _, value := range []any{"Changed", nil, ""} {
+			infraExpect(t, handler, userID, "PATCH", "/api/admin/settings", M{key: value, "activity:hide_admin_activity": true}, 422)
+		}
+	}
+	settings = asMap(infraExpect(t, handler, userID, "GET", "/api/admin/settings", nil, 200)["attributes"])
+	if settings["app:name"] != "Voltra" || settings["app:locale"] != "en" || settings["app:timezone"] != "Europe/Berlin" || boolean(settings["activity:hide_admin_activity"]) {
+		t.Fatal("rejected General settings request changed stored settings")
 	}
 }
 

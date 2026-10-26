@@ -419,12 +419,29 @@ func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		_, sources, e := a.integrationEnvironment(r.Context(), num(imported["id"]))
+		adminEnv, sources, e := a.integrationEnvironment(r.Context(), num(imported["id"]))
 		if e != nil {
 			fail(w, e)
 			return
 		}
 		out["egg_id"], out["saved_license"] = imported["id"], sources["GAME_SERIAL"] != nil
+		if sources["GAME_SERIAL"] != nil {
+			conflict, e := a.fs25LicenceConflict(r.Context(), a.DB, 0, adminEnv)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if conflict {
+				out["saved_license"] = false
+			}
+		}
+		visible := []M{}
+		for _, variable := range variables {
+			if name := str(variable["env_variable"]); name != "GAME_SERIAL" && name != "DLC_PRODUCT_KEY" {
+				visible = append(visible, variable)
+			}
+		}
+		out["variables"] = visible
 	}
 	if len(entry.Agreements) > 0 {
 		out["agreements"] = entry.Agreements
@@ -750,6 +767,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if entry.Path == fs25Path && str(env["GAME_SERIAL"]) == "" {
+		delete(env, "DLC_PRODUCT_KEY")
 		global, _, e := a.integrationEnvironment(ctx, num(imported["id"]))
 		if e != nil {
 			fail(w, e)
@@ -759,7 +777,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 			delete(env, "GAME_SERIAL")
 		}
 		if str(global["GAME_SERIAL"]) == "" && str(env["AUTO_DOWNLOAD"]) == "true" {
-			fail(w, bad("Enter a GIANTS server licence or configure one in Admin integrations for this egg."))
+			fail(w, bad("Ask an administrator to assign a GIANTS server licence in Admin integrations."))
 			return
 		}
 	}

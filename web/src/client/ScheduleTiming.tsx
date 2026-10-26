@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button, Field, Input, Select } from "../lib";
 import { clampInterval, readSimpleTiming, simpleTimingCron, weekDays } from "./scheduleTimingModel";
 import type { IntervalUnit, ScheduleCron, SimpleTiming } from "./scheduleTimingModel";
@@ -11,6 +11,7 @@ const cronFields = [
 ] as const;
 
 export function ScheduleTiming({ value, onChange }: { value: ScheduleCron; onChange: (cron: ScheduleCron) => void }) {
+  const startTimeId=useId();
   const parsed = readSimpleTiming(value);
   const [advanced, setAdvanced] = useState(!parsed);
   // Retain the chosen unit at equivalent boundaries, such as 60 minutes / 1 hour.
@@ -38,10 +39,11 @@ export function ScheduleTiming({ value, onChange }: { value: ScheduleCron; onCha
           update({ ...simple, unit, every: clampInterval(simple.every, unit) });
         }}><option value="minute">minutes</option><option value="hour">hours</option></Select>
       </div>
+      {simple.unit==='hour'&&<div className="schedule-start-time"><label htmlFor={startTimeId}>{simple.every===24?'Run at':'Starting at'}</label><Input id={startTimeId} aria-label="Start time" type="time" step={60} required value={simple.startTime??'00:00'} onInput={event=>{if(event.currentTarget.value)update({...simple,startTime:event.currentTarget.value})}}/></div>}
       {!simple.days.length && <p className="error" role="alert">Select at least one day.</p>}
-      <p className="muted schedule-timing-hint">Uses the panel timezone. Minute intervals start at minute 0 of each hour; hour intervals start at midnight each day.
+      <p className="muted schedule-timing-hint">Uses the panel timezone. {simple.unit==='hour'?(simple.every===24?`Runs once each selected day at ${simple.startTime??'00:00'}.`:`Runs at ${Array.from({length:Math.ceil(24/simple.every)},(_,index)=>{const [hour,minute]=(simple.startTime??'00:00').split(':');return `${String((Number(hour)+index*simple.every)%24).padStart(2,'0')}:${minute}`}).join(', ')} on the selected days.`):'Minute intervals start at minute 0 of each hour.'}
         {simple.unit === "minute" && simple.every > 1 && simple.every < 60 && 60 % simple.every !== 0 ? ` Every ${simple.every} minutes runs at minutes ${Array.from({ length: Math.ceil(60 / simple.every) }, (_, i) => i * simple.every).join(", ")} of each hour.` : ""}
-        {simple.unit === "hour" && 24 % simple.every !== 0 ? ` Every ${simple.every} hours runs at hours ${Array.from({ length: Math.ceil(24 / simple.every) }, (_, i) => i * simple.every).join(", ")} each selected day.` : ""}
+        {simple.unit === "hour" && 24 % simple.every !== 0 ? ' This interval does not divide 24 hours evenly, so the daily pattern has a shorter gap.' : ""}
       </p>
     </> : <div className="schedule-custom"><p>This schedule uses custom cron rules. Open Advanced to edit them.</p>
       <Button type="button" variant="secondary" onClick={() => update({ every: 1, unit: "hour", days: weekDays.map(day => day.value) })}>Use a simple interval</Button>

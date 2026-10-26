@@ -132,3 +132,10 @@
 .game-settings-section:first-child h4{padding-top:0}
 @media(max-width:760px){.game-quick-page>.game-settings-page-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}.game-settings-page-header h2{grid-column:1;grid-row:1}.game-settings-page-header .game-settings-refresh{grid-column:2;grid-row:1;margin-left:0}.game-settings-page-header .game-settings-document{grid-column:1/-1;grid-row:2;width:100%}.game-settings-page-header .game-settings-search{grid-column:1/-1;grid-row:3;width:100%;margin-left:0}}
 @media(min-width:1400px){.game-properties-grid{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}.steam-maintenance-page{max-width:none}.steam-maintenance-layout{grid-template-columns:repeat(auto-fit,minmax(480px,1fr))}}
+.template-readiness{margin:16px 0;padding:14px 16px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-hover);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.template-readiness>p{margin:0 0 8px;font-weight:500;color:var(--text)}
+.template-readiness>ul{padding-left:18px;margin:0}
+.template-readiness li+li{margin-top:6px}
+.template-readiness a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.template-readiness a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.steam-fields .field>.template-field-problem{color:var(--red)}

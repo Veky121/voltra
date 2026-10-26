@@ -8,11 +8,14 @@ const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<'
 mkdirSync(env.DEDI_DIR, {recursive:true});
 for (const [file, directory] of [['dedicatedServer.xml',env.GAME_DIR],['dedicatedServerConfig.xml',env.DEDI_DIR]]) {
   const template = readFileSync(join(env.FS25_CONFIG, file+'.tmpl'), 'utf8');
-  const content = template.replace(/%%([A-Z_]+)%%/g, (_, name) => {
+  let content = template.replace(/%%([A-Z_]+)%%/g, (_, name) => {
     if (values[name] === undefined) throw Error('Missing setting '+name);
     if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(values[name])) throw Error('Invalid XML character in '+name);
     return escape(values[name]);
   });
+  if(file==='dedicatedServerConfig.xml') {
+    try {const existing=readFileSync(join(directory,file),'utf8');const mods=existing.match(/<mods(?:\s[^>]*)?>[\s\S]*?<\/mods>/)?.[0];if(mods)content=content.replace('</gameserver>',mods+'\n</gameserver>');} catch(error) {if(error.code!=='ENOENT')throw error;}
+  }
   writeFileSync(join(directory,file),content,{mode:0o600});
 }
 console.log('[fs25] Configuration saved.');

@@ -1,6 +1,10 @@
 import type {QuickField} from './gameSetupModel';
 
 const names: Record<string, string> = {
+  ServerName: 'Server name', ServerDescription: 'Server description', ServerPlayerMaxNum: 'Player limit',
+  ServerPassword: 'Server password', AdminPassword: 'Admin password', ExpRate: 'Experience multiplier',
+  PalCaptureRate: 'Capture rate multiplier', PalSpawnNumRate: 'Pal spawn multiplier',
+  DayTimeSpeedRate: 'Day speed multiplier', NightTimeSpeedRate: 'Night speed multiplier',
   motd: 'Server message', 'max-players': 'Player limit', 'gamemode': 'Game mode',
   pvp: 'Player combat', 'white-list': 'Whitelist', 'online-mode': 'Verify player accounts',
   'enforce-secure-profile': 'Require secure player profiles', 'level-name': 'World name',
@@ -20,9 +24,11 @@ const names: Record<string, string> = {
 export function readableSettingName(field: Pick<QuickField, 'key' | 'label'>): string {
   const key = field.key.replace(/^\//, '');
   if (names[key]) return names[key];
-  const original = field.label && field.label !== field.key ? field.label : key;
+  const leaf = key.split('/').at(-1)!;
+  if (names[leaf]) return names[leaf];
+  const original = field.label && field.label !== field.key ? field.label : key.includes('/OptionSettings/') ? leaf : key;
   return original.split('/').map(part => {
-    const text = part.replace(/~1/g, '/').replace(/~0/g, '~')
+    const text = part.replace(/^b(?=[A-Z])/, '').replace(/~1/g, '/').replace(/~0/g, '~')
       .replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[._-]+/g, ' ').trim();
     return text.charAt(0).toUpperCase() + text.slice(1);
   }).join(' / ').replace(/\b(rcon|jmx|tls|ip|api)\b/gi, value => value.toUpperCase());
@@ -50,13 +56,33 @@ function minecraftGroup(key: string): string {
 
 export type SettingsGroup = {id: string; label: string; fields: QuickField[]};
 
+const palworldGroups = [
+  {id: 'server', label: 'Server'}, {id: 'world', label: 'World'},
+  {id: 'players', label: 'Players'}, {id: 'pals', label: 'Pals'},
+  {id: 'building', label: 'Building and bases'}, {id: 'items', label: 'Items and gathering'},
+  {id: 'network', label: 'Network and administration'}, {id: 'advanced', label: 'Other settings'},
+];
+function palworldGroup(key: string): string {
+  key = key.split('/').at(-1)!;
+  if (/^(ServerName|ServerDescription|ServerPassword|ServerPlayerMaxNum)$/.test(key)) return 'server';
+  if (/RCON|RESTAPI|AdminPassword|PublicIP|PublicPort|BanList|Crossplay|AllowConnect|LogFormat|Chat/.test(key)) return 'network';
+  if (/Build|BaseCamp|Guild|Worker|WorkSpeed/.test(key)) return 'building';
+  if (/Drop|Collection|Gather|Item|Supply/.test(key)) return 'items';
+  if (/Pal|Capture|Egg/.test(key)) return 'pals';
+  if (/Player|PvP|PVP|DeathPenalty|ExpRate|FriendlyFire/.test(key)) return 'players';
+  if (/Difficulty|DayTime|NightTime|Weather|Random|Event|Invader|Dungeon|World/.test(key)) return 'world';
+  return 'advanced';
+}
+
 export function settingsGroups(fields: QuickField[], game: string, file: string): SettingsGroup[] {
   const minecraft = game === 'minecraft' && file.endsWith('/server.properties');
+  const palworld = /^palworld(?:-|$)/.test(game) || /palworldsettings\.ini$/i.test(file) || fields.some(field => field.key.includes('PalGameWorldSettings'));
   const groups = new Map<string, SettingsGroup>();
   if (minecraft) for (const group of minecraftGroups) groups.set(group.id, {...group, fields: []});
+  if (palworld) for (const group of palworldGroups) groups.set(group.id, {...group, fields: []});
   for (const field of fields) {
     const section = field.key.startsWith('/') ? field.key.slice(1).split('/')[0] : field.key.includes('/') ? field.key.split('/')[0] : 'general';
-    const id = minecraft ? minecraftGroup(field.key) : section;
+    const id = minecraft ? minecraftGroup(field.key) : palworld ? palworldGroup(field.key) : section;
     if (!groups.has(id)) groups.set(id, {id, label: id === 'general' ? 'General' : readableSettingName({key: id, label: id}), fields: []});
     groups.get(id)!.fields.push(field);
   }

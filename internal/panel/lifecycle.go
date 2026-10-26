@@ -323,6 +323,7 @@ func (a *App) serverConfig(ctx context.Context, server M) (M, error) {
 			}
 		}
 	}
+	minecraftRuntimePropertyEnums(egg, env, str(image))
 	allocs, err := a.query(ctx, "SELECT * FROM allocations WHERE server_id=$1 AND node_id=$2 ORDER BY id", server["id"], server["node_id"])
 	if err != nil {
 		return nil, err
@@ -1082,6 +1083,11 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	if fs25Egg(egg) {
+		if err = a.fs25ReserveLicences(ctx, tx, 0, env); err != nil {
+			return nil, err
+		}
+	}
 	allocationID := num(d["allocation_id"])
 	if allocationID == 0 {
 		allocationID, err = a.selectDeployment(ctx, tx, d)
@@ -1795,18 +1801,42 @@ func (a *App) lifecycleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	release, e := a.serverDeleteMutationLock(ctx, s)
+	if e != nil {
+		fail(w, e)
+		return
+	}
+	defer release()
+	if e = a.cleanupServerProxyRoutes(ctx, s); e != nil {
+		fail(w, e)
+		return
+	}
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
 		fail(w, e)
 		return
 	}
 	defer tx.Rollback(ctx)
-	var lockedID int64
 	// Provisioning databases takes this same row lock. Keep the lock across
 	// external cleanup so provisioning cannot race the final server deletion;
 	// process termination rolls the lock back without a persistent transient state.
-	if e = tx.QueryRow(ctx, "SELECT id FROM servers WHERE id=$1 FOR UPDATE", s["id"]).Scan(&lockedID); e != nil {
+	if s, e = lockServerForDeletion(ctx, tx, s["id"]); e != nil {
 		fail(w, e)
+		return
+	}
+	if e = lockDeletionAllocations(ctx, tx, s["id"]); e != nil {
+		fail(w, e)
+		return
+	}
+	// Cleanup is committed before daemon deletion. Keep this final race check:
+	// the server row lock blocks new route references until deletion commits.
+	var hasRoutes bool
+	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM proxy_routes WHERE server_id=$1)", s["id"]).Scan(&hasRoutes); e != nil {
+		fail(w, e)
+		return
+	}
+	if hasRoutes {
+		fail(w, proxyConflict("Public ports changed during deletion. The server has been kept; retry deletion to clean them up automatically."))
 		return
 	}
 	res, e := a.daemonServer(r.Context(), s, "DELETE", "", nil)

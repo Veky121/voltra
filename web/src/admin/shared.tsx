@@ -213,10 +213,12 @@ export function Fields({
               {field.required && " *"}
             </span>
             {field.type === "checkbox" ? (
-              <Switch
+              <div className="admin-switch-control"><Switch
+                aria-label={field.label}
+                disabled={field.disabled}
                 checked={Boolean(v)}
                 onCheckedChange={checked => set(checked)}
-              />
+              /></div>
             ) : field.type === "select" || field.type === "multiselect" ? (
               <Select
                 disabled={field.disabled}

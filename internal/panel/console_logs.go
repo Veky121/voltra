@@ -36,7 +36,7 @@ func (a *App) consoleLogLimit() int {
 }
 
 func consoleLogLines(event, text string) []consoleLogEntry {
-	if event != "console output" && event != "daemon message" && event != "install output" && event != "panel message" {
+	if event != "console output" && event != "daemon message" && event != "install output" && event != "panel message" && event != "steam output" {
 		return nil
 	}
 	text = strings.ReplaceAll(strings.ToValidUTF8(text, "�"), "\x00", "�")

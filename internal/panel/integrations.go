@@ -18,6 +18,9 @@ func (a *App) registerIntegrations(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/admin/integrations/{integration}", a.integrationSave)
 	mux.HandleFunc("DELETE /api/admin/integrations/{integration}", a.integrationDelete)
 	mux.HandleFunc("GET /api/admin/integrations/defaults/{egg}", a.integrationDefaults)
+	mux.HandleFunc("GET /api/admin/servers/{server}/fs25/licences", a.fs25Licences)
+	mux.HandleFunc("PUT /api/admin/servers/{server}/fs25/licences", a.fs25Licences)
+	mux.HandleFunc("POST /api/admin/fs25/licences/inspect", a.fs25InspectLicence)
 }
 
 var integrationFields = map[string][]string{
@@ -260,11 +263,17 @@ func (a *App) integrationEnvironment(ctx context.Context, eggID int64) (M, M, er
 	for _, v := range vars {
 		declared[str(v["env_variable"])] = true
 	}
-	records, err := a.query(ctx, "SELECT * FROM integrations WHERE enabled=true AND (egg_id IS NULL OR egg_id=$1) ORDER BY (egg_id IS NULL),id", eggID)
+	egg, err := a.effectiveEgg(ctx, eggID)
+	if err != nil {
+		return nil, nil, err
+	}
+	farming := fs25Egg(egg)
+	records, err := a.query(ctx, `SELECT * FROM integrations WHERE enabled=true AND (egg_id IS NULL OR egg_id=$1 OR ($2 AND provider='game_license' AND egg_id IN (SELECT id FROM eggs WHERE features @> '["voltra_fs25"]'::jsonb))) ORDER BY (egg_id IS NULL),id`, eggID, farming)
 	if err != nil {
 		return nil, nil, err
 	}
 	env, sources := M{}, M{}
+	dlcLicences := []fs25DLCLicence{}
 	specific := map[string]bool{}
 	for _, row := range records {
 		var credentials M
@@ -272,6 +281,18 @@ func (a *App) integrationEnvironment(ctx context.Context, eggID int64) (M, M, er
 			for _, value := range asSlice(names) {
 				name := str(value)
 				if !declared[name] {
+					continue
+				}
+				if name == "DLC_PRODUCT_KEY" && farming && str(row["provider"]) == "game_license" {
+					if credentials == nil {
+						credentials, err = a.integrationCredentials(row)
+						if err != nil {
+							return nil, nil, err
+						}
+					}
+					if key := str(credentials[field]); key != "" {
+						dlcLicences = append(dlcLicences, fs25DLCLicence{ID: str(row["id"]), Name: str(row["name"]), Key: key})
+					}
 					continue
 				}
 				scoped := row["egg_id"] != nil
@@ -295,6 +316,17 @@ func (a *App) integrationEnvironment(ctx context.Context, eggID int64) (M, M, er
 				specific[name] = scoped
 			}
 		}
+	}
+	if len(dlcLicences) > 0 {
+		if len(dlcLicences) > 32 {
+			return nil, nil, bad("Use at most 32 FS25 DLC licences per template.")
+		}
+		raw, e := json.Marshal(dlcLicences)
+		if e != nil {
+			return nil, nil, e
+		}
+		env["DLC_PRODUCT_KEY"] = string(raw)
+		sources["DLC_PRODUCT_KEY"] = M{"name": "Admin DLC licences", "count": len(dlcLicences), "field": "license_key"}
 	}
 	return env, sources, nil
 }

@@ -315,10 +315,16 @@ ALTER TABLE servers ADD COLUMN IF NOT EXISTS minecraft_pack jsonb NOT NULL DEFAU
 -- Disposable bounded console history, retained across panel and game restarts.
 CREATE TABLE IF NOT EXISTS console_log_entries (
  id bigserial PRIMARY KEY, server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
- event text NOT NULL CHECK(event IN ('console output','daemon message','install output','panel message')),
+ event text NOT NULL CHECK(event IN ('console output','daemon message','install output','panel message','steam output')),
  line text NOT NULL CHECK(octet_length(line)<=17000), created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS console_log_entries_server ON console_log_entries(server_id,id DESC);
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='console_log_entries'::regclass AND conname='console_log_entries_event_check' AND position('steam output' in pg_get_constraintdef(oid))=0) THEN
+  ALTER TABLE console_log_entries DROP CONSTRAINT console_log_entries_event_check;
+  ALTER TABLE console_log_entries ADD CONSTRAINT console_log_entries_event_check CHECK(event IN ('console output','daemon message','install output','panel message','steam output'));
+ END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS console_log_collectors (
  server_id bigint PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
  lease_owner text NOT NULL DEFAULT '', lease_until timestamptz NOT NULL DEFAULT '-infinity',

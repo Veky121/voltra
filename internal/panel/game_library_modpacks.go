@@ -263,7 +263,11 @@ func minecraftSafePackPath(name string) bool {
 }
 
 func minecraftReadZip(data []byte) (*zip.Reader, error) {
-	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	return minecraftReadZipFrom(bytes.NewReader(data), int64(len(data)))
+}
+
+func minecraftReadZipFrom(source io.ReaderAt, size int64) (*zip.Reader, error) {
+	reader, err := zip.NewReader(source, size)
 	if err != nil {
 		return nil, bad("The provider did not return a valid modpack ZIP archive.")
 	}
@@ -276,10 +280,10 @@ func minecraftReadZip(data []byte) (*zip.Reader, error) {
 		if !minecraftSafePackPath(strings.TrimSuffix(f.Name, "/")) || (kind != 0 && kind != os.ModeDir) {
 			return nil, bad("The pack archive contains an unsafe path or special file.")
 		}
-		total += f.UncompressedSize64
-		if f.UncompressedSize64 > 512<<20 || total > 2<<30 {
+		if f.UncompressedSize64 > 512<<20 || f.UncompressedSize64 > minecraftExpandedLimit-total {
 			return nil, bad("This pack exceeds the supported archive size.")
 		}
+		total += f.UncompressedSize64
 	}
 	return reader, nil
 }
@@ -321,8 +325,12 @@ func minecraftParseMRPack(data []byte) (string, string, string, []minecraftDownl
 	if err != nil {
 		return "", "", "", nil, err
 	}
+	return minecraftParseMRPackReader(reader)
+}
+
+func minecraftParseMRPackReader(reader *zip.Reader) (string, string, string, []minecraftDownload, error) {
 	var manifest minecraftMRManifest
-	if err = minecraftZipJSON(reader, "modrinth.index.json", &manifest); err != nil {
+	if err := minecraftZipJSON(reader, "modrinth.index.json", &manifest); err != nil {
 		return "", "", "", nil, err
 	}
 	if manifest.Format != 1 || manifest.Game != "minecraft" {
@@ -408,11 +416,12 @@ func (a *App) minecraftModpackPlan(ctx context.Context, selection M) (minecraftP
 		if !minecraftOfficialURL(archive.URL, "cdn.modrinth.com") {
 			return minecraftPlan{}, bad("The pack has no approved Modrinth archive.")
 		}
-		data, e := a.minecraftFetchArchive(ctx, archive)
+		reader, cleanup, e := a.minecraftFetchArchive(ctx, archive)
 		if e != nil {
 			return minecraftPlan{}, e
 		}
-		game, loader, loaderVersion, files, err = minecraftParseMRPack(data)
+		defer cleanup()
+		game, loader, loaderVersion, files, err = minecraftParseMRPackReader(reader)
 		if err != nil {
 			return minecraftPlan{}, err
 		}
@@ -428,14 +437,11 @@ func (a *App) minecraftModpackPlan(ctx context.Context, selection M) (minecraftP
 		if e != nil {
 			return minecraftPlan{}, e
 		}
-		data, e := a.minecraftFetchArchive(ctx, clientArchive)
+		reader, cleanup, e := a.minecraftFetchArchive(ctx, clientArchive)
 		if e != nil {
 			return minecraftPlan{}, e
 		}
-		reader, e := minecraftReadZip(data)
-		if e != nil {
-			return minecraftPlan{}, e
-		}
+		defer cleanup()
 		var manifest struct {
 			Minecraft struct {
 				Version string `json:"version"`
@@ -483,14 +489,11 @@ func (a *App) minecraftModpackPlan(ctx context.Context, selection M) (minecraftP
 		if e != nil {
 			return minecraftPlan{}, e
 		}
-		data, e = a.minecraftFetchArchive(ctx, archive)
+		reader, cleanup, e = a.minecraftFetchArchive(ctx, archive)
 		if e != nil {
 			return minecraftPlan{}, e
 		}
-		reader, e = minecraftReadZip(data)
-		if e != nil {
-			return minecraftPlan{}, e
-		}
+		defer cleanup()
 		prefix, e := minecraftServerPackPrefix(reader)
 		if e != nil {
 			return minecraftPlan{}, e

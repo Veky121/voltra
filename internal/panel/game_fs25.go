@@ -14,6 +14,8 @@ const fs25Path = "farming-simulator/egg-farming-simulator-25.json"
 const fs25Revision = "3ad302f2a67726567a534c964cc423c76d2d1d88"
 const fs25Source = "https://github.com/nn-home-com/farming-simulator-25-egg/blob/" + fs25Revision + "/egg-farming-simulator-25.json"
 
+const fs25ReadyPattern = `regex:^\[Server\]\s+\[\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2}\]\s+Game server started\s*$`
+
 //go:embed game_library/fs25
 var fs25Files embed.FS
 
@@ -52,7 +54,7 @@ func farmingSimulatorTemplate() gameTemplate {
 	egg["docker_images"] = M{"WineHQ 11 (pinned)": "ghcr.io/nn-home-com/farming-simulator-25-egg@sha256:10073fd00ab197e36c45dd8af94ca297c04ae2a4288d4b3bd65c16aa468b8dc8"}
 	egg["scripts"] = M{"installation": M{"script": script, "container": "debian:bookworm-slim", "entrypoint": "bash"}}
 	egg["features"] = []any{"voltra_fs25"}
-	egg["config"] = M{"files": "{}", "startup": `{"done":"Web manager ready."}`, "logs": "{}", "stop": "^C"}
+	egg["config"] = M{"files": "{}", "startup": M{"done": fs25ReadyPattern, "strip_ansi": true}, "logs": "{}", "stop": "^C"}
 	egg["description"] = "GIANTS-licensed FS25 server under Wine. Downloads from GIANTS or accepts an uploaded installer. Separate server licence required."
 	vars := asSlice(egg["variables"])
 	for _, raw := range vars {
@@ -61,6 +63,7 @@ func farmingSimulatorTemplate() gameTemplate {
 		case "GAME_SERIAL":
 			v["name"] = "GIANTS server licence"
 			v["description"] = "Saved encrypted. Blank uses the configured admin licence."
+			v["user_viewable"], v["user_editable"] = false, false
 		case "AUTO_DOWNLOAD":
 			v["description"] = "Download from GIANTS. Turn off to upload an installer instead."
 		case "DOWNLOAD_DLC":
@@ -79,7 +82,7 @@ func farmingSimulatorTemplate() gameTemplate {
 			v["description"] = "Base-game or installed mod map ID."
 		}
 	}
-	vars = append(vars, M{"name": "DLC product key", "description": "Optional separate key for an uploaded DLC. Blank uses the server serial. Install separately keyed packs one at a time, changing this key between starts.", "env_variable": "DLC_PRODUCT_KEY", "default_value": "", "user_viewable": true, "user_editable": true, "rules": "nullable|string|max:64"}, M{"name": "DLC timeout (seconds)", "description": "Maximum time per DLC before reporting failure. Increase for large packs.", "env_variable": "DLC_TIMEOUT", "default_value": "900", "user_viewable": true, "user_editable": true, "rules": "required|integer|between:60,7200"})
+	vars = append(vars, M{"name": "Admin DLC licences", "description": "Encrypted admin-managed DLC credentials. Downloads are matched to their own licence.", "env_variable": "DLC_PRODUCT_KEY", "default_value": "", "user_viewable": false, "user_editable": false, "rules": "nullable|string|max:16384"}, M{"name": "DLC timeout (seconds)", "description": "Maximum time per DLC before reporting failure. Increase for large packs.", "env_variable": "DLC_TIMEOUT", "default_value": "900", "user_viewable": true, "user_editable": true, "rules": "required|integer|between:60,7200"})
 	egg["variables"] = vars
 	body, _ := json.Marshal(egg)
 	sum := sha256.Sum256(body)
@@ -87,7 +90,7 @@ func farmingSimulatorTemplate() gameTemplate {
 	return gameTemplate{ID: hex.EncodeToString(id[:8]), Path: fs25Path, SHA256: hex.EncodeToString(sum[:]), Profile: "fs25-reviewed-v1", Egg: egg, Defaults: M{"memory": 6144, "disk": 102400}, Platforms: []string{"linux/amd64"}, RequiredPorts: 2,
 		PortRules:    []templatePortRule{{Environment: "WEB_PORT", Minimum: 1024, Maximum: 65535, Count: 2, Condition: "nonzero", AllocatedValue: true, ExcludePrimary: true, AutoAllocate: true}},
 		Verification: "runtime_unverified", Detail: "Reviewed source and hardened installer. Licensed game activation and DLC gameplay have not been verified by Voltra.",
-		SetupSteps: []string{"Use a separate GIANTS server licence. Steam player purchases do not supply the required server serial.", "Start from Console after preparation. GIANTS downloads, Wine installation and activation run on first start. Allow at least 100 GiB for temporary files.", "For DLCs, enable downloads for content offered to this serial, or upload GIANTS Windows installers to /dlc and restart. Use the optional DLC product key for separately keyed packs.", "Check game logs for loaded DLCs and test joining with matching client content. A file or web-manager colour alone does not prove a DLC works."}}
+		SetupSteps: []string{"Use a separate GIANTS server licence. Steam player purchases do not supply the required server serial.", "Start from Console after preparation. GIANTS downloads, Wine installation and activation run on first start. Allow at least 100 GiB for temporary files.", "Administrators save game and DLC licences in Admin integrations, then apply them under server Runtime. Each pack downloads and activates with its matching key.", "Check game logs for loaded DLCs and test joining with matching client content. A file or web-manager colour alone does not prove a DLC works."}}
 }
 
 func fs25Secret(name string) bool {

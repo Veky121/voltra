@@ -14,6 +14,7 @@ import {
 } from "./admin/infrastructure";
 import { Server, Servers } from "./admin/servers";
 import { Integration, Integrations } from "./admin/integrations";
+import {GameLicences} from './admin/GameLicences';
 import { ProxyGateways } from "./admin/ProxyGateways";
 import { JavaRuntimes } from "./admin/JavaRuntimes";
 import { MinecraftRuntimeRules } from "./admin/MinecraftRuntimeRules";
@@ -119,6 +120,7 @@ export default function Admin() {
           <Route path="api-keys" element={<ApplicationKeys />} />
           <Route path="settings" element={<Settings />} />
           <Route path="integrations" element={<Integrations />} />
+          <Route path="integrations/licences" element={<GameLicences />} />
           <Route path="integrations/proxy-gateways" element={<ProxyGateways />} />
           <Route path="proxy-gateways" element={<Navigate to="/admin/integrations/proxy-gateways" replace />} />
           <Route path="integrations/:id" element={<Integration />} />

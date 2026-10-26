@@ -90,6 +90,9 @@ func (a *App) privateJobProgress(ctx context.Context, id, token, stage, detail s
 		return errPrivateCancelled
 	}
 	_, e = a.DB.Exec(ctx, "INSERT INTO steam_job_events(job_id,stage,detail) VALUES($1,$2,$3)", id, stage, detail)
+	if e == nil {
+		a.steamConsoleProgress(ctx, id, stage, detail)
+	}
 	return e
 }
 func (a *App) runPrivateSteamJob(parent context.Context, job M, token string) error {

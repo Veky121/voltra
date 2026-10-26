@@ -7,6 +7,7 @@ import {DropdownMenuItem} from '../../src/components/ui/dropdown-menu';
 import FileMenu from '../../src/client/FileMenu';
 import {MemoryRouter} from 'react-router-dom';
 import {SectionTabs} from '../../src/ui/SectionTabs';
+import {MinecraftDialog} from '../../src/client/MinecraftDialog';
 import '../../src/admin/management-ui.css';
 import '../../src/admin/infrastructure-ui.css';
 import '../../src/client/accountProfile.css';
@@ -52,4 +53,14 @@ function SwitchGeometryFixture(){
   return <GameSwitch key={id} aria-label={id} checked={checked[id]??initial} disabled={disabled} onCheckedChange={value=>setChecked(old=>({...old,[id]:value}))}/>;
  }))}</section>)}</main>;
 }
-createRoot(document.getElementById('root')!).render(location.pathname==='/tabs'?<TabsFixture/>:location.pathname==='/geometry'?<SwitchGeometryFixture/>:<Fixture/>);
+function NativeDialogFixture(){
+ const [open,setOpen]=useState(false),[version,setVersion]=useState('8.3');
+ return <main style={{padding:24}}><button onClick={()=>setOpen(true)}>Open pack versions</button><output aria-label="Selected version">{version}</output>
+  {open&&<MinecraftDialog title="Pack versions" onClose={()=>setOpen(false)}>
+   <Field label="Pack version"><Select aria-label="Pack version" value={version} onChange={event=>setVersion(event.target.value)}>
+    <option value="8.3">All the Mods 10-8.3</option><option value="8.2">All the Mods 10-8.2</option><option value="8.1" disabled>Client only</option>
+   </Select></Field><button onClick={()=>setOpen(false)}>Cancel</button>
+  </MinecraftDialog>}
+ </main>;
+}
+createRoot(document.getElementById('root')!).render(location.pathname==='/dialog'?<NativeDialogFixture/>:location.pathname==='/tabs'?<TabsFixture/>:location.pathname==='/geometry'?<SwitchGeometryFixture/>:<Fixture/>);

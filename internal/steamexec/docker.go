@@ -21,6 +21,7 @@ import (
 
 const helperImage = "ghcr.io/steamcmd/steamcmd:ubuntu-24@sha256:1aefa09cbcdf75a54c7400f02098340db975536f4972036b166e7265da2b5806"
 const helperLabel = "io.voltra.steam-job"
+const clientCacheLabel = "io.voltra.steam-client-cache"
 
 // A fixed wrapper supplies the Steam runtime expected by launch-only eggs.
 // All arguments still come from the validated typed request, never shell text.
@@ -234,6 +235,7 @@ func (e *Executor) helper(ctx context.Context, r steamapi.Request, dir string, m
 	}
 	name := helperName(phaseID(r))
 	args := []string{"run", "--name", name, "--label", helperLabel + "=" + phaseID(r), "--rm", "--pull", "missing", "--platform", "linux/amd64", "--init", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "2g", "--cpus", "2", "--log-driver", "none", "--tmpfs", "/tmp:rw,exec,nosuid,size=1g", "--env", "HOME=/tmp", "--workdir", "/tmp"}
+	var cacheUID, cacheGID uint32
 	if mutation {
 		state, stateErr := e.inspect(ctx, r.ServerUUID)
 		if stateErr != nil {
@@ -250,8 +252,25 @@ func (e *Executor) helper(ctx context.Context, r steamapi.Request, dir string, m
 		if !ok || uid == 0 {
 			return errors.New("game directory must have a non-root Wings owner")
 		}
+		cacheUID, cacheGID = uid, gid
 		args = append(args, "--user", strconv.FormatUint(uint64(uid), 10)+":"+strconv.FormatUint(uint64(gid), 10), "--mount", "type=bind,src="+dir+",dst=/data")
 	}
+	cache, releaseCache, cacheErr := e.clientCache(ctx, r, cacheUID, cacheGID, mutation)
+	if cacheErr != nil {
+		return cacheErr
+	}
+	defer releaseCache()
+	// A killed node process can leave a daemon-side helper running after its
+	// host lock is released. Never reuse that client's files until it stops.
+	cacheUse := &cappedOutput{max: 4096}
+	if err = e.docker.Run(ctx, []string{"ps", "-q", "--filter", "label=" + clientCacheLabel + "=" + filepath.Base(cache)}, cacheUse); err != nil {
+		return errors.New("SteamCMD cache usage could not be checked")
+	}
+	if active, truncated := cacheUse.text(); truncated || strings.TrimSpace(active) != "" {
+		return errors.New("SteamCMD client cache is still in use by an earlier helper; operator recovery required")
+	}
+	args = append(args, "--label", clientCacheLabel+"="+filepath.Base(cache))
+	args = append(args, "--mount", "type=bind,src="+cache+",dst=/tmp/.local/share/Steam")
 	if mutation {
 		args = append(args, "--entrypoint", "/bin/sh", helperImage, "-c", mutationScript, "voltra-steam")
 	} else {
@@ -266,7 +285,7 @@ func (e *Executor) helper(ctx context.Context, r steamapi.Request, dir string, m
 	}
 	args = append(args, "+login", "anonymous")
 	if mutation {
-		// Metadata was checked in a separate ephemeral helper. Refresh alone
+		// Metadata was checked in a separate isolated client cache. Refresh alone
 		// need not populate this session's target app; fetch it explicitly before
 		// app_update to avoid cold anonymous "Missing configuration" failures.
 		args = append(args, "+app_info_update", "1", "+app_info_print", strconv.FormatInt(r.AppID, 10))
@@ -304,7 +323,11 @@ func (e *Executor) helper(ctx context.Context, r steamapi.Request, dir string, m
 		// Anonymous SteamCMD output is kept only on the operator's private node
 		// journal, never returned to browser clients. Bound it like the command
 		// buffer so a failed download remains diagnosable without unbounded logs.
-		if captured, ok := out.(*cappedOutput); ok {
+		captured, ok := out.(*cappedOutput)
+		if stream, streaming := out.(*consoleOutput); streaming {
+			captured, ok = stream.captured, true
+		}
+		if ok {
 			raw, _ := captured.text()
 			if r.BetaPassword != "" {
 				raw = strings.ReplaceAll(raw, r.BetaPassword, "[redacted]")

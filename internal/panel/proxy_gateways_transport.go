@@ -49,6 +49,9 @@ func proxyStoreCall(ctx context.Context, origin, user, password, method, path st
 		return M{"_raw_config": string(raw)}, resp.StatusCode, nil
 	}
 	out := M{}
+	if len(raw) == 0 && method == "GET" {
+		return nil, resp.StatusCode, fmt.Errorf("FRPC JSON response missing")
+	}
 	if len(raw) > 0 {
 		if e = json.Unmarshal(raw, &out); e != nil {
 			return nil, resp.StatusCode, fmt.Errorf("FRPC JSON response invalid")

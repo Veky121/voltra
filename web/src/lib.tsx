@@ -1,4 +1,5 @@
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback} from 'react';
+import {useAPIRequest} from './hooks/useAPIRequest';
 import type {ButtonHTMLAttributes,InputHTMLAttributes,SelectHTMLAttributes,TextareaHTMLAttributes,HTMLAttributes,ReactNode} from 'react';
 import {Card as ShadcnCard} from './components/ui/card';
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
@@ -20,7 +21,7 @@ export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
 }
 export function unwrap(response:any):any{return response?.attributes??response}
 export function rows(response:any):any[]{return (response?.data??[]).map((x:any)=>({...unwrap(x),...(x.meta?{_meta:x.meta}:{})}))}
-export function useAPI<T=any>(path:string|null){const [data,setData]=useState<T|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(!!path),[version,setVersion]=useState(0);const reload=useCallback(()=>setVersion(v=>v+1),[]);useEffect(()=>{let cancelled=false;if(!path){setData(null);setLoading(false);return}setLoading(true);setError('');api<T>(path).then(v=>{if(!cancelled)setData(v)}).catch(e=>{if(!cancelled)setError(e.message)}).finally(()=>{if(!cancelled)setLoading(false)});return()=>{cancelled=true}},[path,version]);return {data,error,loading,reload}}
+export function useAPI<T=any>(path:string|null){return useAPIRequest<T>(path,api)}
 export function translate(dictionary:any,key:string,values:Record<string,any>={},fallback=key,locale='en'):string{const lookup=(path:string)=>path.split('.').reduce((value:any,part)=>value?.[part],dictionary);let found=lookup(key);if(values.count!==undefined&&Number.isFinite(Number(values.count))){let category='other';try{category=new Intl.PluralRules(locale).select(Number(values.count))}catch{}found=(Number(values.count)===0?lookup(`${key}_zero`):undefined)??lookup(`${key}_${category}`)??found}if(typeof found!=='string')return fallback;return found.replace(/{{([^}]+)}}/g,(_whole,path:string)=>{const value=path.split('.').reduce((v:any,p)=>v?.[p],values);return value===undefined?`{{${path}}}`:String(value)})}
 export function useTranslation(namespace:string){const account=useAPI('/api/client/account');const locale=unwrap(account.data)?.language||'en';const local=useAPI(`/locales/locale.json?locale=${encodeURIComponent(locale)}&namespace=${encodeURIComponent(namespace)}`);const english=useAPI(locale==='en'?null:`/locales/locale.json?locale=en&namespace=${encodeURIComponent(namespace)}`);return useCallback((key:string,values:Record<string,any>={},fallback=key)=>translate(local.data?.[locale]?.[namespace],key,values,translate(english.data?.en?.[namespace],key,values,fallback),locale),[local.data,english.data,locale,namespace])}
 type ButtonProps=ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'default'|'secondary'|'danger'};
@@ -33,4 +34,4 @@ export function Card({children,className='',...props}:HTMLAttributes<HTMLElement
 export function ErrorBox({children}: {children?:ReactNode}){return children?<div className="error" role="alert">{children}</div>:null}
 export function Loading(){return <div className="loading" role="status"><span className="spinner"/>Loading…</div>}
 export function Empty({children}: {children?:ReactNode}){return <div className="empty">{children||'Nothing here yet.'}</div>}
-export function Modal({title,onClose,children}: {title:string,onClose:()=>void,children:ReactNode}){useEffect(()=>{const fn=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};document.addEventListener('keydown',fn);return()=>document.removeEventListener('keydown',fn)},[onClose]);return <div className="modal-backdrop" onClick={onClose}><section className="modal" role="dialog" aria-modal="true" aria-label={title} onClick={e=>e.stopPropagation()}><header><h2>{title}</h2><Button aria-label="Close dialog" variant="secondary" onClick={onClose}>×</Button></header>{children}</section></div>}
+export {Modal} from './ui/Modal';

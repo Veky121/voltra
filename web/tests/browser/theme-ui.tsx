@@ -10,6 +10,7 @@ import '../../src/design-system.css';
 import '../../src/shell-ui.css';
 import '../../src/shadcn.css';
 import '../../src/shadcn-app.css';
+import '../../src/ui/controls.css';
 import '../../src/glass-surfaces.css';
 const params=new URLSearchParams(location.search),account=params.get('account')||'theme-fixture-a';
 const servers=[{id:1,uuid:'fixture-server',identifier:'fixture',name:'Survival SMP',status:null,favorite:true,last_visited_at:'2026-10-25T10:00:00Z',egg_name:'Minecraft',game:'minecraft',limits:{memory:8192,disk:32768,cpu:400},allocation:{ip:'192.168.1.10',port:25565},node:'home-server',node_id:1,user:1,owner_id:1},

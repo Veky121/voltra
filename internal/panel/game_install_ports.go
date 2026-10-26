@@ -46,6 +46,9 @@ func gamePortIPsOverlap(a, b string) bool {
 	return x == nil || y == nil || x.IsUnspecified() || y.IsUnspecified() || x.Equal(y)
 }
 func gamePortReserved(node M, port int64) bool {
+	if ports, ok := node["_operator_reserved_ports"].([]int64); ok && reservedGamePort(ports, port) {
+		return true
+	}
 	if port < 1024 || port > 65535 {
 		return true
 	}
@@ -104,7 +107,7 @@ func planGamePortLayout(node M, allocations []M, entry gameTemplate, environment
 			}
 		}
 		if gamePortReserved(node, p) {
-			return "Preferred port is reserved for node management or outside the allowed port range."
+			return "Preferred port is reserved for node management or another service, or outside the allowed port range."
 		}
 		for _, allocation := range allocations {
 			if num(allocation["port"]) == p && gamePortIPsOverlap(ip, str(allocation["ip"])) {
@@ -308,12 +311,21 @@ func planGamePortLayout(node M, allocations []M, entry gameTemplate, environment
 }
 
 func (a *App) planGamePorts(ctx context.Context, node M, entry gameTemplate, env M) (gamePortPlan, M, error) {
+	reservations, err := readGamePortReservations(ctx, a.DB, false)
+	if err != nil {
+		return gamePortPlan{}, nil, err
+	}
+	planningNode := M{}
+	for key, value := range node {
+		planningNode[key] = value
+	}
+	planningNode["_operator_reserved_ports"] = reservations.nodePorts(num(node["id"]))
 	allocations, err := a.query(ctx, "SELECT id,ip,port,server_id FROM allocations WHERE node_id=$1 ORDER BY id", node["id"])
 	if err != nil {
 		return gamePortPlan{}, nil, err
 	}
 	for attempt := 0; attempt < 128; attempt++ {
-		plan, resolved, e := planGamePortLayout(node, allocations, entry, env)
+		plan, resolved, e := planGamePortLayout(planningNode, allocations, entry, env)
 		if e != nil {
 			return plan, nil, e
 		}
@@ -356,8 +368,15 @@ func (a *App) provisionGamePorts(ctx context.Context, node M, plan gamePortPlan)
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	reservations, err := readGamePortReservations(ctx, tx, true)
+	if err != nil {
+		return nil, err
+	}
 	rows := []M{}
 	for _, port := range plan.Ports {
+		if reservedGamePort(reservations.nodePorts(num(node["id"])), port.Port) {
+			return nil, bad("A planned port is reserved for another service. Preview the ports again.")
+		}
 		var id int64
 		err = tx.QueryRow(ctx, `INSERT INTO allocations(node_id,ip,port) VALUES($1,$2,$3) ON CONFLICT(node_id,ip,port) DO UPDATE SET ip=EXCLUDED.ip WHERE allocations.server_id IS NULL RETURNING id`, node["id"], plan.IP, port.Port).Scan(&id)
 		if err != nil {

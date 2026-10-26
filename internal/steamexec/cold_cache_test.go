@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// Each helper starts with a fresh HOME. A metadata helper's cache cannot satisfy
-// a later mutation helper. Refresh alone also need not fetch the target app.
+// Metadata and mutation helpers use separate client caches. The first run can
+// still be cold, and refresh alone need not fetch the target app.
 // This models the native cold-install failure observed with SteamCMD 1792617903.
 type coldCacheDocker struct{ *fakeDocker }
 

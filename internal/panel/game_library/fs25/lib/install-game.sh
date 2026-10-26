@@ -149,7 +149,7 @@ pdlc_snapshot() { find "${DOCS_DIR}/pdlc" -maxdepth 1 -type f -name '*.dlc' -pri
 install_one_dlc() {
     local dlc="$1" name="$2"
     local serial_clean=""
-    serial_clean=$(printf '%s' "${DLC_PRODUCT_KEY:-${GAME_SERIAL:-}}" | tr -d '[:space:]-')
+    serial_clean=$(node "${FS25_LIB}/dlc-licences.mjs" "$dlc") || return 1
 
     mkdir -p "${DOCS_DIR}/pdlc"
     local before; before="$(pdlc_snapshot)"
@@ -228,9 +228,14 @@ install_one_dlc() {
     while IFS= read -r payload; do
         [ -n "$payload" ] && [ -s "${DOCS_DIR}/pdlc/$payload" ] || complete=0
     done <<< "$added"
-    if [ "$exited" -eq 1 ] && wait "$pid" && [ -n "$added" ] && [ "$complete" -eq 1 ]; then
-        printf '%s\n' "$added" > "${DLC_DIR}/.installed-$(sha256sum "$dlc" | cut -d' ' -f1)"
-        log "  ${name} installed ($(printf '%s' "$added" | tr '\n' ' ')) after ${elapsed}s."
+    local installer_exit=0
+    if [ "$exited" -eq 1 ]; then wait "$pid" || installer_exit=$?; fi
+    log "  ${name}: installer exit ${installer_exit}; payload check ${complete}."
+    # Some GIANTS DLC installers return 1 under Wine after writing the complete
+    # payload. Keep it pending: only the licensed game loading it can verify it.
+    if [ "$exited" -eq 1 ] && [ "$installer_exit" -le 1 ] && [ -n "$added" ] && [ "$complete" -eq 1 ]; then
+        printf '%s\n' "$added" > "${DLC_DIR}/.pending-$(sha256sum "$dlc" | cut -d' ' -f1)"
+        log "  ${name}: payload installed after ${elapsed}s; waiting for game validation."
         return 0
     fi
 
@@ -240,7 +245,7 @@ install_one_dlc() {
         [ -z "$payload" ] || mv -- "${DOCS_DIR}/pdlc/$payload" "${DLC_DIR}/failed/$payload" 2>/dev/null || true
     done <<< "$added"
     warn "  ${name} did not register (continuing without it). Check"
-    warn "  /tmp/fs25-dlc-${name}.log; the installer needs a valid product key."
+    warn "  /tmp/fs25-dlc-${name}.log; installer exit ${installer_exit}. No licence verdict is inferred."
     return 1
 }
 
@@ -252,6 +257,7 @@ install_dlcs() {
         base="$(basename "$dlc")"
         name="${base#${DLC_PREFIX}}"; name="${name%%_*}"
         local marker="${DLC_DIR}/.installed-$(sha256sum "$dlc" | cut -d' ' -f1)" complete=1 payload
+        [ -s "$marker" ] || marker="${DLC_DIR}/.pending-$(sha256sum "$dlc" | cut -d' ' -f1)"
         if [ -s "$marker" ]; then
             while IFS= read -r payload; do
                 case "$payload" in ''|*/*|*..*) complete=0;; *) [ -s "${DOCS_DIR}/pdlc/$payload" ] || complete=0;; esac

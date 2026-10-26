@@ -2,9 +2,15 @@
 .ui-switch[data-slot=switch]{display:inline-flex;position:relative;flex:0 0 28px;align-items:center;justify-content:flex-start;gap:0;width:28px;height:17px;min-height:17px;margin:0;padding:0;border:1px solid transparent;border-radius:999px;background:var(--line-strong);color:var(--text);cursor:pointer;box-shadow:none;filter:none;vertical-align:middle;touch-action:manipulation;transition:background 150ms}
 .ui-switch[data-slot=switch][data-checked]{background:var(--primary)}
 .ui-switch[data-slot=switch] [data-slot=switch-thumb]{display:block;flex:none;width:14px;height:14px;border-radius:999px;background:var(--text);translate:none;transform:translateX(0);transition:transform 150ms;pointer-events:none}
-.ui-switch[data-slot=switch][data-checked] [data-slot=switch-thumb]{transform:translateX(12px);background:var(--theme-primary-ink,#fff)}
+.ui-switch[data-slot=switch][data-checked] [data-slot=switch-thumb]{transform:translateX(12px);background:var(--theme-button-ink,var(--accent-ink,#fff))}
 .ui-switch[data-slot=switch]:disabled,.ui-switch[data-slot=switch][data-disabled]{opacity:.45;cursor:not-allowed}
 .ui-switch[data-slot=switch]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* Switches render a hidden native input too. Layout follows the visible button,
+   so legacy checkbox selectors cannot turn a field into an accidental grid. */
+.field:has(>.ui-switch[data-slot=switch]){display:flex;flex-direction:column;align-items:stretch;gap:7px}
+.field>.ui-switch[data-slot=switch]{align-self:flex-start;margin-block:calc((var(--ui-control-height,40px) - 17px)/2)}
+label:not(.field):has(>.ui-switch[data-slot=switch]){display:flex;align-items:center;gap:10px;min-width:0}
+label:not(.field)>.ui-switch[data-slot=switch]{align-self:center;flex-shrink:0}
 .ui-select-field{position:relative;display:inline-flex;min-width:0;width:100%;vertical-align:middle}
 .ui-select[data-slot=select-trigger]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-width:0;min-height:var(--ui-control-height,36px);height:auto;padding:8px 11px;border:1px solid var(--line-strong);border-radius:var(--ui-control-radius,7px);background:var(--ui-input,var(--surface-muted));color:var(--text);font-size:calc(13px * var(--ui-font-scale,1));font-weight:400;line-height:1.4;text-align:left;box-shadow:none;filter:none;cursor:pointer}
 .ui-select[data-slot=select-trigger]:hover{background:var(--ui-input,var(--surface-muted));border-color:color-mix(in srgb,var(--accent) 45%,var(--line-strong))}

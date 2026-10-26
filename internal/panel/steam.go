@@ -345,6 +345,13 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 		}
 	}
 	active, err := queryRowMap(tx.QueryRow(ctx, "SELECT row_to_json(j) FROM steam_jobs j WHERE server_id=$1 AND status IN ('queued','running')", id))
+	if err == nil && operation == "start" && str(active["operation"]) == "check" && str(active["status"]) == "queued" {
+		// A background check that has not begun must not delay game launch.
+		if _, err = tx.Exec(ctx, "UPDATE steam_jobs SET status='cancelled',stage='cancelled',detail='Deferred for server start.',completed_at=now(),updated_at=now() WHERE id=$1", active["id"]); err != nil {
+			return nil, err
+		}
+		err = pgx.ErrNoRows
+	}
 	if err == nil {
 		if reinstall && (str(active["operation"]) != "install" || !boolean(active["force"]) || boolean(active["start_after"]) || boolean(active["restart"])) {
 			return nil, APIError{409, "SteamJobActive", "A different Steam maintenance job is already in progress."}
@@ -545,7 +552,10 @@ func (a *App) steamWorker(ctx context.Context) {
 }
 
 func (a *App) steamSchedule(ctx context.Context) {
-	states, err := a.query(ctx, `SELECT st.*,s.node_id FROM steam_servers st JOIN servers s ON s.id=st.server_id WHERE st.mode='scheduled' AND st.initialized AND NOT st.needs_repair AND s.status IS NULL AND NOT EXISTS(SELECT 1 FROM steam_jobs j WHERE j.server_id=s.id AND j.status IN ('queued','running'))`)
+	// on_start is retained as the stored/API value for the former before-start
+	// mode. Both enabled modes now check in the background; only scheduled
+	// mode may install updates while a server is already stopped.
+	states, err := a.query(ctx, `SELECT st.*,s.node_id FROM steam_servers st JOIN servers s ON s.id=st.server_id WHERE st.mode IN ('on_start','scheduled') AND st.initialized AND NOT st.needs_repair AND s.status IS NULL AND NOT EXISTS(SELECT 1 FROM steam_jobs j WHERE j.server_id=s.id AND j.status IN ('queued','running'))`)
 	if err != nil {
 		return
 	}
@@ -622,11 +632,12 @@ func (a *App) claimSteamJob(ctx context.Context, token string) (M, error) {
 	var nodeID int64
 	err = tx.QueryRow(ctx, `SELECT row_to_json(j),s.node_id FROM steam_jobs j JOIN servers s ON s.id=j.server_id
  WHERE (j.status='queued' OR (j.status='running' AND j.lease_until<now()))
- AND (SELECT count(*) FROM steam_jobs active JOIN servers owner ON owner.id=active.server_id WHERE owner.node_id=s.node_id AND active.status='running' AND active.lease_until>now())<2
- ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&job, &nodeID)
+ AND (j.operation='start' OR (SELECT count(*) FROM steam_jobs active JOIN servers owner ON owner.id=active.server_id WHERE owner.node_id=s.node_id AND active.operation<>'start' AND active.status='running' AND active.lease_until>now())<2)
+ ORDER BY CASE WHEN j.operation='start' THEN 0 ELSE 1 END,j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&job, &nodeID)
 	if err != nil {
 		return nil, err
 	}
+	// Starts use Wings directly and do not consume a SteamCMD maintenance slot.
 	// Match the node executor's two maintenance slots. Serialize only the brief
 	// claim, rather than failing simultaneous installations with capacity errors.
 	var locked bool
@@ -637,10 +648,10 @@ func (a *App) claimSteamJob(ctx context.Context, token string) (M, error) {
 		return nil, pgx.ErrNoRows
 	}
 	var active int
-	if err = tx.QueryRow(ctx, `SELECT count(*) FROM steam_jobs j JOIN servers s ON s.id=j.server_id WHERE s.node_id=$1 AND j.status='running' AND j.lease_until>now()`, nodeID).Scan(&active); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM steam_jobs j JOIN servers s ON s.id=j.server_id WHERE s.node_id=$1 AND j.operation<>'start' AND j.status='running' AND j.lease_until>now()`, nodeID).Scan(&active); err != nil {
 		return nil, err
 	}
-	if active >= 2 {
+	if str(job["operation"]) != "start" && active >= 2 {
 		return nil, pgx.ErrNoRows
 	}
 	job, err = queryRowMap(tx.QueryRow(ctx, `UPDATE steam_jobs SET status='running',lease_token=$2,lease_until=now()+interval '90 seconds',started_at=COALESCE(started_at,now()),updated_at=now() WHERE id=$1 RETURNING row_to_json(steam_jobs)`, job["id"], token))
@@ -663,7 +674,10 @@ func (a *App) steamProgress(ctx context.Context, job M, token, stage, detail str
 
 func (a *App) steamLog(ctx context.Context, jobID, stage, detail string) {
 	// Repeated heartbeats are not separate log entries. Keep a bounded useful history.
-	_, _ = a.DB.Exec(ctx, `INSERT INTO steam_job_events(job_id,stage,detail) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM (SELECT stage,detail FROM steam_job_events WHERE job_id=$1 ORDER BY id DESC LIMIT 1) e WHERE e.stage=$2 AND e.detail=$3)`, jobID, stage, detail)
+	tag, err := a.DB.Exec(ctx, `INSERT INTO steam_job_events(job_id,stage,detail) SELECT $1,$2,$3 WHERE NOT EXISTS(SELECT 1 FROM (SELECT stage,detail FROM steam_job_events WHERE job_id=$1 ORDER BY id DESC LIMIT 1) e WHERE e.stage=$2 AND e.detail=$3)`, jobID, stage, detail)
+	if err == nil && tag.RowsAffected() > 0 {
+		a.steamConsoleProgress(ctx, jobID, stage, detail)
+	}
 	_, _ = a.DB.Exec(ctx, `DELETE FROM steam_job_events WHERE job_id=$1 AND id NOT IN (SELECT id FROM steam_job_events WHERE job_id=$1 ORDER BY id DESC LIMIT 200)`, jobID)
 }
 
@@ -747,35 +761,23 @@ func (a *App) runSteamJob(ctx context.Context, job M, token string) error {
 			return errors.New("Verify and repair files before starting this server.")
 		}
 	}
-	validatedBeforeStart := false
-	shouldCheck := operation == "check" || operation == "start" && str(state["mode"]) != "off" && steamCheckDue(state, time.Now())
-	if shouldCheck {
+	// A start/restart only launches installed files. SteamCMD bootstrap,
+	// version checks and validation belong to separate maintenance jobs.
+	if operation == "check" {
 		result, e := a.executeSteam(ctx, server, state, job, token, "check")
 		if e != nil {
 			_ = a.exec(ctx, "UPDATE steam_servers SET last_failed_at=now(),last_error=$2 WHERE server_id=$1", server["id"], e.Error())
-			if operation != "start" {
-				return e
-			}
-			if err = a.steamProgress(ctx, job, token, "starting", "Steam check failed; starting the installed version.", false); err != nil {
-				return err
-			}
+			return e
 		} else {
 			if err = a.recordSteamResult(ctx, server, result); err != nil {
 				return err
 			}
 			// Scheduled mode can update an already stopped server; checking never stops players.
-			if result.UpdateAvailable && (operation == "start" || !boolean(job["force"]) && str(state["mode"]) == "scheduled" && current == "offline") {
+			if result.UpdateAvailable && !boolean(job["force"]) && str(state["mode"]) == "scheduled" && current == "offline" {
 				if _, err = a.executeSteamMutation(ctx, server, state, job, token, "update"); err != nil {
 					return err
 				}
-				validatedBeforeStart = operation == "start" && boolean(state["validate_on_start"])
 			}
-		}
-	}
-	// Explicit automatic-start validation also applies when metadata is current or cached.
-	if operation == "start" && boolean(state["validate_on_start"]) && (str(state["mode"]) == "on_start" || str(state["mode"]) == "scheduled") && !validatedBeforeStart {
-		if _, err = a.executeSteamMutation(ctx, server, state, job, token, "verify"); err != nil {
-			return err
 		}
 	}
 	if operation == "install" || operation == "update" || operation == "verify" {
@@ -857,6 +859,7 @@ func (a *App) recordSteamResult(ctx context.Context, server M, result steamapi.E
 
 func (a *App) executeSteam(ctx context.Context, server, state, job M, token, operation string) (steamapi.Event, error) {
 	request := steamapi.Request{JobID: str(job["id"]), Operation: operation, ServerUUID: str(server["uuid"]), AppID: num(state["app_id"]), Branch: str(state["branch"]), Validate: operation != "check" && boolean(state["validate_on_start"])}
+	request.StreamOutput = a.steamConsoleAvailable(num(server["node_id"]))
 	if steamPalworldVariant(str(state["game"])) {
 		if !a.steamPalworldNodeAvailable(num(server["node_id"]), str(state["game"])) {
 			return steamapi.Event{}, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node for this Palworld runtime variant."}
@@ -910,6 +913,13 @@ func (a *App) executeSteam(ctx context.Context, server, state, job M, token, ope
 			return event, errors.New("The node returned invalid Steam job data.")
 		}
 		switch event.Type {
+		case "output":
+			if !request.StreamOutput {
+				return event, errors.New("The node sent unrequested Steam console output.")
+			}
+			if err = a.steamConsoleOutput(ctx, job, token, event.Stage, event.Lines); err != nil {
+				return event, err
+			}
 		case "result":
 			latest, e := strconv.ParseUint(event.LatestBuild, 10, 64)
 			if e != nil || latest == 0 {
@@ -923,6 +933,15 @@ func (a *App) executeSteam(ctx context.Context, server, state, job M, token, ope
 			}
 			if event.UpdateAvailable != (event.InstalledBuild != event.LatestBuild) || mutation && (event.InstalledBuild == "" || event.UpdateAvailable) {
 				return event, errors.New("The node did not confirm a complete Steam installation.")
+			}
+			if request.Operation == "check" && request.StreamOutput {
+				detail := "Game is up to date (build " + event.InstalledBuild + ")."
+				if event.UpdateAvailable {
+					detail = "Game update available (installed " + event.InstalledBuild + ", latest " + event.LatestBuild + ")."
+				}
+				if err = a.steamConsoleOutput(ctx, job, token, "metadata", []string{detail}); err != nil {
+					return event, err
+				}
 			}
 			return event, nil
 		case "error":
@@ -1038,6 +1057,9 @@ func (a *App) steamStartAfter(ctx context.Context, server, job M, token string) 
 
 func (a *App) finishSteamJob(ctx context.Context, job M, token string, err error) {
 	status, stage, detail, errorText := "completed", "complete", "Steam maintenance completed.", ""
+	if str(job["operation"]) == "start" {
+		detail = "Server launch requested."
+	}
 	if err != nil {
 		status, stage, detail, errorText = "failed", "error", err.Error(), err.Error()
 		if len(errorText) > 512 {

@@ -466,7 +466,8 @@ export function Startup({ record, onSaved, contextual = false }: { record: any; 
   const eggID = record.egg ?? record.egg_id;
   const q = useAPI(`/api/admin/eggs/${eggID}`);
   const egg = q.data ? unwrap(q.data) : null;
-  const vars = egg ? rows(egg.relationships?.variables ?? { data: [] }) : [];
+  const farming=egg?.features?.includes('voltra_fs25');
+  const vars = egg ? rows(egg.relationships?.variables ?? { data: [] }).filter(variable=>!farming||!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)) : [];
   const existing = record.relationships?.variables
     ? rows(record.relationships.variables)
     : [];

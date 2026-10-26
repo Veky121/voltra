@@ -8,13 +8,15 @@ const fixtureKey = '__serverAdminToolsFixture';
 const modules = {
   react: `export const useState=(...args)=>globalThis.${fixtureKey}.useState(...args); export const useEffect=(...args)=>globalThis.${fixtureKey}.useEffect(...args); export const useId=()=>globalThis.${fixtureKey}.useId(); export const useRef=initial=>useState(()=>({current:initial}))[0];`,
   'react/jsx-runtime': `export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key}); export const jsxs=jsx;`,
-  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a';`,
+  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useSearchParams=()=>[new URLSearchParams()]; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a';`,
   lib: `import {jsx} from 'react/jsx-runtime';
     export const api=(...args)=>globalThis.${fixtureKey}.api(...args);
     export const useAPI=path=>globalThis.${fixtureKey}.query(path);
     export const unwrap=value=>value?.attributes??value;
     export const rows=value=>(value?.data??[]).map(unwrap);
     export const Button=({children,...props})=>jsx('button',{type:'button',...props,children});
+    export const Input=props=>jsx('input',props);
+    export const Select=props=>jsx('select',props);
     export const Card=({children})=>jsx('section',{children});
     export const ErrorBox=({children})=>children?jsx('div',{role:'alert',children}):null;
     export const Loading=()=>jsx('p',{role:'status',children:'Loading'});`,
@@ -42,7 +44,7 @@ const modules = {
     export const ResourceList=props=>jsx('fixture-resources',props);`,
 };
 const bundled = await build({
-  stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
+  stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers'; export {GameLicences} from './src/admin/GameLicences';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
     builder.onResolve({filter:/components\/ui\/switch$/}, () => ({path:'switch',namespace:'fixture'}));
@@ -265,6 +267,41 @@ test('generic runtime saves retain untouched secrets and preserve opaque replace
     assert.deepEqual(editor.props.transform({...editor.props.initial,'env:PASSWORD':replacement}),{image:'runtime-image',environment:{PASSWORD:replacement}});
     assert.deepEqual(editor.props.transform({...editor.props.initial,'env:PASSWORD':'  '}),{image:'runtime-image',environment:{PASSWORD:'  '}});
   }
+});
+
+test('server-limited Runtime omits global licence creation and assignment',()=>{
+ const record={id:7,egg:2,container:{image:'runtime-image',environment:{GAME_SERIAL:'server-key',DLC_PRODUCT_KEY:'private-dlc-key'}}};
+ const f=fixture(ui.Startup,{record,onSaved(){},contextual:true});
+ f.data.set('/api/admin/eggs/2',{data:item({features:['voltra_fs25'],relationships:{variables:{data:[item({env_variable:'GAME_SERIAL'}),item({env_variable:'DLC_PRODUCT_KEY'})]}}})});f.render();
+ const editor=f.nodes(node=>node.type==='fixture-editor'&&node.props.title==='Image and environment')[0];
+ assert.ok(!editor.props.fields.some(field=>field.key.includes('GAME_SERIAL')||field.key.includes('DLC_PRODUCT_KEY')));
+ assert.equal(f.nodes(node=>node.props['aria-label']==='Licence name').length,0);
+ assert.ok(!f.queries.some(path=>path.includes('/fs25/licences')));
+ assert.ok(!f.text().includes('server-key')&&!f.text().includes('private-dlc-key'));
+});
+
+test('central licence page identifies an unknown key and saves it globally without a server',async()=>{
+ const f=fixture(ui.GameLicences);f.data.set('/api/admin/integrations',{data:{data:[]}});f.data.set('/api/admin/eggs',{data:{data:[]}});f.data.set('/api/application/servers?per_page=100',{data:{data:[]}});
+ f.api=async(path,options)=>{f.requests.push({path,method:options.method,body:JSON.parse(options.body)});return path.endsWith('/inspect')?item({egg_id:2,kind:'dlc',suggested_name:'Emergency Pack',products:[{name:'Emergency Pack',kind:'dlc'}]}):item({id:3});};f.render();
+ const field=f.nodes(node=>node.props['aria-label']==='GIANTS product key')[0];assert.equal(field.props.type,'password');field.props.onChange({target:{value:'private-fixture-key'}});f.render();
+ await f.nodes(node=>node.type==='button'&&node.props.children==='Look up key')[0].props.onClick();f.render();
+ assert.equal(f.nodes(node=>node.props['aria-label']==='Licence name')[0].props.value,'Emergency Pack');
+ assert.equal(f.nodes(node=>typeof node.props.children==='string'&&node.props.children.includes('private-fixture-key')).length,0);
+ await f.nodes(node=>node.type==='form')[0].props.onSubmit({preventDefault(){}});f.render();
+ assert.deepEqual(f.requests.map(request=>request.path),['/api/admin/fs25/licences/inspect','/api/admin/integrations']);
+ assert.deepEqual(f.requests[1].body.bindings,{license_key:['DLC_PRODUCT_KEY']});
+ assert.equal(f.nodes(node=>node.props['aria-label']==='GIANTS product key')[0].props.value,'');
+ assert.ok(!f.requests.some(request=>request.path.includes('/servers/')));
+});
+
+test('editing an inspected key invalidates the discovered product and prevents stale saves',async()=>{
+ const f=fixture(ui.GameLicences);f.api=async()=>item({egg_id:2,kind:'dlc',suggested_name:'One',products:[{name:'One',kind:'dlc'}]});f.render();
+ f.nodes(node=>node.props['aria-label']==='GIANTS product key')[0].props.onChange({target:{value:'first'}});f.render();
+ await f.nodes(node=>node.type==='button'&&node.props.children==='Look up key')[0].props.onClick();f.render();
+ assert.equal(f.nodes(node=>node.props['aria-label']==='Licence name').length,1);
+ f.nodes(node=>node.props['aria-label']==='GIANTS product key')[0].props.onChange({target:{value:'second'}});f.render();
+ assert.equal(f.nodes(node=>node.props['aria-label']==='Licence name').length,0);
+ assert.equal(f.nodes(node=>node.type==='button'&&node.props.children==='Save licence').length,0);
 });
 
 test('contextual Manage retains reinstall, transfer and deletion confirmation safeguards',()=>{

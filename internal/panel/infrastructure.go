@@ -1580,6 +1580,13 @@ func infraPublicSettings(settings M) M {
 	return result
 }
 func (a *App) infraSettings(w http.ResponseWriter, r *http.Request) {
+	a.infraApplySettings(w, r, false)
+}
+
+// Deployment identity settings are writable by the local CLI only. Keep the
+// browser route on the same validation and transaction path without exposing
+// an HTTP option to enable these fields.
+func (a *App) infraApplySettings(w http.ResponseWriter, r *http.Request, deploymentSettings bool) {
 	if _, e := a.requireAdmin(r); e != nil {
 		fail(w, e)
 		return
@@ -1597,6 +1604,14 @@ func (a *App) infraSettings(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		fail(w, e)
 		return
+	}
+	if !deploymentSettings {
+		for _, key := range []string{"app:name", "app:locale", "app:timezone"} {
+			if _, present := data[key]; present {
+				fail(w, bad(key+" is not editable through panel settings."))
+				return
+			}
+		}
 	}
 	// This settings API distinguishes an empty secret, which retains credentials,
 	// from explicit null, which clears them. Preserve secret bytes across the

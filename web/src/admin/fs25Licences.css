@@ -1,0 +1,4 @@
+.fs25-licences .fs25-licence-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px;max-width:1100px;margin:16px 0}
+.fs25-licences .fs25-licence-fields label{display:flex;flex-direction:column;gap:8px;min-width:0}
+.fs25-licences .actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:20px}
+.fs25-lookup-action{display:flex;align-items:flex-end}
