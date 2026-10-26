@@ -11,6 +11,16 @@ test('explicit workload survives custom or misleading server names', () => {
   assert.equal(getServerArtwork({egg_name:'Counter-Strike: Source',name:'Production'}).id,'counter-strike-source');
 });
 
+test('verified modpack artwork replaces generic banners without trusting arbitrary URLs',()=>{
+ const path='/api/client/servers/pack-uuid/artwork/pack';
+ const art=getServerArtwork({name:'The NjimGang Hunters',artwork:{game:'minecraft',pack_name:'Vault Hunters Third Edition',pack_icon:path}});
+ assert.equal(art.src,path);
+ assert.equal(art.name,'Vault Hunters Third Edition');
+ assert.equal(art.kind,'modpack');
+ assert.equal(getServerArtwork({game:'palworld',artwork:{game:'minecraft',pack_icon:path}}).id,'palworld');
+ assert.equal(getServerArtwork({artwork:{game:'minecraft',pack_icon:'https://untrusted.example/image.png'}}).id,'minecraft');
+});
+
 test('specific game variants and legacy game names get their own artwork', () => {
   assert.equal(getServerArtwork({name:'Source css batch acceptance'}).id,'counter-strike-source');
   assert.equal(getServerArtwork({name:'Quake batch urbanterror'}).id,'urbanterror');

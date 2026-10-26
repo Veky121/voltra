@@ -73,7 +73,7 @@ function storageReading(used:number,limitMiB:number){
 }
 function Artwork({art,priority,onColor}:{art:ServerArtwork;priority:boolean;onColor:(color:string|undefined)=>void}){
   const [failed,setFailed]=useState(false);
-  return <img src={failed?fallbackArtwork.src:art.src} alt="" loading={priority?'eager':'lazy'} decoding="async" width={460} height={215} onLoad={event=>onColor(artworkColor(event.currentTarget))} onError={failed?undefined:()=>setFailed(true)}/>;
+  return <img className={!failed&&art.kind==='modpack'?'overview-modpack-artwork':undefined} src={failed?fallbackArtwork.src:art.src} alt="" loading={priority?'eager':'lazy'} decoding="async" width={460} height={215} onLoad={event=>onColor(artworkColor(event.currentTarget))} onError={failed?undefined:()=>setFailed(true)}/>;
 }
 function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
   useArtworkLibrary();

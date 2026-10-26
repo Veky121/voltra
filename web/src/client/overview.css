@@ -50,6 +50,7 @@
 .overview-page .overview-server-title [data-slot=card-description]{display:block;margin:4px 0 0;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-page .overview-server-art{position:relative;width:100%;aspect-ratio:460/180;min-height:128px;max-height:220px;flex-shrink:0;overflow:hidden;border-bottom:1px solid var(--ui-divider);background:var(--ui-hover)}
 .overview-page .overview-server-art>img{display:block;width:100%;height:100%;object-fit:cover}
+.overview-page .overview-server-art>img.overview-modpack-artwork{object-fit:contain;padding:12px}
 .overview-page .overview-software-patch{position:absolute;right:12px;bottom:12px;display:grid;place-items:center;width:48px;height:48px;padding:6px;overflow:hidden;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface);box-shadow:0 2px 8px #0003;visibility:hidden}
 .overview-page .overview-software-patch[data-loaded=true]{visibility:visible}
 .overview-page .overview-software-patch img{display:block;width:100%;height:100%;object-fit:contain;border-radius:4px}

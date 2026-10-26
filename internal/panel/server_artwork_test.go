@@ -69,6 +69,22 @@ func TestServerArtworkRecognizesMinecraftTemplatesWithoutDisplayNames(t *testing
 	}
 }
 
+func TestImportedModpackArtworkDoesNotChangeRuntimeClassification(t *testing.T) {
+	egg := M{"uuid": "legacy", "name": "CurseForge Generic", "features": []string{"eula", "java_version", "pid_limit"}}
+	server := M{"minecraft_pack": M{"provider": "curseforge", "project_id": "925200", "name": "All the Mods 10"}}
+	if !serverArtworkMinecraftWorkload(server, egg) {
+		t.Fatal("verified imported modpack lost its artwork")
+	}
+	if javaMinecraftEgg(egg) {
+		t.Fatal("artwork enabled managed Minecraft runtime behavior")
+	}
+	for _, pack := range []M{{"name": "Minecraft"}, {"provider": "untrusted", "project_id": "123", "name": "Pack"}, {"provider": "curseforge", "name": "Pack"}} {
+		if serverArtworkMinecraftWorkload(M{"minecraft_pack": pack}, egg) {
+			t.Fatal("unverified metadata enabled artwork")
+		}
+	}
+}
+
 func TestServerArtworkCacheCoalescesAndRefreshes(t *testing.T) {
 	var cache serverArtworkCache
 	var calls atomic.Int32

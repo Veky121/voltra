@@ -53,7 +53,10 @@ function match(text: string): ServerArtwork | undefined {
 }
 
 export function getServerArtwork(server: Workload): ServerArtwork {
- const base=resolveServerArtwork(server);return panelArtwork('server',base.id,base);
+ const base=resolveServerArtwork(server);
+ const pack=getServerIconSources(server.artwork).find(source=>source.kind==='modpack');
+ if(base.id==='minecraft'&&pack)return {...base,id:'minecraft-modpack',name:server.artwork?.pack_name||'Minecraft modpack',src:pack.src,kind:'modpack'};
+ return panelArtwork('server',base.id,base);
 }
 function resolveServerArtwork(server: Workload): ServerArtwork {
   // Explicit workload metadata wins over a user's custom display name.

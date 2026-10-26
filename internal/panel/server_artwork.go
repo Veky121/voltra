@@ -44,9 +44,20 @@ func serverArtworkMinecraftEgg(egg M) bool {
 	return javaMinecraftEgg(egg) || serverArtworkMinecraftTemplates()[strings.ReplaceAll(str(egg["uuid"]), "-", "")]
 }
 
+func serverArtworkMinecraftWorkload(server, egg M) bool {
+	if serverArtworkMinecraftEgg(egg) {
+		return true
+	}
+	// Verified provider metadata survives imports that retain a generic legacy
+	// egg. It affects artwork only, never runtime or managed Java behavior.
+	pack := asMap(server["minecraft_pack"])
+	provider := str(pack["provider"])
+	return (provider == "curseforge" || provider == "modrinth") && str(pack["project_id"]) != "" && str(pack["name"]) != ""
+}
+
 func (a *App) clientArtworkMetadata(ctx context.Context, user, server, egg M) M {
 	out := M{}
-	if !serverArtworkMinecraftEgg(egg) {
+	if !serverArtworkMinecraftWorkload(server, egg) {
 		return out
 	}
 	out["game"] = "minecraft"
@@ -195,7 +206,7 @@ func (a *App) clientArtwork(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if !serverArtworkMinecraftEgg(egg) {
+	if !serverArtworkMinecraftWorkload(server, egg) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
