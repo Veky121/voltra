@@ -91,6 +91,8 @@ The first command checks current service state. The second enables startup on bo
 
 Management binds to loopback through the outbound connector. SFTP and public game ports require deliberate operator configuration; this installer does not expose them.
 
+When SFTP is forwarded separately, the operator may set `network.sftp_public_addresses` in panel settings to a JSON object keyed by node ID, for example `{"147":{"host":"sftp.example.com","port":2022}}`. The panel displays that address for SFTP without changing Wings API routing or the daemon's SFTP listener. Configure and verify the actual forwarding separately; this setting creates no listener or proxy. Missing or invalid entries fall back to the node's configured address.
+
 ## Existing installations and maintenance
 
 Normal installation refuses any existing Wings or connector binary in PATH, standard binary locations, Pterodactyl configuration, Voltra state directory, or Wings/Voltra systemd unit. Nothing is replaced and no existing service is stopped or restarted.

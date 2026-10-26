@@ -83,7 +83,7 @@ func TestGameSettingsListsAndBooleanEncoding(t *testing.T) {
 }
 
 func TestGameSettingsRejectAmbiguousDocuments(t *testing.T) {
-	for _, tc := range []struct{ file, input string }{{"/paper.yml", "x: 1\nx: 2\n"}, {"/paper.yml", "x: &x {a: 1}\ny: *x\n"}, {"/server.ini", "x=1\nx=2\n"}, {"/server.json", "{invalid}"}} {
+	for _, tc := range []struct{ file, input string }{{"/paper.yml", "x: 1\nx: 2\n"}, {"/paper.yml", "x: &x {a: 1}\ny: *x\n"}, {"/server.json", "{invalid}"}} {
 		if _, err := parseGameSettings(tc.file, []byte(tc.input)); err == nil {
 			t.Errorf("ambiguous document accepted: %s", tc.input)
 		}

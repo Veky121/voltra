@@ -348,7 +348,7 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			value = f.value == f.on
 		}
 		secret := gameSettingSecret.MatchString(f.key)
-		field := M{"key": f.key, "label": f.key, "type": kind, "value": value, "secret": secret, "readonly": gameSettingManaged(egg, file, f.key)}
+		field := M{"key": f.key, "label": f.key, "type": kind, "value": value, "secret": secret, "readonly": f.kind == "readonly" || gameSettingManaged(egg, file, f.key)}
 		game := steamGameID(egg)
 		if javaMinecraftEgg(egg) {
 			game = "minecraft"
@@ -712,6 +712,7 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 		structured       bool
 	}
 	spans := map[string]span{}
+	duplicates := map[string]bool{}
 	section := ""
 	toml := strings.HasSuffix(file, ".toml")
 	inArray := false
@@ -747,7 +748,21 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 			key = section + "/" + name
 		}
 		if _, ok := spans[key]; ok {
-			return out, bad("Duplicate configuration keys cannot be edited here.")
+			if toml {
+				return out, bad("Duplicate configuration keys cannot be edited here.")
+			}
+			// Unreal INI arrays may repeat a key. Preserve every source line and
+			// keep ambiguous values out of the scalar editor.
+			duplicates[key] = true
+			for i := range out.fields {
+				if out.fields[i].key == key {
+					out.fields[i].kind = "readonly"
+					out.fields[i].structured = false
+					out.fields[i].value = "Multiple values; edit this setting in Files."
+					break
+				}
+			}
+			continue
 		}
 		start := eq + 1
 		for start < len(line) && (line[start] == ' ' || line[start] == '\t') {
@@ -811,6 +826,9 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 	out.patch = func(changes map[string]string) ([]byte, error) {
 		updated := append([]string(nil), lines...)
 		for key, value := range changes {
+			if duplicates[key] {
+				return nil, bad("Repeated configuration values must be edited in Files.")
+			}
 			s := spans[key]
 			if !quickSingleLine(value) {
 				return nil, bad("Use a single line for this setting.")
