@@ -8,7 +8,7 @@ const fixtureKey = '__serverAdminToolsFixture';
 const modules = {
   react: `export const useState=(...args)=>globalThis.${fixtureKey}.useState(...args); export const useEffect=(...args)=>globalThis.${fixtureKey}.useEffect(...args); export const useId=()=>globalThis.${fixtureKey}.useId(); export const useRef=initial=>useState(()=>({current:initial}))[0];`,
   'react/jsx-runtime': `export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key}); export const jsxs=jsx;`,
-  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useSearchParams=()=>[new URLSearchParams()]; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a';`,
+  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useSearchParams=()=>[new URLSearchParams()]; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a'; export const Navigate=props=>({type:'fixture-redirect',props});`,
   lib: `import {jsx} from 'react/jsx-runtime';
     export const api=(...args)=>globalThis.${fixtureKey}.api(...args);
     export const useAPI=path=>globalThis.${fixtureKey}.query(path);
@@ -29,6 +29,7 @@ const modules = {
       ...props,type:'button',role:'switch','aria-checked':checked,disabled,
       onClick:()=>{if(!disabled)onCheckedChange?.(!checked,{event:{type:'click'}});}
     });`,
+  startup: `export default props=>({type:'fixture-runtime',props});`,
   shared: `export {api,useAPI,unwrap,rows} from 'fixture:lib';
     import {jsx} from 'react/jsx-runtime';
     export const f=(key,label,type,extra={})=>({key,label,type,...extra});
@@ -47,6 +48,7 @@ const bundled = await build({
   stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers'; export {GameLicences} from './src/admin/GameLicences';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
+    builder.onResolve({filter:/client\/ServerStartup$|^\.\/ServerStartup$/}, () => ({path:'startup',namespace:'fixture'}));
     builder.onResolve({filter:/components\/ui\/switch$/}, () => ({path:'switch',namespace:'fixture'}));
     builder.onResolve({filter:/^(react(?:\/jsx-runtime)?|react-router-dom|fixture:lib)$|(?:^|\/)lib$|(?:^|\/)common$|(?:^|\/)shared$/}, args => {
       const name=args.path === 'fixture:lib' ? 'lib' : args.path.replace(/^.*\//,'');
@@ -172,7 +174,7 @@ test('server IDs reject missing, malformed, fractional and unsafe identifiers',(
 test('account admin gate blocks owners and wildcard permissions before admin data loads',()=>{
   for(const account of [{root_admin:false},{root_admin:'true'},{}]) {
     const f=fixture();f.data.set('/api/client/account',{data:item(account)});f.render();
-    assert.match(f.text(),/Administrator access required/);
+    assert.equal(f.nodes(node=>node.type==='fixture-runtime').length,1);
     assert.deepEqual([...new Set(f.queries)],['/api/client/account']);
     assert.equal(f.requests.length,0);
   }
@@ -180,16 +182,16 @@ test('account admin gate blocks owners and wildcard permissions before admin dat
   assert.deepEqual([...new Set(f.queries)],['/api/client/account']);
 });
 
-test('contextual tools use internal ID, keep top tabs local, and omit environment from overview',()=>{
+test('runtime tools use internal ID, keep top tabs local, and omit raw environment',()=>{
   const f=fixture();f.render();
-  assert.equal(f.nodes(node=>node.props.role==='tab').length,8);
+  assert.equal(f.nodes(node=>node.props.role==='tab').length,5);
   assert.ok(f.queries.includes('/api/application/servers/7?include=allocations,variables,user,node,egg'));
   assert.ok(f.queries.every(path=>!path.includes('untrusted-url')&&!path.includes('999')));
   assert.doesNotMatch(f.text(),/never display this/);
   f.tab('configuration');assert.ok(f.queries.includes(base));
   assert.equal(f.field('config_stop').props.disabled,true);
   const installer=f.nodes(node=>node.type==='details');
-  assert.equal(installer.length,2);assert.ok(installer.every(node=>!node.props.open));
+  assert.equal(installer.length,4);assert.ok(installer.every(node=>!node.props.open));
   assert.equal(f.requests.length,0);
 });
 
@@ -221,7 +223,7 @@ test('backend update guard and managed installer locks do not erase inherited va
   for(const key of ['config_stop','config_files','script_container','script_entry','script_install'])assert.equal(f.field(key).props.disabled,true);
   assert.equal(f.field('script_install').props.value,'echo install');
   assert.match(f.text(),/Stop the server/);
-  assert.equal(f.nodes(node=>node.type==='button'&&node.props.type==='submit')[0].props.disabled,true);
+  assert.equal(f.nodes(node=>node.type==='button'&&node.props.type==='submit').at(-1).props.disabled,true);
   const controls=f.nodes(node=>node.props.role==='switch');
   assert.ok(controls.length>0,'guarded configuration must retain its override switches');
   for(const control of controls){assert.equal(control.props.disabled,true);control.props.onClick();}
@@ -230,12 +232,10 @@ test('backend update guard and managed installer locks do not erase inherited va
   assert.equal(f.requests.length,0);
 });
 
-test('legacy admin server pages render top tabs without a sidebar target',()=>{
-  const f=fixture(ui.Server);f.data.set('/api/application/servers/999?include=allocations,variables,user,node,egg',{data:item({id:999,name:'Legacy admin server',container:{}})});f.render();
-  assert.equal(f.nodes(node=>node.props.role==='tab').length,8);
-  for(const tab of ['details','build','startup','databases','mounts','manage','delete']) {
-    f.tab(tab);assert.ok(f.nodes(node=>node.props.role==='tabpanel')[0].props.id.endsWith(tab));
-  }
+test('legacy admin server pages redirect into the shared server workspace',()=>{
+  const f=fixture(ui.Server);f.data.set('/api/application/servers/999?include=allocations,variables,user,node,egg',{data:item({id:999,identifier:'legacy-server',name:'Legacy admin server',container:{}})});f.render();
+  assert.equal(f.nodes(node=>node.type==='fixture-redirect')[0].props.to,'/server/legacy-server/runtime');
+  assert.equal(f.nodes(node=>node.props.role==='tab').length,0);
 });
 
 test('contextual runtime masks credential inputs and submits only changed environment fields',()=>{

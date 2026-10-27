@@ -3,16 +3,16 @@ import { useEffect, useState } from "react";
 import { api, Button, Card, ErrorBox, Loading, unwrap, useAPI } from "../lib";
 import {
   Build, DeleteServer, Details, Manage, ServerDatabases, ServerMounts,
-  ServerSettingsTabs, Startup,
+  ServerSettingsTabs, RuntimeAssignment, Startup,
 } from "../admin/servers";
+import ServerStartup from "./ServerStartup";
 import { useServer } from "./common";
-import {SettingsRow,SettingsSection,Switch} from '../ui/Settings';
+import {Switch} from '../ui/Settings';
 import "./serverAdminTools.css";
 
 const tabs = [
-  ["overview", "Overview"], ["details", "Details"], ["limits", "Limits"],
-  ["runtime", "Runtime"], ["databases", "Databases"], ["mounts", "Mounts"],
-  ["configuration", "Installation & process"], ["manage", "Manage"],
+  ["runtime", "Runtime"], ["limits", "Resources"], ["mounts", "Mounts"],
+  ["configuration", "Advanced"], ["manage", "Management"],
 ] as const;
 
 const configurationFields = [
@@ -93,24 +93,24 @@ export default function ServerAdminTools() {
   if (account.error) return <Card><ErrorBox>{account.error}</ErrorBox><Button variant="secondary" onClick={account.reload}>Retry administrator check</Button></Card>;
   // Ownership and wildcard server permissions do not grant panel administration.
   // Each application/admin/configuration endpoint also enforces backend admin auth.
-  if (unwrap(account.data)?.root_admin !== true) return <Card><h2>Administrator access required</h2><p>Only panel administrators can open this server's admin tools.</p></Card>;
+  if (unwrap(account.data)?.root_admin !== true) return <ServerStartup section="runtime"/>;
   const id = serverAdminID(server.internal_id);
-  if (id === null) return <ErrorBox>This server's internal ID is unavailable. Reload the server before opening admin tools.</ErrorBox>;
+  if (id === null) return <ErrorBox>This server's internal ID is unavailable. Reload the server before opening resource controls.</ErrorBox>;
   return <AuthorizedServerTools key={id} serverID={id} />;
 }
 
 function AuthorizedServerTools({ serverID }: { serverID: number }) {
   const { reload } = useServer();
   const query = useAPI(`/api/application/servers/${serverID}?include=allocations,variables,user,node,egg`);
-  const [active, setActive] = useState("overview");
+  const [active, setActive] = useState("runtime");
   const [configurationDirty, setConfigurationDirty] = useState(false);
   const record = query.data ? unwrap(query.data) : null;
   const scope = `server-admin-${serverID}`;
-  const discard = () => !configurationDirty || window.confirm("Discard unsaved installation and process changes?");
+  const discard = () => !configurationDirty || window.confirm("Discard unsaved runtime or advanced configuration changes?");
   const saved = () => { query.reload(); reload(); };
-  return <section className="server-admin-tools" aria-label="Server admin tools">
+  return <section className="server-admin-tools" aria-label="Runtime and resources">
     <div className="toolbar server-page-toolbar">
-      <div><h2>Server admin tools</h2><p className="muted">Manage {record?.name || "this server"}. Changes are limited to this server.</p></div>
+      <div><h2>Runtime &amp; resources</h2><p className="muted">Manage {record?.name || "this server"}. Changes are limited to this server.</p></div>
       <Button variant="secondary" disabled={query.loading || configurationDirty} onClick={query.reload}>Refresh server details</Button>
     </div>
     <ErrorBox>{query.error}</ErrorBox>
@@ -122,22 +122,11 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
     {query.loading && !record ? <Loading /> : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
       : record && <section role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
-        {active === "overview" && <SettingsSection title="Server information">
-          <div className="server-admin-summary">{[
-            ["Name", record.name], ["Internal ID", serverID], ["UUID", record.uuid],
-            ["Status", record.status || "Ready"], ["Node", record.node ?? record.node_id],
-            ["Owner", record.user ?? record.owner_id], ["Template", record.egg ?? record.egg_id],
-            ["Installed", record.container?.installed ? "Yes" : "No"],
-          ].map(([label, value]) => <SettingsRow key={String(label)} label={String(label)} control={<span className="settings-value">{String(value ?? "Unavailable")}</span>}/>)}</div>
-          <div className="server-admin-note"><p className="settings-note">Use Runtime for the next start, Installation &amp; process for server overrides, and Manage for explicit lifecycle actions.</p></div>
-        </SettingsSection>}
-        {active === "details" && <Details record={record} onSaved={saved} />}
         {active === "limits" && <Build record={record} onSaved={saved} />}
-        {active === "runtime" && <Startup record={record} onSaved={saved} contextual />}
-        {active === "databases" && <ServerDatabases record={record} />}
+        {active === "runtime" && <ServerStartup section="runtime" administrator onDirtyChange={setConfigurationDirty}/>}
         {active === "mounts" && <ServerMounts record={record} contextual />}
-        {active === "configuration" && <ServerConfigurationEditor serverID={serverID} onSaved={saved} onDirtyChange={setConfigurationDirty} />}
-        {active === "manage" && <><Manage record={record} onSaved={saved} /><DeleteServer record={record} returnTo="/" /></>}
+        {active === "configuration" && <><RuntimeAssignment record={record} onSaved={saved}/><details><summary>Restricted template options</summary><p className="muted">Administrator overrides for fields the template locks or hides. Editable game options are in Settings.</p><Startup record={record} onSaved={saved} contextual restrictedOnly/></details><ServerConfigurationEditor serverID={serverID} onSaved={saved} onDirtyChange={setConfigurationDirty} /></>}
+        {active === "manage" && <><details><summary>Ownership and server details</summary><Details record={record} onSaved={saved}/></details><details><summary>Database provisioning</summary><ServerDatabases record={record}/></details><Manage record={record} onSaved={saved} /><DeleteServer record={record} returnTo="/" /></>}
       </section>}
   </section>;
 }

@@ -25,6 +25,26 @@ export type StartupMeta = {
 export type VariableWrite = { key: string; value: string } | { key: string; reset: true };
 export type VariableIntent = 'save' | 'clear' | 'reset';
 
+// Only known installation/process fields belong in Runtime. Custom template
+// fields stay available in Game settings rather than disappearing behind admin.
+const runtimeVariables = new Set([
+  'SERVER_JARFILE', 'SERVER_JAR', 'JARFILE', 'JAR_FILE', 'JAR_NAME',
+  'MINECRAFT_VERSION', 'MC_VERSION', 'VANILLA_VERSION', 'SERVER_VERSION', 'VERSION',
+  'LOADER', 'MODLOADER', 'MOD_LOADER', 'FABRIC_VERSION', 'FABRIC_LOADER_VERSION',
+  'FORGE_VERSION', 'NEOFORGE_VERSION', 'QUILT_VERSION', 'QUILT_LOADER_VERSION',
+  'PAPER_BUILD', 'BUILD_NUMBER', 'JAVA_VERSION', 'JVM_ARGS', 'JAVA_ARGS',
+  'STARTUP', 'STARTUP_CMD', 'STARTUP_COMMAND', 'SERVER_ARGS', 'SERVER_FLAGS',
+  'STEAM_APP_ID', 'STEAMAPPID', 'SRCDS_APPID', 'APP_ID', 'STEAM_BETA',
+  'SRCDS_BETAID', 'STEAM_BRANCH', 'BETA_BRANCH', 'LOADER_VERSION',
+  'STEAM_BETAPASSWORD', 'STEAM_USER', 'STEAM_PASS', 'STEAM_USERNAME', 'STEAM_PASSWORD',
+  'AUTO_UPDATE', 'AUTO_UPDATE_SERVER', 'UPDATE_ON_START', 'VALIDATE',
+  'GAME_SERIAL', 'DLC_PRODUCT_KEY', 'AUTO_DOWNLOAD', 'DOWNLOAD_DLC',
+]);
+
+export function startupVariableSection(variable: StartupVariable): 'game' | 'runtime' {
+  return runtimeVariables.has(variable.env_variable.toUpperCase()) ? 'runtime' : 'game';
+}
+
 export function secretVariable(variable: StartupVariable): boolean {
   // Metadata owns classification. Keep older password/token fields masked too.
   if (typeof variable.secret === 'boolean') return variable.secret;

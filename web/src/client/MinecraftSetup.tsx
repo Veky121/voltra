@@ -17,7 +17,7 @@ import {GameNameField, GameNodeField} from "./GameSetupFields";
 import {json, value} from "./common";
 
 type LoaderVersions = {versions: {id: string; stable: boolean}[]; recommended?: string};
-type SetupForm = {name: string; version: string; loader: string; loaderChoice: "stable" | "latest" | "other"; loaderVersion: string; runtime: string; memory: string; xms: string; xmx: string; autoHeap: boolean; extraArgs: string; players: string; gameMode: string; difficulty: string; node: string; eula: boolean};
+type SetupForm = {name: string; version: string; loader: string; loaderChoice: "stable" | "latest" | "other"; loaderVersion: string; runtime: string; memory: string; xms: string; xmx: string; autoHeap: boolean; extraArgs: string; node: string; eula: boolean};
 
 export function MinecraftSetup() {
   const request = useMinecraftRequest<MinecraftOptions>(minecraftAPI);
@@ -40,7 +40,7 @@ export function MinecraftSetup() {
 
 function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOptions; pack: MinecraftPackSelection | null; onChangePack: () => void}) {
   const navigate = useNavigate();
-  const [form, setForm] = useState<SetupForm>(() => ({name: pack?.project.name ?? "Minecraft Survival", version: pack?.version.game_versions[0] ?? options.latest, loader: pack?.version.loaders[0] ?? "vanilla", loaderChoice: "stable", loaderVersion: "", runtime: "auto", memory: pack ? "4" : "2", xms: "0.25", xmx: "1.75", autoHeap: true, extraArgs: "", players: "20", gameMode: "survival", difficulty: "normal", node: "", eula: false}));
+  const [form, setForm] = useState<SetupForm>(() => ({name: pack?.project.name ?? "Minecraft Survival", version: pack?.version.game_versions[0] ?? options.latest, loader: pack?.version.loaders[0] ?? "vanilla", loaderChoice: "stable", loaderVersion: "", runtime: "auto", memory: pack ? "4" : "2", xms: "0.25", xmx: "1.75", autoHeap: true, extraArgs: "", node: "", eula: false}));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -76,7 +76,7 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
     event.preventDefault();
     setSubmitted(true);
     if (submitting.current || !canSubmit || !form.eula || !form.name.trim()) return;
-    const body = {name: form.name.trim(), version: form.version, memory: memoryMiB, max_players: Number(form.players), game_mode: form.gameMode, difficulty: form.difficulty, node_id: form.node ? Number(form.node) : null, accept_eula: form.eula, loader: form.loader, loader_version: pack || form.loader === "vanilla" ? "" : selectedLoaderVersion, runtime_id: form.runtime, java_config: {enabled: true, runtime_id: form.runtime, xms_mib: xmsMiB, xmx_mib: xmxMiB, extra_args: form.extraArgs.trim()}, ...(pack ? {modpack: {provider: pack.provider, project_id: String(pack.project.id), version_id: String(pack.version.id)}} : {})};
+    const body = {name: form.name.trim(), version: form.version, memory: memoryMiB, max_players: 20, game_mode: "survival", difficulty: "normal", node_id: form.node ? Number(form.node) : null, accept_eula: form.eula, loader: form.loader, loader_version: pack || form.loader === "vanilla" ? "" : selectedLoaderVersion, runtime_id: form.runtime, java_config: {enabled: true, runtime_id: form.runtime, xms_mib: xmsMiB, xmx_mib: xmxMiB, extra_args: form.extraArgs.trim()}, ...(pack ? {modpack: {provider: pack.provider, project_id: String(pack.project.id), version_id: String(pack.version.id)}} : {})};
     const payload = JSON.stringify(body);
     // Retry an unchanged request with the same key; changed settings get a new key.
     if (submission.current?.payload !== payload) submission.current = {payload, id: crypto.randomUUID()};
@@ -129,11 +129,10 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
         </details>
         {(!validMemory || !validHeap) && <ErrorBox>{validation}</ErrorBox>}
       </Card>
-      <Card className="mc-config-card"><div className="mc-section-heading"><span className="mc-section-number">3</span><h2>Server settings</h2></div>
+      <Card className="mc-config-card"><div className="mc-section-heading"><span className="mc-section-number">3</span><h2>Host machine</h2></div>
         <div className="form-grid"><GameNodeField value={form.node} onChange={node => set("node", node)} nodes={options.nodes} automatic/>
-          <Field label="Maximum players"><Input type="number" required min="1" max="200" step="1" value={form.players} onChange={e => set("players", e.target.value)}/></Field>
-          <Field label="Game mode"><Select value={form.gameMode} onChange={e => set("gameMode", e.target.value)}>{["survival", "creative", "adventure", "spectator"].map(mode => <option key={mode} value={mode}>{mode[0].toUpperCase() + mode.slice(1)}</option>)}</Select></Field>
-          <Field label="Difficulty"><Select value={form.difficulty} onChange={e => set("difficulty", e.target.value)}>{["peaceful", "easy", "normal", "hard"].map(difficulty => <option key={difficulty} value={difficulty}>{difficulty[0].toUpperCase() + difficulty.slice(1)}</option>)}</Select></Field></div>
+</div>
+        <p className="muted">Start with the game defaults. Edit difficulty, game mode, player limits and world options in Settings after creation.</p>
         <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/>
       </Card>
     </fieldset>

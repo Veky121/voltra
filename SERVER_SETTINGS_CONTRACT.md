@@ -1,5 +1,14 @@
 # Server workspace settings
 
+## Local-instance simplification, 2026-10-27
+
+The user approved this for every server and game family, including shorter creation forms. The canonical server routes are `settings` for native game configuration and editable game variables, `settings/general` for identity/SFTP/reinstall, and `runtime` for installation/process variables, Java, Docker images and privileged resource controls. `quick-setup`, `startup`, `settings/startup`, `admin-tools`, and existing admin server URLs redirect to the shared workspace. The admin server creation URL opens Game Library. Do not render a second admin game/environment editor. Restricted template fields retain an explicitly labelled administrator override in Advanced; backend permissions remain authoritative.
+
+Creation uses valid game/template defaults and defers optional gameplay controls. Keep version/loader, host/resource choices, agreements, required credentials, and fields without valid defaults. Conditional requirements must remain reachable. Do not remove backend validation or automatically start/reinstall when saving settings.
+
+The original implementation contract below documents API behavior. Its old navigation/tab inventory is superseded by this section.
+
+
 The user approved moving server-specific settings into the server workspace, with clear next-start vs installation behavior, named fields, secret masking and administrator-only controls. Shared infrastructure and reusable egg defaults stay global. Existing admin URLs must keep working. Preserve all dirty checkout changes. Do not restart services or mutate real games/auth data. Root owns Client/navigation/core/schema/integration. No commits or extra subagents.
 
 ## Server configuration overrides

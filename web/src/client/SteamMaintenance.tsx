@@ -20,7 +20,7 @@ export default function SteamMaintenance() {
     const timer = setInterval(reloadServer, 3000);
     return () => clearInterval(timer);
   }, [server.is_installing, server.status, reloadServer]);
-  return <div className="steam-maintenance-page games-ui"><header className="page-header"><div><h2>Steam maintenance</h2><p className="muted">Manage game files, update checks and repairs.</p></div>{id && can(permissions, 'file.read-content') && <Link to={`/server/${encodeURIComponent(id)}/quick-setup`}>Quick setup →</Link>}</header>
+  return <div className="steam-maintenance-page games-ui"><header className="page-header"><div><h2>Steam maintenance</h2><p className="muted">Manage game files, update checks and repairs.</p></div>{id && can(permissions, 'file.read-content') && <Link to={`/server/${encodeURIComponent(id)}/settings`}>Game settings →</Link>}</header>
     {!base ? <ErrorBox>Select a server to view Steam maintenance.</ErrorBox> : !readable ? <p className="muted">Startup read permission is required to view Steam maintenance.</p> : <>
       <ErrorBox>{request.error}</ErrorBox>{request.error && <Button variant="secondary" onClick={request.reload}>Retry Steam status</Button>}
       {request.loading && !request.data && <p role="status">Loading Steam status...</p>}

@@ -1,3 +1,4 @@
+import {startupVariableSection} from './startupSettingsModel';
 import {GameSwitch} from './GameSwitch';
 import './games-ui.css';
 import {useRef, useState, type FormEvent} from 'react';
@@ -40,11 +41,15 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const [name, setName] = useState(`${options.name} server`);
   const [node, setNode] = useState(String(initialNode?.id ?? ''));
   const [memory, setMemory] = useState(String((initialBudget>=options.minimum_memory ? Math.min(options.defaults.memory,initialBudget) : options.defaults.memory) / 1024));
-  const [players, setPlayers] = useState(String(options.defaults.max_players));
+  const players = String(options.defaults.max_players);
   const [password, setPassword] = useState('');
-  const [preset, setPreset] = useState(options.presets[0]?.value ?? '');
+  const preset = options.presets[0]?.value ?? '';
   const [startAfterInstall, setStartAfterInstall] = useState(true);
   const advancedFields = options.advanced_fields ?? [];
+  const setupFields = advancedFields.filter(field => {
+    if (startupVariableSection({env_variable: field.key}) === 'runtime') return true;
+    try {steamAdvancedEnvironment([field], {[field.key]: field.type === 'boolean' ? field.default === '1' : field.default}); return false;} catch {return true;}
+  });
   const [advanced, setAdvanced] = useState<Record<string, string | boolean>>(() => Object.fromEntries(advancedFields.map(field => [field.key, field.type === 'boolean' ? field.default === '1' : field.default])));
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const submitting = useRef(false);
@@ -84,11 +89,10 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
       {memoryValue !== null && memoryValue > memoryMaximum && <p className="game-stop-note" role="status">This node has {memoryMaximum / 1024} GiB available for allocation. Lower the limit or choose another node.</p>}
       {memoryWarning && <p id="steam-memory-warning" className="game-stop-note" role="status">{memoryWarning}</p>}
       <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/>
-      {passwordRules.enabled && <Field label="Server password" hint={passwordRules.required ? `Required, ${passwordRules.min_length} to ${passwordRules.max_length} characters.` : 'Optional. Players use this when joining.'}><Input type="password" autoComplete="new-password" required={passwordRules.required} minLength={passwordRules.min_length} maxLength={passwordRules.max_length} value={password} onChange={event => setPassword(event.target.value)}/></Field>}
-      <details className="steam-advanced"><summary>Advanced settings</summary><div className="steam-form-grid">
-        <Field label="Maximum players" hint={options.minimum_players === options.maximum_players ? "This game uses a fixed player limit." : undefined}><Input type="number" disabled={options.minimum_players === options.maximum_players} required min={options.minimum_players} max={options.maximum_players} step={1} value={players} onChange={event => setPlayers(event.target.value)}/></Field>
-        {options.presets.length > 0 && <Field label="Preset"><Select value={preset} onChange={event => setPreset(event.target.value)}>{options.presets.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field>}
-        <SteamAdvancedControls fields={advancedFields} values={advanced} onChange={(key, value) => setAdvanced(previous => ({...previous, [key]: value}))}/>
+      {passwordRules.enabled && passwordRules.required && <Field label="Server password" hint={passwordRules.required ? `Required, ${passwordRules.min_length} to ${passwordRules.max_length} characters.` : 'Optional. Players use this when joining.'}><Input type="password" autoComplete="new-password" required={passwordRules.required} minLength={passwordRules.min_length} maxLength={passwordRules.max_length} value={password} onChange={event => setPassword(event.target.value)}/></Field>}
+      <p className="muted">Game defaults are ready to use. Edit player limits, optional passwords and gameplay options in Settings after creation.</p>
+      <details className="steam-advanced"><summary>Installation options</summary><div className="steam-form-grid">
+        <SteamAdvancedControls fields={setupFields} values={advanced} onChange={(key, value) => setAdvanced(previous => ({...previous, [key]: value}))}/>
         {options.supports_install_only === true && <label className="game-boolean"><GameSwitch checked={startAfterInstall} onCheckedChange={checked => setStartAfterInstall(checked)}/><span>Start server after installation</span></label>}
         
       </div></details>

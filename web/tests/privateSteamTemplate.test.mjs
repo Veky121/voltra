@@ -54,7 +54,8 @@ test('actual shared form submits sanitized values, hides both credential alias f
  // policy and trusted-node requirements with the real validator.
  assert.match(source,/templateSetupProblems\(\{[^\n]*node:\s*selectedNode[^\n]*privateSupported:\s*options\.private_content_supported\s*===\s*true/);
  assert.match(source,/options.steam_installation\?\.private_reason/);
- assert.match(source,/options\.variables\.filter\(variable => variable\.user_viewable(?: && !\(fs25 && fs25Advanced\.includes\(variable\.env_variable\)\))?\)\.map\(renderVariable\)/);
+ assert.match(source,/setupVariables\.map\(renderVariable\)/);
+ assert.match(source,/templateVariableProblem\(variable, defaultEnvironment\)/);
  const maintenance=fs.readFileSync(new URL('../src/client/PrivateSteamMaintenance.tsx',import.meta.url),'utf8');
  assert.match(maintenance,/setBetaPassword\(''\); setCode\(''\)/);
  assert.match(maintenance,/privateAuthorizationBody\(username, savePassword, password, status.original_controls\)/);

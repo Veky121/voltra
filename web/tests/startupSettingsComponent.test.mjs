@@ -43,10 +43,10 @@ function load({react = React,variables = [baseVariable,secretVariable],meta = {}
   return module.exports;
 }
 
-const render = options => renderToStaticMarkup(React.createElement(load(options).default));
+const render = (options = {}) => renderToStaticMarkup(React.createElement(load(options).default, {section:options.section || 'runtime'}));
 
 test('render has named typed controls, masked secrets, separate save buttons and collapsed details', () => {
-  const html = render({meta:{raw_startup_command:'run --players {{MAX_PLAYERS}} --password {{RCON_PASSWORD}} do-not-show another-secret'}});
+  const html = render({section:'game',meta:{raw_startup_command:'run --players {{MAX_PLAYERS}} --password {{RCON_PASSWORD}} do-not-show another-secret'}});
   assert.match(html,/<input(?=[^>]*name="MAX_PLAYERS")(?=[^>]*type="number")[^>]*>/);
   assert.match(html,/<input(?=[^>]*name="RCON_PASSWORD")(?=[^>]*type="password")(?=[^>]*value="")[^>]*>/);
   assert.match(html,/Save value/);
@@ -54,29 +54,28 @@ test('render has named typed controls, masked secrets, separate save buttons and
   assert.match(html,/Template default/);
   assert.match(html,/Server override/);
   assert.match(html,/Saving does not restart or reinstall it/);
-  assert.match(html,/<details class="startup-preview card">/);
-  assert.match(html,/<details class="startup-advanced card">/);
+  assert.doesNotMatch(html,/startup-preview|startup-advanced|data-java-runtime/);
   assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
   assert.doesNotMatch(html,/do-not-show|another-secret/);
   assert.doesNotMatch(html,/textarea|Save all|Admin tools/);
 });
 
 test('read-only variables render without save, clear or reset actions', () => {
-  const html = render({permissions:['startup.read'],meta:{java_managed:true}});
+  const html = render({section:'game',permissions:['startup.read'],meta:{java_managed:true}});
   assert.match(html,/Read-only/);
   assert.match(html,/<input(?=[^>]*name="MAX_PLAYERS")(?=[^>]*disabled)[^>]*>/);
   assert.doesNotMatch(html,/Save value|Clear value|Reset to template default|startup-advanced/);
-  assert.match(html,/data-java-runtime-allowed="false"/);
+  assert.doesNotMatch(html,/data-java-runtime/);
   const denied = render({permissions:[]});
   assert.match(denied,/do not have permission/);
   assert.doesNotMatch(denied,/MAX_PLAYERS|RCON_PASSWORD|Command preview/);
 });
 
 test('template read-only is respected independently of account startup permission', () => {
-  const html = render({variables:[{...baseVariable,is_editable:false}]});
+  const html = render({section:'game',variables:[{...baseVariable,is_editable:false}]});
   assert.match(html,/<input(?=[^>]*name="MAX_PLAYERS")(?=[^>]*disabled)[^>]*>/);
   assert.doesNotMatch(html,/Reset to template default/);
-  assert.doesNotMatch(render({variables:[{...baseVariable,can_reset:false}]}),/Reset to template default/);
+  assert.doesNotMatch(render({section:'game',variables:[{...baseVariable,can_reset:false}]}),/Reset to template default/);
 });
 
 test('managed Java image is never exposed through the raw runtime selector', () => {
@@ -87,9 +86,13 @@ test('managed Java image is never exposed through the raw runtime selector', () 
   assert.match(restricted,/data-java-runtime-allowed="false"/);
 });
 
-test('admin link requires a successful finished account response with boolean root_admin', () => {
-  assert.match(render({account:{root_admin:true}}),/href="..\/admin-tools"/);
-  for (const options of [{account:{root_admin:false}},{account:{root_admin:'true'}},{account:{root_admin:true},accountLoading:true},{account:{root_admin:true},accountError:'Denied'}]) assert.doesNotMatch(render(options),/Admin tools/);
+test('runtime and game sections keep each variable in one editor without an admin detour', () => {
+  const variables = [baseVariable,secretVariable,{...baseVariable,env_variable:'MINECRAFT_VERSION',name:'Minecraft version',rules:'required|string',server_value:'1.21'}];
+  const game = render({section:'game',variables});
+  const runtime = render({variables,meta:{raw_startup_command:'run {{MAX_PLAYERS}} {{RCON_PASSWORD}}'}});
+  assert.match(game,/name="MAX_PLAYERS"/); assert.doesNotMatch(game,/name="MINECRAFT_VERSION"/);
+  assert.match(runtime,/name="MINECRAFT_VERSION"/); assert.doesNotMatch(runtime,/name="MAX_PLAYERS"|name="RCON_PASSWORD"|admin-tools/);
+  assert.doesNotMatch(runtime,/do-not-show|another-secret/);
 });
 
 // A small hook runner exercises field event handlers without a browser or network.

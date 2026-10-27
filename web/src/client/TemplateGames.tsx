@@ -1,3 +1,4 @@
+import {startupVariableSection} from './startupSettingsModel';
 import {GameSwitch} from './GameSwitch';
 import {useRef, useState, type FormEvent} from 'react';
 import {Link, useNavigate, useParams} from 'react-router-dom';
@@ -61,7 +62,6 @@ function ManagedTemplateSetup({template, game}: {template: Template; game: Steam
 
 export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const fs25 = options.profile?.startsWith('fs25-') ?? options.name === 'Farming Simulator 25';
-  const fs25Advanced = ['KEEP_INSTALLER','AUTO_SAVE_INTERVAL','STATS_INTERVAL','PAUSE_IF_EMPTY','SAVEGAME_INDEX','SERVER_LANGUAGE','WEB_USERNAME','ADMIN_PASSWORD','GAME_PASSWORD','DLC_TIMEOUT'];
   const navigate = useNavigate();
   const initialNode = gameInitialNode(fs25 ? options.nodes.filter(node => (node.available_disk ?? 0) >= options.defaults.disk && (node.available_memory ?? 0) >= options.defaults.memory) : options.nodes) ?? gameInitialNode(options.nodes);
   const [environment, setEnvironment] = useState<Record<string, string>>(() => clearTemplateSteamSecrets(Object.fromEntries(options.variables.map(variable => [variable.env_variable, variable.default_value])), options.steam_installation));
@@ -82,6 +82,12 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const storageWarning = templateStorageWarning(options.name, diskValue, options.defaults.disk);
   const selectedNode = options.nodes.find(item => String(item.id) === node);
   const memoryMaximum = gameMemoryBudget(1048576, selectedNode), diskMaximum = gameResourceBudget(16777216, selectedNode?.available_disk);
+  // Decide from original defaults so correcting a required field never removes it.
+  const defaultEnvironment = Object.fromEntries(options.variables.map(variable => [variable.env_variable, variable.default_value]));
+  const setupVariables = options.variables.filter(variable => startupVariableSection(variable) === 'runtime'
+    || !!templateVariableProblem(variable, defaultEnvironment)
+    || /(?:^|\|)required_(?:if|unless|with|without)/.test(variable.rules)
+    || fs25 && ['WEB_PASSWORD', 'AUTO_DOWNLOAD'].includes(variable.env_variable));
   const checkedVariables=options.variables.filter(variable=>!(fs25&&['SERVER_NAME','WEB_PORT'].includes(variable.env_variable))&&!options.agreements?.some(agreement=>agreement.environment===variable.env_variable)&&(!templateSteamRole(variable.env_variable)||templateSteamRole(variable.env_variable)==='branch')&&!(privateContent&&['SRCDS_APPID','AUTO_UPDATE'].includes(variable.env_variable))&&!options.port_rules?.some(rule=>rule.auto_allocate&&rule.environment===variable.env_variable));
   const setupProblems=templateSetupProblems({name,node:selectedNode,memory:memoryValue,memoryMaximum,disk:diskValue,diskMaximum,imageValid:options.images.some(item=>item.value===image),portsReady:!!ports.data,portsLoading:ports.loading,portsError:!!ports.error,steamError:!!steamEnvironmentError,privateContent,privateSupported:options.private_content_supported===true,fs25,savedLicence:!!options.saved_license,variables:checkedVariables,environment,agreements:options.agreements});
   const valid=setupProblems.length===0;
@@ -126,8 +132,9 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
     {options.agreements?.map(agreement => <GameAgreementField key={agreement.environment} agreement={agreement} value={environment[agreement.environment] ?? "0"} onChange={value => setEnvironment(previous => ({...previous, [agreement.environment]: value}))}/>)}
     {options.steam_installation && <p className="muted">Steam account, password, Guard and private branch password controls use Steam maintenance after preparation. They are not saved in ordinary game settings. {options.steam_installation.coverage === 'pending' ? 'Private support for this recipe is pending review.' : ''}</p>}
     {fs25 && <p className="muted">{options.saved_license ? 'The administrator supplies the game licence and assigned DLC keys automatically.' : 'Ask an administrator to configure a GIANTS server licence before using automatic download.'}</p>}
-    <h2>Game settings</h2><div className="steam-form-grid">{options.variables.filter(variable => variable.user_viewable && !(fs25 && fs25Advanced.includes(variable.env_variable))).map(renderVariable)}</div>
-    <details className="steam-advanced"><summary>Runtime and advanced settings</summary><div className="steam-form-grid"><Field label="Runtime image"><Select id="game-runtime-image" value={image} onChange={event => setImage(event.target.value)}>{options.images.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field>{options.variables.filter(variable => !variable.user_viewable || fs25 && fs25Advanced.includes(variable.env_variable)).map(renderVariable)}</div></details>
+    <p className="muted">Game options use the template defaults. Edit them in Settings after creation.</p>
+    {!!setupVariables.length && <><h2>Installation requirements</h2><div className="steam-form-grid">{setupVariables.map(renderVariable)}</div></>}
+    <details className="steam-advanced"><summary>Runtime image</summary><div className="steam-form-grid"><Field label="Runtime image"><Select id="game-runtime-image" value={image} onChange={event => setImage(event.target.value)}>{options.images.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field></div></details>
     {!options.nodes.length && <p className="game-stop-note">No compatible online node is available. Connect a node, then reload this setup.</p>}
     <ErrorBox>{error}</ErrorBox>
     {!busy&&setupProblems.length>0&&<section id="game-template-readiness" className="template-readiness" aria-label="Setup requirements"><p role="status">{setupProblems.length===1?'Complete this requirement to create your server.':`Complete these ${setupProblems.length} requirements to create your server.`}</p><ul>{setupProblems.map((problem,index)=><li key={`${problem.field}:${index}`}>{problem.field?<a href={`#${problem.field}`} onClick={event=>{event.preventDefault();focusProblem(problem.field!);}}>{problem.message}</a>:problem.message}</li>)}</ul></section>}

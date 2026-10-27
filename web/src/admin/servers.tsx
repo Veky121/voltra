@@ -1,7 +1,7 @@
 import {SectionTabs} from "../ui/SectionTabs";
 import { useEffect, useState } from "react";
 import "../client/serverAdminTools.css";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Switch } from "../ui/Settings";
 import {
   Action,
@@ -57,90 +57,13 @@ export function Server() {
       ? null
       : `${servers}/${id}?include=allocations,variables,user,node,egg`
   );
-  const [tab, setTab] = useState("overview");
-  if (id === "new") return <CreateServer />;
+  if (id === "new") return <Navigate to="/game-library" replace/>;
   const record = q.data ? unwrap(q.data) : null;
-  return (
-    <div className="admin-management-page management-ui">
-      <Heading title={record?.name ?? `Server #${id}`}>
-        <Link to="/admin/servers">All servers</Link>
-        {record && (
-          <Link className="button" to={`/server/${record.identifier}/console`}>
-            Open console
-          </Link>
-        )}
-        <button className="secondary" onClick={q.reload}>
-          Refresh
-        </button>
-      </Heading>
-      <ErrorMessage error={q.error} />
-      <ServerSettingsTabs active={tab} onChange={setTab} tabs={[
-        ["overview", "Overview"], ["details", "Details"], ["build", "Build"],
-        ["startup", "Startup"], ["databases", "Databases"], ["mounts", "Mounts"],
-        ["manage", "Manage"], ["delete", "Delete"],
-      ]} />
-      <section role="tabpanel" id={`server-settings-panel-${tab}`} aria-labelledby={`server-settings-tab-${tab}`} tabIndex={0}>
-      {q.loading ? (
-        <p className="admin-loading" role="status">Loading server...</p>
-      ) : (
-        record && (
-          <>
-            {tab === "overview" && (
-              <>
-                <div className="grid grid-2">
-                  <Panel title="Server information">
-                    <dl className="admin-information">
-                      {[
-                        "uuid",
-                        "identifier",
-                        "external_id",
-                        "status",
-                        "created_at",
-                        "updated_at",
-                      ].map((k) => (
-                        <div key={k}>
-                          <dt className="muted">{k.replaceAll("_", " ")}</dt>
-                          <dd>
-                            {String(
-                              record[k] ?? (k === "status" ? "Ready" : "—")
-                            )}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </Panel>
-                  <Panel title="Resources">
-                    <JsonView
-                      value={{
-                        node: record.node ?? record.node_id,
-                        owner: record.user ?? record.owner_id,
-                        limits: record.limits,
-                        feature_limits: record.feature_limits,
-                        container: record.container,
-                      }}
-                    />
-                  </Panel>
-                </div>
-              </>
-            )}
-            {tab === "details" && (
-              <Details record={record} onSaved={q.reload} />
-            )}
-            {tab === "build" && <Build record={record} onSaved={q.reload} />}
-            {tab === "startup" && (
-              <Startup record={record} onSaved={q.reload} />
-            )}
-            {tab === "databases" && <ServerDatabases record={record} />}
-            {tab === "mounts" && <ServerMounts record={record} />}
-            {tab === "manage" && <Manage record={record} onSaved={q.reload} />}
-            {tab === "delete" && <DeleteServer record={record} />}
-          </>
-        )
-      )}
-      </section>
-    </div>
-  );
+  if (q.error) return <ErrorMessage error={q.error}/>;
+  if (!record) return <p role="status">Loading server...</p>;
+  return <Navigate to={`/server/${record.identifier || record.uuid}/runtime`} replace/>;
 }
+
 function CreateServer() {
   const navigate = useNavigate();
   const usersQ = useAPI("/api/application/users?per_page=100"),
@@ -462,12 +385,30 @@ export function Build({ record, onSaved }: { record: any; onSaved: () => void })
     />
   );
 }
-export function Startup({ record, onSaved, contextual = false }: { record: any; onSaved: () => void; contextual?: boolean }) {
+export function RuntimeAssignment({record, onSaved}: {record: any; onSaved: () => void}) {
+  const eggID = record.egg ?? record.egg_id;
+  return (
+      <details className="server-admin-advanced">
+        <summary>Startup command and template assignment</summary>
+        <p className="muted">The command may contain sensitive values. Template and installer choices affect this server only. A template change can require a separate reinstall.</p>
+        <Editor
+          title="Startup command and template"
+          endpoint={`${servers}/${record.id}/startup`}
+          initial={{ startup: record.container?.startup_command ?? record.startup, egg: eggID,
+            skip_scripts: record.container?.skip_scripts ?? record.skip_scripts }}
+          fields={[f("startup", "Startup command", "textarea"), f("egg", "Egg ID", "number"), f("skip_scripts", "Skip installation script", "checkbox")]}
+          onSaved={onSaved}
+          submit="Save server assignment"
+        />
+      </details>
+  );
+}
+export function Startup({ record, onSaved, contextual = false, restrictedOnly = false }: { record: any; onSaved: () => void; contextual?: boolean; restrictedOnly?: boolean }) {
   const eggID = record.egg ?? record.egg_id;
   const q = useAPI(`/api/admin/eggs/${eggID}`);
   const egg = q.data ? unwrap(q.data) : null;
   const farming=egg?.features?.includes('voltra_fs25');
-  const vars = egg ? rows(egg.relationships?.variables ?? { data: [] }).filter(variable=>!farming||!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)) : [];
+  const vars = egg ? rows(egg.relationships?.variables ?? { data: [] }).filter(variable=>(!farming||!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)) && (!restrictedOnly || variable.user_viewable === false || variable.user_editable === false)) : [];
   const existing = record.relationships?.variables
     ? rows(record.relationships.variables)
     : [];
@@ -487,14 +428,14 @@ export function Startup({ record, onSaved, contextual = false }: { record: any; 
     return <>
       <p className="muted">Runtime changes apply on the next start. Saving does not restart or reinstall this server.</p>
       <Editor
-        title="Image and environment"
+        title={restrictedOnly ? "Restricted template options" : "Image and environment"}
         endpoint={`${servers}/${record.id}/startup`}
-        initial={{ image: record.container?.image ?? record.image,
+        initial={{ ...(!restrictedOnly ? {image: record.container?.image ?? record.image} : {}),
           ...Object.fromEntries(vars.map(variable => [`env:${variable.env_variable}`, secret(variable) ? "" : current[variable.env_variable] ?? ""])) }}
-        fields={[f("image", "Docker image"), ...vars.map(variable => f(`env:${variable.env_variable}`, variable.name || variable.env_variable,
+        fields={[...(!restrictedOnly ? [f("image", "Docker image")] : []), ...vars.map(variable => f(`env:${variable.env_variable}`, variable.name || variable.env_variable,
           secret(variable) ? "password" : variable.field_type === "textarea" ? "textarea" : undefined,
           { hint: `${variable.description || variable.env_variable}${secret(variable) ? " Leave blank to keep the saved value." : ""}` }))]}
-        transform={v => ({ image: v.image, environment: Object.fromEntries(vars
+        transform={v => ({ ...(!restrictedOnly ? {image: v.image} : {}), environment: Object.fromEntries(vars
           .filter(variable => Object.hasOwn(v, `env:${variable.env_variable}`)
             && (!secret(variable) || v[`env:${variable.env_variable}`] !== "")
             && v[`env:${variable.env_variable}`] !== current[variable.env_variable])
@@ -502,19 +443,7 @@ export function Startup({ record, onSaved, contextual = false }: { record: any; 
         onSaved={onSaved}
         submit="Save for next start"
       />
-      <details className="server-admin-advanced">
-        <summary>Startup command and template assignment</summary>
-        <p className="muted">The command may contain sensitive values. Template and installer choices affect this server only. A template change can require a separate reinstall.</p>
-        <Editor
-          title="Startup command and template"
-          endpoint={`${servers}/${record.id}/startup`}
-          initial={{ startup: record.container?.startup_command ?? record.startup, egg: eggID,
-            skip_scripts: record.container?.skip_scripts ?? record.skip_scripts }}
-          fields={[f("startup", "Startup command", "textarea"), f("egg", "Egg ID", "number"), f("skip_scripts", "Skip installation script", "checkbox")]}
-          onSaved={onSaved}
-          submit="Save server assignment"
-        />
-      </details>
+      {!restrictedOnly && <RuntimeAssignment record={record} onSaved={onSaved}/>}
     </>;
   }
   return (

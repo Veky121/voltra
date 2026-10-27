@@ -1,7 +1,7 @@
 import { SidebarSection } from "./Navigation";
 import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
-import { Loading,useAPI } from "./lib";
+import { useAPI } from "./lib";
 import {
   can,
   PageError,
@@ -23,7 +23,6 @@ import {MinecraftContent} from "./client/MinecraftContent";
 import SteamGames from "./client/SteamGames";
 import GameTemplateSetup from "./client/TemplateGames";
 import SteamMaintenance from "./client/SteamMaintenance";
-import GameQuickSetup from "./client/GameQuickSetup";
 import {managedSteamServer} from "./client/gameSetupModel";
 import {useServerNavigation} from './ServerNavigation';
 
@@ -74,9 +73,8 @@ function Server() {
   ];
   const managedSteam = managedSteamServer(server);
   if(server.game==="minecraft")groups[2].tabs.unshift(["content","Mods & plugins","eggs","file.read"]);
-  groups[1].tabs.unshift(["quick-setup","Game settings","settings","file.read-content"]);
+  if(administrator || can(permissions, "startup.read")) groups[1].tabs.push(["runtime","Runtime & resources","wrench",""]);
   if(managedSteam||(Array.isArray(server.egg_features)&&server.egg_features.includes('voltra:steam-private-prepared-v1')))groups[2].tabs.unshift(["steam","Steam maintenance","startup","startup.read"]);
-  if(administrator)groups.push({label:'Administration',tabs:[['admin-tools','Admin tools','wrench','']]});
   return (
     <ServerContext.Provider
       value={{ server, permissions, base, reload: r.reload }}
@@ -95,7 +93,7 @@ function Server() {
             {server.status === "installing"
               ? "Installation output is available in the console."
               : server.status === "reinstall_failed"
-                ? "Review the installation output in the dashboard console. An owner or administrator can correct the settings and retry Reinstall server under Settings."
+                ? "Review the installation output in the dashboard console. An owner or administrator can correct the settings and retry Reinstall server under Settings > General."
                 : ""}
           </div>
         )}
@@ -113,8 +111,9 @@ function Server() {
           <Route path="backups" element={<Backups />} />
           <Route path="network" element={<LegacySettingsPage page="network" />} />
           <Route path="startup" element={<LegacySettingsPage page="startup" />} />
-          <Route path="admin-tools" element={account.loading?<Loading/>:administrator?<ServerAdminTools/>:<div role="alert">Administrator access is required for these tools.</div>} />
-          <Route path="quick-setup" element={<GameQuickSetup />} />
+          <Route path="runtime" element={<ServerAdminTools/>} />
+          <Route path="admin-tools" element={<Navigate to={`/server/${id}/runtime`} replace/>} />
+          <Route path="quick-setup" element={<Navigate to={`/server/${id}/settings`} replace/>} />
           <Route path="steam" element={<SteamMaintenance />} />
           <Route path="content" element={<MinecraftContent server={id??server.uuid} />} />
           <Route path="settings/*" element={<ServerSettings />} />
@@ -151,4 +150,3 @@ export default function Client() {
     </Routes>
   );
 }
-

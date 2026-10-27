@@ -8,7 +8,7 @@ import '../../src/theme.css';
 // These fixtures exist only on the isolated :5189 Vite server.
 const item = (object: string, attributes: any) => ({object, attributes});
 const params = new URLSearchParams(location.search);
-type Scenario = {game?: string; permissions?: string[]; state?: string; node?: boolean; folders?: boolean; failedSave?: boolean; installFail?: boolean; activeJob?: boolean; noNodes?: boolean; noInstall?: boolean; missing?: boolean; jobOperation?: string; lifecycle?: string; uninstalled?: boolean; nullFields?: boolean; jobLogs?: boolean; jobStatus?: 'queued' | 'running'; steamTimes?: {last_checked_at?: string | null; last_attempt_at?: string | null; last_failed_at?: string | null}};
+type Scenario = {admin?: boolean; game?: string; permissions?: string[]; state?: string; node?: boolean; folders?: boolean; failedSave?: boolean; installFail?: boolean; activeJob?: boolean; noNodes?: boolean; noInstall?: boolean; missing?: boolean; jobOperation?: string; lifecycle?: string; uninstalled?: boolean; nullFields?: boolean; jobLogs?: boolean; jobStatus?: 'queued' | 'running'; steamTimes?: {last_checked_at?: string | null; last_attempt_at?: string | null; last_failed_at?: string | null}};
 let scenario: Scenario = {}, calls: {path: string; method: string; body: any}[] = [];
 let revision = 'revision-1';
 let fields = basicFields('palworld');
@@ -24,8 +24,23 @@ const fakeFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push({path, method, body});
   let status = 200, data: any;
   const game = path.includes('/satisfactory') ? 'satisfactory' : scenario.game || 'palworld';
-  if (path.match(/\/game-library\/steam\/[^/]+$/)) data = item('steam_game_options', {id:game,name:game === 'satisfactory' ? 'Satisfactory' : 'Palworld',can_install:!scenario.noInstall,nodes:scenario.noNodes ? [] : [{id:7,name:'Linux node'}],defaults:{memory:16384,max_players:game === 'satisfactory' ? 4 : 32},minimum_memory:8192,maximum_memory:65536,minimum_players:1,maximum_players:game === 'satisfactory' ? 4 : 32,presets:[{value:'default',label:'Standard'}],help:[]});
+  if (path === '/api/client/game-library/minecraft') data = item('minecraft_options',{latest:'1.21',versions:['1.21'],can_install:true,nodes:[{id:7,name:'Fixture host',automatic_ports:true}],loaders:[{id:'vanilla',name:'Vanilla'}],runtimes:[]});
+  else if (path === '/api/client/game-library/templates/simple') data = item('template_options',{id:'simple',name:'Custom game',category:'other',available:true,source:'https://example.com',nodes:[{id:7,name:'Fixture host',automatic_ports:true}],images:[{label:'Default',value:'fixture:latest'}],defaults:{memory:1024,disk:10240},variables:[
+    {env_variable:'CUSTOM_GAME_OPTION',name:'Gameplay option',description:'',default_value:'default',rules:'required|string',user_viewable:true},
+    {env_variable:'MINECRAFT_VERSION',name:'Game version',description:'',default_value:'1.21',rules:'required|string',user_viewable:true},
+    {env_variable:'REQUIRED_KEY',name:'Required installation key',description:'',default_value:'',rules:'required|string|min:4',user_viewable:true},
+  ]});
+  else if (path.match(/\/game-library\/steam\/[^/]+$/)) data = item('steam_game_options', {id:game,name:game === 'satisfactory' ? 'Satisfactory' : 'Palworld',can_install:!scenario.noInstall,nodes:scenario.noNodes ? [] : [{id:7,name:'Linux node'}],defaults:{memory:16384,max_players:game === 'satisfactory' ? 4 : 32},minimum_memory:8192,maximum_memory:65536,minimum_players:1,maximum_players:game === 'satisfactory' ? 4 : 32,presets:[{value:'default',label:'Standard'}],help:[]});
+  else if (path.endsWith('/ports')) data = item('game_port_plan',{ip:'127.0.0.1',ports:[{role:'game',preferred_port:8211,port:8211}],detail:'Fixture available ports'});
   else if (path.endsWith('/install')) {if (scenario.installFail) {status = 503; data = {errors:[{detail:'Temporary install failure'}]};} else data = item('game_installation',{identifier:'fixture',name:body.name,status:'installing'});}
+  else if (path === '/api/client/account') data = item('account',{root_admin:scenario.admin === true});
+  else if (path.endsWith('/startup') && method === 'GET') data = {object:'list',data:[
+    item('egg_variable',{env_variable:'MINECRAFT_VERSION',name:'Minecraft version',rules:'required|string',default_value:'1.21',server_value:'1.21',is_editable:true}),
+    item('egg_variable',{env_variable:'CUSTOM_GAME_OPTION',name:'Custom game option',rules:'required|string',default_value:'default',server_value:'default',is_editable:true}),
+  ],meta:{java_managed:true,raw_startup_command:'run {{CUSTOM_GAME_OPTION}}'}};
+  else if (path.endsWith('/startup/variable')) data = item('egg_variable',{env_variable:body.key,name:body.key === 'CUSTOM_GAME_OPTION' ? 'Custom game option' : 'Minecraft version',rules:'required|string',default_value:'default',server_value:body.value,is_editable:true});
+  else if (path.endsWith('/java')) data = item('java_settings',{config:{enabled:false},egg:{enabled:false},runtimes:[],effective:{},can_update:false});
+  else if (path.startsWith('/api/application/servers/7?')) data = item('server',{id:7,identifier:'fixture',uuid:'fixture-uuid',name:'Isolated game fixture',egg:2,container:{installed:true,environment:{}}});
   else if (path.endsWith('/resources')) data = item('stats',{current_state:scenario.state || 'offline',resources:{}});
   else if (path.endsWith('/game-settings/folders')) data = item('game_settings_folders',{folders:quick().attributes.folders});
   else if (new URL(path,location.href).pathname.endsWith('/game-settings')) {
@@ -36,8 +51,9 @@ const fakeFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     if (method === 'PATCH') {mode = body.mode; interval = body.check_interval_seconds;}
     const logs = scenario.jobLogs ? [{stage:'downloading',detail:'Safe download progress',created_at:'2026-10-22T06:00:00Z'}] : undefined;
     data = item('steam_status',{supported:true,game,app_id:2394010,branch:'public',mode,check_interval_seconds:interval,last_checked_at:'2026-10-22T06:00:00Z',last_attempt_at:'2026-10-22T06:00:00Z',last_failed_at:null,...scenario.steamTimes,installed_build:scenario.uninstalled ? '' : '123',latest_build:'124',update_available:true,needs_repair:!!scenario.uninstalled,current_job:scenario.activeJob ? {id:'job-1',operation:scenario.jobOperation || 'update',status:scenario.jobStatus || 'running',stage:'downloading',detail:'Downloading game files',created_at:'2026-10-22T06:00:00Z',logs} : null,jobs:scenario.jobLogs ? [{id:'old-job',operation:'check',status:'succeeded',stage:'complete',detail:'Checked Steam',created_at:'2026-10-22T05:00:00Z',completed_at:'2026-10-22T05:00:10Z',logs}] : [],node_available:scenario.node !== false});
-  } else if (/\/steam\/(check|update|verify)$/.test(path)) {status = 202; data = item('steam_job',{id:'job-2',operation:path.split('/').at(-1),status:'queued'});}
-  else if (/\/servers\/[^/]+$/.test(path)) data = {...item('server',{identifier:'fixture',uuid:'fixture-uuid',name:'Isolated game fixture',game:scenario.game || 'palworld',status:scenario.lifecycle || null,limits:{memory:16384},permissions:scenario.permissions || ['*']}),meta:{user_permissions:scenario.permissions || ['*']}};
+  } else if (path.endsWith('/steam/private')) data = item('private_steam_status',{supported:false,private_content:false});
+  else if (/\/steam\/(check|update|verify)$/.test(path)) {status = 202; data = item('steam_job',{id:'job-2',operation:path.split('/').at(-1),status:'queued'});}
+  else if (/\/servers\/[^/]+$/.test(path)) data = {...item('server',{internal_id:7,identifier:'fixture',uuid:'fixture-uuid',name:'Isolated game fixture',game:scenario.game || 'palworld',status:scenario.lifecycle || null,limits:{memory:16384},permissions:scenario.permissions || ['*']}),meta:{user_permissions:scenario.permissions || ['*']}};
   else if (path.includes('/files/list')) data = {object:'list',data:[]};
   else if (path === '/api/client') data = {object:'list',data:[]};
   else {status = 404; data = {errors:[{detail:`Unmocked endpoint ${method} ${path}`}]};}
@@ -51,11 +67,11 @@ async function show(path: string, next: Scenario = {}) {
   if (next.nullFields) fields = fields.map(field => field.key === 'ExpRate' || field.type === 'boolean' ? {...field,value:null} : field) as any;
   await act(async () => {root.render(<MemoryRouter key={++mount} initialEntries={[path]}><Client/></MemoryRouter>);});
   // Server lookup, telemetry and page data mount in separate effect turns.
-  for (let turn = 0; turn < 4; turn++) await act(async () => {await new Promise(resolve => setTimeout(resolve, 10));});
+  for (let turn = 0; turn < 4; turn++) await act(async () => {await new Promise(resolve => setTimeout(resolve, 90));});
 }
 const assert = (condition: unknown, message: string) => {if (!condition) throw new Error(message);};
 const button = (label: string) => [...document.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === label || button.textContent === label) as HTMLButtonElement;
-const input = (label: string) => (document.querySelector(`[aria-label=${JSON.stringify(label)}]`) || [...document.querySelectorAll('label')].find(node => node.querySelector('span')?.textContent === label)?.querySelector('input,select')) as HTMLInputElement;
+const input = (label: string) => {const node = (document.querySelector(`[aria-label=${JSON.stringify(label)}]`) || [...document.querySelectorAll('label')].find(node => node.querySelector('span')?.textContent === label)?.querySelector('input,select')) as HTMLElement; return (node?.matches('input,select') ? node : node?.querySelector('input,select')) as HTMLInputElement;};
 async function change(label: string, value: string) {
   const element = input(label);
   assert(element, `Missing input ${label}`);
@@ -80,7 +96,75 @@ async function narrowLayout() {
 async function suite() {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   const results: {name: string; passed: boolean; error?: string}[] = [];
-  async function test(name: string, fn: () => Promise<void>) {if (params.get('scope') === 'settings' && !/Quick setup|native|Revision|quick settings|file content|Folders link|Missing game files|Satisfactory directs|settings fill|switch/i.test(name)) return; try {await fn(); results.push({name,passed:true});} catch (error) {results.push({name,passed:false,error:String(error)});}}
+  async function test(name: string, fn: () => Promise<void>) {if (params.get('scope') === 'simplification' && !name.startsWith('Simplification:')) return; if (params.get('scope') === 'settings' && !/Quick setup|native|Revision|quick settings|file content|Folders link|Missing game files|Satisfactory directs|settings fill|switch/i.test(name)) return; try {await fn(); results.push({name,passed:true});} catch (error) {results.push({name,passed:false,error:String(error)});}}
+  await test('Simplification: creation defers gameplay controls and preserves API defaults', async () => {
+    await show('/game-library/palworld',{installFail:true});
+    assert(!input('Maximum players') && !input('Server password') && !input('Preset'), 'Creation still asks for gameplay settings');
+    await click('Create server');
+    const request=calls.find(call=>call.path.endsWith('/install'))!;
+    assert(request.body.max_players === 32 && request.body.preset === 'default' && !request.body.server_password, 'Creation defaults changed');
+  });
+  await test('Simplification: Minecraft creation defers gameplay but still requires EULA acceptance', async () => {
+    await show('/game-library/minecraft',{installFail:true});
+    assert(!input('Maximum players') && !input('Game mode') && !input('Difficulty'), 'Minecraft still asks for gameplay options');
+    assert(button('Install Minecraft').disabled, 'EULA bypassed');
+    await act(async()=>{(document.querySelector('.mc-eula [role=switch]') as HTMLButtonElement).click();});
+    await click('Install Minecraft');
+    const request=calls.find(call=>call.path.endsWith('/install'))!;
+    assert(request.body.max_players===20 && request.body.game_mode==='survival' && request.body.difficulty==='normal' && request.body.accept_eula===true, 'Minecraft defaults or agreement changed');
+  });
+  await test('Simplification: templates defer valid game defaults and retain required installation inputs', async () => {
+    await show('/game-library/template/simple',{installFail:true});
+    assert(!input('Gameplay option') && input('Game version') && input('Required installation key'), 'Template fields not simplified');
+    assert(button('Create server').disabled, 'Missing required key allowed');
+    await change('Required installation key','valid-key');
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,350));});
+    assert(input('Required installation key'), 'Corrected required field disappeared');
+    await click('Create server');
+    const request=calls.find(call=>call.path.endsWith('/install'))!;
+    assert(request.body.environment.CUSTOM_GAME_OPTION==='default' && request.body.environment.REQUIRED_KEY==='valid-key', 'Deferred template defaults missing');
+  });
+  await test('Simplification: game options are outside admin tools for every game family', async () => {
+    for (const game of ['minecraft','palworld','satisfactory','custom-template']) {
+      await show('/server/fixture/settings',{game});
+      assert(input('Custom game option'), 'Custom game option unavailable for '+game);
+      assert(!input('Minecraft version'), 'Runtime option leaked into Game settings');
+      assert(![...document.querySelectorAll('a')].some(a=>a.textContent === 'Admin tools'), 'Admin sidebar remains');
+      const fields=calls.filter(call=>call.path.endsWith('/startup'));
+      assert(fields.length===1, 'Multiple startup editors loaded');
+    }
+  });
+  await test('Simplification: owner can edit custom game options using existing permissions', async () => {
+    await show('/server/fixture/settings',{permissions:['startup.read','startup.update']});
+    await change('Custom game option','changed');
+    const control=input('Custom game option');
+    await act(async()=>{control.closest('form')!.requestSubmit();});
+    assert(calls.some(call=>call.method==='PUT' && call.body.key==='CUSTOM_GAME_OPTION' && call.body.value==='changed'), 'Custom game option did not save');
+    assert(!calls.some(call=>call.path.startsWith('/api/application')), 'Owner accessed admin APIs');
+  });
+  await test('Simplification: runtime is available to members without administrator APIs', async () => {
+    await show('/server/fixture/runtime',{permissions:['startup.read','startup.update']});
+    assert(input('Minecraft version') && !input('Custom game option'), 'Runtime split is incorrect');
+    assert(!calls.some(call=>call.path.startsWith('/api/application')), 'Member requested admin APIs');
+    assert(![...document.querySelectorAll('button')].some(b=>b.textContent==='Resources'), 'Member exposed to resources');
+  });
+  await test('Simplification: administrator has the same runtime editor and advanced resource tabs', async () => {
+    await show('/server/fixture/runtime',{admin:true});
+    assert(input('Minecraft version') && !input('Custom game option'), 'Administrator runtime differs');
+    for (const label of ['Runtime','Resources','Mounts','Advanced','Management']) assert(button(label), 'Missing tab '+label);
+    assert(document.querySelectorAll('input[name="MINECRAFT_VERSION"]').length===1, 'Runtime editor duplicated');
+  });
+  await test('Simplification: old game, startup, and admin links reach canonical editors', async () => {
+    for (const path of ['quick-setup','startup','settings/startup','admin-tools']) {
+      await show('/server/fixture/'+path);
+      assert(input(path==='quick-setup' ? 'Custom game option' : 'Minecraft version'), 'Legacy link failed '+path);
+    }
+  });
+  await test('Simplification: read-only game access cannot save startup variables', async () => {
+    await show('/server/fixture/settings',{permissions:['startup.read']});
+    assert(input('Custom game option').disabled, 'Read-only variable writable');
+    assert(!calls.some(call=>call.method!=='GET'), 'Read-only view mutated data');
+  });
   await test('Palworld defaults and idempotent install retry', async () => {
     await show('/game-library/palworld',{installFail:true});
     assert(input('Memory (GiB)').value === '16', 'Memory default is not API driven');
@@ -106,7 +190,7 @@ async function suite() {
   await test('Create permission blocks provisioning', async () => {await show('/game-library/palworld',{noInstall:true}); assert(button('Create server').disabled, 'Install enabled without permission');});
   await test('Satisfactory directs players to built-in Server Manager', async () => {await show('/server/fixture/quick-setup',{game:'satisfactory',folders:false}); assert(document.body.textContent?.includes('No generated server configuration'), 'Missing configuration guidance'); assert(!button('Save settings'), 'Satisfactory invents setting controls'); assert(document.body.textContent?.includes('Folders appear after'), 'Missing folder empty state');});
   await test('Quick setup PUT sends official changed keys and optimistic revision', async () => {await show('/server/fixture/quick-setup'); await change('Server name','My pals'); await click('Save settings'); const request = calls.find(call => call.method === 'PUT')!; assert(request.body.revision === 'revision-1' && request.body.settings.ServerName === 'My pals' && !Object.hasOwn(request.body.settings,'ExpRate'), 'Quick settings shape mismatch'); assert(document.body.textContent?.includes('Saved. Applies'), 'Missing save success');});
-  await test('Missing native settings keep game defaults when another field changes', async () => {await show('/server/fixture/quick-setup',{nullFields:true}); assert(input('Experience rate').value === '', 'Null number displayed literally'); await change('Server name','Keep defaults'); await click('Save settings'); const request = calls.find(call => call.method === 'PUT')!; assert(Object.keys(request.body.settings).join() === 'ServerName', 'Missing defaults overwritten');});
+  await test('Missing native settings keep game defaults when another field changes', async () => {await show('/server/fixture/quick-setup',{nullFields:true}); assert((document.getElementById('game-property-ExpRate') as HTMLInputElement).value === '', 'Null number displayed literally'); await change('Server name','Keep defaults'); await click('Save settings'); const request = calls.find(call => call.method === 'PUT')!; assert(Object.keys(request.body.settings).join() === 'ServerName', 'Missing defaults overwritten');});
   await test('Revision conflicts preserve draft and offer reload', async () => {await show('/server/fixture/quick-setup',{failedSave:true}); await change('Server name','Keep draft'); await click('Save settings'); assert(input('Server name').value === 'Keep draft', 'Conflict lost draft'); assert(button('Reload current settings'), 'Missing reload');});
   await test('Running game blocks quick settings saves', async () => {await show('/server/fixture/quick-setup',{state:'running'}); assert(input('Server name').matches(':disabled') && button('Save settings').disabled, 'Running settings writable');});
   await test('Read-only permission blocks quick settings saves', async () => {await show('/server/fixture/quick-setup',{permissions:['file.read-content','file.read']}); assert(button('Save settings').disabled, 'Read-only settings writable');});
@@ -140,10 +224,10 @@ async function suite() {
   await test('Successful provisioning opens Steam installation progress', async () => {await show('/game-library/palworld'); await click('Create server'); for(let turn=0;turn<3;turn++) await act(async()=>{}); assert(document.body.textContent?.includes('Steam maintenance'), 'Install did not open progress page');});
   await test('Disconnected node disables maintenance', async () => {await show('/server/fixture/steam',{node:false}); assert(button('Check now').disabled, 'Disconnected check enabled');});
   await test('Steam read permission hides write actions', async () => {await show('/server/fixture/steam',{permissions:['startup.read']}); assert(!button('Check now') && button('Save automatic settings').disabled, 'Read-only Steam writable');});
-  await test('Automatic mode and cooldown PATCH exact shape', async () => {await show('/server/fixture/steam'); await change('Automatic mode','scheduled'); await change('Check cooldown (minutes)','120'); await click('Save automatic settings'); const request = calls.find(call => call.method === 'PATCH')!; assert(request.body.mode === 'scheduled' && request.body.check_interval_seconds === 7200, 'Automatic settings shape mismatch');});
+  await test('Automatic mode and cooldown PATCH exact shape', async () => {await show('/server/fixture/steam'); await change('Automatic mode','scheduled'); await change('Check interval (minutes)','120'); await click('Save automatic settings'); const request = calls.find(call => call.method === 'PATCH')!; assert(request.body.mode === 'scheduled' && request.body.check_interval_seconds === 7200, 'Automatic settings shape mismatch');});
   await test('Quick settings sections retain every unsaved draft', async () => {await show('/server/fixture/quick-setup',{game:'minecraft'});await change('Server message','New message');await change('View distance','12');assert(input('Server message').value==='New message','Section edit lost draft');await click('Save settings');const settings=calls.find(call=>call.method==='PUT')!.body.settings;assert(settings.motd==='New message'&&settings['view-distance']==='12','Save lost a hidden category change');});
   await test('Game settings fill the width and folders follow below', async () => {await show('/server/fixture/quick-setup');const settings=document.querySelector('.game-settings-card')!.getBoundingClientRect(),layout=document.querySelector('.game-quick-layout')!.getBoundingClientRect(),folders=document.querySelector('.game-folders')!.getBoundingClientRect();assert(settings.width===layout.width,'Settings lost width to a sidebar');assert(folders.top>=settings.bottom,'Folders are beside settings');});
-  await test('Boolean settings use an accessible switch and save a boolean', async () => {await show('/server/fixture/quick-setup');const control=document.querySelector('input[role=switch][aria-label="Backup saves"]') as HTMLInputElement;assert(control?.checked,'Missing enabled switch');await act(async()=>{control.click()});await click('Save settings');assert(calls.find(call=>call.method==='PUT')?.body.settings.bIsUseBackupSaveData===false,'Switch lost boolean encoding');});
+  await test('Boolean settings use an accessible switch and save a boolean', async () => {await show('/server/fixture/quick-setup');const control=document.querySelector('[role=switch][aria-label="Backup saves"]') as HTMLButtonElement;assert(control?.getAttribute('aria-checked')==='true','Missing enabled switch');await act(async()=>{control.click()});await click('Save settings');assert(calls.find(call=>call.method==='PUT')?.body.settings.bIsUseBackupSaveData===false,'Switch lost boolean encoding');});
   await test('Compact setup fits a 390px viewport', async () => {await show('/game-library/palworld'); await narrowLayout();});
   await test('Quick settings and folders stack at 390px', async () => {await show('/server/fixture/quick-setup'); await narrowLayout();});
   await test('Steam maintenance fits a 390px viewport', async () => {await show('/server/fixture/steam'); await narrowLayout();});

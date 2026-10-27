@@ -22,6 +22,6 @@ export function GameMemoryField({value, onChange, minimum, maximum, describedBy}
 }
 
 export function GameNodeField({value, onChange, nodes, automatic = false}: {value: string; onChange: (value: string) => void; nodes: SetupNode[]; automatic?: boolean}) {
-  return <Field label="Node"><Select id="game-server-node" value={value} required={!automatic} onChange={event => onChange(event.target.value)}>{automatic ? <option value="">Choose automatically</option> : !nodes.length && <option value="">No compatible nodes</option>}{nodes.map(node => <option key={node.id} value={node.id} disabled={!gameNodeAvailable(node)}>{node.name}{node.unavailable_reason ? ` · ${node.unavailable_reason}` : !node.automatic_ports && node.free_allocations !== undefined && node.free_allocations < 1 ? ' · No available ports' : ''}</option>)}</Select></Field>;
+  return <Field label="Host machine"><Select id="game-server-node" value={value} required={!automatic} onChange={event => onChange(event.target.value)}>{automatic ? <option value="">Choose automatically</option> : !nodes.length && <option value="">No compatible nodes</option>}{nodes.map(node => <option key={node.id} value={node.id} disabled={!gameNodeAvailable(node)}>{node.name}{node.unavailable_reason ? ` · ${node.unavailable_reason}` : !node.automatic_ports && node.free_allocations !== undefined && node.free_allocations < 1 ? ' · No available ports' : ''}</option>)}</Select></Field>;
 }
 

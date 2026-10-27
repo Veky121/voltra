@@ -1,10 +1,9 @@
 import {GameSwitch} from './GameSwitch';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, Button, Card, Input, Select, useAPI } from '../lib';
 import { can, items, json, PageError, useServer, value } from './common';
 import { JavaSettings } from './JavaSettings';
-import { commandPreview, secretVariable, variableCanReset, variableControl, variableEditable, variableProblem, variableValue, variableWrite } from './startupSettingsModel';
+import { commandPreview, secretVariable, variableCanReset, variableControl, variableEditable, variableProblem, variableValue, variableWrite, startupVariableSection } from './startupSettingsModel';
 import type { StartupMeta, StartupVariable, VariableIntent, VariableWrite } from './startupSettingsModel';
 import './startupSettings.css';
 
@@ -103,8 +102,8 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
   </form>;
 }
 
-function RuntimeImage({ base, image, images, permitted, onSaved }: {
-  base: string; image: string; images: Record<string, string>; permitted: boolean; onSaved: (image: string) => void;
+function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyChange, onSaved }: {
+  base: string; image: string; images: Record<string, string>; permitted: boolean; customAllowed: boolean; onDirtyChange: (dirty: boolean) => void; onSaved: (image: string) => void;
 }) {
   const [draft, setDraft] = useState(image);
   const previous = useRef(image);
@@ -115,6 +114,7 @@ function RuntimeImage({ base, image, images, permitted, onSaved }: {
   useEffect(() => { const oldImage = previous.current; setDraft(current => current === oldImage ? image : current); previous.current = image; }, [image]);
   const choices = Object.entries(images);
   const dirty = draft !== image;
+  useEffect(() => {onDirtyChange(dirty); return () => onDirtyChange(false);}, [dirty, onDirtyChange]);
   return <details className="startup-advanced card">
     <summary>Advanced runtime image{dirty ? ' · Unsaved' : ''}</summary>
     <p className="muted">The container image applies next start. Saving does not reinstall the server.</p>
@@ -127,7 +127,7 @@ function RuntimeImage({ base, image, images, permitted, onSaved }: {
       }).catch(cause => setError(cause instanceof Error ? cause.message : 'Could not save the image.')).finally(() => { locked.current = false; setBusy(false); });
     }}>
       <label className="field"><span>Runtime image{!permitted ? ' · Read-only' : ''}</span>
-        {choices.length ? <Select value={draft} disabled={!permitted || busy} onChange={event => { setDraft(event.target.value); setSuccess(''); }}>
+        {customAllowed ? <Input value={draft} disabled={!permitted || busy} onChange={event => {setDraft(event.target.value); setSuccess('');}}/> : choices.length ? <Select value={draft} disabled={!permitted || busy} onChange={event => { setDraft(event.target.value); setSuccess(''); }}>
           {!choices.some(([, value]) => value === draft) && <option value={draft}>{draft || 'Choose an image'}</option>}
           {choices.map(([name, image]) => <option key={name} value={image}>{name} · {image}</option>)}
         </Select> : <Input value={draft} disabled={!permitted || busy} onChange={event => { setDraft(event.target.value); setSuccess(''); }} />}
@@ -138,24 +138,30 @@ function RuntimeImage({ base, image, images, permitted, onSaved }: {
   </details>;
 }
 
-function StartupContent() {
+type SettingsSection = 'game' | 'runtime';
+type SettingsProps = {section: SettingsSection; administrator?: boolean; onDirtyChange?: (dirty: boolean) => void};
+
+function StartupContent({section, administrator = false, onDirtyChange}: SettingsProps) {
   const { base, permissions, reload, server } = useServer();
   const permitted = can(permissions, 'startup.read');
   const query = useAPI(permitted ? `${base}/startup` : null);
-  const account = useAPI(permitted ? '/api/client/account' : null);
   const [saved, setSaved] = useState<Record<string, StartupVariable>>({});
   const [savedMeta, setSavedMeta] = useState<StartupMeta | null>(null);
   const [savedImage, setSavedImage] = useState<string | null>(null);
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const onDirty = useRef((key: string, pending: boolean) => setDirty(current => current[key] === pending ? current : { ...current, [key]: pending })).current;
+  const imageDirty = useRef((pending: boolean) => onDirty('__runtime_image', pending)).current;
   useEffect(() => { setSaved({}); setSavedMeta(null); }, [query.data]);
-  if (!permitted) return <section className="startup-settings games-ui"><h2>Startup</h2><p>You do not have permission to view startup settings.</p></section>;
-  if (!query.data) return <section className="startup-settings games-ui"><h2>Startup</h2>{query.loading ? <p role="status">Loading startup settings...</p> : <><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry</Button></>}</section>;
-  const variables = (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable);
+  const pending = Object.values(dirty).filter(Boolean).length;
+  useEffect(() => { onDirtyChange?.(pending > 0); return () => onDirtyChange?.(false); }, [pending, onDirtyChange]);
+  useEffect(() => { if (!pending) return; const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';}; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, [pending]);
+  if (!permitted && section === 'game') return null;
+  if (!permitted) return <section className="startup-settings games-ui"><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2><p>You do not have permission to view startup settings.</p></section>;
+  if (!query.data) return <section className="startup-settings games-ui"><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2>{query.loading ? <p role="status">Loading startup settings...</p> : <><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry</Button></>}</section>;
+  const variables = (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable).filter(variable => startupVariableSection(variable) === section);
   const meta: StartupMeta = { ...(query.data.meta || {}), ...savedMeta };
   const updateAllowed = can(permissions, 'startup.update');
   const imageAllowed = can(permissions, 'startup.docker-image');
-  const pending = Object.values(dirty).filter(Boolean).length;
   const farming = variables.some(variable=>variable.env_variable==='GAME_SERIAL') && variables.some(variable=>variable.env_variable==='DLC_PRODUCT_KEY');
   const licenceFields = new Set(['GAME_SERIAL','DLC_PRODUCT_KEY','AUTO_DOWNLOAD','DOWNLOAD_DLC']);
   const renderVariable = (variable:StartupVariable) => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
@@ -168,24 +174,23 @@ function StartupContent() {
     return updated;
   }}/>;
   return <section className="startup-settings games-ui">
-    <header className="startup-heading"><div><h2>Startup</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div>
-      {!account.loading && !account.error && value(account.data)?.root_admin === true && <Link className="startup-admin-link" to="../admin-tools">Admin tools</Link>}
+    <header className="startup-heading"><div><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div>
     </header>
     <PageError error={query.error} />
     <div className="startup-save-note" role="status">{pending ? `${pending} unsaved ${pending === 1 ? 'field' : 'fields'}. Save each field separately.` : 'Each field saves separately.'}{!updateAllowed && ' You have read-only access to variables.'}</div>
     {farming && <Card className="startup-variables"><h3>Game licence and DLC</h3><p className="muted">Game and DLC licences are supplied by the administrator. Contact your administrator to add or change a DLC licence.</p><div className="startup-variable-grid">{variables.filter(variable=>licenceFields.has(variable.env_variable)&&!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)).map(renderVariable)}</div></Card>}
-    <Card className="startup-variables"><h3>Server variables</h3>
-      {!variables.length && <p className="muted">This template has no visible startup variables.</p>}
+    <Card className="startup-variables"><h3>{section === 'game' ? 'Game options' : 'Installation & startup options'}</h3>
+      {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}
       <div className="startup-variable-grid">{variables.filter(variable=>!farming || !licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
     </Card>
-    <JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
-    {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} onSaved={image => { setSavedImage(image); reload(); }} />}
-    <details className="startup-preview card"><summary>Startup command preview</summary><p className="muted">Preview of saved settings. Secret values are hidden. Unsaved drafts are excluded.</p><pre>{commandPreview(meta, variables)}</pre></details>
+    {section === 'runtime' && <><JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
+    {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} customAllowed={administrator} onDirtyChange={imageDirty} onSaved={image => { setSavedImage(image); reload(); }} />}
+    <details className="startup-preview card"><summary>Startup command preview</summary><p className="muted">Preview of saved settings. Secret values are hidden. Unsaved drafts are excluded.</p><pre>{commandPreview(meta, (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable))}</pre></details></>}
   </section>;
 }
 
-export default function ServerStartup() {
+export default function ServerStartup({section = 'runtime', administrator = false, onDirtyChange}: Partial<SettingsProps>) {
   const { base } = useServer();
-  return <StartupContent key={base} />;
+  return <StartupContent key={`${base}:${section}`} section={section} administrator={administrator} onDirtyChange={onDirtyChange} />;
 }
 
