@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  commandPreview, secretVariable, startupRules, variableControl,
+  commandPreview, secretVariable, startupRules, startupVariableSection, variableControl,
   variableCanReset, variableEditable, variableProblem, variableValue, variableWrite,
 } from '../src/client/startupSettingsModel.ts';
 
@@ -99,4 +99,9 @@ test('two-value boolean enums use switches without turning ordinary enums into t
  for (const rules of ['required|boolean','required|in:0,1','required|in:1,0','required|in:true,false']) assert.equal(variableControl({...variable,rules}).boolean,true,rules);
  assert.equal(variableControl({...variable,rules:'required|in:0,1,2'}).boolean,false);
  assert.equal(variableControl({...variable,env_variable:'API_TOKEN',rules:'in:0,1'}).boolean,false);
+});
+
+test('managed Minecraft loader names and community version aliases stay in Runtime',()=>{
+ for(const env_variable of ['MINECRAFT_VERSION','MINECRAFT_LOADER','MINECRAFT_LOADER_VERSION','ARCLIGHT_LOADER','DL_VERSION','LOADER_VERSION','FABRIC_VERSION','SRCDS_BETAID'])assert.equal(startupVariableSection({env_variable}),'runtime');
+ for(const env_variable of ['MAX_PLAYERS','GAME_MODE','DIFFICULTY','CUSTOM_GAME_OPTION'])assert.equal(startupVariableSection({env_variable}),'game');
 });

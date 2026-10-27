@@ -36,6 +36,8 @@ const fakeFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   else if (path === '/api/client/account') data = item('account',{root_admin:scenario.admin === true});
   else if (path.endsWith('/startup') && method === 'GET') data = {object:'list',data:[
     item('egg_variable',{env_variable:'MINECRAFT_VERSION',name:'Minecraft version',rules:'required|string',default_value:'1.21',server_value:'1.21',is_editable:true}),
+    item('egg_variable',{env_variable:'MINECRAFT_LOADER',name:'Minecraft loader',rules:'required|string',default_value:'fabric',server_value:'fabric',is_editable:false}),
+    item('egg_variable',{env_variable:'MINECRAFT_LOADER_VERSION',name:'Loader version',rules:'nullable|string',default_value:'',server_value:'0.20.1',is_editable:false}),
     item('egg_variable',{env_variable:'CUSTOM_GAME_OPTION',name:'Custom game option',rules:'required|string',default_value:'default',server_value:'default',is_editable:true}),
   ],meta:{java_managed:true,raw_startup_command:'run {{CUSTOM_GAME_OPTION}}'}};
   else if (path.endsWith('/startup/variable')) data = item('egg_variable',{env_variable:body.key,name:body.key === 'CUSTOM_GAME_OPTION' ? 'Custom game option' : 'Minecraft version',rules:'required|string',default_value:'default',server_value:body.value,is_editable:true});
@@ -128,7 +130,7 @@ async function suite() {
     for (const game of ['minecraft','palworld','satisfactory','custom-template']) {
       await show('/server/fixture/settings',{game});
       assert(input('Custom game option'), 'Custom game option unavailable for '+game);
-      assert(!input('Minecraft version'), 'Runtime option leaked into Game settings');
+      assert(!input('Minecraft version') && !input('Minecraft loader') && !input('Loader version'), 'Runtime option leaked into Game settings');
       assert(![...document.querySelectorAll('a')].some(a=>a.textContent === 'Admin tools'), 'Admin sidebar remains');
       const fields=calls.filter(call=>call.path.endsWith('/startup'));
       assert(fields.length===1, 'Multiple startup editors loaded');
@@ -144,7 +146,7 @@ async function suite() {
   });
   await test('Simplification: runtime is available to members without administrator APIs', async () => {
     await show('/server/fixture/runtime',{permissions:['startup.read','startup.update']});
-    assert(input('Minecraft version') && !input('Custom game option'), 'Runtime split is incorrect');
+    assert(input('Minecraft version') && input('Minecraft loader') && input('Loader version') && !input('Custom game option'), 'Runtime split is incorrect');
     assert(!calls.some(call=>call.path.startsWith('/api/application')), 'Member requested admin APIs');
     assert(![...document.querySelectorAll('button')].some(b=>b.textContent==='Resources'), 'Member exposed to resources');
   });
