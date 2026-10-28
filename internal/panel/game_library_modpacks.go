@@ -17,6 +17,7 @@ import (
 )
 
 func (a *App) gameLibraryModpacks(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(providerMetadataBrowse(r.Context()))
 	if _, err := a.user(r); err != nil {
 		fail(w, err)
 		return
@@ -216,6 +217,7 @@ func minecraftCFVersions(values []any) ([]string, []string) {
 }
 
 func (a *App) gameLibraryModpackVersions(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(providerMetadataBrowse(r.Context()))
 	if _, err := a.user(r); err != nil {
 		fail(w, err)
 		return

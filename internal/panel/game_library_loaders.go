@@ -49,6 +49,7 @@ func minecraftLoaderKnown(loader string) bool {
 }
 
 func (a *App) gameLibraryLoaderVersions(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(providerMetadataBrowse(r.Context()))
 	if _, err := a.user(r); err != nil {
 		fail(w, err)
 		return

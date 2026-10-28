@@ -102,6 +102,10 @@ func (a *App) clientServers(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if r.URL.Query().Get("summary") == "overview" {
+		a.clientServerSummaries(w, r, u)
+		return
+	}
 	listType := r.URL.Query().Get("type")
 	if listType == "" && boolean(u["root_admin"]) {
 		listType = "admin-all"

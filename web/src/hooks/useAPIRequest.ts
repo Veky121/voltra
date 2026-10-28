@@ -1,5 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 
+import {observeQuery} from './queryCache';
+
 type Request = <T>(path:string,options?:RequestInit)=>Promise<T>;
 type RequestState<T> = {path:string|null;data:T|null;error:string;loading:boolean};
 
@@ -12,6 +14,11 @@ export function useAPIRequest<T>(path:string|null,request:Request) {
     if(!path){
       setState({path,data:null,error:'',loading:false});
       return;
+    }
+    const shared=observeQuery(path,request,snapshot=>setState({path,...snapshot}));
+    if(shared){
+      refresh.current=shared.reload;
+      return()=>{shared.unsubscribe();refresh.current=()=>{};};
     }
     let active=true,inFlight=false,queued=false;
     const abort=new AbortController();
@@ -26,7 +33,7 @@ export function useAPIRequest<T>(path:string|null,request:Request) {
         const data=await request<T>(path!,{signal:abort.signal});
         if(active)setState({path,data,error:'',loading:false});
       } catch(error) {
-        if(active)setState(previous=>({...previous,error:error instanceof Error?error.message:String(error),loading:false}));
+        if(active)setState(previous=>({...previous,data:[401,403,404].includes(Number((error as any)?.status))?null:previous.data,error:error instanceof Error?error.message:String(error),loading:false}));
       } finally {
         inFlight=false;
         if(active&&queued){queued=false;void load();}

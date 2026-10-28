@@ -22,42 +22,118 @@ const labels:Record<string,string>={running:"Running",offline:"Stopped",stopped:
 function useOverview(){
   const [servers,setServers]=useState<ServerRecord[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true);
   useEffect(()=>{
-    let active=true;
-    let timer:ReturnType<typeof setTimeout>;
-    const abort=new AbortController();
-    async function poll(){
+    let active=true,metadataAt=0;
+    let stateTimer:ReturnType<typeof setTimeout>,resourceTimer:ReturnType<typeof setTimeout>,flushTimer:ReturnType<typeof setTimeout>|undefined;
+    let stateAbort=new AbortController(),resourceAbort=new AbortController();
+    let records:ServerRecord[]=[];
+    let statePolling=false,resourcePolling=false;
+    const generations=new Map<string,object>();
+    const pending=new Map<string,{generation:object;patch:Partial<ServerRecord>}>();
+    function publish(next:ServerRecord[]){
+      const previous=new Map(records.map(s=>[s.uuid,s]));
+      const present=new Set(next.map(s=>s.uuid));
+      for(const uuid of generations.keys())if(!present.has(uuid))generations.delete(uuid);
+      for(const s of next)if(!generations.has(s.uuid)||previous.get(s.uuid)?.status!==s.status)generations.set(s.uuid,{});
+      records=next;
+      setServers(records);
+    }
+    function flush(){
+      flushTimer=undefined;
+      if(active&&!document.hidden&&pending.size){
+        records=records.map(s=>{
+          const update=pending.get(s.uuid);
+          return update&&update.generation===generations.get(s.uuid)&&!s.status&&!s.is_installing?{...s,...update.patch}:s;
+        });
+        setServers(records);
+      }
+      pending.clear();
+    }
+    async function resourceRequest(server:ServerRecord,signal:AbortSignal){
+      const child=new AbortController();
+      let deadline:ReturnType<typeof setTimeout>;
+      let cancel=()=>{};
+      const stopped=new Promise<never>((_,reject)=>{
+        cancel=()=>{child.abort();reject(new Error('Resource request cancelled'));};
+        signal.addEventListener('abort',cancel,{once:true});
+        deadline=setTimeout(cancel,3000);
+        if(signal.aborted)cancel();
+      });
       try{
-        let response=await api("/api/client?per_page=100",{signal:abort.signal});
-        const all=items(response);
-        const pages=Number(response.meta?.pagination?.total_pages??1);
-        for(let page=2;page<=pages;page++){
-          response=await api(`/api/client?per_page=100&page=${page}`,{signal:abort.signal});
-          all.push(...items(response));
-        }
-        if(!active)return;
-        const records:ServerRecord[]=all.map(s=>({...s,liveState:s.status||(s.is_installing?"installing":"unknown")}));
-        setServers(current=>records.map(s=>{
-          const old=current.find(previous=>previous.uuid===s.uuid);
-          return old&&!s.status&&!s.is_installing?{...s,liveState:old.liveState,resources:old.resources,resourceError:old.resourceError}:s;
-        }));setLoading(false);setError("");
-        let next=0;
-        await Promise.all(Array.from({length:Math.min(4,records.length)},async()=>{
-          while(next<records.length){
-            const server=records[next++];
-            if(server.status||server.is_installing)continue;
-            let updated={...server};
+        return value(await Promise.race([api(`/api/client/servers/${server.identifier||server.uuid}/resources`,{signal:child.signal}),stopped]));
+      }finally{clearTimeout(deadline!);signal.removeEventListener('abort',cancel);}
+    }
+    async function collectResources(){
+      if(resourcePolling||!active||document.hidden)return;
+      resourcePolling=true;
+      const controller=resourceAbort=new AbortController();
+      const queue=records.filter(s=>!s.status&&!s.is_installing).map(server=>({server,generation:generations.get(server.uuid)!}));
+      let next=0;
+      try{
+        await Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{
+          while(next<queue.length&&!controller.signal.aborted){
+            const {server,generation}=queue[next++];
+            if(generations.get(server.uuid)!==generation)continue;
+            let patch:Partial<ServerRecord>;
             try{
-              const stats=value(await api(`/api/client/servers/${server.identifier||server.uuid}/resources`,{signal:abort.signal}));
-              updated={...server,liveState:stats.is_suspended?"suspended":stats.current_state||"unavailable",resources:stats.resources};
-            }catch{updated={...server,liveState:"unavailable",resourceError:true};}
-            if(active)setServers(current=>current.map(s=>s.uuid===server.uuid?updated:s));
+              const stats=await resourceRequest(server,controller.signal);
+              patch={liveState:stats.is_suspended?'suspended':stats.current_state||'unavailable',resources:stats.resources,resourceError:false};
+            }catch{patch={liveState:'unavailable',resourceError:true};}
+            if(active&&!controller.signal.aborted){
+              pending.set(server.uuid,{generation,patch});
+              if(flushTimer===undefined)flushTimer=setTimeout(flush,50);
+            }
           }
         }));
-      }catch(err){if(active)setError(err instanceof Error?err.message:String(err));}
-      finally{if(active){setLoading(false);timer=setTimeout(poll,1000);}}
+      }finally{
+        resourcePolling=false;
+        if(active&&!document.hidden)resourceTimer=setTimeout(collectResources,1000);
+      }
     }
+    async function poll(){
+      if(statePolling||!active||document.hidden)return;
+      statePolling=true;
+      const controller=stateAbort=new AbortController();
+      try{
+        if(Date.now()-metadataAt>=15000){
+          let response=await api('/api/client?summary=overview&per_page=100',{signal:controller.signal});
+          const all=items(response);
+          const pages=Number(response.meta?.pagination?.total_pages??1);
+          for(let page=2;page<=pages;page++){
+            response=await api(`/api/client?summary=overview&per_page=100&page=${page}`,{signal:controller.signal});
+            all.push(...items(response));
+          }
+          if(!active||controller.signal.aborted)return;
+          const previous=new Map(records.map(s=>[s.uuid,s]));
+          publish(all.map(s=>({...s,liveState:s.status||(s.is_installing?'installing':previous.get(s.uuid)?.liveState||'unknown'),resources:previous.get(s.uuid)?.resources})));
+          metadataAt=Date.now();
+        }else{
+          const states=new Map(items(await api('/api/client?summary=overview&states=1',{signal:controller.signal})).map(s=>[s.uuid,s]));
+          if(!active||controller.signal.aborted)return;
+          publish(records.filter(s=>states.has(s.uuid)).map(s=>{
+            const state=states.get(s.uuid)!;
+            return {...s,status:state.status,is_installing:['installing','install_failed'].includes(state.status),liveState:state.status||(s.status?'unknown':s.liveState)};
+          }));
+        }
+        setError('');
+        // Resource workers have their own schedule and never hold up membership/status.
+        if(!resourcePolling){clearTimeout(resourceTimer);void collectResources();}
+      }catch(err){if(active&&!controller.signal.aborted)setError(err instanceof Error?err.message:String(err));}
+      finally{
+        statePolling=false;
+        if(active){setLoading(false);if(!document.hidden)stateTimer=setTimeout(poll,1000);}
+      }
+    }
+    function stop(){
+      clearTimeout(stateTimer);clearTimeout(resourceTimer);clearTimeout(flushTimer);
+      flushTimer=undefined;pending.clear();stateAbort.abort();resourceAbort.abort();
+    }
+    function visibility(){
+      stop();
+      if(!document.hidden){metadataAt=0;void poll();}
+    }
+    document.addEventListener('visibilitychange',visibility);
     void poll();
-    return()=>{active=false;clearTimeout(timer);abort.abort();};
+    return()=>{active=false;stop();document.removeEventListener('visibilitychange',visibility);};
   },[]);
   return {servers,error,loading};
 }
@@ -105,11 +181,12 @@ export default function Overview(){
   const stopped=q.servers.filter(s=>["offline","stopped"].includes(s.liveState)).length;
   const other=q.servers.length-running-stopped;
   const matchesState=(s:ServerRecord)=>filter==='all'||(filter==='running'?s.liveState==='running':filter==='stopped'?['offline','stopped'].includes(s.liveState):!['running','offline','stopped'].includes(s.liveState));
+  const preferences=new Map(navigation.servers.map(s=>[s.uuid,s]));
   const filtered=q.servers.filter(s=>{
-    const preference=navigation.servers.find(p=>p.uuid===s.uuid);
+    const preference=preferences.get(s.uuid);
     return (view!=='favorites'||preference?.favorite)&&(view!=='recent'||preference?.last_visited_at)&&matchesState(s)&&`${s.name} ${s.description||''} ${s.node||''}`.toLowerCase().includes(search.trim().toLowerCase());
   });
-  if(view==='recent')filtered.sort((a,b)=>Date.parse(navigation.servers.find(p=>p.uuid===b.uuid)?.last_visited_at||'')-Date.parse(navigation.servers.find(p=>p.uuid===a.uuid)?.last_visited_at||''));
+  if(view==='recent')filtered.sort((a,b)=>Date.parse(preferences.get(b.uuid)?.last_visited_at||'')-Date.parse(preferences.get(a.uuid)?.last_visited_at||''));
   const filters=[{id:'all',label:'All servers',count:q.servers.length},{id:'running',label:'Running',count:running},{id:'stopped',label:'Stopped',count:stopped},{id:'attention',label:'Other states',count:other}];
   return <div className="page workspace-page overview-page">
     <h1 className="overview-accessible-title">Server overview</h1>

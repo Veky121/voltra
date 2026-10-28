@@ -113,3 +113,10 @@ test('a disabled query makes no request and a queued refresh cannot follow a URL
   f.requests[1].resolve({server:'two'});await f.settle();
   assert.equal(f.value.data.server,'two');f.unmount();
 });
+
+
+test('permission rejection clears prior data instead of leaving stale authority',async()=>{
+  const f=fixture();f.requests[0].resolve({permissions:['*']});await f.settle();
+  f.value.reload();f.requests[1].reject(Object.assign(new Error('Forbidden'),{status:403}));await f.settle();
+  assert.equal(f.value.data,null);assert.equal(f.value.error,'Forbidden');f.unmount();
+});

@@ -85,7 +85,13 @@ func (a *App) minecraftProviderResponse(ctx context.Context, address, key string
 }
 
 func (a *App) minecraftProviderJSON(ctx context.Context, address, key string, target any) error {
-	data, err := a.minecraftProviderBytes(ctx, address, key, 16<<20, minecraftAPIHosts)
+	data, err := a.providerMetadataJSON(ctx, address, key, "minecraft", func(ctx context.Context) ([]byte, error) {
+		data, err := a.minecraftProviderBytes(ctx, address, key, 16<<20, minecraftAPIHosts)
+		if err == nil && !json.Valid(data) {
+			return nil, APIError{502, "MinecraftProviderInvalid", "The Minecraft provider returned invalid metadata."}
+		}
+		return data, err
+	})
 	if err != nil {
 		return err
 	}

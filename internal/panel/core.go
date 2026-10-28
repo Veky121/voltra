@@ -50,6 +50,7 @@ type App struct {
 	privateSteam       *privateSteamHub
 	managedHTTPS       *managedHTTPS
 	artworkCache       serverArtworkCache
+	providerMetadata   providerMetadataCache
 	artworkLibraryOnce sync.Once
 	artworkLibrary     *panelArtworkLibrary
 }
@@ -624,10 +625,7 @@ func (a *App) serveWeb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if info, e := os.Stat(name); e == nil && !info.IsDir() {
-		if strings.EqualFold(filepath.Ext(name), ".html") {
-			w.Header().Set("Cache-Control", "no-cache")
-		}
-		http.ServeFile(w, r, name)
+		a.serveWebFile(w, r, name, info)
 		return
 	}
 	// A stale lazy-import URL must not receive the SPA HTML shell as JavaScript.

@@ -1,30 +1,38 @@
 import { SidebarSection } from "./Navigation";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
-import { useAPI } from "./lib";
+import { Loading, useAPI } from "./lib";
 import {
   can,
   PageError,
   ServerContext,
   value,
 } from "./client/common";
-import { Account, Activity } from "./client/Account";
-import Console from "./client/Console";
-import Files from "./client/Files";
-import { Backups } from "./client/Operations";
-import ServerSettings from './client/ServerSettings';
-import ServerAdminTools from './client/ServerAdminTools';
-import { Schedules, Users } from "./client/Collaboration";
 import ServerDashboard, {ServerWorkspace} from "./client/ServerDashboard";
 import {NavIcon,type IconName} from "./Icons";
-import Overview from "./client/Overview";
-import {GameLibrary,MinecraftSetup} from "./client/GameLibrary";
-import {MinecraftContent} from "./client/MinecraftContent";
-import SteamGames from "./client/SteamGames";
-import GameTemplateSetup from "./client/TemplateGames";
-import SteamMaintenance from "./client/SteamMaintenance";
 import {managedSteamServer} from "./client/gameSetupModel";
 import {useServerNavigation} from './ServerNavigation';
+
+const Account = lazy(() => import("./client/Account").then(module => ({default: module.Account})));
+const Activity = lazy(() => import("./client/Account").then(module => ({default: module.Activity})));
+const Console = lazy(() => import("./client/Console"));
+const Files = lazy(() => import("./client/Files"));
+const Backups = lazy(() => import("./client/Operations").then(module => ({default: module.Backups})));
+const ServerSettings = lazy(() => import("./client/ServerSettings"));
+const ServerAdminTools = lazy(() => import("./client/ServerAdminTools"));
+const Schedules = lazy(() => import("./client/Collaboration").then(module => ({default: module.Schedules})));
+const Users = lazy(() => import("./client/Collaboration").then(module => ({default: module.Users})));
+const Overview = lazy(() => import("./client/Overview"));
+const GameLibrary = lazy(() => import("./client/GameLibrary").then(module => ({default: module.GameLibrary})));
+const MinecraftSetup = lazy(() => import("./client/GameLibrary").then(module => ({default: module.MinecraftSetup})));
+const MinecraftContent = lazy(() => import("./client/MinecraftContent").then(module => ({default: module.MinecraftContent})));
+const SteamGames = lazy(() => import("./client/SteamGames"));
+const GameTemplateSetup = lazy(() => import("./client/TemplateGames"));
+const SteamMaintenance = lazy(() => import("./client/SteamMaintenance"));
+
+function routePage(children: ReactNode) {
+  return <Suspense fallback={<Loading />}>{children}</Suspense>;
+}
 
 function LegacySettingsPage({page}:{page:string}) {
   const {id}=useParams();
@@ -102,24 +110,24 @@ function Server() {
           return tabs.length>0&&<SidebarSection key={group.label} label={group.label}>{tabs.map(([path,label,icon])=><NavLink key={path} title={label} end={!path} to={`/server/${id}${path?`/${path}`:''}`}><NavIcon name={icon}/><span>{label}</span></NavLink>)}</SidebarSection>;
         })}
         <Routes>
-          <Route index element={<ServerDashboard><Console /></ServerDashboard>} />
+          <Route index element={<ServerDashboard>{routePage(<Console />)}</ServerDashboard>} />
           <Route path="console" element={<Navigate to={`/server/${id}`} replace />} />
-          <Route path="files/*" element={<Files />} />
+          <Route path="files/*" element={routePage(<Files />)} />
           <Route path="databases" element={<LegacySettingsPage page="databases" />} />
-          <Route path="schedules/*" element={<Schedules />} />
-          <Route path="users" element={<Users />} />
-          <Route path="backups" element={<Backups />} />
+          <Route path="schedules/*" element={routePage(<Schedules />)} />
+          <Route path="users" element={routePage(<Users />)} />
+          <Route path="backups" element={routePage(<Backups />)} />
           <Route path="network" element={<LegacySettingsPage page="network" />} />
           <Route path="startup" element={<LegacySettingsPage page="startup" />} />
-          <Route path="runtime" element={<ServerAdminTools/>} />
+          <Route path="runtime" element={routePage(<ServerAdminTools/>)} />
           <Route path="admin-tools" element={<Navigate to={`/server/${id}/runtime`} replace/>} />
           <Route path="quick-setup" element={<Navigate to={`/server/${id}/settings`} replace/>} />
-          <Route path="steam" element={<SteamMaintenance />} />
-          <Route path="content" element={<MinecraftContent server={id??server.uuid} />} />
-          <Route path="settings/*" element={<ServerSettings />} />
+          <Route path="steam" element={routePage(<SteamMaintenance />)} />
+          <Route path="content" element={routePage(<MinecraftContent server={id??server.uuid} />)} />
+          <Route path="settings/*" element={routePage(<ServerSettings />)} />
           <Route
             path="activity"
-            element={<Activity path={`${base}/activity`} />}
+            element={routePage(<Activity path={`${base}/activity`} />)}
           />
           <Route path="*" element={<p>Page not found.</p>} />
         </Routes>
@@ -131,12 +139,12 @@ function Server() {
 export default function Client() {
   return (
     <Routes>
-      <Route path="/" element={<Overview />} />
-      <Route path="/game-library" element={<GameLibrary />} />
-      <Route path="/game-library/minecraft" element={<MinecraftSetup />} />
-      <Route path="/game-library/template/:template" element={<GameTemplateSetup />} />
-      <Route path="/game-library/:game" element={<SteamGames />} />
-      <Route path="/account/*" element={<Account />} />
+      <Route path="/" element={routePage(<Overview />)} />
+      <Route path="/game-library" element={routePage(<GameLibrary />)} />
+      <Route path="/game-library/minecraft" element={routePage(<MinecraftSetup />)} />
+      <Route path="/game-library/template/:template" element={routePage(<GameTemplateSetup />)} />
+      <Route path="/game-library/:game" element={routePage(<SteamGames />)} />
+      <Route path="/account/*" element={routePage(<Account />)} />
       <Route path="/server/:id/*" element={<Server />} />
       <Route
         path="*"

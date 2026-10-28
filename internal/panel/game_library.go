@@ -89,6 +89,7 @@ func minecraftOfficialURL(raw string, hosts ...string) bool {
 	return false
 }
 func (a *App) gameLibraryMinecraft(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(providerMetadataBrowse(r.Context()))
 	user, err := a.user(r)
 	if err != nil {
 		fail(w, err)

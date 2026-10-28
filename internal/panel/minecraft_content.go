@@ -211,34 +211,43 @@ func (p mcContentProvider) request(ctx context.Context, endpoint string, target 
 	if !strings.HasPrefix(endpoint, "/") || !mcContentAllowedURL(address, host) {
 		return bad("Invalid provider metadata address.")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	req, e := http.NewRequestWithContext(ctx, "GET", address, nil)
+	data, e := p.app.providerMetadataJSON(ctx, address, p.credential, "content/"+p.name, func(ctx context.Context) ([]byte, error) {
+		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		req, e := http.NewRequestWithContext(ctx, "GET", address, nil)
+		if e != nil {
+			return nil, e
+		}
+		req.Header.Set("User-Agent", "Voltra-MinecraftContent/1.0")
+		req.Header.Set("Accept", "application/json")
+		if p.credential != "" {
+			if p.name == "curseforge" {
+				req.Header.Set("x-api-key", p.credential)
+			} else {
+				req.Header.Set("Authorization", p.credential)
+			}
+		}
+		client := p.client()
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return errors.New("metadata redirects are disabled") }
+		res, e := client.Do(req)
+		if e != nil {
+			return nil, APIError{502, "ContentProviderUnavailable", "The content provider could not be reached. Try again shortly."}
+		}
+		defer res.Body.Close()
+		if res.StatusCode != 200 {
+			return nil, APIError{502, "ContentProviderUnavailable", fmt.Sprintf("The content provider returned HTTP %d. Check its availability and the global credential.", res.StatusCode)}
+		}
+		data, e := io.ReadAll(io.LimitReader(res.Body, (4<<20)+1))
+		if e != nil || len(data) > 4<<20 {
+			return nil, APIError{502, "ContentProviderMetadata", "The content provider returned invalid or oversized metadata."}
+		}
+		if !json.Valid(data) {
+			return nil, APIError{502, "ContentProviderMetadata", "The content provider returned invalid metadata."}
+		}
+		return data, nil
+	})
 	if e != nil {
 		return e
-	}
-	req.Header.Set("User-Agent", "Voltra-MinecraftContent/1.0")
-	req.Header.Set("Accept", "application/json")
-	if p.credential != "" {
-		if p.name == "curseforge" {
-			req.Header.Set("x-api-key", p.credential)
-		} else {
-			req.Header.Set("Authorization", p.credential)
-		}
-	}
-	client := p.client()
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return errors.New("metadata redirects are disabled") }
-	res, e := client.Do(req)
-	if e != nil {
-		return APIError{502, "ContentProviderUnavailable", "The content provider could not be reached. Try again shortly."}
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return APIError{502, "ContentProviderUnavailable", fmt.Sprintf("The content provider returned HTTP %d. Check its availability and the global credential.", res.StatusCode)}
-	}
-	data, e := io.ReadAll(io.LimitReader(res.Body, (4<<20)+1))
-	if e != nil || len(data) > 4<<20 {
-		return APIError{502, "ContentProviderMetadata", "The content provider returned invalid or oversized metadata."}
 	}
 	// CurseForge file/project IDs exceed the float formatting threshold. Keep
 	// their decimal representation intact for identity checks and follow-up URLs.
@@ -913,6 +922,7 @@ func (a *App) mcContentRequired(r *http.Request, permission string) (M, mcConten
 }
 
 func (a *App) mcContentCatalog(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(providerMetadataBrowse(r.Context()))
 	s, e := a.server(r, "file.read")
 	if e != nil {
 		fail(w, e)
@@ -985,6 +995,7 @@ func (a *App) mcContentCatalog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, item("minecraft_content", result))
 }
 func (a *App) mcContentVersions(w http.ResponseWriter, r *http.Request) {
+	r = r.WithContext(providerMetadataBrowse(r.Context()))
 	_, info, e := a.mcContentRequired(r, "file.read")
 	if e != nil {
 		fail(w, e)

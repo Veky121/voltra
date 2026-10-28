@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {Select,  api, Button, Card, ErrorBox, Field, Loading } from "./lib";
+import {Select,  api, Button, Card, ErrorBox, Field, Loading, queryCacheSessionIdentity } from "./lib";
 import "./setup.css";
 import BrandMark from "./BrandMark";
 import {DesktopRecoveryActions} from './desktop';
@@ -16,7 +16,7 @@ type SetupStatus = {
   dev_mode: boolean;
   https_pending?: boolean;
 };
-type Session = { authenticated: boolean; csrf_token?: string; user?: { root_admin: boolean } };
+type Session = { authenticated: boolean; csrf_token?: string; user?: { id?: number; root_admin: boolean } };
 async function logoutSession(session:Session){
   const result=await api<{redirect_url?:string}>('/api/auth/logout',{method:'POST',headers:sessionHeaders(session)});
   if(result.redirect_url==='/cdn-cgi/access/logout'){window.location.assign(result.redirect_url);return false;}
@@ -38,6 +38,7 @@ function SetupFrame({ title, children }: { title: string; children: ReactNode })
 export default function SetupGate({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const explicitSetup = location.pathname.replace(/\/+$/, "") === "/setup";
   const [state, setState] = useState<{ status: SetupStatus; session: Session } | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -56,17 +57,17 @@ export default function SetupGate({ children }: { children: ReactNode }) {
       if (!disposed) setError(controller.signal.aborted ? "The panel took too long to respond. Check the service, then retry." : errorText(failure));
     }).finally(() => clearTimeout(timeout));
     return () => { disposed = true; clearTimeout(timeout); controller.abort(); };
-  }, [revision, location.pathname]);
+  }, [revision, explicitSetup]);
   useEffect(() => {
     window.addEventListener("focus", reload);
     window.addEventListener("panel-auth-changed", reload);
+    window.addEventListener("desktop-session-rejected", reload);
     const timer = setInterval(reload, 60000);
-    return () => { window.removeEventListener("focus", reload); window.removeEventListener("panel-auth-changed", reload); clearInterval(timer); };
+    return () => { window.removeEventListener("focus", reload); window.removeEventListener("panel-auth-changed", reload); window.removeEventListener("desktop-session-rejected", reload); clearInterval(timer); };
   }, [reload]);
   if (error) return <SetupFrame title="Panel unavailable"><ErrorBox>{error}</ErrorBox><div className="actions"><Button onClick={reload}>Retry</Button><DesktopRecoveryActions/></div></SetupFrame>;
   if (!state) return <SetupFrame title="Opening panel"><Loading /></SetupFrame>;
   const { status, session } = state;
-  const explicitSetup = location.pathname.replace(/\/+$/, "") === "/setup";
   const development = status.dev_mode && !status.auth_enabled;
   if (status.needs_setup && (explicitSetup || !development)) {
     if (!status.setup_allowed) return <SetupFrame title="Set up locally"><p className="muted">Open this panel on the server using its loopback address to create the administrator.</p><Button variant="secondary" onClick={reload}>Check again</Button></SetupFrame>;
@@ -82,7 +83,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   // Only the server's explicit development mode preserves the existing local
   // workflow. Production never falls through to the application anonymously.
   if (!session.authenticated && !development) return <Login session={session} onAuthenticated={reload} />;
-  return <AccountSessionContext.Provider value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
+  return <AccountSessionContext.Provider key={queryCacheSessionIdentity(session)} value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
 }
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {

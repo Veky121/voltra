@@ -1,12 +1,19 @@
 import {useCallback} from 'react';
+import {invalidateQueryCache,purgeQueryCache,normalizedQueryPath,setQueryCacheScope} from './hooks/queryCache';
+export {invalidateQueryCache,purgeQueryCache,setQueryCacheScope} from './hooks/queryCache';
 import {useAPIRequest} from './hooks/useAPIRequest';
 import type {ButtonHTMLAttributes,InputHTMLAttributes,SelectHTMLAttributes,TextareaHTMLAttributes,HTMLAttributes,ReactNode} from 'react';
 import {Card as ShadcnCard} from './components/ui/card';
+export function queryCacheSessionIdentity(session:any):string{return JSON.stringify([!!session?.authenticated,session?.user?.id??null,!!session?.user?.root_admin]);}
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
   const headers=new Headers(options.headers);
   headers.set('Accept','application/json');
   if(options.body&&!(options.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
   const response=await fetch(path,{...options,headers});
+  const mutationPath=normalizedQueryPath(path).split('?')[0];
+  if(response.status===401)purgeQueryCache();
+  if(response.ok&&mutationPath.startsWith('/api/auth/')&&mutationPath!=='/api/auth/session')purgeQueryCache();
+  if(response.ok&&!['GET','HEAD','OPTIONS'].includes((options.method||'GET').toUpperCase())&&!mutationPath.startsWith('/api/auth/'))invalidateQueryCache(path);
   if(response.status===401)window.dispatchEvent(new Event('desktop-session-rejected'));
   if(response.ok&&path==='/api/auth/logout')window.dispatchEvent(new Event('panel-auth-changed'));
   if(response.status===204)return undefined as T;
@@ -14,9 +21,10 @@ export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
   const data=contentType.includes('json')?await response.json():await response.text();
   if(!response.ok){
     const message=typeof data==='object'?(data.errors?.map((e:any)=>e.detail||e.message).join('\n')||data.message):data;
-    throw new Error(message||`Request failed (${response.status})`);
+    throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status});
   }
   if(path==='/api/admin/settings'&&options.method&&options.method.toUpperCase()!=='GET')window.dispatchEvent(new Event('panel-settings-changed'));
+  if(mutationPath==='/api/auth/session')setQueryCacheScope(queryCacheSessionIdentity(data));
   return data as T;
 }
 export function unwrap(response:any):any{return response?.attributes??response}
