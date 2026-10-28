@@ -159,5 +159,12 @@ export function resourceLimitGB(value: unknown): string {
   return amount === 0 ? 'Unlimited' : formatMiBGB(amount);
 }
 export function resourceReadingGB(used: unknown, limitMiB: unknown): string {
-  return `${resourceUsageGB(used)} / ${resourceLimitGB(limitMiB)}`;
+  if (resourceUsageGB(used) === 'Unavailable') return 'Unavailable';
+  const compact = (amount: number) => amount > 0 && amount < 0.1
+    ? '<0.1' : amount.toLocaleString(undefined, {maximumFractionDigits: 1});
+  const usage = compact(Number(used) / 1024 ** 3);
+  const limit = resourceLimitGB(limitMiB);
+  if (limit === 'Unavailable') return `${usage} GB`;
+  if (limit === 'Unlimited') return `${usage} GB / ∞`;
+  return `${usage} / ${compact(Number(limitMiB) / 1024)} GB`;
 }

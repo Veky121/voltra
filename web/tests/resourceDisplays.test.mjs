@@ -12,13 +12,16 @@ new Function('exports','formatBytesGB','formatMiBGB',compiled)(exports,formatByt
 const {resourceUsageGB,resourceLimitGB,resourceReadingGB}=exports;
 
 test('resource readings convert byte usage and MiB limits independently to GB',()=>{
-  assert.equal(resourceReadingGB(512*1024**2,1024),'0.5 GB / 1 GB');
-  assert.equal(resourceReadingGB(1024**3,512),'1 GB / 0.5 GB');
+  assert.equal(resourceReadingGB(512*1024**2,1024),'0.5 / 1 GB');
+  assert.equal(resourceReadingGB(1024**3,512),'1 / 0.5 GB');
+  assert.equal(resourceReadingGB(1024,10240),'<0.1 / 10 GB');
+  assert.equal(resourceReadingGB(2.21*1024**3,15000),'2.2 / 14.6 GB');
   assert.equal(resourceUsageGB(1024),'<0.001 GB');
   assert.equal(resourceLimitGB(1),'<0.001 GB');
 });
 test('zero usage, unlimited limits and absent data remain distinct',()=>{
-  assert.equal(resourceReadingGB(0,0),'0 GB / Unlimited');
+  assert.equal(resourceReadingGB(0,0),'0 GB / ∞');
+  assert.equal(resourceReadingGB(undefined,1024),'Unavailable');
   for(const value of [undefined,null,'',NaN,Infinity,-1]){
     assert.equal(resourceUsageGB(value),'Unavailable');
     assert.equal(resourceLimitGB(value),'Unavailable');
