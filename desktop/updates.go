@@ -43,12 +43,12 @@ type updateController struct {
 	status   updateStatus
 }
 
-// Only the selected channel is queried. Stable rejects prereleases even if a
-// carrier feed is mispublished. Signed bytes must also come from version assets.
+// Only the selected channel is queried. Release accepts final and beta builds;
+// nightly remains isolated. Signed bytes must also come from version assets.
 type channelProvider struct{ base, channel string }
 
 func (p *channelProvider) Name() string { return "voltra" }
-func validChannel(s string) bool        { return s == "stable" || s == "beta" || s == "nightly" }
+func validChannel(s string) bool        { return s == "release" || s == "nightly" }
 func releaseChannel(v string) string {
 	v = "v" + strings.TrimPrefix(v, "v")
 	if !semver.IsValid(v) {
@@ -56,10 +56,10 @@ func releaseChannel(v string) string {
 	}
 	pre := semver.Prerelease(v)
 	if pre == "" {
-		return "stable"
+		return "release"
 	}
 	if strings.HasPrefix(pre, "-beta.") {
-		return "beta"
+		return "release"
 	}
 	if strings.HasPrefix(pre, "-nightly.") {
 		return "nightly"
@@ -117,7 +117,7 @@ func (p *channelProvider) Download(ctx context.Context, rel *updater.Release, w 
 func loadUpdateChannel(dir string) (string, error) {
 	b, err := os.ReadFile(filepath.Join(dir, "updates.json"))
 	if errors.Is(err, os.ErrNotExist) {
-		return "stable", nil
+		return "release", nil
 	}
 	if err != nil {
 		return "", err
@@ -125,7 +125,15 @@ func loadUpdateChannel(dir string) (string, error) {
 	var v struct {
 		Channel string `json:"channel"`
 	}
-	if json.Unmarshal(b, &v) != nil || !validChannel(v.Channel) {
+	if json.Unmarshal(b, &v) != nil {
+		return "", errors.New("invalid saved update channel")
+	}
+	// Migrate only in memory. Reading preferences must never rewrite session or
+	// desktop data, and remains safe on read-only storage.
+	if v.Channel == "stable" || v.Channel == "beta" {
+		v.Channel = "release"
+	}
+	if !validChannel(v.Channel) {
 		return "", errors.New("invalid saved update channel")
 	}
 	return v.Channel, nil
@@ -135,7 +143,7 @@ func (c *updateController) changeChannel(channel string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !validChannel(channel) {
-		return errors.New("choose stable, beta, or nightly")
+		return errors.New("choose release or nightly")
 	}
 	if c.status.State == "ready" {
 		return errors.New("restart to apply the staged update before changing channel")
@@ -210,7 +218,7 @@ func configureUpdater(app *application.App, host *desktopHost) error {
 	if updateManifestURL == "" && updatePublicKey == "" {
 		return nil
 	}
-	u, err := url.Parse(strings.ReplaceAll(updateManifestURL, "{{channel}}", "stable"))
+	u, err := url.Parse(strings.ReplaceAll(updateManifestURL, "{{channel}}", "release"))
 	if err != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil || u.Fragment != "" || !strings.Contains(updateManifestURL, "{{channel}}") {
 		return errors.New("updates require a GitHub HTTPS manifest URL containing {{channel}}")
 	}

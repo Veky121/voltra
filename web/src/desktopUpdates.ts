@@ -1,5 +1,7 @@
 import {useSyncExternalStore} from 'react';
-export type UpdateStatus={channel:string;state:string;version:string;available_version?:string;error?:string};
+export const updateChannels=[{value:'release',label:'Release'},{value:'nightly',label:'Nightly'}] as const;
+export type UpdateChannel=typeof updateChannels[number]['value'];
+export type UpdateStatus={channel:UpdateChannel;state:string;version:string;available_version?:string;error?:string};
 type Snapshot={status:UpdateStatus|null;busy:boolean;error:string;checkedAt:number|null};
 let snapshot:Snapshot={status:null,busy:false,error:'',checkedAt:null};
 const listeners=new Set<()=>void>();

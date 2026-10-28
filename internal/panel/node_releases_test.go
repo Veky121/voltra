@@ -83,11 +83,11 @@ func TestNodeReleaseLatestCompleteAndPinnedCommands(t *testing.T) {
 		t.Fatal("successful metadata check not cached", e)
 	}
 }
-func TestNodeReleaseStableExcludesPrereleasesAndDrafts(t *testing.T) {
+func TestNodeReleaseReleaseExcludesUnsupportedPrereleasesAndDrafts(t *testing.T) {
 	t.Setenv("NODE_RELEASE_VERSION", "")
 	t.Setenv("NODE_RELEASE_CHANNEL", "stable")
 	stable, b := nodeFixtureRelease("v1.0.0", false)
-	beta, _ := nodeFixtureRelease("v2.0.0-beta.1", true)
+	beta, _ := nodeFixtureRelease("v2.0.0-rc.1", true)
 	draft, _ := nodeFixtureRelease("v3.0.0", false)
 	draft.Draft = true
 	calls := 0
@@ -151,5 +151,122 @@ func TestNodeReleaseExplicitPinAndInvalidConfiguration(t *testing.T) {
 	t.Setenv("NODE_RELEASE_VERSION", "latest")
 	if _, e = a.resolveNodeInstaller(context.Background()); e == nil {
 		t.Fatal("mutable explicit pin accepted")
+	}
+}
+
+func TestNodeReleaseCanonicalSelection(t *testing.T) {
+	for _, channel := range []string{"release", "stable", "beta", "nightly"} {
+		t.Run(channel, func(t *testing.T) {
+			t.Setenv("NODE_RELEASE_VERSION", "")
+			t.Setenv("NODE_RELEASE_CHANNEL", channel)
+			tags := []string{"v1.0.0-beta.2", "v1.0.0-beta.10", "v0.9.0", "v9.0.0-rc.1", "v9.0.0-beta.01", "v9.0.0-nightly.20260230.1", "v9.0.0-nightly.20261028.0", "v1.0.0-nightly.20261028.2", "v1.0.0-nightly.20261028.10"}
+			releases := []nodePublishedRelease{}
+			bodies := map[string]map[string][]byte{}
+			for _, tag := range tags {
+				r, b := nodeFixtureRelease(tag, strings.Contains(tag, "-"))
+				releases = append(releases, r)
+				bodies[tag] = b
+			}
+			calls := 0
+			a := nodeFixtureApp(t, releases, bodies, &calls)
+			want, canonical := "v1.0.0-beta.10", "release"
+			if channel == "nightly" {
+				want, canonical = "v1.0.0-nightly.20261028.10", "nightly"
+			}
+			r, err := a.resolveNodeInstaller(context.Background())
+			if err != nil || r.Version != want || r.Channel != canonical {
+				t.Fatalf("%+v %v", r, err)
+			}
+			// A final version supersedes its beta at the same version.
+			final, b := nodeFixtureRelease("v1.0.0", false)
+			releases = append(releases, final)
+			bodies[final.Tag] = b
+			a = nodeFixtureApp(t, releases, bodies, &calls)
+			r, err = a.resolveNodeInstaller(context.Background())
+			if channel != "nightly" {
+				want = final.Tag
+			}
+			if err != nil || r.Version != want {
+				t.Fatalf("%+v %v", r, err)
+			}
+		})
+	}
+}
+
+func TestNodeReleasePolicyDefaultsAndInvalidConfiguration(t *testing.T) {
+	original := NodeReleaseVersion
+	t.Cleanup(func() { NodeReleaseVersion = original })
+	t.Setenv("NODE_RELEASE_VERSION", "")
+	t.Setenv("NODE_RELEASE_CHANNEL", "")
+	for _, version := range []string{"dev", "v1.0.0", "v1.0.0-beta.1", "v1.0.0-nightly.20261028.1", "v1.0.0-nightly.20260230.1"} {
+		NodeReleaseVersion = version
+		want := "release"
+		if version == "v1.0.0-nightly.20261028.1" {
+			want = "nightly"
+		}
+		channel, _, err := nodeReleasePolicy()
+		if err != nil || channel != want {
+			t.Fatalf("%s: %s %v", version, channel, err)
+		}
+	}
+	for _, channel := range []string{"preview", "Release", " nightly", "stable,beta"} {
+		t.Setenv("NODE_RELEASE_CHANNEL", channel)
+		calls := 0
+		a := nodeFixtureApp(t, nil, nil, &calls)
+		if _, err := a.resolveNodeInstaller(context.Background()); err == nil || calls != 0 {
+			t.Fatalf("invalid channel %q fetched metadata", channel)
+		}
+	}
+}
+
+func TestNodeReleasePinOverridesChannel(t *testing.T) {
+	for _, tc := range []struct{ channel, tag string }{{"release", "v1.0.0-nightly.20261028.1"}, {"nightly", "v1.0.0"}, {"release", "v1.0.0-rc.1"}} {
+		t.Run(tc.channel+tc.tag, func(t *testing.T) {
+			t.Setenv("NODE_RELEASE_CHANNEL", tc.channel)
+			t.Setenv("NODE_RELEASE_VERSION", tc.tag)
+			release, b := nodeFixtureRelease(tc.tag, strings.Contains(tc.tag, "-"))
+			calls := 0
+			a := nodeFixtureApp(t, []nodePublishedRelease{release}, map[string]map[string][]byte{tc.tag: b}, &calls)
+			r, err := a.resolveNodeInstaller(context.Background())
+			if err != nil || r.Version != tc.tag || r.Channel != tc.channel || r.Source != "pinned" {
+				t.Fatalf("%+v %v", r, err)
+			}
+		})
+	}
+}
+
+func TestNodeReleaseChannelIsolationAndCache(t *testing.T) {
+	t.Setenv("NODE_RELEASE_VERSION", "")
+	final, fb := nodeFixtureRelease("v1.0.0", false)
+	nightly, nb := nodeFixtureRelease("v2.0.0-nightly.20261028.1", true)
+	calls := 0
+	a := nodeFixtureApp(t, []nodePublishedRelease{final, nightly}, map[string]map[string][]byte{final.Tag: fb, nightly.Tag: nb}, &calls)
+	for _, channel := range []string{"release", "nightly", "release"} {
+		t.Setenv("NODE_RELEASE_CHANNEL", channel)
+		r, err := a.resolveNodeInstaller(context.Background())
+		want := final.Tag
+		if channel == "nightly" {
+			want = nightly.Tag
+		}
+		if err != nil || r.Version != want || r.Channel != channel {
+			t.Fatalf("%+v %v", r, err)
+		}
+	}
+	for _, channel := range []string{"release", "nightly"} {
+		t.Setenv("NODE_RELEASE_CHANNEL", channel)
+		other, bodies := nightly, nb
+		if channel == "nightly" {
+			other, bodies = final, fb
+		}
+		a = nodeFixtureApp(t, []nodePublishedRelease{other}, map[string]map[string][]byte{other.Tag: bodies}, &calls)
+		before := calls
+		for i := 0; i < 2; i++ {
+			if _, err := a.resolveNodeInstaller(context.Background()); err == nil {
+				t.Fatal("other channel accepted")
+			}
+		}
+		if calls != before+2 {
+			t.Fatal("failed resolution was cached")
+		}
 	}
 }

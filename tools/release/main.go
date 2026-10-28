@@ -30,10 +30,7 @@ func parseTag(tag string) (plan, error) {
 	if m == nil {
 		return plan{}, errors.New("use vX.Y.Z, vX.Y.Z-beta.N, or vX.Y.Z-nightly.YYYYMMDD.RUN")
 	}
-	channel := "stable"
-	if m[4] != "" {
-		channel = "beta"
-	}
+	channel := "release"
 	if m[6] != "" {
 		channel = "nightly"
 		if _, err := time.Parse("20060102", m[7]); err != nil {
@@ -133,8 +130,8 @@ func run(args []string) error {
 			return err
 		}
 		base := strings.TrimSpace(string(b))
-		stable, err := parseTag("v" + base)
-		if err != nil || stable.Channel != "stable" {
+		basePlan, err := parseTag("v" + base)
+		if err != nil || strings.Contains(basePlan.Version, "-") {
 			return errors.New("VERSION must contain a stable X.Y.Z base")
 		}
 		return run([]string{"plan", "v" + base + "-nightly." + args[2] + "." + args[3]})

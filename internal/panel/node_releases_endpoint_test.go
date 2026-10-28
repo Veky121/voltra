@@ -33,7 +33,7 @@ func TestNodeInstallerEndpointAdminAndPanelAddress(t *testing.T) {
 		}
 	}
 	status, result := pairingRequest(t, h, admin, "GET", path, "", nil)
-	if status != 200 || result["version"] != release.Tag || result["panel_url"] != "https://panel.example.com" {
+	if status != 200 || result["version"] != release.Tag || result["channel"] != "release" || result["panel_url"] != "https://panel.example.com" {
 		t.Fatal(status, result)
 	}
 	command := str(result["install_command"])

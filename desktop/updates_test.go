@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/wailsapp/wails/v3/pkg/updater"
@@ -31,8 +33,8 @@ func (f *fakeUpdates) Restart(context.Context) error            { f.restarts++; 
 func TestUpdateConsentAndPersistence(t *testing.T) {
 	dir := t.TempDir()
 	f := &fakeUpdates{}
-	c := &updateController{dir: dir, engine: f, provider: &channelProvider{channel: "stable"}, status: updateStatus{Channel: "stable", State: "idle"}}
-	if channel, e := loadUpdateChannel(dir); e != nil || channel != "stable" {
+	c := &updateController{dir: dir, engine: f, provider: &channelProvider{channel: "release"}, status: updateStatus{Channel: "release", State: "idle"}}
+	if channel, e := loadUpdateChannel(dir); e != nil || channel != "release" {
 		t.Fatal(channel, e)
 	}
 	if c.action("install") == nil {
@@ -44,10 +46,10 @@ func TestUpdateConsentAndPersistence(t *testing.T) {
 	if f.installs != 0 || f.restarts != 0 || c.snapshot().State != "available" {
 		t.Fatal("check installed silently")
 	}
-	if e := c.changeChannel("beta"); e != nil {
+	if e := c.changeChannel("nightly"); e != nil {
 		t.Fatal(e)
 	}
-	if channel, e := loadUpdateChannel(dir); e != nil || channel != "beta" {
+	if channel, e := loadUpdateChannel(dir); e != nil || channel != "nightly" {
 		t.Fatal(channel, e)
 	}
 	if c.action("install") == nil {
@@ -65,7 +67,7 @@ func TestUpdateConsentAndPersistence(t *testing.T) {
 	if f.installs != 1 || f.restarts != 0 {
 		t.Fatal("installation restarted silently")
 	}
-	if c.changeChannel("stable") == nil {
+	if c.changeChannel("release") == nil {
 		t.Fatal("changed channel with staged update")
 	}
 	if e := c.action("restart"); e != nil || f.restarts != 1 {
@@ -98,10 +100,10 @@ func TestDevelopmentBuildCanFindBetaAndManualChecksRefreshFeed(t *testing.T) {
 		if r.Header.Get("Cache-Control") != "no-cache" {
 			t.Error("missing cache bypass")
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"schemaVersion": 1, "version": "0.1.0-beta.2", "channel": "beta", "artifacts": []any{map[string]any{"platform": "windows", "arch": "amd64", "url": "https://github.com/Veky121/voltra/releases/download/v0.1.0-beta.2/Voltra-windows-amd64.exe", "filename": "Voltra-windows-amd64.exe", "filetype": "exe", "digestAlgo": "sha256", "digest": base64.StdEncoding.EncodeToString(make([]byte, 32)), "signatureAlgo": "ed25519", "signature": base64.StdEncoding.EncodeToString(make([]byte, 64))}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"schemaVersion": 1, "version": "0.1.0-beta.2", "channel": "release", "artifacts": []any{map[string]any{"platform": "windows", "arch": "amd64", "url": "https://github.com/Veky121/voltra/releases/download/v0.1.0-beta.2/Voltra-windows-amd64.exe", "filename": "Voltra-windows-amd64.exe", "filetype": "exe", "digestAlgo": "sha256", "digest": base64.StdEncoding.EncodeToString(make([]byte, 32)), "signatureAlgo": "ed25519", "signature": base64.StdEncoding.EncodeToString(make([]byte, 64))}}})
 	}))
 	defer server.Close()
-	provider := &channelProvider{base: server.URL, channel: "beta"}
+	provider := &channelProvider{base: server.URL, channel: "release"}
 	for range 2 {
 		release, err := provider.Check(context.Background(), updater.CheckRequest{CurrentVersion: "0.1.0-dev", Platform: "windows", Arch: "amd64"})
 		if err != nil || release == nil || release.Version != "0.1.0-beta.2" {
@@ -128,7 +130,7 @@ func TestLiveOfficialUpdateFeeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, channel := range []string{"stable", "beta", "nightly"} {
+	for _, channel := range []string{"release", "nightly"} {
 		provider := &channelProvider{base: updateManifestURL, channel: channel}
 		release, err := provider.Check(context.Background(), updater.CheckRequest{CurrentVersion: "0.1.0-dev", Platform: "windows", Arch: "amd64"})
 		if err != nil {
@@ -145,13 +147,18 @@ func TestLiveOfficialUpdateFeeds(t *testing.T) {
 	}
 }
 func TestEndpointSchemaAndChannelIsolation(t *testing.T) {
-	v, channel := "1.2.0", "stable"
+	v, channel := "1.2.0", "release"
+	selected := "release"
+	artifactURL := ""
 	signed := true
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("channel") != "stable" {
+		if r.URL.Query().Get("channel") != selected {
 			t.Error("missing channel")
 		}
 		a := map[string]any{"platform": "windows", "arch": "amd64", "url": "https://github.com/Veky121/voltra/releases/download/v" + v + "/Voltra-windows-amd64.exe", "filename": "Voltra-windows-amd64.exe", "filetype": "exe", "digestAlgo": "sha256", "digest": base64.StdEncoding.EncodeToString(make([]byte, 32))}
+		if artifactURL != "" {
+			a["url"] = artifactURL
+		}
 		if signed {
 			a["signatureAlgo"] = "ed25519"
 			a["signature"] = base64.StdEncoding.EncodeToString(make([]byte, 64))
@@ -159,23 +166,112 @@ func TestEndpointSchemaAndChannelIsolation(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"schemaVersion": 1, "version": v, "channel": channel, "artifacts": []any{a}})
 	}))
 	defer server.Close()
-	p := &channelProvider{base: server.URL, channel: "stable"}
+	p := &channelProvider{base: server.URL, channel: "release"}
 	req := updater.CheckRequest{CurrentVersion: "1.0.0", Platform: "windows", Arch: "amd64"}
 	if rel, e := p.Check(context.Background(), req); e != nil || rel == nil || len(rel.Verification.Digest) != 32 {
 		t.Fatal(rel, e)
 	}
 	v = "2.0.0-beta.1"
-	if rel, e := p.Check(context.Background(), req); e == nil || rel != nil {
-		t.Fatal("stable offered prerelease")
+	if rel, e := p.Check(context.Background(), req); e != nil || rel == nil {
+		t.Fatal("release rejected beta", e)
 	}
-	channel = "beta"
+	v = "2.0.0-nightly.1"
+	if rel, e := p.Check(context.Background(), req); e == nil || rel != nil {
+		t.Fatal("release offered nightly")
+	}
+	channel = "nightly"
 	if rel, e := p.Check(context.Background(), req); e != nil || rel != nil {
-		t.Fatal("stable queried beta")
+		t.Fatal("release queried nightly", e)
+	}
+	selected = "nightly"
+	p.channel = selected
+	if rel, e := p.Check(context.Background(), req); e != nil || rel == nil {
+		t.Fatal("nightly rejected nightly", e)
+	}
+	for _, candidate := range []string{"2.0.0", "2.0.0-beta.1"} {
+		v = candidate
+		if rel, e := p.Check(context.Background(), req); e == nil || rel != nil {
+			t.Fatal("nightly accepted release build", candidate)
+		}
+	}
+	selected = "release"
+	p.channel = selected
+	channel = selected
+	for _, candidate := range []string{"1.0.0", "0.9.0", "1.0.0-beta.1"} {
+		v = candidate
+		if rel, e := p.Check(context.Background(), req); e != nil || rel != nil {
+			t.Fatal("offered equal or older build", candidate, e)
+		}
 	}
 	v = "1.2.0"
-	channel = "stable"
+	for _, candidate := range []string{"http://github.com/Veky121/voltra/releases/download/v1.2.0/a.exe", "https://github.com/Veky121/voltra/releases/download/update-release/a.exe", "https://example.com/a.exe"} {
+		artifactURL = candidate
+		if rel, e := p.Check(context.Background(), req); e == nil || rel != nil {
+			t.Fatal("unsafe artifact accepted", candidate)
+		}
+	}
+	artifactURL = ""
+
+	v = "1.2.0"
+	channel = "release"
 	signed = false
 	if _, e := p.Check(context.Background(), req); e == nil {
 		t.Fatal("unsigned offer accepted")
+	}
+}
+
+func TestLegacyUpdateChannelReadPreservesDesktopData(t *testing.T) {
+	for _, saved := range []string{"stable", "beta", "release", "nightly"} {
+		t.Run(saved, func(t *testing.T) {
+			dir := t.TempDir()
+			original := []byte(`{"channel":"` + saved + `","future_setting":{"keep":true}}`)
+			session := []byte("protected-session-bytes")
+			if err := os.WriteFile(filepath.Join(dir, "updates.json"), original, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "session.dat"), session, 0600); err != nil {
+				t.Fatal(err)
+			}
+			want := "release"
+			if saved == "nightly" {
+				want = saved
+			}
+			for range 2 {
+				if got, err := loadUpdateChannel(dir); err != nil || got != want {
+					t.Fatal(got, err)
+				}
+			}
+			for name, wantBytes := range map[string][]byte{"updates.json": original, "session.dat": session} {
+				got, err := os.ReadFile(filepath.Join(dir, name))
+				if err != nil || !bytes.Equal(got, wantBytes) {
+					t.Fatal("read changed desktop data", name, err)
+				}
+			}
+			c := &updateController{dir: dir, provider: &channelProvider{}, status: updateStatus{State: "idle"}}
+			for _, legacy := range []string{"stable", "beta"} {
+				if c.changeChannel(legacy) == nil {
+					t.Fatal("API accepted legacy channel", legacy)
+				}
+			}
+			if err := c.changeChannel(want); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := loadUpdateChannel(dir); err != nil || got != want {
+				t.Fatal(got, err)
+			}
+			got, err := os.ReadFile(filepath.Join(dir, "session.dat"))
+			if err != nil || !bytes.Equal(got, session) {
+				t.Fatal("channel change altered session", err)
+			}
+		})
+	}
+	for _, invalid := range []string{`{`, `{"channel":"unknown"}`, `{}`} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "updates.json"), []byte(invalid), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadUpdateChannel(dir); err == nil {
+			t.Fatal("invalid preference accepted", invalid)
+		}
 	}
 }

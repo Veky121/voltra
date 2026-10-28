@@ -107,6 +107,7 @@ jobs:
       - run: npm ci --prefix web
       - run: npm run build --prefix web
       - run: bash tools/ci/test-linux.sh ./tools/release ./internal/nodeagent
+      - run: python3 -m unittest discover -s tools/release -p 'test_*.py'
       - env:
           CGO_ENABLED: '0'
           GOOS: linux

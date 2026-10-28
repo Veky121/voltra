@@ -12,7 +12,7 @@ func TestNodeReleaseLiveMetadata(t *testing.T) {
 		t.Skip("explicit read-only live metadata check")
 	}
 	t.Setenv("NODE_RELEASE_VERSION", "")
-	t.Setenv("NODE_RELEASE_CHANNEL", "beta")
+	t.Setenv("NODE_RELEASE_CHANNEL", "release")
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	a := &App{}

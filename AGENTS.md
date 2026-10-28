@@ -19,3 +19,11 @@ Ownership:
 - parity: tools/parity/**, tests/parity/**, artifacts/parity/**; independent inventory and acceptance.
 
 Any applicable child delegation needs explicit user or parent authorization. Root has user authorization for subagents. Prefer finishing your assigned implementation and reporting gaps over creating more subagents.
+
+## Update publication policy
+
+- There are two update channels: Release and Nightly. Beta describes product maturity; versioned beta builds can be published on Release.
+- Always default agent development updates and publication to Nightly. Update Release only when Veky explicitly requests a Release publication for that work. General instructions to push, publish, update the desktop, or restart a service do not authorize a Release publication.
+- Do not create or push final or beta release tags, advance `update-release`, or advance its legacy `update-beta`/`update-stable` compatibility feeds without that explicit Release instruction. Use a versioned nightly tag or the existing nightly workflow for routine updates.
+- Keep each desktop user's selected update channel. This agent publication policy does not authorize changing user preferences, promoting Nightly automatically, or installing updates without the applicable task authorization.
+- Before publication, verify scoped changes and required checks. Keep unrelated dirty files out of release checkouts. Report the published version/channel and distinguish tests, builds, browser checks, installation, and live deployment.

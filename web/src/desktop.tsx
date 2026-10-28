@@ -3,8 +3,8 @@ import {Button,Card,ErrorBox,Field,Input,Loading,Modal,Select} from './lib';
 import './desktop.css';
 import BrandMark from './BrandMark';
 import {parseDesktopPairing} from './desktopPairing';
-import {Link,useLocation} from 'react-router-dom';
-import {startUpdateChecks,updateAction,useDesktopUpdates} from './desktopUpdates';
+import {Link,useLocation,useNavigate} from 'react-router-dom';
+import {startUpdateChecks,updateAction,updateChannels,useDesktopUpdates} from './desktopUpdates';
 import {installDesktopWindowGestures} from './desktopWindowGestures';
 import {SettingsRow,SettingsSection} from './ui/Settings';
 
@@ -27,21 +27,22 @@ function DesktopUpdates({enabled}:{enabled:boolean}){
 }
 
 export function DesktopAppInfo(){
+  const navigate=useNavigate();
   const [app,setApp]=useState<Status|null>(null),[error,setError]=useState('');
   const {status,busy,error:updateError,checkedAt}=useDesktopUpdates();
   useEffect(()=>{void local('status').then(setApp).catch(e=>setError(e.message))},[]);
   if(import.meta.env.VITE_DESKTOP!=='true')return null;
   return <section className="desktop-app-info settings-page">
-    {app&&!app.linked&&<Link to="/">Back to connection</Link>}
+    <div className="toolbar"><Button variant="secondary" onClick={()=>{if((window.history.state?.idx??0)>0)navigate(-1);else navigate('/')}} aria-label="Go back">← Back</Button></div>
     <ErrorBox>{error||updateError||status?.error}</ErrorBox>
     <SettingsSection title="App & updates">
     <SettingsRow label="Version" control={<span className="settings-value">{app?`Voltra ${app.version}`:'…'}</span>}/>
     {app?.updates_enabled?<>
-      <SettingsRow label="Update channel" description="Release is stable. Beta and Nightly builds are available separately." control={<Select aria-label="Update channel" value={status?.channel||'stable'} disabled={busy||status?.state==='ready'} onChange={e=>void updateAction('update-channel',{channel:e.target.value}).then(changed=>{if(changed)void updateAction('updates')})}><option value="stable">Release</option><option value="beta">Beta</option><option value="nightly">Nightly</option></Select>}/>
+      <SettingsRow label="Update channel" description="Release includes stable and beta builds. Nightly contains nightly builds only." control={<Select aria-label="Update channel" value={status?.channel||'release'} disabled={busy||status?.state==='ready'} onChange={e=>void updateAction('update-channel',{channel:e.target.value}).then(changed=>{if(changed)void updateAction('updates')})}>{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/>
       <SettingsRow label="Updates" description={checkedAt?`Last checked ${new Date(checkedAt).toLocaleTimeString()}. Check now bypasses the hourly timer.`:'Check now queries the selected channel immediately.'} control={<div className="desktop-app-actions"><Button variant="secondary" disabled={busy||status?.state==='ready'} onClick={()=>void updateAction('updates')}>{busy?'Checking…':'Check now'}</Button>
       {status?.state==='available'&&<Button disabled={busy} onClick={()=>void updateAction('update-install')}>Install {status.available_version}</Button>}
-      {status?.state==='ready'&&<Button disabled={busy} onClick={()=>void updateAction('update-restart')}>Restart to update</Button>}</div>}>{status?.state==='up-to-date'&&<span className="settings-note" role="status">No newer build on {status.channel==='stable'?'Release':status.channel==='beta'?'Beta':'Nightly'}.{status.channel==='stable'?' Published Beta and Nightly builds appear only in their own channels.':''}</span>}</SettingsRow>
-    </>:<><SettingsRow label="Update channel" control={<Select aria-label="Update channel" disabled value="stable"><option value="stable">Release</option><option value="beta">Beta</option><option value="nightly">Nightly</option></Select>}/><SettingsRow label="Updates" description="This executable was built without signed updates. Replace it once with an updater-enabled build." control={<a href="https://github.com/Veky121/voltra/releases" target="_blank" rel="noreferrer">Download Voltra</a>}/></>}
+      {status?.state==='ready'&&<Button disabled={busy} onClick={()=>void updateAction('update-restart')}>Restart to update</Button>}</div>}>{status?.state==='up-to-date'&&<span className="settings-note" role="status">No newer build on {status.channel==='release'?'Release':'Nightly'}.{status.channel==='release'?' Nightly builds appear only on Nightly.':''}</span>}</SettingsRow>
+    </>:<><SettingsRow label="Update channel" control={<Select aria-label="Update channel" disabled value="release">{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/><SettingsRow label="Updates" description="This executable was built without signed updates. Replace it once with an updater-enabled build." control={<a href="https://github.com/Veky121/voltra/releases" target="_blank" rel="noreferrer">Download Voltra</a>}/></>}
     </SettingsSection>
     <SettingsSection title="Connection"><SettingsRow label="Panel" control={<span className="settings-value desktop-app-panel">{app?.panel_url||'Not connected'}</span>}/>
     {app?.linked&&<SettingsRow label="This computer" control={<Button variant="danger" onClick={requestDesktopUnlink}>Unlink panel</Button>}/>}
@@ -75,9 +76,10 @@ function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaxim
 }
 
 function DesktopTitlebar({status,maximized,onMaximizedChange,onUnlink,unlinking}:{status:Status|null;maximized:boolean;onMaximizedChange:(value:boolean)=>void;onUnlink:()=>void;unlinking:boolean}){
+  const location=useLocation();
   return <header className="desktop-bar">
-    <div className="desktop-title"><BrandMark/><span>Voltra</span>{status&&<span className="desktop-version-label">v{status.version}</span>}{status?.linked&&<span className="desktop-panel-address" title={status.panel_url}>{status.panel_url}</span>}</div>
-    <div className="desktop-title-actions">{status&&<DesktopUpdates enabled={status.updates_enabled}/>} {status?.linked&&<Button variant="secondary" disabled={unlinking} onClick={onUnlink}>{unlinking?'Unlinking…':'Unlink panel'}</Button>}<Link className="button secondary" to="/account/app">App &amp; updates</Link></div>
+    <div className="desktop-title"><BrandMark/><span>Voltra</span>{status&&<span className="desktop-version-label">v{status.version}</span>}</div>
+    <div className="desktop-title-actions">{status&&<DesktopUpdates enabled={status.updates_enabled}/>} {status?.linked&&<Button variant="secondary" disabled={unlinking} onClick={onUnlink}>{unlinking?'Unlinking…':'Unlink panel'}</Button>}<Link className="button secondary" to="/account/app" replace={location.pathname.replace(/\/+$/,'')==='/account/app'}>App &amp; updates</Link></div>
     <WindowControls maximized={maximized} onMaximizedChange={onMaximizedChange}/>
   </header>;
 }

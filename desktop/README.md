@@ -84,8 +84,11 @@ an unintended origin.
 Local builds include the official GitHub channel feed and pinned Ed25519 public
 key. Use `build.ps1 -DisableUpdates` only for deliberately offline builds.
 
-Channels are Release, Beta and Nightly. Release uses the stable feed and never
-offers prereleases. A release on Beta or Nightly does not appear on Release.
+Channels are Release and Nightly, with Release selected by default. The `release`
+feed accepts final stable and beta versioned builds and rejects nightly builds.
+The `nightly` feed accepts only nightly builds. Saved `stable` and `beta` channel
+preferences map to `release` when read, without rewriting desktop or session data.
+New channel selections persist only `release` or `nightly` in `updates.json`.
 Local `-dev` builds can adopt a signed published build even when their development
 label would sort above it under SemVer. Checks run on launch and hourly; Check
 now ignores that timer and refreshes the feed. Check, Install and Restart remain

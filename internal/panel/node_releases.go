@@ -20,6 +20,25 @@ import (
 )
 
 var nodeReleaseTag = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$`)
+
+// Feed selection follows the canonical release tool grammar. Explicit pins retain
+// the broader published-version grammar above as an operator override.
+var nodeReleaseFeedTag = regexp.MustCompile(`^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-beta\.([1-9][0-9]*)|-nightly\.([0-9]{8})\.([1-9][0-9]*))?$`)
+
+func nodeReleaseTagChannel(tag string) string {
+	parts := nodeReleaseFeedTag.FindStringSubmatch(tag)
+	if parts == nil {
+		return ""
+	}
+	if parts[5] != "" {
+		if _, err := time.Parse("20060102", parts[5]); err != nil {
+			return ""
+		}
+		return "nightly"
+	}
+	return "release"
+}
+
 var nodeReleaseDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
 const nodeReleaseRepo = "https://github.com/Veky121/voltra/releases/"
@@ -61,13 +80,17 @@ func nodeReleasePolicy() (channel, pin string, err error) {
 	}
 	channel = os.Getenv("NODE_RELEASE_CHANNEL")
 	if channel == "" {
-		channel = "beta" // Development and prerelease panels use the beta feed.
-		if nodeReleaseTag.MatchString(NodeReleaseVersion) && !strings.Contains(NodeReleaseVersion, "-") {
-			channel = "stable"
+		channel = "release"
+		if nodeReleaseTagChannel(NodeReleaseVersion) == "nightly" {
+			channel = "nightly"
 		}
 	}
-	if channel != "stable" && channel != "beta" {
-		return "", "", bad("NODE_RELEASE_CHANNEL must be stable or beta.")
+	switch channel {
+	case "stable", "beta":
+		channel = "release" // Preserve existing environment configuration.
+	case "release", "nightly":
+	default:
+		return "", "", bad("NODE_RELEASE_CHANNEL must be release or nightly (legacy stable and beta are accepted).")
 	}
 	return channel, pin, nil
 }
@@ -198,7 +221,7 @@ func (a *App) resolveNodeInstaller(ctx context.Context) (nodeInstallerRelease, e
 		if _, ok := nodeReleaseAssets(release); !ok {
 			continue
 		}
-		if pin == "" && (channel == "stable" && (release.Prerelease || strings.Contains(release.Tag, "-")) || strings.Contains(strings.ToLower(release.Tag), "nightly")) {
+		if pin == "" && (nodeReleaseTagChannel(release.Tag) != channel || (channel == "release" && !strings.Contains(release.Tag, "-") && release.Prerelease)) {
 			continue
 		}
 		eligible = append(eligible, release)

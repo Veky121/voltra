@@ -23,6 +23,7 @@ jobs:
       - run: npm ci --prefix web
       - run: npm run build --prefix web
       - run: node --experimental-strip-types --test web/tests/*.test.mjs
+      - run: python3 -m unittest discover -s tools/release -p 'test_*.py'
       - run: bash tools/ci/test-linux.sh ./...
       - run: go build ./cmd/panel ./cmd/node
   desktop:

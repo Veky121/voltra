@@ -32,7 +32,7 @@ func TestNightlyPlan(t *testing.T) {
 }
 
 func TestChannels(t *testing.T) {
-	for tag, want := range map[string]string{"v0.1.0": "stable", "v0.1.0-beta.1": "beta", "v0.1.0-nightly.20261023.1": "nightly"} {
+	for tag, want := range map[string]string{"v0.1.0": "release", "v0.1.0-beta.1": "release", "v0.1.0-nightly.20261023.1": "nightly"} {
 		p, e := parseTag(tag)
 		if e != nil || p.Channel != want {
 			t.Fatal(tag, p, e)
