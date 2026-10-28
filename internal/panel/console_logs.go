@@ -263,15 +263,85 @@ func (a *App) consoleLogLease(ctx context.Context, id int64, owner string) (bool
 	return err == nil, err
 }
 
+// Reasons are fixed categories: never include remote close text, URLs, tokens,
+// JSON payloads, or database error details in diagnostics or saved history.
+type consoleCaptureFailure struct {
+	reason string
+	cause  error
+}
+
+func (e *consoleCaptureFailure) Error() string { return e.reason }
+func (e *consoleCaptureFailure) Unwrap() error { return e.cause }
+
+func consoleCaptureReason(err error) string {
+	if errors.Is(err, context.Canceled) {
+		return "capture canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "capture deadline exceeded"
+	}
+	var failure *consoleCaptureFailure
+	if errors.As(err, &failure) {
+		return failure.reason
+	}
+	var closed *websocket.CloseError
+	if errors.As(err, &closed) {
+		return fmt.Sprintf("websocket closed (code %d)", closed.Code)
+	}
+	var network net.Error
+	if errors.As(err, &network) {
+		if network.Timeout() {
+			return "network timeout"
+		}
+		return "network connection failed"
+	}
+	for _, reason := range []string{"console capture authentication timed out", "console capture authentication rejected", "console capture lease lost", "console capture lease expired"} {
+		if err != nil && err.Error() == reason {
+			return reason
+		}
+	}
+	return "capture session failed"
+}
+
+type consoleCaptureState struct {
+	disconnectedAt time.Time
+	reason         string
+	lastDiagnostic time.Time
+	suppressed     int
+}
+
+func (s *consoleCaptureState) diagnose(now time.Time, err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return false
+	}
+	if !s.lastDiagnostic.IsZero() && now.Sub(s.lastDiagnostic) < time.Minute {
+		s.suppressed++
+		return false
+	}
+	s.lastDiagnostic = now
+	return true
+}
+
 func (a *App) collectConsoleLogs(ctx context.Context, server M) {
 	id, owner := num(server["id"]), randomToken(24)
+	capture := &consoleCaptureState{}
 	for ctx.Err() == nil {
 		claimed, err := a.consoleLogLease(ctx, id, owner)
 		if err == nil && claimed {
-			err = a.consoleLogSession(ctx, server, owner)
+			err = a.consoleLogSessionWithState(ctx, server, owner, capture)
+			if ctx.Err() == nil && err != nil {
+				if capture.disconnectedAt.IsZero() {
+					capture.disconnectedAt = time.Now()
+					capture.reason = consoleCaptureReason(err)
+				}
+			}
 			cleanup, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			_, _ = a.DB.Exec(cleanup, "UPDATE console_log_collectors SET connected=false,lease_until=now() WHERE server_id=$1 AND lease_owner=$2", id, owner)
 			cancel()
+		}
+		if ctx.Err() == nil && capture.diagnose(time.Now(), err) {
+			slog.Warn("console history capture disconnected", "server_id", id, "node_id", num(server["node_id"]), "reason", consoleCaptureReason(err), "suppressed", capture.suppressed)
+			capture.suppressed = 0
 		}
 		select {
 		case <-ctx.Done():
@@ -289,6 +359,10 @@ func (a *App) consoleLogToken(node, server M) (string, error) {
 }
 
 func (a *App) consoleLogSession(ctx context.Context, server M, owner string) error {
+	return a.consoleLogSessionWithState(ctx, server, owner, &consoleCaptureState{})
+}
+
+func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner string, capture *consoleCaptureState) error {
 	node, err := a.node(ctx, num(server["node_id"]))
 	if err != nil {
 		return err
@@ -307,6 +381,9 @@ func (a *App) consoleLogSession(ctx context.Context, server M, owner string) err
 		resp.Body.Close()
 	}
 	if err != nil {
+		if resp != nil {
+			return &consoleCaptureFailure{fmt.Sprintf("websocket handshake rejected (HTTP %d)", resp.StatusCode), err}
+		}
 		return err
 	}
 	defer conn.Close()
@@ -419,7 +496,17 @@ func (a *App) consoleLogSession(ctx context.Context, server M, owner string) err
 					if _, err = a.DB.Exec(ctx, "UPDATE console_log_collectors SET connected=true WHERE server_id=$1 AND lease_owner=$2", server["id"], owner); err != nil {
 						return err
 					}
-					add("panel message", "\x1b[0m\x1b[93m[Voltra]: Console history capture connected. Output from any disconnected period may be missing.\x1b[0m")
+					message := "\x1b[0m\x1b[94m[Voltra]: Console history capture connected. Saved history is retained; continuity during panel downtime cannot be verified.\x1b[0m"
+					if !capture.disconnectedAt.IsZero() {
+						gap := time.Since(capture.disconnectedAt).Round(time.Second)
+						if gap < time.Second {
+							gap = time.Second
+						}
+						message = fmt.Sprintf("\x1b[0m\x1b[93m[Voltra]: Console history capture reconnected after approximately %s (%s). Output during this capture gap may be missing.\x1b[0m", gap, capture.reason)
+					}
+					add("panel message", message)
+					capture.disconnectedAt = time.Time{}
+					capture.reason = ""
 					// Seed an empty archive from Wings' retained tail. Reconnects to an
 					// existing archive must not repeatedly append the same old output.
 					var hasOutput bool

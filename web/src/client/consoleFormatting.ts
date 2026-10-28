@@ -49,6 +49,11 @@ export function formatConsoleLines(lines: string[]): FormattedConsoleLine[] {
 export function formatConsoleBatch(lines: string[], initialStyle: ConsoleStyle = {}): {lines: FormattedConsoleLine[]; endStyle: ConsoleStyle} {
   let style: ConsoleStyle = {...initialStyle};
   const formatted = lines.map(line => {
+    const plain = line.replace(/\x1b\[[\d;]*m/g, '');
+    // Minecraft/Forge logger defaults INFO to green. Treat its leading foreground
+    // as severity styling, while retaining explicit colors inside the message.
+    const minecraftInfo = /^\[\d\d:\d\d:\d\d\] \[[^\]\r\n]+\/INFO\](?: \[[^\]\r\n]*\])?:/.test(plain);
+    if (minecraftInfo) delete style.color;
     const segments: ConsoleSegment[] = [];
     let position = 0;
     for (const match of line.matchAll(/\x1b\[([\d;]*)m/g)) {
@@ -80,6 +85,7 @@ export function formatConsoleBatch(lines: string[], initialStyle: ConsoleStyle =
           }
         }
       }
+      if (minecraftInfo && segments.length === 0) delete style.color;
       position = match.index + match[0].length;
     }
     if (position < line.length) segments.push({text: line.slice(position), style: {...style}});
