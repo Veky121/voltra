@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adhocore/gronx"
@@ -834,13 +835,30 @@ func (a *App) collabTasks(w http.ResponseWriter, r *http.Request) {
 // held while one task runs so multiple application processes cannot run it together.
 // Daemon actions are at-least-once if a process dies after Wings accepts a request.
 func (a *App) RunScheduler(ctx context.Context) {
+	var cleanup sync.WaitGroup
+	cleanup.Add(2)
+	go a.collabScheduleCleanup(ctx, &cleanup)
+	go func() {
+		defer cleanup.Done()
+		timer := time.NewTicker(time.Second)
+		defer timer.Stop()
+		for ctx.Err() == nil {
+			a.collabSchedulerBatch(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+			}
+		}
+	}()
+	defer cleanup.Wait()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		a.collabSchedulerTick(ctx)
+		a.collabQueueDueSchedules(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -914,6 +932,11 @@ func (a *App) collabQueueSchedule(ctx context.Context, id int64, manual bool) er
 	return tx.Commit(ctx)
 }
 func (a *App) collabSchedulerTick(ctx context.Context) {
+	a.collabQueueDueSchedules(ctx)
+	a.collabSchedulerBatch(ctx)
+}
+
+func (a *App) collabQueueDueSchedules(ctx context.Context) {
 	due, err := a.query(ctx, "SELECT id FROM schedules WHERE is_active AND NOT is_processing AND next_run_at<=now() AND EXISTS(SELECT 1 FROM tasks WHERE schedule_id=schedules.id) ORDER BY next_run_at LIMIT 100")
 	if err == nil {
 		for _, s := range due {
@@ -922,24 +945,18 @@ func (a *App) collabSchedulerTick(ctx context.Context) {
 			}
 		}
 	}
-	for i := 0; i < 100 && ctx.Err() == nil; i++ {
-		ran, e := a.collabSchedulerStep(ctx)
-		if e != nil {
-			a.audit(ctx, 0, 0, "system:schedule.worker_failed", M{"error": e.Error()})
-			return
-		}
-		if !ran {
-			return
-		}
-	}
 }
+
 func (a *App) collabSchedulerStep(ctx context.Context) (bool, error) {
+	return a.collabSchedulerRun(ctx, 0)
+}
+func (a *App) collabSchedulerRun(ctx context.Context, runID int64) (bool, error) {
 	tx, err := a.DB.Begin(ctx)
 	if err != nil {
 		return false, err
 	}
 	defer tx.Rollback(ctx)
-	rows, err := tx.Query(ctx, "SELECT * FROM schedule_runs WHERE status IN ('pending','running') AND run_after<=now() ORDER BY run_after,id FOR UPDATE SKIP LOCKED LIMIT 1")
+	rows, err := tx.Query(ctx, "SELECT * FROM schedule_runs WHERE status IN ('pending','running') AND run_after<=now() AND ($1::bigint=0 OR id=$1) ORDER BY run_after,id FOR UPDATE SKIP LOCKED LIMIT 1", runID)
 	if err != nil {
 		return false, err
 	}
@@ -951,6 +968,12 @@ func (a *App) collabSchedulerStep(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	run := M(rr[0])
+	// A transaction-scoped node lock bounds actions across panel processes too.
+	var nodeLocked bool
+	err = tx.QueryRow(ctx, "SELECT pg_try_advisory_xact_lock(hashtextextended('voltra:scheduler-node:'||node_id::text,0)) FROM servers WHERE id=$1", run["server_id"]).Scan(&nodeLocked)
+	if err != nil || !nodeLocked {
+		return false, err
+	}
 	sid := num(run["schedule_id"])
 	rows, err = tx.Query(ctx, "SELECT * FROM schedules WHERE id=$1 FOR UPDATE", sid)
 	if err != nil {
@@ -1010,8 +1033,32 @@ func (a *App) collabSchedulerStep(ctx context.Context) (bool, error) {
 	if err = tx.QueryRow(ctx, "SELECT min(sequence_id) FROM tasks WHERE schedule_id=$1", sid).Scan(&first); err != nil {
 		return true, err
 	}
+	// Read node credentials through the claim transaction for direct command and
+	// status requests. Managed power and backups retain their shared service paths.
+	var actionNode M
+	if str(task["action"]) == "command" || boolean(schedule["only_when_online"]) {
+		nodeRows, e := tx.Query(ctx, "SELECT * FROM nodes WHERE id=$1", server["node_id"])
+		if e != nil {
+			return true, e
+		}
+		nodeMaps, e := pgx.CollectRows(nodeRows, pgx.RowToMap)
+		if e != nil {
+			return true, e
+		}
+		if len(nodeMaps) == 0 {
+			return true, notFound()
+		}
+		actionNode = M(nodeMaps[0])
+		token, e := a.unseal(str(actionNode["daemon_token"]))
+		if e != nil {
+			return true, e
+		}
+		actionNode["daemon_token"] = token
+	}
+	actionCtx, cancelAction := context.WithTimeout(ctx, collabScheduleActionTimeout)
+	defer cancelAction()
 	if boolean(schedule["only_when_online"]) && num(task["sequence_id"]) == first {
-		resp, e := a.daemonServer(ctx, server, "GET", "", nil)
+		resp, e := a.daemon(actionCtx, actionNode, "GET", "/api/servers/"+str(server["uuid"]), nil)
 		if e != nil {
 			return true, finish("failed", "Unable to check server online state: "+e.Error())
 		}
@@ -1034,18 +1081,18 @@ func (a *App) collabSchedulerStep(ctx context.Context) (bool, error) {
 	switch str(task["action"]) {
 	case "power":
 		var resp *http.Response
-		resp, actionErr = a.daemonServer(ctx, server, "POST", "/power", M{"action": task["payload"]})
+		resp, actionErr = a.daemonServer(actionCtx, server, "POST", "/power", M{"action": task["payload"]})
 		if resp != nil {
 			resp.Body.Close()
 		}
 	case "command":
 		var resp *http.Response
-		resp, actionErr = a.daemonServer(ctx, server, "POST", "/commands", M{"commands": []string{str(task["payload"])}})
+		resp, actionErr = a.daemon(actionCtx, actionNode, "POST", "/api/servers/"+str(server["uuid"])+"/commands", M{"commands": []string{str(task["payload"])}})
 		if resp != nil {
 			resp.Body.Close()
 		}
 	case "backup":
-		_, actionErr = a.createBackup(ctx, server, M{"name": "Scheduled backup " + str(schedule["id"]) + " at " + now(), "ignored": strings.Split(str(task["payload"]), "\n"), "truncate": true})
+		_, actionErr = a.createBackup(actionCtx, server, M{"name": "Scheduled backup " + str(schedule["id"]) + " at " + now(), "ignored": strings.Split(str(task["payload"]), "\n"), "truncate": true})
 	default:
 		actionErr = bad("Unknown task action.")
 	}

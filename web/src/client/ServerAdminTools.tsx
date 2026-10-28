@@ -104,14 +104,19 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
   const query = useAPI(`/api/application/servers/${serverID}?include=allocations,variables,user,node,egg`);
   const [active, setActive] = useState("runtime");
   const [configurationDirty, setConfigurationDirty] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const record = query.data ? unwrap(query.data) : null;
   const scope = `server-admin-${serverID}`;
   const discard = () => !configurationDirty || window.confirm("Discard unsaved runtime or advanced configuration changes?");
   const saved = () => { query.reload(); reload(); };
   return <section className="server-admin-tools" aria-label="Runtime and resources">
     <div className="toolbar server-page-toolbar">
-      <div><h2>Runtime &amp; resources</h2><p className="muted">Manage {record?.name || "this server"}. Changes are limited to this server.</p></div>
-      <Button variant="secondary" disabled={query.loading || configurationDirty} onClick={query.reload}>Refresh server details</Button>
+      <Button variant="secondary" disabled={query.loading} onClick={() => {
+        if (!window.confirm("Reload all server settings? Unsaved changes in this tab will be discarded.")) return;
+        setConfigurationDirty(false);
+        setRefreshVersion(version => version + 1);
+        query.reload(); reload();
+      }}>Refresh settings</Button>
     </div>
     <ErrorBox>{query.error}</ErrorBox>
     <ServerSettingsTabs scope={scope} tabs={tabs} active={active} onChange={tab => {
@@ -121,12 +126,12 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
     }} />
     {query.loading && !record ? <Loading /> : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
-      : record && <section role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
+      : record && <section key={`${active}-${refreshVersion}`} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
         {active === "limits" && <Build record={record} onSaved={saved} />}
-        {active === "runtime" && <ServerStartup section="runtime" administrator onDirtyChange={setConfigurationDirty}/>}
+        {active === "runtime" && <ServerStartup section="runtime" administrator showCommandPreview={false} runtimeCommand={<RuntimeAssignment record={record} onSaved={saved}/>} onDirtyChange={setConfigurationDirty}/>}
         {active === "mounts" && <ServerMounts record={record} contextual />}
-        {active === "configuration" && <><RuntimeAssignment record={record} onSaved={saved}/><details><summary>Restricted template options</summary><p className="muted">Administrator overrides for fields the template locks or hides. Editable game options are in Settings.</p><Startup record={record} onSaved={saved} contextual restrictedOnly/></details><ServerConfigurationEditor serverID={serverID} onSaved={saved} onDirtyChange={setConfigurationDirty} /></>}
-        {active === "manage" && <><details><summary>Ownership and server details</summary><Details record={record} onSaved={saved}/></details><details><summary>Database provisioning</summary><ServerDatabases record={record}/></details><Manage record={record} onSaved={saved} /><DeleteServer record={record} returnTo="/" /></>}
+        {active === "configuration" && <><Startup record={record} onSaved={saved} contextual restrictedOnly/><ServerConfigurationEditor serverID={serverID} onSaved={saved} onDirtyChange={setConfigurationDirty} /></>}
+        {active === "manage" && <><Manage record={record} onSaved={saved} /><Details record={record} onSaved={saved}/><ServerDatabases record={record}/><DeleteServer record={record} returnTo="/" /></>}
       </section>}
   </section>;
 }
@@ -158,10 +163,6 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty]);
 
-  const reloadCurrent = () => {
-    if (busy || (dirty && !window.confirm("Discard your unsaved draft and load the current server configuration?"))) return;
-    setError(""); setSuccess(""); query.reload();
-  };
   if (!configuration) return <Card><h3>Installation &amp; process</h3><ErrorBox>{query.error}</ErrorBox>
     {query.loading ? <Loading /> : <Button variant="secondary" onClick={query.reload}>Retry configuration</Button>}
   </Card>;
@@ -184,21 +185,19 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
       || overridden && draft[field.key] !== configurationDraft(configuration)[field.key];
     const controls = <>
       <div className="server-configuration-field-heading"><label htmlFor={id}>{field.label}</label>
-        <span className="badge">{overridden ? "Server override" : "Inherited from template"}{changed ? " · Unsaved" : ""}</span>
+        <span className="muted">{changed ? "Unsaved" : overridden ? "Server override" : "Template default"}</span>
       </div>
-      <p id={`${id}-hint`} className="muted">{field.hint}</p>
       <div className="actions server-configuration-inheritance">
         <label><Switch checked={overridden} disabled={!editable || managed && !overridden}
-          onCheckedChange={checked => change(field.key, checked ? fieldText(configuration.effective[field.key]) : undefined)} />Override for this server</label>
-        {overridden && <Button variant="secondary" disabled={!editable} onClick={() => change(field.key)}>Reset {field.label.toLowerCase()} to template</Button>}
+          onCheckedChange={checked => change(field.key, checked ? fieldText(configuration.effective[field.key]) : undefined)} />Override template</label>
+        {overridden && <Button variant="secondary" disabled={!editable} onClick={() => change(field.key)}>Use template</Button>}
       </div>
+      <p id={`${id}-hint`} className="muted">{field.hint}</p>
       {field.kind === "text" ? <input id={id} value={text} disabled={!editable || managed || !overridden} aria-describedby={`${id}-hint`} onChange={event => change(field.key, event.target.value)} />
-        : <textarea id={id} value={text} rows={field.kind === "script" ? 14 : 7} spellCheck={false}
+        : <textarea id={id} value={text} rows={field.kind === "script" ? 14 : field.key === "config_files" && text.trim() === "{}" ? 3 : 5} spellCheck={false}
           disabled={!editable || managed || !overridden} aria-describedby={`${id}-hint`} onChange={event => change(field.key, event.target.value)} />}
     </>;
-    return field.kind === "script" ? <details key={field.key} className="server-configuration-field server-admin-advanced">
-      <summary>Installation script{changed ? " · Unsaved" : ""}</summary>{controls}
-    </details> : <div key={field.key} className="server-configuration-field">{controls}</div>;
+    return <div key={field.key} className={`server-configuration-field server-configuration-${field.kind}`}>{controls}</div>;
   };
   return <form className="server-configuration-editor" onSubmit={async event => {
     event.preventDefault();
@@ -223,25 +222,19 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
       setBusy(false);
     }
   }}>
-    <Card><h3>Installation &amp; process</h3>
-      <p>These overrides belong to this server. Inherited fields continue to follow the template <strong>{configuration.template.name}</strong>.</p>
-      <div className="server-configuration-status"><span className="muted">Revision <code>{configuration.revision}</code></span>
-        <Button variant="secondary" disabled={busy || query.loading} onClick={reloadCurrent}>Reload current settings</Button>
-      </div>
-      {!configuration.can_update && <p role="status" className="muted">{configuration.update_unavailable_reason || "Editing is unavailable. Stop the server, then reload configuration to check again."}</p>}
-      <p className="muted">The server must be stopped to save. The backend checks its state and revision again when saving.</p>
+    <div className="server-configuration-notice">
+      {!configuration.can_update && <p role="status" className="muted">{configuration.update_unavailable_reason || "Stop the server, then refresh settings to edit."}</p>}
       <ErrorBox>{error || query.error}</ErrorBox>
       {success && <p className="success" role="status">{success}</p>}
-    </Card>
-    <Card><h3>Process configuration</h3><p className="muted">Applies on the next start. Saving does not restart the running process.</p>
+    </div>
+    <Card><h3>Process configuration</h3>
       {configurationFields.filter(field => field.group === "process").map(renderField)}
     </Card>
-    <details className="card server-admin-advanced">
-      <summary>Installation settings · Next install or reinstall only</summary>
-      <p className="muted">Saving never runs the installer. Review changes before explicitly requesting a reinstall under Manage.</p>
+    <Card><h3>Installation settings</h3>
+      <p className="muted">Used on the next install or reinstall. Saving does not run the installer.</p>
       {configuration.managed && <p role="status" className="muted">This server uses a managed installer. Installer overrides are unavailable. Use its managed installation controls. Process overrides can still be edited when the server is stopped.</p>}
       {configurationFields.filter(field => field.group === "installation").map(renderField)}
-    </details>
+    </Card>
     <div className="actions"><Button type="submit" disabled={!editable || !dirty}>{busy ? "Saving server overrides..." : "Save server overrides"}</Button>
       <span className="muted" role="status">{dirty ? "Unsaved changes. Saving does not reinstall." : "No unsaved changes."}</span>
     </div>

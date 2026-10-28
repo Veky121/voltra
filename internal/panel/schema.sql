@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS schedule_runs (
 );
 ALTER TABLE schedule_runs ADD COLUMN IF NOT EXISTS task_id bigint REFERENCES tasks(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS schedule_runs_one_active ON schedule_runs(schedule_id) WHERE status IN ('pending','running');
+CREATE INDEX IF NOT EXISTS schedule_runs_terminal_retention ON schedule_runs(updated_at,id) WHERE status IN ('completed','failed');
 CREATE TABLE IF NOT EXISTS database_hosts (
  id bigserial PRIMARY KEY,name text NOT NULL,host text NOT NULL,port bigint NOT NULL DEFAULT 3306,username text NOT NULL,password text NOT NULL,node_id bigint REFERENCES nodes(id) ON DELETE SET NULL,max_databases bigint,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()

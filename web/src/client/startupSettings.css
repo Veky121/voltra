@@ -31,6 +31,14 @@
 .startup-advanced>summary,.startup-preview>summary{cursor:pointer;font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}
 .startup-advanced>p,.startup-preview>p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.5;margin:12px 0}
 .startup-preview pre{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:0}
+.startup-runtime-card{display:grid;gap:24px}
+.startup-runtime-card>.server-runtime-assignment .card{border:0;border-radius:0;background:none;box-shadow:none;padding:0;margin:0}
+.startup-runtime-card>section+section{border-top:1px solid var(--ui-divider);padding-top:24px}
+.startup-runtime-card>section>h3{margin:0 0 8px;font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}
+.startup-runtime-card>.startup-variables{padding:24px 0 0}
+.startup-runtime-card>.java-settings.card{border:0;border-top:1px solid var(--ui-divider);border-radius:0;background:none;box-shadow:none;padding:24px 0 0}
+.startup-runtime-card .startup-variable-grid>.startup-variable{border:0;border-radius:0;background:none;padding:0}
+.startup-runtime-card .startup-variable-grid>.startup-variable.is-dirty{border-left:2px solid var(--accent);padding-left:12px;box-shadow:none}
 @media(min-width:1000px){.startup-variables{padding:20px 24px}.startup-control-row{max-width:760px}}
 @media(max-width:600px){.startup-heading{gap:12px}.startup-variable-heading{align-items:flex-start;flex-direction:column;gap:6px}.startup-control-row{align-items:stretch;flex-direction:column}.startup-control-row>.button{align-self:flex-start}.startup-settings .card{padding:16px}}
 .startup-variable-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;margin-top:16px;align-items:start}

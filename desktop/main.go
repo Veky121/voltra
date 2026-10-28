@@ -59,7 +59,7 @@ func main() {
 		},
 	})
 	if err = configureUpdater(app, host); err != nil {
-		log.Fatal(err)
+		log.Printf("Updater disabled: %v", err)
 	}
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "main", Title: "Voltra", Width: 1440, Height: 940, MinWidth: 900, MinHeight: 640,

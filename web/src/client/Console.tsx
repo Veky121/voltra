@@ -7,6 +7,7 @@ import {consoleStateLine} from './consoleLifecycle';
 import {requestServerPower, consolePowerEvent, type ConsolePowerEvent} from './serverPower';
 import {appendConsoleHistory, emptyConsoleHistory} from './consoleHistory';
 import {ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS} from './consoleQueue';
+import {ConsoleReplayOverlap} from './consoleReplay';
 import './console.css';
 import {
   can,
@@ -95,38 +96,45 @@ export default function Console() {
     let historyMode: "loading" | "persistent" | "live" | "legacy" = "loading";
     let replayTimer: ReturnType<typeof setTimeout>;
     const replayAbort = new AbortController();
+    const overlap = new ConsoleReplayOverlap();
+    const savedOverlap = new ConsoleReplayOverlap();
     let cursor = "0", socketReady = false, replayedSaved = false, requestedLiveLogs = false;
     const showingLive = () => historyMode === "live" || historyMode === "legacy";
     const requestLiveLogs = () => {
-      if (socketReady && showingLive() && !requestedLiveLogs) {
+      if (socketReady && historyMode === "legacy" && !requestedLiveLogs) {
         current?.send(JSON.stringify({event:"send logs", args:[]}));
         requestedLiveLogs = true;
       }
     };
-    // Once fallback starts, retain the live source for this visit. Switching back
-    // mid-stream would replay collector copies of lines already shown live.
+    // Modern fallback keeps polling from the last successful saved cursor.
+    // Only legacy servers request the unnumbered Wings log snapshot.
     const useLiveFallback = () => { historyMode = "live"; requestLiveLogs(); };
     const replay = async () => {
       let delay = 1000;
       try {
         const saved = await api(`${base}/console-history?after=${cursor}`, {signal: replayAbort.signal});
         if (!active) return;
-        if (historyMode === "loading") historyMode = "persistent";
-        if (!saved.capture?.connected) useLiveFallback();
-        if (saved.reset && historyMode !== "live") {
+        historyMode = saved.capture?.connected ? "persistent" : "live";
+        if (historyMode === 'persistent') savedOverlap.clear();
+        if (saved.reset) {
+          overlap.clear();
+          savedOverlap.clear();
           pendingLines.current.clear();
           setHistory(emptyConsoleHistory());
         }
         if (saved.truncated) queueLines("\x1b[0m\x1b[93m[Voltra]: Older output expired from the saved buffer while this console was disconnected.\x1b[0m");
         const restored: string[] = [];
         for (const entry of saved.data ?? []) {
-          if (replayedSaved && historyMode === "live" && entry.event !== "panel message" && entry.event !== "steam output") continue;
           const text = consoleOutput(String(entry.line ?? ""), entry.event, true);
           if (!text) continue;
           const at = new Date(entry.created_at);
           const stamp = (entry.event === "panel message" || entry.event === "steam output") && !Number.isNaN(at.getTime()) ? `[${at.toLocaleTimeString([], {hour12:false})}] ` : "";
-          if (!replayedSaved) restored.push(stamp + text);
-          else queueLines(stamp + text);
+          for (const line of text.split(/\r?\n/)) {
+            if (overlap.consume(entry.event, line)) continue;
+            if (historyMode === 'live') savedOverlap.record(entry.event, line);
+            if (!replayedSaved) restored.push(stamp + line);
+            else queueLines(stamp + line);
+          }
         }
         if (restored.length) setHistory(old => active ? appendConsoleHistory(old, restored) : old);
         replayedSaved = true;
@@ -151,7 +159,7 @@ export default function Console() {
     const observeState = (next: string) => {
       const line = consoleStateLine(observedState, next);
       if (line) {
-        if (showingLive()) queueLines(line);
+        if (historyMode === "legacy") queueLines(line);
         observedState = next;
       }
       statusRef.current = next;
@@ -166,7 +174,11 @@ export default function Console() {
       const clean = consoleOutput(s, event);
       if (!clean) return;
       const colored = consoleOutput(s, event, true);
-      if (showingLive()) for (const line of colored.split(/\r?\n/)) queueLines(line);
+      if (showingLive()) for (const line of colored.split(/\r?\n/)) {
+        if (historyMode !== 'legacy' && savedOverlap.consume(event, line)) continue;
+        if (historyMode !== "legacy") overlap.record(event, line);
+        queueLines(line);
+      }
       if (statusRef.current === "running") return;
       const f = features.current.find((f) =>
         featureErrors[f]?.some((e) => clean.toLowerCase().includes(e))

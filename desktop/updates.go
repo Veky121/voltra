@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -45,7 +47,31 @@ type updateController struct {
 
 // Only the selected channel is queried. Release accepts final and beta builds;
 // nightly remains isolated. Signed bytes must also come from version assets.
-type channelProvider struct{ base, channel string }
+type channelProvider struct {
+	base, channel  string
+	explicitSwitch bool
+}
+
+func updateHTTPClient(download bool) *http.Client {
+	timeout := 30 * time.Second
+	if download {
+		timeout = 10 * time.Minute
+	}
+	return &http.Client{Timeout: timeout, Transport: &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+	}, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("too many update redirects")
+		}
+		if len(via) > 0 && via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return errors.New("update redirect requires HTTPS")
+		}
+		return nil
+	}}
+}
 
 func (p *channelProvider) Name() string { return "voltra" }
 func validChannel(s string) bool        { return s == "release" || s == "nightly" }
@@ -69,7 +95,7 @@ func releaseChannel(v string) string {
 
 var updateCheckSequence atomic.Uint64
 
-func (p *channelProvider) endpoint() (*endpoint.Provider, error) {
+func (p *channelProvider) endpoint(download bool) (*endpoint.Provider, error) {
 	feed, err := url.Parse(strings.ReplaceAll(p.base, "{{channel}}", p.channel))
 	if err != nil {
 		return nil, err
@@ -77,15 +103,20 @@ func (p *channelProvider) endpoint() (*endpoint.Provider, error) {
 	query := feed.Query()
 	query.Set("check", strconv.FormatInt(time.Now().UnixNano(), 10)+"-"+strconv.FormatUint(updateCheckSequence.Add(1), 10))
 	feed.RawQuery = query.Encode()
-	return endpoint.New(endpoint.Config{URL: feed.String(), Channel: p.channel, Headers: map[string]string{"Cache-Control": "no-cache", "Pragma": "no-cache"}})
+	return endpoint.New(endpoint.Config{URL: feed.String(), Channel: p.channel, HTTPClient: updateHTTPClient(download), Headers: map[string]string{"Cache-Control": "no-cache", "Pragma": "no-cache"}})
 }
 func (p *channelProvider) Check(ctx context.Context, req updater.CheckRequest) (*updater.Release, error) {
+	// Only a channel change in this session permits crossing version precedence.
+	// After reopening, ordinary checks keep the installed version as the floor.
+	if p.explicitSwitch && releaseChannel(req.CurrentVersion) != "" && releaseChannel(req.CurrentVersion) != p.channel {
+		req.CurrentVersion = "0.0.0"
+	}
 	// Development labels do not represent a published release. In SemVer,
 	// 0.1.0-dev sorts after 0.1.0-beta, which otherwise hides beta offers.
 	if pre := semver.Prerelease("v" + strings.TrimPrefix(req.CurrentVersion, "v")); pre == "-dev" || strings.HasPrefix(pre, "-dev.") {
 		req.CurrentVersion = "0.0.0"
 	}
-	ep, err := p.endpoint()
+	ep, err := p.endpoint(false)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +139,7 @@ func (p *channelProvider) Check(ctx context.Context, req updater.CheckRequest) (
 	return rel, nil
 }
 func (p *channelProvider) Download(ctx context.Context, rel *updater.Release, w io.Writer, progress func(int64, int64)) error {
-	ep, err := p.endpoint()
+	ep, err := p.endpoint(true)
 	if err != nil {
 		return err
 	}
@@ -142,6 +173,9 @@ func (c *updateController) snapshot() updateStatus { c.mu.Lock(); defer c.mu.Unl
 func (c *updateController) changeChannel(channel string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.engine == nil {
+		return errors.New(c.status.Error)
+	}
 	if !validChannel(channel) {
 		return errors.New("choose release or nightly")
 	}
@@ -168,6 +202,7 @@ func (c *updateController) changeChannel(channel string) error {
 	if err = os.Rename(tmp.Name(), filepath.Join(c.dir, "updates.json")); err != nil {
 		return err
 	}
+	c.provider.explicitSwitch = channel != c.status.Channel
 	c.provider.channel = channel
 	c.status = updateStatus{Channel: channel, State: "idle", Version: version}
 	return nil
@@ -177,6 +212,9 @@ func (c *updateController) action(action string) error {
 	defer c.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+	if c.engine == nil {
+		return errors.New(c.status.Error)
+	}
 	c.status.Error = ""
 	var err error
 	switch action {
@@ -209,12 +247,19 @@ func (c *updateController) action(action string) error {
 		return errors.New("unknown update action")
 	}
 	if err != nil {
-		c.status.State = "error"
+		if action != "restart" {
+			c.status.State = "error"
+		}
 		c.status.Error = err.Error()
 	}
 	return err
 }
-func configureUpdater(app *application.App, host *desktopHost) error {
+func configureUpdater(app *application.App, host *desktopHost) (result error) {
+	defer func() {
+		if result != nil {
+			host.updates = failedUpdateController(host.dir, result)
+		}
+	}()
 	if updateManifestURL == "" && updatePublicKey == "" {
 		return nil
 	}
@@ -228,7 +273,7 @@ func configureUpdater(app *application.App, host *desktopHost) error {
 	}
 	channel, err := loadUpdateChannel(host.dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot read update preferences: %w. Repair updates.json in %s or restore a valid backup, then reopen Voltra", err, host.dir)
 	}
 	p := &channelProvider{base: updateManifestURL, channel: channel}
 	// Wails' interval calls CheckAndInstall. Leave it disabled: installation
@@ -239,6 +284,17 @@ func configureUpdater(app *application.App, host *desktopHost) error {
 	host.updates = &updateController{engine: app.Updater, provider: p, dir: host.dir, status: updateStatus{Channel: channel, State: "idle", Version: version}}
 	return nil
 }
+func failedUpdateController(dir string, err error) *updateController {
+	return &updateController{dir: dir, status: updateStatus{State: "error", Version: version, Error: fmt.Sprintf("Updates unavailable: %v. Saved preferences and panel session have been preserved.", err)}}
+}
+
+func (c *updateController) errorSnapshot(err error) updateStatus {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.status.Error = err.Error()
+	return c.status
+}
+
 func (h *desktopHost) serveUpdates(w http.ResponseWriter, r *http.Request) {
 	if h.updates == nil {
 		desktopError(w, 409, "Updates are not configured for this build.")
@@ -253,13 +309,13 @@ func (h *desktopHost) serveUpdates(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := h.updates.changeChannel(input.Channel); err != nil {
-			desktopError(w, 409, err.Error())
+			desktopJSON(w, 409, h.updates.errorSnapshot(err))
 			return
 		}
 	} else if r.Method == "POST" {
 		action := map[string]string{"/desktop/updates": "check", "/desktop/update-install": "install", "/desktop/update-restart": "restart"}[r.URL.Path]
 		if err := h.updates.action(action); err != nil {
-			desktopError(w, 409, err.Error())
+			desktopJSON(w, 409, h.updates.errorSnapshot(err))
 			return
 		}
 	}

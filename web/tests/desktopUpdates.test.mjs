@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {updateAction,startUpdateChecks,updateChannels} from '../src/desktopUpdates.ts';
+import {updateAction,startUpdateChecks,updateChannels,useDesktopUpdates} from '../src/desktopUpdates.ts';
 test('automatic checks respect cadence and staged updates; manual actions stay available',async()=>{
  const originalFetch=globalThis.fetch,originalNow=Date.now;
  let now=10000000,requests=[],state='idle',channel='release',interval,focus;
@@ -21,4 +21,23 @@ test('automatic checks respect cadence and staged updates; manual actions stay a
 
 test('channel choices expose only canonical Release and Nightly',()=>{
  assert.deepEqual(updateChannels,[{value:'release',label:'Release'},{value:'nightly',label:'Nightly'}]);
+});
+
+
+test('failed restart publishes authoritative staged state and permits retry',async()=>{
+ const {createElement}=await import('react');
+ const {renderToStaticMarkup}=await import('react-dom/server');
+ let observed;
+ function Probe(){observed=useDesktopUpdates();return null;}
+ const originalFetch=globalThis.fetch;
+ let fail=true;
+ globalThis.fetch=async()=>new Response(JSON.stringify({channel:'nightly',state:fail?'ready':'error',version:'1.0.0',available_version:'2.0.0',error:fail?'Restart failed; retry.':'Staging lost.'}),{status:409});
+ try{
+  assert.equal(await updateAction('update-restart'),false);
+  renderToStaticMarkup(createElement(Probe));
+  assert.equal(observed.status.state,'ready');assert.equal(observed.status.error,'Restart failed; retry.');assert.equal(observed.busy,false);
+  fail=false;await updateAction('update-restart');renderToStaticMarkup(createElement(Probe));
+  assert.equal(observed.status.state,'error','must replace stale ready state');
+  assert.equal(observed.error,'Staging lost.');
+ }finally{globalThis.fetch=originalFetch;}
 });

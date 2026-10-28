@@ -1,5 +1,5 @@
 ﻿.server-admin-tools{min-width:0;font-size:calc(13px * var(--ui-font-scale,1))}
-.server-admin-tools>.toolbar{justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+.server-admin-tools>.toolbar{justify-content:flex-end;align-items:center;gap:12px;margin-bottom:20px}
 .server-admin-tools>.toolbar h2{font-size:calc(16px * var(--ui-font-scale,1));font-weight:550;letter-spacing:-.015em;margin-bottom:6px}
 .server-admin-tools>.toolbar p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;margin:0;color:var(--muted)}
 .server-admin-advanced>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -17,9 +17,7 @@
 .server-admin-tools [role=tabpanel] .card>p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;color:var(--muted)}
 .server-admin-advanced>summary{cursor:pointer;padding:6px 0;color:var(--muted);font-size:calc(13px * var(--ui-font-scale,1));font-weight:500;line-height:1.6}
 .server-admin-advanced[open]>summary{margin-bottom:16px;color:var(--text)}
-.server-configuration-status,.server-configuration-field-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.server-configuration-status{padding-top:12px;margin:16px 0;border-top:1px solid var(--ui-divider);font-size:calc(12px * var(--ui-font-scale,1))}
-.server-configuration-status code{overflow-wrap:anywhere}
+.server-configuration-field-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .server-configuration-field{margin-top:20px;padding-top:16px;border-top:1px solid var(--ui-divider);min-width:0}
 .server-configuration-field-heading>label{font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}
 .server-configuration-field-heading>.badge{font-size:calc(10px * var(--ui-font-scale,1));color:var(--muted);background:var(--ui-hover);border-color:var(--ui-border)}
@@ -35,3 +33,15 @@
 .server-configuration-editor .card>h3{font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}
 .server-configuration-editor .card>p{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
 @media(max-width:700px){.server-admin-tools>.toolbar{align-items:flex-start}.server-admin-summary{grid-template-columns:minmax(0,1fr)}.server-admin-summary>.settings-row:nth-child(odd){border-right:0}.server-configuration-status{align-items:flex-start}.server-configuration-field-heading .badge{white-space:normal}.server-configuration-editor>.actions{justify-content:flex-start;flex-direction:column;align-items:stretch}.server-configuration-editor>.actions>.muted{margin:0}}
+
+.server-configuration-notice:empty{display:none}
+.server-configuration-notice>p{margin:0 0 16px;font-size:calc(12px * var(--ui-font-scale,1))}
+.server-configuration-field{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;row-gap:8px}
+.server-configuration-field-heading{justify-content:flex-start;gap:12px}
+.server-configuration-field-heading>.muted{font-size:calc(11px * var(--ui-font-scale,1))}
+.server-configuration-inheritance{margin:0;justify-content:flex-end}
+.server-configuration-field>p,.server-configuration-field>input,.server-configuration-field>textarea{grid-column:1/-1}
+.server-configuration-field>p{margin:0 0 2px}
+.server-configuration-editor .card>.server-configuration-field:first-of-type{margin-top:12px;padding-top:0;border-top:0}
+.server-runtime-assignment{margin-top:16px}
+@media(max-width:700px){.server-configuration-field{grid-template-columns:minmax(0,1fr)}.server-configuration-inheritance{justify-content:flex-start}}

@@ -1,5 +1,6 @@
 import {GameSwitch} from './GameSwitch';
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { api, Button, Card, Input, Select, useAPI } from '../lib';
 import { can, items, json, PageError, useServer, value } from './common';
 import { JavaSettings } from './JavaSettings';
@@ -115,8 +116,8 @@ function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyCh
   const choices = Object.entries(images);
   const dirty = draft !== image;
   useEffect(() => {onDirtyChange(dirty); return () => onDirtyChange(false);}, [dirty, onDirtyChange]);
-  return <details className="startup-advanced card">
-    <summary>Advanced runtime image{dirty ? ' · Unsaved' : ''}</summary>
+  return <section className="startup-advanced">
+    <h3>Runtime image{dirty ? ' · Unsaved' : ''}</h3>
     <p className="muted">The container image applies next start. Saving does not reinstall the server.</p>
     <form aria-busy={busy} onSubmit={event => {
       event.preventDefault();
@@ -135,13 +136,13 @@ function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyCh
       {permitted && <div className="startup-field-actions"><Button type="submit" disabled={busy || !dirty || !draft.trim()}>{busy ? 'Saving...' : 'Save image'}</Button>{dirty && <Button variant="secondary" disabled={busy} onClick={() => setDraft(image)}>Discard draft</Button>}</div>}
     </form>
     <PageError error={error} />{success && <p className="success" role="status">{success}</p>}
-  </details>;
+  </section>;
 }
 
 type SettingsSection = 'game' | 'runtime';
-type SettingsProps = {section: SettingsSection; administrator?: boolean; onDirtyChange?: (dirty: boolean) => void};
+type SettingsProps = {section: SettingsSection; administrator?: boolean; showCommandPreview?: boolean; runtimeCommand?: ReactNode; onDirtyChange?: (dirty: boolean) => void};
 
-function StartupContent({section, administrator = false, onDirtyChange}: SettingsProps) {
+function StartupContent({section, administrator = false, showCommandPreview = true, runtimeCommand, onDirtyChange}: SettingsProps) {
   const { base, permissions, reload, server } = useServer();
   const permitted = can(permissions, 'startup.read');
   const query = useAPI(permitted ? `${base}/startup` : null);
@@ -173,24 +174,30 @@ function StartupContent({section, administrator = false, onDirtyChange}: Setting
     query.reload();
     return updated;
   }}/>;
-  return <section className="startup-settings games-ui">
-    <header className="startup-heading"><div><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div>
-    </header>
-    <PageError error={query.error} />
-    <div className="startup-save-note" role="status">{pending ? `${pending} unsaved ${pending === 1 ? 'field' : 'fields'}. Save each field separately.` : 'Each field saves separately.'}{!updateAllowed && ' You have read-only access to variables.'}</div>
-    {farming && <Card className="startup-variables"><h3>Game licence and DLC</h3><p className="muted">Game and DLC licences are supplied by the administrator. Contact your administrator to add or change a DLC licence.</p><div className="startup-variable-grid">{variables.filter(variable=>licenceFields.has(variable.env_variable)&&!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)).map(renderVariable)}</div></Card>}
-    <Card className="startup-variables"><h3>{section === 'game' ? 'Game options' : 'Installation & startup options'}</h3>
+  const OptionsGroup = section === 'runtime' ? 'section' : Card;
+  const options = <>
+    {farming && <OptionsGroup className="startup-variables"><h3>Game licence and DLC</h3><p className="muted">Game and DLC licences are supplied by the administrator. Contact your administrator to add or change a DLC licence.</p><div className="startup-variable-grid">{variables.filter(variable=>licenceFields.has(variable.env_variable)&&!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)).map(renderVariable)}</div></OptionsGroup>}
+    <OptionsGroup className="startup-variables"><h3>{section === 'game' ? 'Game options' : 'Installation & startup options'}</h3>
       {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}
       <div className="startup-variable-grid">{variables.filter(variable=>!farming || !licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
-    </Card>
-    {section === 'runtime' && <><JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
-    {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} customAllowed={administrator} onDirtyChange={imageDirty} onSaved={image => { setSavedImage(image); reload(); }} />}
-    <details className="startup-preview card"><summary>Startup command preview</summary><p className="muted">Preview of saved settings. Secret values are hidden. Unsaved drafts are excluded.</p><pre>{commandPreview(meta, (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable))}</pre></details></>}
+    </OptionsGroup>
+  </>;
+  return <section className="startup-settings games-ui">
+    {section === 'game' && <header className="startup-heading"><div><h2>Additional game options</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div></header>}
+    <PageError error={query.error} />
+    {section === 'game' && <div className="startup-save-note" role="status">{pending ? `${pending} unsaved ${pending === 1 ? 'field' : 'fields'}. Save each field separately.` : 'Each field saves separately.'}{!updateAllowed && ' You have read-only access to variables.'}</div>}
+    {section === 'runtime' ? <Card className="startup-runtime-card">
+      {runtimeCommand}
+      {showCommandPreview && <section className="startup-preview"><h3>Startup command</h3><p className="muted">Preview of saved settings. Secret values are hidden. Unsaved drafts are excluded.</p><pre>{commandPreview(meta, (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable))}</pre></section>}
+      {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} customAllowed={administrator} onDirtyChange={imageDirty} onSaved={image => { setSavedImage(image); reload(); }} />}
+      <JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
+      {options}
+    </Card> : options}
   </section>;
 }
 
-export default function ServerStartup({section = 'runtime', administrator = false, onDirtyChange}: Partial<SettingsProps>) {
+export default function ServerStartup({section = 'runtime', administrator = false, showCommandPreview = true, runtimeCommand, onDirtyChange}: Partial<SettingsProps>) {
   const { base } = useServer();
-  return <StartupContent key={`${base}:${section}`} section={section} administrator={administrator} onDirtyChange={onDirtyChange} />;
+  return <StartupContent key={`${base}:${section}`} section={section} administrator={administrator} showCommandPreview={showCommandPreview} runtimeCommand={runtimeCommand} onDirtyChange={onDirtyChange} />;
 }
 
