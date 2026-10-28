@@ -4,11 +4,11 @@ import {templateAgreementsAccepted, templateMemoryWarning, templateStorageWarnin
 
 test('template storage warnings distinguish below-default limits from adequate or invalid values', () => {
  const selected=64*1024;
- assert.match(templateStorageWarning('Counter-Strike 2',selected,160*1024),/160 GiB.*selected 64 GiB.*updates may run out of space/);
+ assert.match(templateStorageWarning('Counter-Strike 2',selected,160*1024),/160 GB.*selected 64 GB.*updates may run out of space/);
  for(const value of [160*1024,192*1024,null,0,127,NaN,Infinity,128.5])assert.equal(templateStorageWarning('Game',value,160*1024),null);
  assert.equal(templateStorageWarning('Game',128,NaN),null);
  assert.equal(templateStorageWarning('Game',128,0),null);
- assert.match(templateStorageWarning('Small server',128,1024),/0.125 GiB/);
+ assert.match(templateStorageWarning('Small server',128,1024),/0.125 GB/);
 });
 
 const automaticRole = environment => ({environment, condition:'nonzero', allocated_value:true, auto_allocate:true, exclude_primary:true, minimum:1, maximum:65535, count:3});
@@ -270,8 +270,8 @@ test('publisher agreement requires the exact reviewed version and never boolean 
 });
 
 test('below-default memory warns without redefining valid custom limits', () => {
- assert.match(templateMemoryWarning('Renown',4096,8192),/8 GiB of memory.*4 GiB.*fail to start/);
- assert.match(templateMemoryWarning('Renown',7168,8192),/7 GiB/);
+ assert.match(templateMemoryWarning('Renown',4096,8192),/8 GB of memory.*4 GB.*fail to start/);
+ assert.match(templateMemoryWarning('Renown',7168,8192),/7 GB/);
  for(const value of [8192,16384,null,0,127,NaN,Infinity,128.5])assert.equal(templateMemoryWarning('Renown',value,8192),null);
 });
 

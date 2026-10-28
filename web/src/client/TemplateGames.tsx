@@ -1,3 +1,4 @@
+import {miBToGB} from "../resourceUnits.ts";
 import {startupVariableSection} from './startupSettingsModel';
 import {GameSwitch} from './GameSwitch';
 import {useRef, useState, type FormEvent} from 'react';
@@ -68,8 +69,8 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const [privateContent, setPrivateContent] = useState(templateSteamDefault(options.steam_installation, !!options.private_content_supported));
   const [name, setName] = useState(`${options.name} server`);
   const [node, setNode] = useState(String(initialNode?.id ?? ''));
-  const [memory, setMemory] = useState(String(Math.min(options.defaults.memory, Math.max(128, gameMemoryBudget(1048576, initialNode))) / 1024));
-  const [disk, setDisk] = useState(String(Math.min(options.defaults.disk, Math.max(128, gameResourceBudget(16777216, initialNode?.available_disk))) / 1024));
+  const [memory, setMemory] = useState(String(miBToGB(Math.min(options.defaults.memory, Math.max(128, gameMemoryBudget(1048576, initialNode))))));
+  const [disk, setDisk] = useState(String(miBToGB(Math.min(options.defaults.disk, Math.max(128, gameResourceBudget(16777216, initialNode?.available_disk))))));
   const [image, setImage] = useState(options.images[0]?.value ?? '');
   const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const submitting = useRef(false), submission = useRef<{payload: string; id: string} | null>(null);
@@ -121,12 +122,12 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   };
   return <div className="steam-setup-layout" style={fs25 ? {display:"block"} : undefined}><Card><form ref={setupForm} onSubmit={install}><fieldset className="steam-fields" disabled={busy}>
     {!!options.platforms?.length && <p className="muted">Required node: {options.platforms.map(platform => platform.replace('linux/', 'Linux ').replace('arm64', 'ARM64').replace('amd64', 'x64')).join(', ')}. Only matching online nodes are listed.</p>}
-    <GameNameField value={name} onChange={setName}/><div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={128} maximum={Math.max(128, memoryMaximum)} describedBy={memoryWarning ? "game-template-memory-warning" : undefined}/><Field label="Storage (GiB)"><Input id="game-server-storage" required type="number" min={0.125} max={Math.max(128, diskMaximum) / 1024} step={1 / 1024} value={disk} aria-describedby={storageWarning ? "game-template-storage-warning" : undefined} onChange={event => setDisk(event.target.value)}/></Field></div>
+    <GameNameField value={name} onChange={setName}/><div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={128} maximum={Math.max(128, memoryMaximum)} describedBy={memoryWarning ? "game-template-memory-warning" : undefined}/><Field label="Storage (GB)"><Input id="game-server-storage" required type="number" min={0.125} max={miBToGB(Math.max(128, diskMaximum))} step="any" value={disk} aria-describedby={storageWarning ? "game-template-storage-warning" : undefined} onChange={event => setDisk(event.target.value)}/></Field></div>
     {memoryWarning && <p id="game-template-memory-warning" className="game-stop-note" role="status">{memoryWarning}</p>}
     {storageWarning && <p id="game-template-storage-warning" className="game-stop-note" role="status">{storageWarning}</p>}
     {(options.steam_installation || options.private_content_supported) && <><Field label="Steam installation"><Select value={privateContent ? 'private' : 'public'} onChange={event => {const next = event.target.value === 'private'; setPrivateContent(next); setEnvironment(previous => clearTemplateSteamSecrets(previous, options.steam_installation));}}><option value="private">Use my Steam account after preparation</option><option value="public">Anonymous Steam installation</option></Select></Field>{privateContent && <p className="muted">Preparation creates the server directory and runtime helpers. Add your Steam authorization on the next page to download game files. Public automatic updates are disabled.</p>}{privateContent && !options.private_content_supported && <p role="status" className="game-stop-note">{options.steam_installation?.private_reason || 'Private Steam setup for this recipe needs a reviewed publication policy.'}</p>}{privateContent && options.private_content_supported && selectedNode?.private_content_ready !== true && <p role="status" className="game-stop-note">Private Steam installation is not enabled on this node. Choose a node with a trusted private Steam worker.</p>}</>}
     {selectedNode?.unavailable_reason && <p className="game-stop-note" role="status">{selectedNode.unavailable_reason}</p>}
-    {((memoryValue !== null && memoryValue > memoryMaximum) || (diskValue !== null && diskValue > diskMaximum)) && <p className="game-stop-note" role="status">This node has {memoryMaximum / 1024} GiB of memory and {diskMaximum / 1024} GiB of storage available for allocation. Lower the limits or choose another node.</p>}
+    {((memoryValue !== null && memoryValue > memoryMaximum) || (diskValue !== null && diskValue > diskMaximum)) && <p className="game-stop-note" role="status">This node has {miBToGB(memoryMaximum)} GB of memory and {miBToGB(diskMaximum)} GB of storage available for allocation. Lower the limits or choose another node.</p>}
     {steamEnvironmentError && <p role="alert">{steamEnvironmentError}</p>}
     <div id="game-template-ports" tabIndex={-1}><GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/></div>
     {options.agreements?.map(agreement => <GameAgreementField key={agreement.environment} agreement={agreement} value={environment[agreement.environment] ?? "0"} onChange={value => setEnvironment(previous => ({...previous, [agreement.environment]: value}))}/>)}

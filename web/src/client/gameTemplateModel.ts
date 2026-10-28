@@ -1,3 +1,4 @@
+import {miBToGB} from "../resourceUnits.ts";
 export type TemplateVariableDefinition = {env_variable: string; rules: string; default_value: string};
 export type GameAgreement = {environment: string; title: string; text: string; effective_date: string; reviewed_date?: string; accept_value: string};
 
@@ -8,7 +9,7 @@ export function templateAgreementsAccepted(agreements: GameAgreement[] | undefin
 function templateResourceWarning(name: string, selectedMiB: number | null, defaultMiB: number, resource: 'memory' | 'storage'): string | null {
   if (selectedMiB === null || !Number.isSafeInteger(selectedMiB) || selectedMiB < 128 || !Number.isSafeInteger(defaultMiB) || defaultMiB <= 0 || selectedMiB >= defaultMiB) return null;
   const risk = resource === 'memory' ? 'the server may fail to start or be stopped when it runs out of memory' : 'installation or updates may run out of space';
-  return `${name} defaults to ${defaultMiB / 1024} GiB of ${resource}. The selected ${selectedMiB / 1024} GiB is lower; ${risk}.`;
+  return `${name} defaults to ${miBToGB(defaultMiB)} GB of ${resource}. The selected ${miBToGB(selectedMiB)} GB is lower; ${risk}.`;
 }
 
 export function templateStorageWarning(name: string, selectedMiB: number | null, defaultMiB: number) { return templateResourceWarning(name, selectedMiB, defaultMiB, 'storage'); }

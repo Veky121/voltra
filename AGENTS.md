@@ -27,3 +27,7 @@ Any applicable child delegation needs explicit user or parent authorization. Roo
 - Do not create or push final or beta release tags, advance `update-release`, or advance its legacy `update-beta`/`update-stable` compatibility feeds without that explicit Release instruction. Use a versioned nightly tag or the existing nightly workflow for routine updates.
 - Keep each desktop user's selected update channel. This agent publication policy does not authorize changing user preferences, promoting Nightly automatically, or installing updates without the applicable task authorization.
 - Before publication, verify scoped changes and required checks. Keep unrelated dirty files out of release checkouts. Report the published version/channel and distinguish tests, builds, browser checks, installation, and live deployment.
+
+## Memory and storage units
+
+Use GB for user-facing memory, heap, swap, storage, capacity and upload-limit forms and resource summaries. Entering `8` must request 8 GB. Convert at API boundaries with the shared resource-unit helpers; existing Wings/panel limits remain integer MiB, with 1 displayed GB representing 1024 MiB. Preserve zero/unlimited and swap sentinel semantics, existing saved capacities, and appropriate file-size/network units. Never require users to calculate or enter MiB.

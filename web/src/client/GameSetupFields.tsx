@@ -1,3 +1,4 @@
+import {miBToGB} from "../resourceUnits.ts";
 import './games-ui.css';
 import {Field, Input, Select} from '../lib';
 import type {SetupNode} from './gameSetupModel';
@@ -18,7 +19,7 @@ export function GameNameField({value, onChange}: {value: string; onChange: (valu
 }
 
 export function GameMemoryField({value, onChange, minimum, maximum, describedBy}: {value: string; onChange: (value: string) => void; minimum: number; maximum: number; describedBy?: string}) {
-  return <Field label="Memory (GiB)" hint={`Minimum ${minimum / 1024} GiB`}><Input id="game-server-memory" type="number" required min={minimum / 1024} max={maximum / 1024} step={1 / 1024} value={value} aria-describedby={describedBy} onChange={event => onChange(event.target.value)}/></Field>;
+  return <Field label="Memory (GB)" hint={`Minimum ${miBToGB(minimum)} GB`}><Input id="game-server-memory" type="number" required min={miBToGB(minimum)} max={miBToGB(maximum)} step="any" value={value} aria-describedby={describedBy} onChange={event => onChange(event.target.value)}/></Field>;
 }
 
 export function GameNodeField({value, onChange, nodes, automatic = false}: {value: string; onChange: (value: string) => void; nodes: SetupNode[]; automatic?: boolean}) {

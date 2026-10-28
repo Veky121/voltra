@@ -20,7 +20,7 @@ export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
   const contentType=response.headers.get('content-type')||'';
   const data=contentType.includes('json')?await response.json():await response.text();
   if(!response.ok){
-    const message=typeof data==='object'?(data.errors?.map((e:any)=>e.detail||e.message).join('\n')||data.message):data;
+    const message=typeof data==='object'?(data.errors?.map((e:any)=>e.detail||e.message).join('\n')||data.message||(typeof data.error==='string'?data.error:undefined)):data;
     throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status});
   }
   if(path==='/api/admin/settings'&&options.method&&options.method.toUpperCase()!=='GET')window.dispatchEvent(new Event('panel-settings-changed'));

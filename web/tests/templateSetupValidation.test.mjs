@@ -42,3 +42,14 @@ test('length checks count characters and never return an entered secret',()=>{
  const problems=templateSetupProblems(ready({environment:{WEB_PASSWORD:secret,GAME_SERIAL:'fixture'},variables:[{...password,rules:'required|string|max:12'}]}));
  assert.match(problems[0].message,/12 characters/);assert.ok(!JSON.stringify(problems).includes(secret));
 });
+
+
+test('resource readiness rejects invalid stored units and enforces rounded save bounds', () => {
+ for (const value of [null, NaN, Infinity, -1, 0, 127, 128.5]) {
+  assert.ok(templateSetupProblems(ready({memory:value})).some(p=>p.field==='game-server-memory'));
+  assert.ok(templateSetupProblems(ready({disk:value})).some(p=>p.field==='game-server-storage'));
+ }
+ assert.ok(templateSetupProblems(ready({memory:16385})).some(p=>p.field==='game-server-memory'));
+ assert.ok(templateSetupProblems(ready({disk:204801})).some(p=>p.field==='game-server-storage'));
+ assert.deepEqual(templateSetupProblems(ready({memory:1264,disk:1264})),[]);
+});

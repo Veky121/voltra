@@ -38,6 +38,12 @@ test('forbidden refresh removes previously cached authority',async()=>{
 });
 const apiBundle=await build({stdin:{contents:"export {api,queryCacheSessionIdentity} from './src/lib'; export {observeQuery,purgeQueryCache} from './src/hooks/queryCache';",resolveDir:new URL('..',import.meta.url).pathname.replace(/^\/(.:)/,'$1'),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'ui-stubs',setup(b){b.onResolve({filter:/components\/ui\/card|\.\/ui\/Select|\.\/ui\/Modal/},()=>({path:'ui',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export const Card=()=>null;export const Select=()=>null;export const Modal=()=>null;'}));}}]});
 const real=await import(`data:text/javascript;base64,${Buffer.from(apiBundle.outputFiles[0].text).toString('base64')}`);
+test('desktop proxy failures show the supplied connection error',async()=>{
+ const oldFetch=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:'The panel could not be reached. Check your connection and retry.'}),{status:502,headers:{'content-type':'application/json'}});
+ try{await assert.rejects(real.api('/api/client/servers/test/websocket'),error=>error.status===502&&error.message==='The panel could not be reached. Check your connection and retry.');}
+ finally{globalThis.fetch=oldFetch;}
+});
 test('api mutations target related data and silent session identity changes purge',async()=>{
  const oldFetch=globalThis.fetch,oldWindow=globalThis.window;
  globalThis.window=Object.assign(new EventTarget(),{location:{origin:'http://localhost'}});

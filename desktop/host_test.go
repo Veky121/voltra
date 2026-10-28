@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -19,6 +20,63 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+func TestDesktopProxyCompressedWebsocketMetadata(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/client/servers/test/websocket" && r.Header.Get("Accept-Encoding") != "identity" {
+			t.Error("rewritten metadata did not request identity encoding")
+		}
+		if r.URL.Path == "/api/client/artwork/test.png" && r.Header.Get("Accept-Encoding") != "gzip, deflate, br" {
+			t.Error("ordinary proxy encoding changed")
+		}
+		if r.Header.Get("Authorization") != "Bearer test-device-credential" || r.Header.Get("Cookie") != "" {
+			t.Error("proxy credential isolation changed")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip")
+		compressed := gzip.NewWriter(w)
+		defer compressed.Close()
+		_, _ = io.WriteString(compressed, `{"data":{"token":"test-console-signature","socket":"wss://panel.example/api/client/servers/test/ws?signature=test"}}`)
+	}))
+	defer remote.Close()
+	h := &desktopHost{session: session{PanelURL: remote.URL, Token: "test-device-credential"}}
+	req := httptest.NewRequest("GET", "http://localhost/api/client/servers/test/websocket", nil)
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cookie", "local-only=test")
+	w := httptest.NewRecorder()
+	h.proxy(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("compressed metadata returned %d", w.Code)
+	}
+	var result struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Data["socket"] != "/api/client/servers/test/ws?signature=test" || result.Data["token"] != "test-console-signature" {
+		t.Fatal("metadata path or signature changed")
+	}
+	if w.Header().Get("Content-Encoding") != "" {
+		t.Fatal("rewritten metadata still marked compressed")
+	}
+	req = httptest.NewRequest("GET", "http://localhost/api/client/artwork/test.png", nil)
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	w = httptest.NewRecorder()
+	h.proxy(w, req)
+	if w.Code != http.StatusOK || w.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatal("ordinary compressed response was changed")
+	}
+	compressed, err := gzip.NewReader(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer compressed.Close()
+	body, err := io.ReadAll(compressed)
+	if err != nil || !bytes.Contains(body, []byte("wss://panel.example/")) {
+		t.Fatal("ordinary response body was rewritten")
+	}
+}
 
 func TestDesktopProtectedSession(t *testing.T) {
 	if runtime.GOOS != "windows" {

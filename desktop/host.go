@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -293,6 +294,10 @@ func (h *desktopHost) proxy(w http.ResponseWriter, r *http.Request) {
 		director(req)
 		req.Host = target.Host
 		proxyHeaders(req, s)
+		if strings.HasSuffix(r.URL.Path, "/websocket") {
+			// This JSON response is rewritten locally, so request plain metadata.
+			req.Header.Set("Accept-Encoding", "identity")
+		}
 		req.Header["X-Forwarded-For"] = nil
 	}
 	proxy.ModifyResponse = func(resp *http.Response) error {
@@ -304,10 +309,19 @@ func (h *desktopHost) proxy(w http.ResponseWriter, r *http.Request) {
 		// The panel returns an absolute console address. Keep the socket on
 		// the local transport so the native host supplies its credential.
 		if strings.HasSuffix(r.URL.Path, "/websocket") && resp.StatusCode == 200 {
+			bodyReader := io.Reader(resp.Body)
+			if strings.EqualFold(strings.TrimSpace(resp.Header.Get("Content-Encoding")), "gzip") {
+				compressed, err := gzip.NewReader(resp.Body)
+				if err != nil {
+					return err
+				}
+				defer compressed.Close()
+				bodyReader = compressed
+			}
 			var result struct {
 				Data map[string]any `json:"data"`
 			}
-			if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&result); err != nil {
+			if err := json.NewDecoder(io.LimitReader(bodyReader, 1<<20)).Decode(&result); err != nil {
 				return err
 			}
 			_ = resp.Body.Close()

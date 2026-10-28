@@ -344,7 +344,7 @@ func (a *App) javaResolve(ctx context.Context, egg M, config M, memory int64) (M
 		xmx = memory - reserve
 	}
 	if xmx < 1 || memory > 0 && xmx > memory-reserve {
-		return nil, bad("The maximum heap must leave at least 128 MiB or 10% of container memory for Java overhead.")
+		return nil, bad("The maximum heap must leave at least 0.125 GB or 10% of container memory for Java overhead.")
 	}
 	if xms == 0 {
 		xms = min(int64(256), xmx)

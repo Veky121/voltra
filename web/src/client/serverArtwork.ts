@@ -58,6 +58,12 @@ export function getServerArtwork(server: Workload): ServerArtwork {
  if(base.id==='minecraft'&&pack)return {...base,id:'minecraft-modpack',name:server.artwork?.pack_name||'Minecraft modpack',src:pack.src,kind:'modpack'};
  return panelArtwork('server',base.id,base);
 }
+// Overview banners show the base game; identity icons retain modpack artwork.
+export function getServerBannerArtwork(server: Workload): ServerArtwork {
+  const base = resolveServerArtwork(server);
+  return panelArtwork('server', base.id, base);
+}
+
 function resolveServerArtwork(server: Workload): ServerArtwork {
   // Explicit workload metadata wins over a user's custom display name.
   const explicit = (server.game || server.artwork?.game) && match(server.game || server.artwork?.game || '');

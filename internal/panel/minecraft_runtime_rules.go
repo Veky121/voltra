@@ -167,7 +167,7 @@ func (a *App) applyMinecraftRuntimeRules(ctx context.Context, provider, projectI
 			continue
 		}
 		if memory < num(rule["min_memory_mib"]) {
-			return nil, bad(fmt.Sprintf("%s requires at least %d MiB of server memory.", str(rule["name"]), num(rule["min_memory_mib"])))
+			return nil, bad(fmt.Sprintf("%s requires at least %g GB of server memory.", str(rule["name"]), float64(num(rule["min_memory_mib"]))/1024))
 		}
 		if major := num(rule["required_major"]); major > num(result["required_major"]) {
 			result["required_major"] = major

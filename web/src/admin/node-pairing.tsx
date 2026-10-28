@@ -1,3 +1,4 @@
+import { formatMiBGB } from "../resourceUnits";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {Select,  Button, Field, Loading, Modal } from "../lib";
@@ -135,7 +136,7 @@ function useMutation() {
 }
 
 function capacity(mib: number) {
-  return mib >= 1024 ? `${(mib / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} GiB` : `${mib.toLocaleString()} MiB`;
+  return formatMiBGB(mib);
 }
 function date(value: string) {
   const parsed = new Date(value);

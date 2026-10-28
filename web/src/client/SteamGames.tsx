@@ -1,3 +1,4 @@
+import {miBToGB} from "../resourceUnits.ts";
 import {startupVariableSection} from './startupSettingsModel';
 import {GameSwitch} from './GameSwitch';
 import './games-ui.css';
@@ -40,7 +41,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const initialBudget=gameMemoryBudget(options.maximum_memory,initialNode);
   const [name, setName] = useState(`${options.name} server`);
   const [node, setNode] = useState(String(initialNode?.id ?? ''));
-  const [memory, setMemory] = useState(String((initialBudget>=options.minimum_memory ? Math.min(options.defaults.memory,initialBudget) : options.defaults.memory) / 1024));
+  const [memory, setMemory] = useState(String(miBToGB(initialBudget>=options.minimum_memory ? Math.min(options.defaults.memory,initialBudget) : options.defaults.memory)));
   const players = String(options.defaults.max_players);
   const [password, setPassword] = useState('');
   const preset = options.presets[0]?.value ?? '';
@@ -86,7 +87,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
       <div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={options.minimum_memory} maximum={Math.max(options.minimum_memory,memoryMaximum)} describedBy={memoryWarning ? "steam-memory-warning" : undefined}/></div>
       
       {selectedNode?.unavailable_reason && <p className="game-stop-note" role="status">{selectedNode.unavailable_reason}</p>}
-      {memoryValue !== null && memoryValue > memoryMaximum && <p className="game-stop-note" role="status">This node has {memoryMaximum / 1024} GiB available for allocation. Lower the limit or choose another node.</p>}
+      {memoryValue !== null && memoryValue > memoryMaximum && <p className="game-stop-note" role="status">This node has {miBToGB(memoryMaximum)} GB available for allocation. Lower the limit or choose another node.</p>}
       {memoryWarning && <p id="steam-memory-warning" className="game-stop-note" role="status">{memoryWarning}</p>}
       <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/>
       {passwordRules.enabled && passwordRules.required && <Field label="Server password" hint={passwordRules.required ? `Required, ${passwordRules.min_length} to ${passwordRules.max_length} characters.` : 'Optional. Players use this when joining.'}><Input type="password" autoComplete="new-password" required={passwordRules.required} minLength={passwordRules.min_length} maxLength={passwordRules.max_length} value={password} onChange={event => setPassword(event.target.value)}/></Field>}

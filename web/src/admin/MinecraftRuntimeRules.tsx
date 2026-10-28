@@ -1,3 +1,4 @@
+import { miBToGB, gbToMiB } from "../resourceUnits";
 import {useEffect, useState} from "react";
 import {api, Button, Card, Field, Input, Select, useAPI, unwrap} from "../lib";
 import {Switch} from "../ui/Settings";
@@ -6,7 +7,7 @@ import "./management-ui.css";
 type RuntimeRule = {
   id:string; name:string; enabled:boolean; provider:string; project_id:string;
   project_version:string; loader:string; game_version:string; required_major:number;
-  required_distribution:string; min_memory_mib:number; jvm_args:string;
+  required_distribution:string; min_memory_mib:number | string; jvm_args:string;
 };
 const emptyRule = ():RuntimeRule => ({id:crypto.randomUUID(),name:"",enabled:true,provider:"",project_id:"",project_version:"",loader:"",game_version:"",required_major:0,required_distribution:"",min_memory_mib:0,jvm_args:""});
 
@@ -15,13 +16,14 @@ export function MinecraftRuntimeRules(){
   const [rules,setRules]=useState<RuntimeRule[]>([]);
   const [openRules,setOpenRules]=useState<Record<string,boolean>>({});
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[saved,setSaved]=useState(false);
-  useEffect(()=>{if(query.data)setRules(unwrap(query.data).rules??[])},[query.data]);
+  useEffect(()=>{if(query.data)setRules((unwrap(query.data).rules??[]).map((rule:RuntimeRule)=>({...rule,min_memory_mib:miBToGB(Number(rule.min_memory_mib))})))},[query.data]);
   function update(id:string,patch:Partial<RuntimeRule>){setSaved(false);setRules(old=>old.map(rule=>rule.id===id?{...rule,...patch}:rule))}
   async function save(){
     setError("");setSaved(false);setBusy(true);
     try{
-      const result=await api("/api/admin/minecraft/runtime-rules",{method:"PUT",body:JSON.stringify({rules})});
-      setRules(unwrap(result).rules);setSaved(true);
+      const payload=rules.map(rule=>{const memory=gbToMiB(rule.min_memory_mib);if(!Number.isFinite(memory)||Number(rule.min_memory_mib)<0||Number(rule.min_memory_mib)>1024)throw new Error("Minimum server memory: enter a GB amount between 0 and 1024.");return {...rule,min_memory_mib:memory}});
+      const result=await api("/api/admin/minecraft/runtime-rules",{method:"PUT",body:JSON.stringify({rules:payload})});
+      setRules(unwrap(result).rules.map((rule:RuntimeRule)=>({...rule,min_memory_mib:miBToGB(Number(rule.min_memory_mib))})));setSaved(true);
     }catch(err){setError(err instanceof Error?err.message:String(err))}finally{setBusy(false)}
   }
   return <Card className="admin-panel admin-runtime-rules management-ui">
@@ -41,7 +43,7 @@ export function MinecraftRuntimeRules(){
           <Field label="Minecraft version" hint="An exact version, or leave blank for all versions."><Input value={rule.game_version} onChange={e=>update(rule.id,{game_version:e.target.value})}/></Field>
           <Field label="Minimum Java major" hint="0 keeps the requirement from Minecraft metadata."><Input type="number" min={0} max={999} step={1} value={rule.required_major} onChange={e=>update(rule.id,{required_major:Number(e.target.value)})}/></Field>
           <Field label="Required distribution" hint="Match a distribution registered above, such as temurin or graalvm. Leave blank for any."><Input value={rule.required_distribution} onChange={e=>update(rule.id,{required_distribution:e.target.value})}/></Field>
-          <Field label="Minimum server memory (GiB)"><Input type="number" min={0} max={1024} step={0.25} value={rule.min_memory_mib/1024} onChange={e=>update(rule.id,{min_memory_mib:Number(e.target.value)*1024})}/></Field>
+          <Field label="Minimum server memory (GB)" hint="0 adds no minimum memory requirement."><Input type="number" min={0} max={1024} step="any" value={rule.min_memory_mib} onChange={e=>update(rule.id,{min_memory_mib:e.target.value})}/></Field>
           <Field label="Additional JVM arguments" hint="Heap size is managed separately. Example: -XX:+UseG1GC"><Input value={rule.jvm_args} maxLength={4096} onChange={e=>update(rule.id,{jvm_args:e.target.value})}/></Field>
         </div>
         <div className="actions admin-form-actions admin-form-actions-split"><label className="admin-inline-switch"><Switch checked={rule.enabled} onCheckedChange={checked => update(rule.id,{enabled:checked})}/>Enabled</label><Button variant="danger" onClick={()=>{setRules(old=>old.filter(x=>x.id!==rule.id));setSaved(false)}}>Remove rule</Button></div>

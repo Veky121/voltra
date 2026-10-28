@@ -1,3 +1,4 @@
+import {gbToMiB} from "../resourceUnits.ts";
 import {useCallback, useEffect, useState} from "react";
 import {api, unwrap} from "../lib";
 
@@ -34,6 +35,6 @@ export function useMinecraftRequest<T>(path: string | null) {
 
 export function gibToMiB(input: string): number | null {
   if (!input.trim()) return null;
-  const gib = Number(input), mib = gib * 1024;
+  const gib = Number(input), mib = gbToMiB(input);
   return Number.isFinite(gib) && gib >= 0 && Number.isSafeInteger(mib) ? mib : null;
 }

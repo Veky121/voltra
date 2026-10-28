@@ -1,3 +1,4 @@
+import {formatBytesGB,formatMiBGB} from '../resourceUnits';
 import './gameSwitch.css';
 import { createContext, useContext, useState } from "react";
 import { api, Button } from "../lib";
@@ -145,4 +146,18 @@ export function Check({
       {label}
     </label>
   );
+}
+
+// Resource telemetry is bytes; configured resource limits are MiB.
+export function resourceUsageGB(value: unknown): string {
+  return value === null || value === undefined || value === ''
+    ? 'Unavailable' : formatBytesGB(Number(value));
+}
+export function resourceLimitGB(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'Unavailable';
+  const amount = Number(value);
+  return amount === 0 ? 'Unlimited' : formatMiBGB(amount);
+}
+export function resourceReadingGB(used: unknown, limitMiB: unknown): string {
+  return `${resourceUsageGB(used)} / ${resourceLimitGB(limitMiB)}`;
 }

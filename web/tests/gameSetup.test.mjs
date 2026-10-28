@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {miBToGB} from '../src/resourceUnits.ts';
 import assert from 'node:assert/strict';
 import {activeSteamJob, checkDue, managedSteamServer, memoryMiB, gameMemoryBudget, gameResourceBudget, gameInitialNode, quickSettings, safeFolderLink, steamJobLabel, steamMemoryWarning, stoppedServer} from '../src/client/gameSetupModel.ts';
 
@@ -25,10 +26,11 @@ test('setup selects a viable node and caps memory to available capacity', () => 
   assert.equal(gameInitialNode([]),undefined);
 });
 
-test('memory conversion rejects partial MiB and invalid budgets', () => {
+test('memory conversion rounds decimal GB and rejects invalid budgets', () => {
   assert.equal(memoryMiB('16'), 16384);
   assert.equal(memoryMiB('0.5'), 512);
-  for (const value of ['', ' ', 'no', 'Infinity', '-2', '0', '1.0001']) assert.equal(memoryMiB(value), null);
+  assert.equal(memoryMiB('1.0006'), 1025);
+  for (const value of ['', ' ', 'no', 'Infinity', '-2', '0']) assert.equal(memoryMiB(value), null);
 });
 test('folder shortcuts preserve Files directory routing and reject unsafe paths', () => {
   assert.equal(safeFolderLink('abc', 'FactoryGame/Saved/SaveGames/server/My Session'), '/server/abc/files?directory=%2FFactoryGame%2FSaved%2FSaveGames%2Fserver%2FMy+Session');
@@ -67,10 +69,10 @@ const localTime = value => new Date(value).toLocaleString();
 
 test('Palworld warns for valid RAM below the API default without changing the minimum', () => {
   const options = {name:'Palworld',defaults:{memory:16384},minimum_memory:8192,maximum_memory:131072};
-  assert.match(steamMemoryWarning(options, memoryMiB('8')), /Palworld defaults to 16 GiB.*risk of crashes/);
-  assert.match(steamMemoryWarning(options, memoryMiB('15.5')), /16 GiB/);
+  assert.match(steamMemoryWarning(options, memoryMiB('8')), /Palworld defaults to 16 GB.*risk of crashes/);
+  assert.match(steamMemoryWarning(options, memoryMiB('15.5')), /16 GB/);
   for (const value of ['16','32','7','bad','']) assert.equal(steamMemoryWarning(options, memoryMiB(value)), null);
-  assert.match(steamMemoryWarning({...options,name:'Satisfactory',defaults:{memory:12288}},8192), /Satisfactory defaults to 12 GiB/);
+  assert.match(steamMemoryWarning({...options,name:'Satisfactory',defaults:{memory:12288}},8192), /Satisfactory defaults to 12 GB/);
 });
 
 test('attempts never imply failure, including a first check and an older API without failed-at', () => {
@@ -119,4 +121,16 @@ test('masked Quick setup secrets remain untouched unless explicitly replaced or 
  assert.deepEqual(quickSettings(fields,{AdminPassword:null,ServerPassword:null,ServerName:'After'}),{ServerName:'After'});
  assert.deepEqual(quickSettings(fields,{ServerPassword:''}),{ServerPassword:''});
  assert.deepEqual(quickSettings(fields,{AdminPassword:'replacement'}),{AdminPassword:'replacement'});
+});
+
+
+test('setup resource drafts preserve stored MiB through decimal editing and JSON save', () => {
+  for (const stored of [128, 512, 1025, 8192, 1048575]) {
+    const draft = String(miBToGB(stored));
+    const saved = JSON.parse(JSON.stringify({memory: memoryMiB(draft), disk: memoryMiB(draft)}));
+    assert.deepEqual(saved, {memory: stored, disk: stored});
+  }
+  assert.equal(memoryMiB('8'), 8192);
+  assert.equal(memoryMiB('1.2345'), 1264);
+  for (const invalid of ['', ' ', '-0.0001', '-1', 'NaN', 'Infinity', '1e300']) assert.equal(memoryMiB(invalid), null);
 });

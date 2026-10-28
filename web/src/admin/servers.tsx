@@ -24,9 +24,9 @@ import {
 } from "./shared";
 const servers = "/api/application/servers";
 const limits = [
-  f("memory", "Memory limit (MiB)", "number", { default: 1024 }),
-  f("swap", "Swap (MiB)", "number"),
-  f("disk", "Disk limit (MiB)", "number", { default: 10240 }),
+  f("memory", "Memory limit (GB)", "number", { default: 1024, unit: "GB", hint: "0 means unlimited memory." }),
+  f("swap", "Swap (GB)", "number", { unit: "GB", swapSentinel: true, hint: "0 disables swap. -1 allows unlimited swap." }),
+  f("disk", "Disk limit (GB)", "number", { default: 10240, unit: "GB", hint: "0 means unlimited storage." }),
   f("io", "IO weight", "number", { default: 500 }),
   f("cpu", "CPU limit (%)", "number", { default: 100 }),
   f("threads", "CPU pinning"),
@@ -198,7 +198,7 @@ function CreateServer() {
           setError("");
           setBusy(true);
           try {
-            const v = normalize(fields, values);
+            const v = normalize([...fields, ...limits, ...features], values);
             const body = {
               ...v,
               environment: Object.fromEntries(Object.entries(v.environment).filter(([name]) => !integrationDefaults[name] || integrationOverrides[name])),

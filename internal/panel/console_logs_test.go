@@ -453,3 +453,102 @@ func testConsoleCaptureRenewReconnectAndCancellation(t *testing.T, existing bool
 		t.Fatal("saved history lost", all)
 	}
 }
+
+func TestConsoleCaptureOfflineAttachmentsRememberState(t *testing.T) {
+	f := operationsFixtureNew(t)
+	ctx := context.Background()
+	id := num(f.server["id"])
+	const owner = "offline-attachments"
+	if ok, err := f.a.consoleLogLease(ctx, id, owner); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	// A nonempty archive must never request the un-cursored Wings tail again.
+	if err := f.a.appendConsoleLogs(ctx, id, "", consoleLogLines("console output", "saved output")); err != nil {
+		t.Fatal(err)
+	}
+	var session atomic.Int32
+	results := make(chan error, 6)
+	states := []string{"offline", "offline", "running", "offline", "offline", "offline"}
+	wings := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := (&websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}).Upgrade(w, r, nil)
+		if err != nil {
+			results <- err
+			return
+		}
+		defer conn.Close()
+		var request struct {
+			Event string `json:"event"`
+		}
+		if err = conn.ReadJSON(&request); err != nil || request.Event != "auth" {
+			results <- fmt.Errorf("auth: %v", err)
+			return
+		}
+		n := int(session.Add(1)) - 1
+		for _, m := range []M{
+			{"event": "auth success", "args": []string{}},
+			{"event": "status", "args": []string{states[n]}},
+			{"event": "status", "args": []string{states[n]}},
+			{"event": "console output", "args": []string{fmt.Sprintf("real output %d", n)}},
+		} {
+			if err = conn.WriteJSON(m); err != nil {
+				results <- err
+				return
+			}
+		}
+		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(1012, "private"), time.Now().Add(time.Second))
+		// A replay request here would append duplicate historical output.
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+		if err = conn.ReadJSON(&request); err == nil {
+			results <- fmt.Errorf("unexpected %s", request.Event)
+			return
+		}
+		results <- nil
+	}))
+	defer wings.Close()
+	u, _ := url.Parse(wings.URL)
+	port, _ := strconv.Atoi(u.Port())
+	if _, err := f.a.update(ctx, "nodes", num(f.node["id"]), M{"fqdn": u.Hostname(), "daemon_listen": port}); err != nil {
+		t.Fatal(err)
+	}
+	capture := &consoleCaptureState{}
+	for i := range states {
+		if i == 1 || i == 4 {
+			// A new worker/panel must recover the retained state too.
+			capture = &consoleCaptureState{}
+		}
+		if i > 0 && i != 4 {
+			capture.disconnectedAt = time.Now().Add(-6 * time.Second)
+			capture.reason = "capture session failed"
+		}
+		bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := f.a.consoleLogSessionWithState(bounded, f.server, owner, capture)
+		cancel()
+		if err == nil {
+			t.Fatal("transport failure hidden")
+		}
+		if err = <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, err := f.a.query(ctx, "SELECT line FROM console_log_entries WHERE server_id=$1 ORDER BY id", id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, row := range rows {
+		lines = append(lines, str(row["line"]))
+	}
+	all := strings.Join(lines, "\n")
+	// Initial unknown attach is neutral. Only offline->running and running->offline warn.
+	if strings.Count(all, "capture connected.") != 1 || strings.Count(all, "capture reconnected") != 2 || strings.Count(all, "Current server state: offline.") != 1 || strings.Count(all, "Server entered the running state.") != 1 || strings.Count(all, "Server is now offline.") != 1 {
+		t.Fatal("incorrect attach/state notices", all)
+	}
+	for i := range states {
+		if strings.Count(all, fmt.Sprintf("real output %d", i)) != 1 {
+			t.Fatal("real output lost or duplicated", all)
+		}
+	}
+	if strings.Count(all, "saved output") != 1 {
+		t.Fatal("history replayed", all)
+	}
+}

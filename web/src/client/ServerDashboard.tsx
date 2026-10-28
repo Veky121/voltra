@@ -1,3 +1,4 @@
+import {formatBytesGB} from '../resourceUnits';
 import {requestServerPower} from './serverPower';
 import type {PowerSignal} from './consoleLifecycle';
 import {advancePowerOperation,beginPowerOperation,powerOperationLabel,type PowerOperation} from './powerOperation';
@@ -8,7 +9,7 @@ import {api,Button} from '../lib';
 import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
 import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
 import {Icon,type IconName} from '../Icons';
-import {bytes,can,items,PageError,useServer,value} from './common';
+import {bytes,resourceUsageGB,resourceLimitGB,can,items,PageError,useServer,value} from './common';
 import './serverHeader.css';
 import './shadcn-cards.css';
 import './dashboard-ui.css';
@@ -195,9 +196,9 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
   const {server}=useServer();
   const {resources:r,samples,updated}=useServerTelemetry();
   const address=serverAddress(server);
-  const limit=(key:string)=>server.limits?.[key]?bytes(number(server.limits[key])*1024**2):'∞';
+  const limit=(key:string)=>resourceLimitGB(server.limits?.[key]);
   const cards:{label:string;icon:IconName;value:string;limit?:string}[]=[
-    {label:'Disk',icon:'disk',value:updated?bytes(r.disk_bytes):'—',limit:limit('disk')},
+    {label:'Disk',icon:'disk',value:updated?resourceUsageGB(r.disk_bytes):'—',limit:limit('disk')},
   ];
   const network=samples.slice(1).map((sample,index)=>{
     const previous=samples[index],elapsed=Math.max((sample.at-previous.at)/1000,.001);
@@ -208,7 +209,7 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
   return <>
     <div className="dashboard-charts dashboard-resource-charts">
       <UsageChart title="CPU" reading={updated?`${number(r.cpu_absolute).toFixed(2)}%`:'\u2014'} limit={server.limits?.cpu?`${server.limits.cpu}%`:'\u221e'} series={[{name:'CPU',color:'var(--accent)',values:samples.map(s=>s.cpu)}]} maximum={number(server.limits?.cpu)||1} format={n=>`${n<1?n.toFixed(2):n.toFixed(0)}%`}/>
-      <UsageChart title="Memory" reading={updated?bytes(r.memory_bytes):'\u2014'} limit={limit('memory')} series={[{name:'Memory',color:'var(--theme-accent-b,var(--accent))',values:samples.map(s=>s.memory)}]} maximum={number(server.limits?.memory)*1024**2} format={bytes}/>
+      <UsageChart title="Memory" reading={updated?resourceUsageGB(r.memory_bytes):'\u2014'} limit={limit('memory')} series={[{name:'Memory',color:'var(--theme-accent-b,var(--accent))',values:samples.map(s=>s.memory)}]} maximum={number(server.limits?.memory)*1024**2} format={formatBytesGB}/>
       <UsageChart title="Network" address={address} series={[{name:'In',color:'var(--accent)',values:network.map(s=>s.rx)},{name:'Out',color:'var(--theme-accent-b,var(--muted))',values:network.map(s=>s.tx)}]} maximum={1} format={n=>`${bytes(n)}/s`}/>
     {cards.map(card=><Card className="metric-card shadcn-card" data-metric={card.icon} key={card.label}>
       <CardHeader className="metric-header"><CardTitle><h2>{card.label}</h2></CardTitle><CardAction><span className="metric-icon"><Icon name={card.icon}/></span></CardAction></CardHeader>

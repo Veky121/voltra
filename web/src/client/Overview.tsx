@@ -5,8 +5,8 @@ import {api,Button,Input} from "../lib";
 import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
 import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
 import {Icon} from "../Icons";
-import {bytes,items,PageError,value} from "./common";
-import {fallbackArtwork,getServerArtwork,type ServerArtwork} from "./serverArtwork";
+import {resourceReadingGB,items,PageError,value} from "./common";
+import {fallbackArtwork,getServerBannerArtwork,type ServerArtwork} from "./serverArtwork";
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {getServerSoftwareArtwork} from './serverSoftwareArtwork';
 import {ServerSoftwarePatch} from './ServerSoftwarePatch';
@@ -141,19 +141,13 @@ function useOverview(){
 function Meter({label,reading,ratio}:{label:string;reading:string;ratio:number}){
   return <div className={`overview-resource resource-${label.toLowerCase()}`} data-pressure={ratio>=.95?'high':ratio>=.8?'elevated':undefined}><span>{label}</span><strong title={reading}>{reading}</strong><div className="overview-meter" aria-hidden="true"><span style={{width:`${Math.min(100,Math.max(0,ratio*100))}%`}}/></div></div>;
 }
-function storageReading(used:number,limitMiB:number){
-  if(!limitMiB)return bytes(used);
-  const unit=limitMiB>=1024?1024**3:1024**2;
-  const format=(n:number)=>new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(n);
-  return `${format(used/unit)} / ${format(limitMiB*1024**2/unit)} ${unit===1024**3?"GiB":"MiB"}`;
-}
 function Artwork({art,priority,onColor}:{art:ServerArtwork;priority:boolean;onColor:(color:string|undefined)=>void}){
   const [failed,setFailed]=useState(false);
   return <img className={!failed&&art.kind==='modpack'?'overview-modpack-artwork':undefined} src={failed?fallbackArtwork.src:art.src} alt="" loading={priority?'eager':'lazy'} decoding="async" width={460} height={215} onLoad={event=>onColor(artworkColor(event.currentTarget))} onError={failed?undefined:()=>setFailed(true)}/>;
 }
 function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
   useArtworkLibrary();
-  const r=s.resources,art=getServerArtwork(s),software=getServerSoftwareArtwork(s);
+  const r=s.resourceError?undefined:s.resources,art=getServerBannerArtwork(s),software=getServerSoftwareArtwork(s);
   const [glow,setGlow]=useState<{source:string;color:string|undefined}>();
   return <Card className="overview-server-card shadcn-card" data-state={s.liveState} data-artwork={art.id} style={{'--artwork-color':glow?.source===art.src?glow.color:undefined} as CSSProperties}>
     <Link className="overview-server-link" to={`/server/${s.identifier||s.uuid}`}>
@@ -165,8 +159,8 @@ function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
     </CardHeader>
     <CardContent className="overview-resources">
       <Meter label="CPU" reading={r?`${Number(r.cpu_absolute||0).toFixed(1)}%`:"—"} ratio={Number(r?.cpu_absolute||0)/(s.limits?.cpu||100)}/>
-      <Meter label="Memory" reading={r?storageReading(Number(r.memory_bytes||0),s.limits?.memory):"—"} ratio={s.limits?.memory?Number(r?.memory_bytes||0)/(s.limits.memory*1024**2):0}/>
-      <Meter label="Disk" reading={r?storageReading(Number(r.disk_bytes||0),s.limits?.disk):"—"} ratio={s.limits?.disk?Number(r?.disk_bytes||0)/(s.limits.disk*1024**2):0}/>
+      <Meter label="Memory" reading={r?resourceReadingGB(r.memory_bytes,s.limits?.memory):"—"} ratio={s.limits?.memory?Number(r?.memory_bytes||0)/(s.limits.memory*1024**2):0}/>
+      <Meter label="Disk" reading={r?resourceReadingGB(r.disk_bytes,s.limits?.disk):"—"} ratio={s.limits?.disk?Number(r?.disk_bytes||0)/(s.limits.disk*1024**2):0}/>
     </CardContent>
     <CardFooter className="overview-server-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name="nodes"/></ItemMedia><ItemContent><ItemDescription title={s.node}>{s.node}</ItemDescription></ItemContent><ItemActions className="overview-open">{s.resourceError?"Live status unavailable":"Open server"}<Icon name="chevron"/></ItemActions></Item></CardFooter>
     </Link>

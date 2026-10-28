@@ -1,3 +1,4 @@
+import {formatMiBGB, miBToGB} from "../resourceUnits";
 import "./minecraftSetup.css";
 import {GameSwitch} from './GameSwitch';
 import './games-ui.css';
@@ -68,7 +69,7 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
   const validRuntime = form.runtime === "auto" || enabledRuntimes.some(runtime => String(runtime.id) === form.runtime);
   const loaders = options.loaders;
   const loaderName = loaders.find(loader => loader.id === form.loader)?.name ?? form.loader;
-  const validation = !validMemory ? "Enter 0.5 to 1024 GiB of memory in whole MiB increments." : !validHeap ? "Java heap must use whole MiB, fit within the server memory reserve, and have an initial size no greater than its maximum." : !validRuntime ? "Choose an enabled Java runtime." : !validLoaderVersion ? "Choose an available loader version." : !validNode ? "Choose an available node." : "";
+  const validation = !validMemory ? "Enter 0.5 to 1024 GB of memory." : !validHeap ? "Java heap must fit within the server memory reserve, and have an initial size no greater than its maximum." : !validRuntime ? "Choose an enabled Java runtime." : !validLoaderVersion ? "Choose an available loader version." : !validNode ? "Choose an available node." : "";
   const canSubmit = options.can_install && !!ports.data && !ports.loading && !ports.error && !validation && !loaderRequest.loading && !loaderRequest.error && (!pack || pack.version.server_supported === true);
   const versions = [...new Set([form.version, ...options.versions])].filter(Boolean);
 
@@ -116,15 +117,15 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
       </Card>
       <Card className="mc-config-card"><div className="mc-section-heading"><span className="mc-section-number">2</span><h2>Java and memory</h2></div>
         <div className="form-grid"><Field label="Java runtime"><Select value={form.runtime} onChange={e => set("runtime", e.target.value)}><option value="auto">Automatic</option>{enabledRuntimes.map(runtime => <option key={runtime.id} value={String(runtime.id)}>{runtime.name} · Java {runtime.major}{runtime.distribution ? ` · ${runtime.distribution}` : ""}</option>)}</Select></Field>
-          <Field label="Server memory" hint={memoryMiB !== null ? `${memoryMiB.toLocaleString()} MiB` : "Use whole MiB increments."}><div className="mc-unit-input"><Input type="number" required min="0.5" max="1024" step="any" inputMode="decimal" value={form.memory} onChange={e => set("memory", e.target.value)}/><span>GiB</span></div></Field></div>
+          <Field label="Server memory" hint={memoryMiB !== null ? `${formatMiBGB(memoryMiB)}` : "Enter a size in GB."}><div className="mc-unit-input"><Input type="number" required min="0.5" max="1024" step="any" inputMode="decimal" value={form.memory} onChange={e => set("memory", e.target.value)}/><span>GB</span></div></Field></div>
         <p className="muted mc-help">Automatic selects the Java version required by the game and loader.</p>
         {runtimeRequest.loading && <p className="muted" role="status">Loading registered Java runtimes...</p>}
         <ErrorBox>{runtimeRequest.error}</ErrorBox>{runtimeRequest.error && <Button variant="secondary" onClick={runtimeRequest.reload}>Retry Java runtimes</Button>}
         {!runtimeRequest.loading && !runtimeRequest.error && enabledRuntimes.length === 0 && <p className="muted">No enabled Java runtimes. Ask an administrator to register one.</p>}
         <details className="mc-advanced"><summary>Advanced memory and Java arguments</summary>
-          <div className="form-grid"><Field label="Initial Java heap" hint={xmsMiB !== null ? `${xmsMiB.toLocaleString()} MiB` : "Use whole MiB increments."}><div className="mc-unit-input"><Input type="number" required min="0.0009765625" step="any" value={form.xms} onChange={e => set("xms", e.target.value)}/><span>GiB</span></div></Field>
-            <Field label="Maximum Java heap" hint={form.autoHeap ? `${Math.max(0, heapBudget).toLocaleString()} MiB after memory reserve` : xmxMiB !== null ? `${xmxMiB.toLocaleString()} MiB` : "Use whole MiB increments."}><div className="mc-unit-input"><Input type="number" required={!form.autoHeap} disabled={form.autoHeap} min="0.0009765625" step="any" value={form.autoHeap ? String(Math.max(0, heapBudget) / 1024) : form.xmx} onChange={e => set("xmx", e.target.value)}/><span>GiB</span></div></Field></div>
-          <label className="check"><GameSwitch checked={form.autoHeap} onCheckedChange={checked => setForm(previous => ({...previous, autoHeap: checked, xmx: !checked ? String(Math.max(0, heapBudget) / 1024) : previous.xmx}))}/>Set maximum heap automatically</label>
+          <div className="form-grid"><Field label="Initial Java heap" hint={xmsMiB !== null ? `${formatMiBGB(xmsMiB)}` : "Enter a size in GB."}><div className="mc-unit-input"><Input type="number" required min="0.0009765625" step="any" value={form.xms} onChange={e => set("xms", e.target.value)}/><span>GB</span></div></Field>
+            <Field label="Maximum Java heap" hint={form.autoHeap ? `${formatMiBGB(Math.max(0, heapBudget))} after memory reserve` : xmxMiB !== null ? `${formatMiBGB(xmxMiB)}` : "Enter a size in GB."}><div className="mc-unit-input"><Input type="number" required={!form.autoHeap} disabled={form.autoHeap} min="0.0009765625" step="any" value={form.autoHeap ? String(miBToGB(Math.max(0, heapBudget))) : form.xmx} onChange={e => set("xmx", e.target.value)}/><span>GB</span></div></Field></div>
+          <label className="check"><GameSwitch checked={form.autoHeap} onCheckedChange={checked => setForm(previous => ({...previous, autoHeap: checked, xmx: !checked ? String(miBToGB(Math.max(0, heapBudget))) : previous.xmx}))}/>Set maximum heap automatically</label>
           <Field label="Extra Java arguments" hint="Memory flags are managed by the heap controls."><Input placeholder="-XX:+UseG1GC" value={form.extraArgs} onChange={e => set("extraArgs", e.target.value)}/></Field>
         </details>
         {(!validMemory || !validHeap) && <ErrorBox>{validation}</ErrorBox>}
@@ -138,7 +139,7 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
     </fieldset>
     <aside className="mc-install-summary"><Card>
       <div className="mc-summary-heading">{pack ? <MinecraftPackIcon pack={pack.project}/> : <GameIcon minecraft/>}<div><h2>{pack?.project.name ?? "Minecraft"}</h2><p>{pack ? pack.version.name : "Java Edition"}</p></div></div>
-      <dl><div><dt>Version</dt><dd>{form.version}</dd></div><div><dt>Loader</dt><dd>{loaderName}{!pack && selectedLoaderVersion ? ` ${selectedLoaderVersion}` : ""}</dd></div><div><dt>Java</dt><dd>{form.runtime === "auto" ? "Automatic" : enabledRuntimes.find(runtime => String(runtime.id) === form.runtime)?.name ?? "Unavailable"}</dd></div><div><dt>Memory</dt><dd>{form.memory || "0"} GiB</dd></div><div><dt>Storage</dt><dd>10 GiB</dd></div></dl>
+      <dl><div><dt>Version</dt><dd>{form.version}</dd></div><div><dt>Loader</dt><dd>{loaderName}{!pack && selectedLoaderVersion ? ` ${selectedLoaderVersion}` : ""}</dd></div><div><dt>Java</dt><dd>{form.runtime === "auto" ? "Automatic" : enabledRuntimes.find(runtime => String(runtime.id) === form.runtime)?.name ?? "Unavailable"}</dd></div><div><dt>Memory</dt><dd>{form.memory || "0"} GB</dd></div><div><dt>Storage</dt><dd>10 GB</dd></div></dl>
       <label className="check mc-eula"><GameSwitch checked={form.eula} disabled={busy} required onCheckedChange={checked => set("eula", checked)}/><span>I agree to the <a href="https://www.minecraft.net/en-us/eula" target="_blank" rel="noreferrer">Minecraft EULA</a>.</span></label>
       <ErrorBox>{error || (submitted ? validation : "")}</ErrorBox>
       {!options.can_install && <p className="mc-inline-empty">An administrator must install new servers.</p>}

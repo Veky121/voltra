@@ -319,7 +319,7 @@ func (a *App) gameLibraryInstallMinecraft(w http.ResponseWriter, r *http.Request
 	}
 	memory, ok := applicationInteger(input["memory"])
 	if !ok || memory < 512 || memory > 1048576 {
-		fail(w, bad("Choose between 512 MiB and 1 TiB of container memory."))
+		fail(w, bad("Choose between 0.5 GB and 1024 GB of container memory."))
 		return
 	}
 	players, ok := applicationInteger(input["max_players"])

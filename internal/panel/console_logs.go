@@ -308,6 +308,7 @@ type consoleCaptureState struct {
 	reason         string
 	lastDiagnostic time.Time
 	suppressed     int
+	serverState    string
 }
 
 func (s *consoleCaptureState) diagnose(now time.Time, err error) bool {
@@ -362,7 +363,37 @@ func (a *App) consoleLogSession(ctx context.Context, server M, owner string) err
 	return a.consoleLogSessionWithState(ctx, server, owner, &consoleCaptureState{})
 }
 
+// Only panel-generated state messages count as a remembered process state.
+func consoleHistoryServerState(line string) string {
+	line = strings.TrimSuffix(line, "\x1b[0m")
+	for state, messages := range map[string][]string{
+		"offline":  {"Current server state: offline.", "Server is now offline. The process exited or was stopped.", "Server stopped. The container is offline.", "Server went offline during startup. Check the output above."},
+		"running":  {"Current server state: running.", "Server entered the running state."},
+		"starting": {"Current server state: starting.", "Server is starting. Preparing the container and launching the process."},
+		"stopping": {"Current server state: stopping.", "Server is stopping. Waiting for the process to exit."},
+	} {
+		for _, message := range messages {
+			if strings.HasSuffix(line, "m[Voltra]: "+message) {
+				return state
+			}
+		}
+	}
+	return ""
+}
+
 func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner string, capture *consoleCaptureState) error {
+	if capture.serverState == "" {
+		rows, err := a.query(ctx, "SELECT line FROM console_log_entries WHERE server_id=$1 AND event='panel message' ORDER BY id DESC LIMIT 256", server["id"])
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if state := consoleHistoryServerState(str(row["line"])); state != "" {
+				capture.serverState = state
+				break
+			}
+		}
+	}
 	node, err := a.node(ctx, num(server["node_id"]))
 	if err != nil {
 		return err
@@ -452,11 +483,33 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 			batchBytes += len(entry.Line)
 		}
 	}
+	// Authentication alone says nothing about the process state. Wait for a
+	// status (or real output) before deciding whether to warn about continuity.
+	attachPending := true
+	attach := func(offline bool) {
+		if !attachPending {
+			return
+		}
+		attachPending = false
+		if !offline {
+			message := "\x1b[0m\x1b[94m[Voltra]: Console history capture connected. Saved history is retained; continuity during panel downtime cannot be verified.\x1b[0m"
+			if !capture.disconnectedAt.IsZero() {
+				gap := time.Since(capture.disconnectedAt).Round(time.Second)
+				if gap < time.Second {
+					gap = time.Second
+				}
+				message = fmt.Sprintf("\x1b[0m\x1b[93m[Voltra]: Console history capture reconnected after approximately %s (%s). Output during this capture gap may be missing.\x1b[0m", gap, capture.reason)
+			}
+			add("panel message", message)
+		}
+		capture.disconnectedAt = time.Time{}
+		capture.reason = ""
+	}
 	tick := time.NewTicker(250 * time.Millisecond)
 	defer tick.Stop()
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
-	authenticated, state := false, ""
+	authenticated, state := false, capture.serverState
 	authDeadline := time.NewTimer(15 * time.Second)
 	defer authDeadline.Stop()
 	for {
@@ -496,17 +549,6 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 					if _, err = a.DB.Exec(ctx, "UPDATE console_log_collectors SET connected=true WHERE server_id=$1 AND lease_owner=$2", server["id"], owner); err != nil {
 						return err
 					}
-					message := "\x1b[0m\x1b[94m[Voltra]: Console history capture connected. Saved history is retained; continuity during panel downtime cannot be verified.\x1b[0m"
-					if !capture.disconnectedAt.IsZero() {
-						gap := time.Since(capture.disconnectedAt).Round(time.Second)
-						if gap < time.Second {
-							gap = time.Second
-						}
-						message = fmt.Sprintf("\x1b[0m\x1b[93m[Voltra]: Console history capture reconnected after approximately %s (%s). Output during this capture gap may be missing.\x1b[0m", gap, capture.reason)
-					}
-					add("panel message", message)
-					capture.disconnectedAt = time.Time{}
-					capture.reason = ""
 					// Seed an empty archive from Wings' retained tail. Reconnects to an
 					// existing archive must not repeatedly append the same old output.
 					var hasOutput bool
@@ -528,9 +570,13 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 				return fmt.Errorf("console capture authentication rejected")
 			case "console output", "daemon message", "install output":
 				if authenticated {
+					attach(false)
 					add(m.Event, text)
 				}
 			case "status":
+				if authenticated {
+					attach(text == "offline" && state == "offline")
+				}
 				if authenticated && text != state {
 					color, message := "94", ""
 					switch text {
@@ -555,6 +601,7 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 						}
 						add("panel message", "\x1b[0m\x1b["+color+"m[Voltra]: "+message+"\x1b[0m")
 						state = text
+						capture.serverState = text
 					}
 				}
 			}

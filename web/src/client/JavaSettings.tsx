@@ -1,3 +1,4 @@
+import {gbToMiB, miBToGB} from "../resourceUnits.ts";
 import './games-ui.css';
 import {SettingsRow, Switch} from '../ui/Settings';
 import { useEffect, useState } from "react";
@@ -32,21 +33,21 @@ type Draft = {
   automatic: boolean;
   extra_args: string;
 };
-function draftFrom(config: JavaConfig): Draft {
+export function draftFrom(config: JavaConfig): Draft {
   return {
     runtime_id: config.runtime_id || "auto",
     required_major: String(config.required_major || 0),
     required_distribution: config.required_distribution || "",
-    xms: String((config.xms_mib ?? 256) / 1024),
-    xmx: config.xmx_mib ? String(config.xmx_mib / 1024) : "1",
+    xms: String(miBToGB(config.xms_mib ?? 256)),
+    xmx: config.xmx_mib ? String(miBToGB(config.xmx_mib)) : "1",
     automatic: !config.xmx_mib,
     extra_args: config.extra_args || "",
   };
 }
-function toMiB(gib: string): number {
-  if (!gib.trim()) throw new Error("Enter a heap size in GiB.");
-  const mib = Number(gib) * 1024;
-  if (!Number.isSafeInteger(mib) || mib <= 0) throw new Error("Heap sizes must be positive and convert to whole MiB.");
+export function toMiB(gib: string): number {
+  if (!gib.trim()) throw new Error("Enter a heap size in GB.");
+  const mib = gbToMiB(gib);
+  if (!Number.isSafeInteger(mib) || mib <= 0) throw new Error("Enter a positive heap size in GB.");
   return mib;
 }
 
@@ -76,10 +77,10 @@ export function JavaSettings({ base, memoryMiB, canChangeRuntime = true, onSaved
   const editable = data.can_update && !action.busy && !query.loading;
   const runtimeEditable = canChangeRuntime && data.can_change_runtime !== false;
   const limit = Number(memoryMiB || 0);
-  const previewXms = Number(draft.xms) * 1024;
+  const previewXms = gbToMiB(draft.xms);
   const previewXmx = draft.automatic
     ? limit > 0 && effective.reserved_mib != null ? limit - effective.reserved_mib : undefined
-    : Number(draft.xmx) * 1024;
+    : gbToMiB(draft.xmx);
   const validPreview = Number.isSafeInteger(previewXms) && previewXms > 0 && Number.isSafeInteger(previewXmx) && Number(previewXmx) > 0;
   const flags = validPreview ? [
     `-Xms${previewXms}M`,
@@ -94,9 +95,9 @@ export function JavaSettings({ base, memoryMiB, canChangeRuntime = true, onSaved
       <PageError error={data.effective_error || ""} />
       {!data.can_update && <p className="muted">You can view Java settings. Updating them requires startup permissions.</p>}
       <p className="muted">
-        {limit > 0 ? `The container limit is ${limit / 1024} GiB. ` : ""}
+        {limit > 0 ? `The container limit is ${miBToGB(limit)} GB. ` : ""}
         The heap is only part of Java's memory use. Leave room for threads, native memory and the server process.
-        {effective.reserved_mib != null ? ` Automatic heap keeps ${effective.reserved_mib} MiB outside the heap.` : ""}
+        {effective.reserved_mib != null ? ` Automatic heap keeps ${miBToGB(effective.reserved_mib)} GB outside the heap.` : ""}
       </p>
       <form onSubmit={(event) => {
         event.preventDefault();
@@ -137,12 +138,12 @@ export function JavaSettings({ base, memoryMiB, canChangeRuntime = true, onSaved
               <Input aria-label="Required Java major" type="number" min={0} max={999} step={1} required value={draft.required_major} onChange={(e) => change("required_major", e.target.value)} />}/>
             <SettingsRow label="Required distribution" description={data.egg?.required_distribution ? `Leave empty to use ${data.egg.required_distribution} from the egg.` : "Leave empty to allow any registered distribution."} control={
               <Input aria-label="Required distribution" maxLength={80} value={draft.required_distribution} onChange={(e) => change("required_distribution", e.target.value)} />}/>
-            <SettingsRow label="Initial heap / GiB" description="Sets -Xms. Steps of 0.25 GiB equal 256 MiB." control={
-              <Input aria-label="Initial heap / GiB" type="number" min={0.25} step={0.25} required value={draft.xms} onChange={(e) => change("xms", e.target.value)} />}/>
+            <SettingsRow label="Initial heap / GB" description="Sets -Xms. Enter the initial heap size in GB." control={
+              <Input aria-label="Initial heap / GB" type="number" min={1 / 1024} step="any" required value={draft.xms} onChange={(e) => change("xms", e.target.value)} />}/>
             <SettingsRow label="Automatic maximum heap" description="The panel reserves memory outside the heap. Unlimited containers need an explicit maximum." control={
               <Switch aria-label="Automatic maximum heap" checked={draft.automatic} onCheckedChange={checked => change("automatic", checked)} />}/>
-            {!draft.automatic && <SettingsRow label="Maximum heap / GiB" description="Sets -Xmx. The backend checks the container limit and memory reserve." control={
-              <Input aria-label="Maximum heap / GiB" type="number" min={0.25} step={0.25} required value={draft.xmx} onChange={(e) => change("xmx", e.target.value)} />}/>}
+            {!draft.automatic && <SettingsRow label="Maximum heap / GB" description="Sets -Xmx. The backend checks the container limit and memory reserve." control={
+              <Input aria-label="Maximum heap / GB" type="number" min={1 / 1024} step="any" required value={draft.xmx} onChange={(e) => change("xmx", e.target.value)} />}/>}
             <SettingsRow label="Extra JVM arguments" description="Heap sizes are managed above. Do not add heap or memory percentage flags here." control={
               <Textarea aria-label="Extra JVM arguments" rows={3} maxLength={16384} spellCheck={false} value={draft.extra_args} onChange={(e) => change("extra_args", e.target.value)} />}/>
           </div>

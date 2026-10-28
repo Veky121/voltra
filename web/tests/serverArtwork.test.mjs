@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {getServerArtwork,getServerIconSources} from '../src/client/serverArtwork.ts';
+import {getServerArtwork,getServerBannerArtwork,getServerIconSources} from '../src/client/serverArtwork.ts';
+import {setArtworkMapping} from '../src/client/artworkLibrary.ts';
 import catalog from '../src/client/serverArtworkCatalog.json' with {type: 'json'};
 
 test('explicit workload survives custom or misleading server names', () => {
@@ -70,4 +71,31 @@ test('server icons precede pack artwork and only use authorized same-origin imag
     assert.deepEqual(getServerIconSources({server_icon:src,pack_icon:src}),[]);
   }
   assert.deepEqual(getServerIconSources(),[]);
+});
+
+
+test('Overview Minecraft modpack banners use base game art and retain identity icons',()=>{
+ const pack='/api/client/servers/pack-uuid/artwork/pack';
+ const icon='/api/client/servers/pack-uuid/artwork/icon';
+ for(const pack_name of ['Vault Hunters Third Edition','ATM10','ATM11']){
+  const server={name:pack_name,artwork:{game:'minecraft',pack_name,pack_icon:pack,server_icon:icon}};
+  assert.deepEqual(getServerBannerArtwork(server),getServerBannerArtwork({game:'minecraft'}));
+  assert.equal(getServerArtwork(server).src,pack);
+  assert.deepEqual(getServerIconSources(server.artwork),[{src:icon,kind:'server'},{src:pack,kind:'modpack'}]);
+ }
+});
+
+test('Overview banners use provider mapping and preserve other workload artwork',()=>{
+ const minecraft='/api/client/artwork/'+'a'.repeat(64)+'.png';
+ const palworld='/api/client/artwork/'+'b'.repeat(64)+'.png';
+ setArtworkMapping({server:{minecraft,palworld}});
+ try{
+  assert.equal(getServerBannerArtwork({artwork:{game:'minecraft',pack_icon:'/api/client/servers/pack/artwork/pack'}}).src,minecraft);
+  assert.equal(getServerBannerArtwork({game:'minecraft'}).src,minecraft);
+  for(const server of [{game:'palworld',name:'Minecraft',artwork:{game:'minecraft',pack_icon:'/api/client/servers/pack/artwork/pack'}},{egg_name:'Counter-Strike: Source'},{name:'Private instance'},{name:'Redis cache'}]){
+   assert.deepEqual(getServerBannerArtwork(server),getServerArtwork(server));
+  }
+  assert.equal(getServerBannerArtwork({game:'palworld'}).src,palworld);
+ }finally{setArtworkMapping(null)}
+ assert.equal(getServerBannerArtwork({game:'minecraft'}).src,catalog.find(art=>art.id==='minecraft').src);
 });

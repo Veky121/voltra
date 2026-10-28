@@ -1,4 +1,5 @@
 import test from 'node:test';
+import * as resourceUnits from '../src/resourceUnits.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
@@ -13,7 +14,7 @@ import * as setupValidation from '../src/client/templateSetupValidation.ts';
 const require=createRequire(import.meta.url),source=fs.readFileSync(new URL('../src/client/TemplateGames.tsx',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
 function load(){
- const module={exports:{}},modules={'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
+ const module={exports:{}},modules={'../resourceUnits.ts':resourceUnits,'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
   react:React,'react-router-dom':{useNavigate:()=>()=>{},useParams:()=>({}),Link:'a'},
   '../lib':{api(){throw Error('No network in component fixture');},Button:({children,variant,...props})=>React.createElement('button',props,children),Card:'section',ErrorBox:({children})=>React.createElement('div',null,children),Field:({label,hint,children})=>React.createElement('label',null,label,children,hint),Input:'input',Select:'select',unwrap:x=>x},
   './common':{json:()=>{}},'./GameSetupFields':{GameAgreementField:()=>null,GameMemoryField:()=>null,GameNameField:()=>null,GameNodeField:()=>null},

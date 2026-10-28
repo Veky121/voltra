@@ -246,7 +246,7 @@ func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
 		return v, bad("Select an available node.")
 	}
 	if v.Memory, ok = applicationInteger(in["memory"]); !ok || v.Memory < spec.MinimumMemory || v.Memory > 131072 {
-		return v, bad(fmt.Sprintf("Choose memory from %d to 131072 MiB.", spec.MinimumMemory))
+		return v, bad(fmt.Sprintf("Choose memory from %g to 128 GB.", float64(spec.MinimumMemory)/1024))
 	}
 	if v.Players, ok = applicationInteger(in["max_players"]); !ok || v.Players < 1 || v.Players > spec.MaximumPlayers || spec.FixedPlayers && v.Players != spec.Players {
 		return v, bad(fmt.Sprintf("Choose a player limit from 1 to %d.", spec.MaximumPlayers))

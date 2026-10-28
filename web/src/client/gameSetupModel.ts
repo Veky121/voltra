@@ -1,3 +1,4 @@
+import {gbToMiB, miBToGB} from "../resourceUnits.ts";
 export type SteamGame = string;
 export type GameProfile = {id: string; name: string; description: string; after_setup: string; ports: number; consecutive_ports: boolean; password: {enabled: boolean; required: boolean; min_length: number; max_length: number}};
 export type Choice = {value: string; label: string};
@@ -46,7 +47,7 @@ export function managedSteamServer(server: {steam_managed?: boolean; game?: unkn
 }
 export function memoryMiB(gib: string): number | null {
   if (!gib.trim()) return null;
-  const value = Number(gib) * 1024;
+  const value = gbToMiB(gib);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 export function gameMemoryBudget(maximum: number, node?: SetupNode): number {
@@ -60,7 +61,7 @@ export function gameInitialNode(nodes: SetupNode[]): SetupNode | undefined {
 }
 export function steamMemoryWarning(options: SteamOptions, memory: number | null): string | null {
   if (memory === null || memory < options.minimum_memory || memory > options.maximum_memory || memory >= options.defaults.memory) return null;
-  return `${options.name} defaults to ${options.defaults.memory / 1024} GiB of memory. Using less memory increases the risk of crashes, especially with more players or larger saves.`;
+  return `${options.name} defaults to ${miBToGB(options.defaults.memory)} GB of memory. Using less memory increases the risk of crashes, especially with more players or larger saves.`;
 }
 export function safeFolderLink(server: string, path: string): string | null {
   if (!path || path.includes('\\') || /[\u0000-\u001f]/.test(path) || path.split('/').some(part => part === '..')) return null;

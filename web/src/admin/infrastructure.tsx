@@ -1,3 +1,4 @@
+import { formatMiBGB } from "../resourceUnits";
 import { useState, type ComponentProps } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Loading } from "../lib";
@@ -88,11 +89,11 @@ export function Node() {
     }),
     f("behind_proxy", "Behind a reverse proxy", "checkbox"),
     f("public", "Allow automatic deployment", "checkbox", { default: true }),
-    f("memory", "Memory capacity (MiB)", "number", { required: true }),
+    f("memory", "Memory capacity (GB)", "number", { required: true, unit: "GB", positive: true }),
     f("memory_overallocate", "Memory overallocation (%)", "number"),
-    f("disk", "Disk capacity (MiB)", "number", { required: true }),
+    f("disk", "Disk capacity (GB)", "number", { required: true, unit: "GB", positive: true }),
     f("disk_overallocate", "Disk overallocation (%)", "number"),
-    f("upload_size", "Maximum upload (MiB)", "number", { default: 100 }),
+    f("upload_size", "Maximum upload (GB)", "number", { default: 100, unit: "GB", positive: true }),
     f("daemon_listen", "Wings HTTP port", "number", { default: 8080 }),
     f("daemon_sftp", "Wings SFTP port", "number", { default: 2022 }),
     f("daemon_base", "Server data directory", undefined, {
@@ -267,7 +268,7 @@ function NodeExtras({ node }: { node: any }) {
             },
             {
               label: "Memory",
-              render: (x) => `${x.limits?.memory ?? x.memory} MiB`,
+              render: (x) => Number(x.limits?.memory ?? x.memory) === 0 ? "Unlimited" : formatMiBGB(Number(x.limits?.memory ?? x.memory)),
             },
             { label: "Status", render: (x) => x.status ?? "Ready" },
           ]}

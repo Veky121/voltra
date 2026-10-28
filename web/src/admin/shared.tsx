@@ -1,3 +1,4 @@
+import { miBToGB, gbToMiB, formatMiBGB } from "../resourceUnits";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {Select,  api, rows, unwrap, useAPI as useCoreAPI } from "../lib";
@@ -65,6 +66,9 @@ export type FieldSpec = {
     | "select"
     | "multiselect"
     | "email";
+  unit?: "GB";
+  swapSentinel?: boolean;
+  positive?: boolean;
   required?: boolean;
   disabled?: boolean;
   hint?: string;
@@ -77,8 +81,14 @@ export const f = (
   type?: FieldSpec["type"],
   extra: Partial<FieldSpec> = {}
 ): FieldSpec => ({ key, label, type, ...extra });
+export function resourceDraft(fields: FieldSpec[], initial: RecordData) {
+  return Object.fromEntries(Object.entries(initial).map(([key, value]) => {
+    const field = fields.find(field => field.key === key);
+    return [key, field?.unit === "GB" && value != null ? field.swapSentinel && Number(value) === -1 ? -1 : miBToGB(Number(value)) : value];
+  }));
+}
 export function defaults(fields: FieldSpec[]) {
-  return Object.fromEntries(
+  return resourceDraft(fields, Object.fromEntries(
     fields.map((x) => [
       x.key,
       x.default ??
@@ -92,7 +102,7 @@ export function defaults(fields: FieldSpec[]) {
           ? []
           : ""),
     ])
-  );
+  ));
 }
 export function ErrorMessage({ error }: { error?: string }) {
   return error ? (
@@ -267,6 +277,8 @@ export function Fields({
               <input
                 required={field.required}
                 type={field.type ?? "text"}
+                step={field.unit === "GB" ? "any" : undefined}
+                min={field.unit === "GB" ? field.swapSentinel ? -1 : 0 : undefined}
                 value={v}
                 onChange={(e) =>
                   set(
@@ -292,6 +304,16 @@ export function normalize(fields: FieldSpec[], value: RecordData) {
     if (field.type === "json" && typeof out[field.key] === "string")
       out[field.key] = JSON.parse(out[field.key] || "{}");
     if (field.type === "select" && out[field.key] === "") out[field.key] = null;
+    if (field.unit === "GB") {
+      const raw = out[field.key];
+      const amount = field.swapSentinel && Number(raw) === -1 ? -1 : gbToMiB(raw);
+      if (raw == null || !Number.isFinite(amount) || (Number(raw) < 0 && !(field.swapSentinel && Number(raw) === -1)))
+        throw new Error(`${field.label}: enter a valid non-negative GB amount${field.swapSentinel ? " or -1 for unlimited swap" : ""}.`);
+      if (field.positive && amount <= 0)
+        throw new Error(`${field.label}: enter a positive GB amount.`);
+      out[field.key] = amount;
+      continue;
+    }
     if (field.type === "number")
       out[field.key] =
         out[field.key] == null || out[field.key] === ""
@@ -321,13 +343,13 @@ export function Editor({
 }) {
   const [value, setValue] = useState<RecordData>({
     ...defaults(fields),
-    ...initial,
+    ...resourceDraft(fields, initial ?? {}),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    setValue({ ...defaults(fields), ...initial });
+    setValue({ ...defaults(fields), ...resourceDraft(fields, initial ?? {}) });
   }, [initial]);
   return (
     <Panel title={title}>
@@ -482,6 +504,8 @@ export function ResourceList({
                       ? x[key]
                         ? "Yes"
                         : "No"
+                      : ["memory", "disk", "upload_size"].includes(key)
+                      ? formatMiBGB(Number(x[key]))
                       : String(x[key] ?? "—")}
                   </Link>
                 ),

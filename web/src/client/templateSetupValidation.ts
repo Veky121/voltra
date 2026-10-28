@@ -1,3 +1,4 @@
+import {miBToGB} from "../resourceUnits.ts";
 import {templateAgreementsAccepted,templateVariableProblem,type TemplateVariableDefinition,type GameAgreement} from './gameTemplateModel.ts';
 
 export type SetupProblem={field?:string;message:string};
@@ -16,10 +17,10 @@ export function templateSetupProblems(input:TemplateReadiness):SetupProblem[]{
   else if(input.fs25&&Array.from(input.name.trim()).length>60)add('game-server-name','Farming Simulator server names must be no more than 60 characters.');
   if(!input.node)add('game-server-node','Choose a compatible host machine.');
   else if(input.node.setup_available===false)add('game-server-node',input.node.unavailable_reason||'This host machine is not ready for setup.');
-  if(input.memory===null||input.memory<128)add('game-server-memory','Enter at least 0.125 GiB of memory.');
-  else if(input.memory>input.memoryMaximum)add('game-server-memory',`Memory exceeds the host's available ${input.memoryMaximum/1024} GiB.`);
-  if(input.disk===null||input.disk<128)add('game-server-storage','Enter at least 0.125 GiB of storage.');
-  else if(input.disk>input.diskMaximum)add('game-server-storage',`Storage exceeds the host's available ${input.diskMaximum/1024} GiB.`);
+  if(input.memory===null||!Number.isSafeInteger(input.memory)||input.memory<128)add('game-server-memory','Enter at least 0.125 GB of memory.');
+  else if(input.memory>input.memoryMaximum)add('game-server-memory',`Memory exceeds the host's available ${miBToGB(input.memoryMaximum)} GB.`);
+  if(input.disk===null||!Number.isSafeInteger(input.disk)||input.disk<128)add('game-server-storage','Enter at least 0.125 GB of storage.');
+  else if(input.disk>input.diskMaximum)add('game-server-storage',`Storage exceeds the host's available ${miBToGB(input.diskMaximum)} GB.`);
   if(!input.imageValid)add('game-runtime-image','Choose an available runtime image in advanced settings.');
   if(input.steamError)add(undefined,'Review the Steam installation settings above.');
   if(input.privateContent&&(!input.privateSupported||input.node?.private_content_ready!==true))add('game-server-node','Private Steam installation requires a supported host and trusted worker.');
