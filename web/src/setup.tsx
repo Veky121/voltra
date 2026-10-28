@@ -41,31 +41,50 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   const explicitSetup = location.pathname.replace(/\/+$/, "") === "/setup";
   const [state, setState] = useState<{ status: SetupStatus; session: Session } | null>(null);
   const [error, setError] = useState("");
+  const checking = useRef(false);
+  const authEpoch = useRef(0);
   const [revision, setRevision] = useState(0);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
     let disposed = false;
+    const epoch = authEpoch.current;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
+    checking.current = true;
     setError("");
-    void Promise.all([
+    void Promise.allSettled([
       api<SetupStatus>("/api/setup/status", { signal: controller.signal, cache: "no-store" }),
-      api<Session>("/api/auth/session", { signal: controller.signal, cache: "no-store" }),
-    ]).then(([status, session]) => {
-      if (!controller.signal.aborted) setState({ status, session });
-    }).catch((failure) => {
-      if (!disposed) setError(controller.signal.aborted ? "The panel took too long to respond. Check the service, then retry." : errorText(failure));
-    }).finally(() => clearTimeout(timeout));
+      api<Session>("/api/auth/session", { signal: controller.signal, cache: "no-store" }).then(session => {
+        if (!disposed && epoch === authEpoch.current) setState(previous => previous ? {...previous, session} : previous);
+        return session;
+      }),
+    ]).then(([statusResult, sessionResult]) => {
+      if (disposed) return;
+      // Session identity must be applied even when the setup endpoint fails.
+      setState(previous => {
+        const status = statusResult.status === 'fulfilled' ? statusResult.value : previous?.status;
+        const session = sessionResult.status === 'fulfilled' && epoch === authEpoch.current ? sessionResult.value : previous?.session;
+        return status && session ? {status, session} : previous;
+      });
+      const failure = [statusResult, sessionResult].find(result => result.status === 'rejected');
+      if (failure?.status === 'rejected') setError(controller.signal.aborted ? "The panel took too long to respond. Check the service, then retry." : errorText(failure.reason));
+    }).finally(() => { clearTimeout(timeout); if (!disposed) checking.current = false; });
     return () => { disposed = true; clearTimeout(timeout); controller.abort(); };
   }, [revision, explicitSetup]);
   useEffect(() => {
+    const rejected = () => {
+      authEpoch.current++;
+      setState(previous => previous ? {...previous, session: {authenticated:false}} : null);
+      if (!checking.current) reload();
+    };
+    const changed = () => { authEpoch.current++; setState(null); reload(); };
     window.addEventListener("focus", reload);
-    window.addEventListener("panel-auth-changed", reload);
-    window.addEventListener("desktop-session-rejected", reload);
+    window.addEventListener("panel-auth-changed", changed);
+    window.addEventListener("desktop-session-rejected", rejected);
     const timer = setInterval(reload, 60000);
-    return () => { window.removeEventListener("focus", reload); window.removeEventListener("panel-auth-changed", reload); window.removeEventListener("desktop-session-rejected", reload); clearInterval(timer); };
+    return () => { window.removeEventListener("focus", reload); window.removeEventListener("panel-auth-changed", changed); window.removeEventListener("desktop-session-rejected", rejected); clearInterval(timer); };
   }, [reload]);
-  if (error) return <SetupFrame title="Panel unavailable"><ErrorBox>{error}</ErrorBox><div className="actions"><Button onClick={reload}>Retry</Button><DesktopRecoveryActions/></div></SetupFrame>;
+  if (error && !state) return <SetupFrame title="Panel unavailable"><ErrorBox>{error}</ErrorBox><div className="actions"><Button onClick={reload}>Retry</Button><DesktopRecoveryActions/></div></SetupFrame>;
   if (!state) return <SetupFrame title="Opening panel"><Loading /></SetupFrame>;
   const { status, session } = state;
   const development = status.dev_mode && !status.auth_enabled;
@@ -83,7 +102,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   // Only the server's explicit development mode preserves the existing local
   // workflow. Production never falls through to the application anonymously.
   if (!session.authenticated && !development) return <Login session={session} onAuthenticated={reload} />;
-  return <AccountSessionContext.Provider key={queryCacheSessionIdentity(session)} value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
+  return <AccountSessionContext.Provider key={queryCacheSessionIdentity(session)} value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{error && <div role="status" className="error">Session check unavailable. Your current page is still open. <Button onClick={reload}>Retry session check</Button></div>}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
 }
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {

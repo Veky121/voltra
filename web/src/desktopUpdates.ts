@@ -13,7 +13,7 @@ export async function updateAction(path:string,body:unknown={},automatic=false){
  publish({busy:true,error:''});
  try{
   const response=await fetch(`/desktop/${path}`,{method:path==='update-status'?'GET':'POST',headers:{'Content-Type':'application/json'},body:path==='update-status'?undefined:JSON.stringify(body),cache:'no-store'});
-  const data=await response.json();if(!response.ok)throw new Error(data.error||'Update request failed.');
+  const data=await response.json();if(!response.ok){if(data.state)publish({status:data});throw new Error(data.error||'Update request failed.');}
   publish({status:data,...(path==='updates'?{checkedAt:Date.now()}:{}),...(path==='update-channel'?{checkedAt:null}:{})});
   return true;
  }catch(error){publish({error:(error as Error).message,...(path==='updates'?{checkedAt:Date.now()}: {})});return false;}

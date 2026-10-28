@@ -1,3 +1,4 @@
+import RouteRecovery from "./RouteRecovery";
 import { SidebarSection } from "./Navigation";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
@@ -31,7 +32,12 @@ const GameTemplateSetup = lazy(() => import("./client/TemplateGames"));
 const SteamMaintenance = lazy(() => import("./client/SteamMaintenance"));
 
 function routePage(children: ReactNode) {
-  return <Suspense fallback={<Loading />}>{children}</Suspense>;
+  return <RoutePage>{children}</RoutePage>;
+}
+
+function RoutePage({children}:{children:ReactNode}) {
+  const location=useLocation();
+  return <RouteRecovery key={location.pathname}><Suspense fallback={<Loading />}>{children}</Suspense></RouteRecovery>;
 }
 
 function LegacySettingsPage({page}:{page:string}) {

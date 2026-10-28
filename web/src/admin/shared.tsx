@@ -71,6 +71,8 @@ export type FieldSpec = {
   positive?: boolean;
   required?: boolean;
   disabled?: boolean;
+  min?: number;
+  step?: number | "any";
   hint?: string;
   options?: { value: string | number; label: string }[];
   default?: any;
@@ -277,8 +279,8 @@ export function Fields({
               <input
                 required={field.required}
                 type={field.type ?? "text"}
-                step={field.unit === "GB" ? "any" : undefined}
-                min={field.unit === "GB" ? field.swapSentinel ? -1 : 0 : undefined}
+                step={field.unit === "GB" ? "any" : field.step}
+                min={field.unit === "GB" ? field.swapSentinel ? -1 : 0 : field.min}
                 value={v}
                 onChange={(e) =>
                   set(

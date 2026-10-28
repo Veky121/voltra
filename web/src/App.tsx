@@ -4,6 +4,7 @@ import {useLocation} from 'react-router-dom';
 import {Loading,useAPI,unwrap} from './lib';
 import {SidebarTarget} from './Navigation';
 import SetupGate from './setup';
+import RouteRecovery from './RouteRecovery';
 import {ServerNavigationProvider} from './ServerNavigation';
 import {ThemeProvider} from './ThemeProvider';
 import AppSidebar,{SidebarRouteEffects} from './components/AppSidebar';
@@ -16,7 +17,7 @@ function AuthenticatedShell(){
  const {data,error,reload}=useAPI('/api/client/account');
  useEffect(()=>{window.addEventListener('account-profile-updated',reload);return()=>window.removeEventListener('account-profile-updated',reload)},[reload]);
  const account=data?unwrap(data):null;
- if(error)return <div className="page"><p role="alert">{error}</p><button onClick={reload}>Retry</button></div>;
+ if(error&&!account)return <div className="page"><p role="alert">{error}</p><button onClick={reload}>Retry</button></div>;
  if(!account)return <Loading/>;
  return <ThemeProvider key={account.uuid||account.id} account={String(account.uuid||account.id)}><ServerNavigationProvider><ArtworkProvider><AppShell account={account}/></ArtworkProvider></ServerNavigationProvider></ThemeProvider>;
 }
@@ -38,7 +39,7 @@ function AppShell({account}:{account:Record<string,any>}){
    <AppSidebar account={account} name={name} setTarget={setSidebarTarget}/>
    <SidebarInset id="main-content" className="app-content voltra-shadcn-content" tabIndex={-1}>
     <div className="voltra-mobile-toolbar"><SidebarTrigger aria-label="Open navigation"/><span>{name}</span></div>
-    <Suspense fallback={<Loading/>}>{admin?<Admin/>:<Client/>}</Suspense>
+    <RouteRecovery resetKey={location.pathname}><Suspense fallback={<Loading/>}>{admin?<Admin/>:<Client/>}</Suspense></RouteRecovery>
    </SidebarInset>
   </SidebarProvider>
  </TooltipProvider></SidebarTarget.Provider>;

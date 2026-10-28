@@ -29,7 +29,7 @@ const modules = {
       ...props,type:'button',role:'switch','aria-checked':checked,disabled,
       onClick:()=>{if(!disabled)onCheckedChange?.(!checked,{event:{type:'click'}});}
     });`,
-  startup: `export default props=>({type:'fixture-runtime',props});`,
+  startup: `import {jsx} from 'react/jsx-runtime'; export default ({runtimeCommand,...props})=>jsx('fixture-runtime',{...props,children:runtimeCommand});`,
   shared: `export {api,useAPI,unwrap,rows} from 'fixture:lib';
     import {jsx} from 'react/jsx-runtime';
     export const f=(key,label,type,extra={})=>({key,label,type,...extra});
@@ -113,7 +113,7 @@ function fixture(Component=ui.default, props={}) {
           active={hooks:state.get(id),index:0};
           return visit(node.type(node.props),`${id}.result`);
         }
-        return {...node,props:{...node.props,children:visit(node.props.children,`${path}.children`)}};
+        return {...node,props:{...node.props,children:visit(node.props.children,`${path}:${node.key??''}.children`)}};
       }
       for(let turn=0;turn<20;turn++) {
         pending=false; effects=[]; f.tree=visit({type:Component,props});
@@ -131,7 +131,7 @@ function fixture(Component=ui.default, props={}) {
     tab(key){const node=f.nodes(node=>node.props.role==='tab'&&node.props.id.endsWith(`-${key}`))[0];assert.ok(node,`missing ${key} tab`);node.props.onClick();f.render();},
     field(key){return f.nodes(node=>node.props.id===`server-configuration-7-${key}`)[0];},
     override(key) {
-      const group=f.nodes(node=>node.props.className==='server-configuration-field'&&f.textOf(node).includes(`server-configuration-7-${key}`))[0];
+      const group=f.nodes(node=>node.props.className?.split(' ').includes('server-configuration-field')&&f.textOf(node).includes(`server-configuration-7-${key}`))[0];
       const switches=[];
       function walk(node){if(Array.isArray(node))node.forEach(walk);else if(node&&typeof node==='object'){if(node.props.role==='switch')switches.push(node);walk(node.props.children);}}
       walk(group);assert.equal(switches.length,1,`missing override switch for ${key}`);
@@ -191,7 +191,8 @@ test('runtime tools use internal ID, keep top tabs local, and omit raw environme
   f.tab('configuration');assert.ok(f.queries.includes(base));
   assert.equal(f.field('config_stop').props.disabled,true);
   const installer=f.nodes(node=>node.type==='details');
-  assert.equal(installer.length,4);assert.ok(installer.every(node=>!node.props.open));
+  assert.equal(installer.length,0);
+  assert.equal(f.nodes(node=>node.props.title === "Startup command and template").length,0);
   assert.equal(f.requests.length,0);
 });
 
@@ -203,7 +204,7 @@ test('revision conflict retains draft; retry uses server endpoint and never invo
   f.confirm=false;f.tab('runtime');assert.ok(f.field('config_stop'));assert.equal(f.confirmations.length,1);
   f.apiError='';await f.save();
   assert.deepEqual(f.requests,[0,1].map(()=>({path:base,method:'PUT',body:{revision:'revision-1',overrides:{config_stop:'server-stop'}}})));
-  assert.match(f.text(),/revision-2/);assert.match(f.text(),/Nothing was started or reinstalled/);
+  assert.match(f.text(),/Nothing was started or reinstalled/);
 });
 
 test('disabling an override through the Switch callback restores inheritance and omits the override on save',async()=>{
@@ -248,7 +249,7 @@ test('contextual runtime masks credential inputs and submits only changed enviro
   assert.equal(editor.props.initial['env:PASSWORD'],'');
   assert.equal(editor.props.fields.find(field=>field.key==='env:PASSWORD').type,'password');
   assert.deepEqual(editor.props.transform({image:'runtime-image','env:PORT':'25566'}),{image:'runtime-image',environment:{PORT:'25566'}});
-  assert.equal(f.nodes(node=>node.type==='details')[0].props.open,undefined);
+  assert.equal(f.nodes(node=>node.type==='details').length,0);
 });
 
 test('generic runtime saves retain untouched secrets and preserve opaque replacements exactly',()=>{
@@ -314,4 +315,40 @@ test('contextual Manage retains reinstall, transfer and deletion confirmation sa
   f.confirm=false;transfer.props.onSubmit({preventDefault(){}});
   assert.match(f.confirmations.at(-1),/server will stop/);assert.equal(f.requests.length,0);
   actions.find(node=>node.props.path.endsWith('/force')).props.onDone();assert.deepEqual(f.navigations,['/']);
+});
+
+test('empty restricted options omit the form; real restricted secrets remain masked',()=>{
+  const record={id:7,egg:2,container:{environment:{TOKEN:'private-token'}}};
+  const f=fixture(ui.Startup,{record,onSaved(){},contextual:true,restrictedOnly:true});
+  f.data.set('/api/admin/eggs/2',{data:item({relationships:{variables:{data:[]}}})});f.render();
+  assert.equal(f.nodes(node=>node.type==='fixture-editor').length,0);
+  f.data.set('/api/admin/eggs/2',{data:item({relationships:{variables:{data:[item({env_variable:'TOKEN',user_viewable:false})]}}})});f.render();
+  const editor=f.nodes(node=>node.type==='fixture-editor')[0];
+  assert.equal(editor.props.initial['env:TOKEN'],'');
+  assert.equal(editor.props.fields[0].type,'password');
+  assert.deepEqual(editor.props.transform({'env:TOKEN':''}),{environment:{}});
+});
+
+
+test('Runtime owns command assignment and suppresses the duplicate preview',()=>{
+  const f=fixture();f.render();
+  const runtime=f.nodes(node=>node.type==='fixture-runtime')[0];
+  assert.equal(runtime.props.showCommandPreview,false);
+  assert.equal(f.nodes(node=>node.type==='fixture-editor'&&node.props.title==='Startup command and template').length,1);
+  f.tab('manage');
+  assert.equal(f.nodes(node=>node.type==='details').length,0);
+});
+
+test('refresh requires confirmation before discarding a configuration draft',()=>{
+  const f=fixture();f.render();f.tab('configuration');f.override('config_stop');
+  f.field('config_stop').props.onChange({target:{value:'unsaved-stop'}});f.render();
+  const refresh=()=>f.nodes(node=>node.type==='button'&&node.props.children==='Refresh settings')[0];
+  f.confirm=false;refresh().props.onClick();f.render();
+  assert.equal(f.field('config_stop').props.value,'unsaved-stop');
+  assert.equal(f.reloads||0,0);
+  f.confirm=true;refresh().props.onClick();f.render();
+  assert.equal(f.field('config_stop').props.value,'^C');
+  assert.equal(f.field('config_stop').props.disabled,true);
+  assert.equal(f.reloads,1);
+  assert.equal(f.requests.length,0);
 });

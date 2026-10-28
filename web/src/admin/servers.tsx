@@ -198,7 +198,7 @@ function CreateServer() {
           setError("");
           setBusy(true);
           try {
-            const v = normalize([...fields, ...limits, ...features], values);
+            const v = normalize(fields, values);
             const body = {
               ...v,
               environment: Object.fromEntries(Object.entries(v.environment).filter(([name]) => !integrationDefaults[name] || integrationOverrides[name])),
@@ -388,19 +388,17 @@ export function Build({ record, onSaved }: { record: any; onSaved: () => void })
 export function RuntimeAssignment({record, onSaved}: {record: any; onSaved: () => void}) {
   const eggID = record.egg ?? record.egg_id;
   return (
-      <details className="server-admin-advanced">
-        <summary>Startup command and template assignment</summary>
-        <p className="muted">The command may contain sensitive values. Template and installer choices affect this server only. A template change can require a separate reinstall.</p>
+      <section className="server-runtime-assignment">
         <Editor
           title="Startup command and template"
           endpoint={`${servers}/${record.id}/startup`}
           initial={{ startup: record.container?.startup_command ?? record.startup, egg: eggID,
             skip_scripts: record.container?.skip_scripts ?? record.skip_scripts }}
-          fields={[f("startup", "Startup command", "textarea"), f("egg", "Egg ID", "number"), f("skip_scripts", "Skip installation script", "checkbox")]}
+          fields={[f("startup", "Startup command", "textarea"), f("egg", "Template ID", "number", {hint: "Changing the template may require a separate reinstall."}), f("skip_scripts", "Skip installation script", "checkbox")]}
           onSaved={onSaved}
           submit="Save server assignment"
         />
-      </details>
+      </section>
   );
 }
 export function Startup({ record, onSaved, contextual = false, restrictedOnly = false }: { record: any; onSaved: () => void; contextual?: boolean; restrictedOnly?: boolean }) {
@@ -422,11 +420,12 @@ export function Startup({ record, onSaved, contextual = false, restrictedOnly = 
   if (contextual) {
     if (q.loading) return <p role="status">Loading runtime settings...</p>;
     if (!egg || q.error) return <ErrorMessage error={q.error || "Runtime settings are unavailable."} />;
+    if (restrictedOnly && vars.length === 0) return null;
     const current = { ...environment, ...record.container?.environment };
     const secret = (variable: RecordData) => variable.secret || variable.is_secret || variable.field_type === "password"
       || variable.user_viewable === false || /password|passwd|secret|token|api_?key|credential/i.test(variable.env_variable);
     return <>
-      <p className="muted">Runtime changes apply on the next start. Saving does not restart or reinstall this server.</p>
+      {!restrictedOnly && <p className="muted">Runtime changes apply on the next start. Saving does not restart or reinstall this server.</p>}
       <Editor
         title={restrictedOnly ? "Restricted template options" : "Image and environment"}
         endpoint={`${servers}/${record.id}/startup`}
