@@ -341,6 +341,7 @@ export default function Console() {
       <Notice action={a}/>
       <PageError error={socketError}/>
       <PageError error={historyError}/>
+      {features.current.includes('voltra_fs25') && can(permissions,'control.console') && <Button disabled={a.busy || status!=='running'} onClick={()=>void a.run(()=>api(`${base}/fs25/save`,json('POST',{})))}>Save game</Button>}
       <Terminal history={history} status={status} connection={connection} busy={a.busy} onClear={()=>{pendingLines.current.clear();setHistory(emptyConsoleHistory())}} onSend={(command,done)=>{void a.run(()=>api(`${base}/command`,json('POST',{command})),done)}}/>
       {feature && (
         <Modal

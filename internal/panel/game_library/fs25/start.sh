@@ -120,6 +120,11 @@ fi
 
 # ---- 4. Render configuration from environment ---------------------------------
 node "${FS25_LIB}/configure.mjs" || exit 1
+if [ "${VOLTRA_FS25_SAVE:-false}" = true ]; then
+    node "${FS25_LIB}/prepare-save.mjs" || exit 1
+else
+    node "${FS25_LIB}/prepare-save.mjs" --disable || exit 1
+fi
 
 # The dedicated server binds its web portal to the container network IP, not
 # loopback, so detect it and share it with the helper that drives the portal.
@@ -127,6 +132,10 @@ WEB_HOST=$(ip -4 addr show scope global 2>/dev/null | grep -oP '(?<=inet\s)\d+(\
 [ -z "$WEB_HOST" ] && WEB_HOST=$(hostname -i 2>/dev/null | awk '{print $1}')
 [ -z "$WEB_HOST" ] && WEB_HOST=127.0.0.1
 export WEB_HOST
+if [ "${VOLTRA_FS25_SAVE:-false}" = true ]; then
+    node "${FS25_LIB}/save-worker.mjs" &
+    SAVE_WORKER_PID=$!
+fi
 log "Web portal host detected as ${WEB_HOST}."
 
 # ---- 5. Start the dedicated server (web portal) -------------------------------
@@ -149,13 +158,25 @@ WINE_PID=$!
 
 # ---- 8. Clean shutdown handler ------------------------------------------------
 shutdown() {
+    if [ "${VOLTRA_FS25_SAVE:-false}" = true ] && kill -0 "$WINE_PID" 2>/dev/null; then
+        if ! node "${FS25_LIB}/start-game.mjs" --is-stopped >/dev/null 2>&1 && ! node "${FS25_LIB}/save-game.mjs"; then
+            err "Save was not confirmed. Keeping FS25 running; a Wings/Docker shutdown deadline can still force termination."
+            return 1
+        fi
+    fi
     log "Shutdown requested — stopping FS25 server..."
-    node "${FS25_LIB}/start-game.mjs" --stop >/dev/null 2>&1 || true
+    if ! node "${FS25_LIB}/start-game.mjs" --stop; then
+        if [ "${VOLTRA_FS25_SAVE:-false}" = true ]; then
+            err "Game session stop was not confirmed. Keeping Wine running."
+            return 1
+        fi
+    fi
     sleep 3
     wineserver -k >/dev/null 2>&1 || true
     kill "$WINE_PID"  >/dev/null 2>&1 || true
     [ -z "${TAIL_PID:-}" ] || kill "$TAIL_PID"  >/dev/null 2>&1 || true
     [ -z "${DLC_VERIFY_PID:-}" ] || kill "$DLC_VERIFY_PID" >/dev/null 2>&1 || true
+    [ -z "${SAVE_WORKER_PID:-}" ] || kill "$SAVE_WORKER_PID" >/dev/null 2>&1 || true
     kill "$XVFB_PID"  >/dev/null 2>&1 || true
     exit 0
 }
@@ -184,5 +205,7 @@ fi
 log "Web manager ready. Streaming log (web portal: http://${WEB_HOST}:${WEB_PORT}). Check the game log for gameplay readiness."
 
 # Keep PID1 alive while the Wine process runs; react to signals via the trap.
-wait "$WINE_PID"
+while kill -0 "$WINE_PID" 2>/dev/null; do
+    wait "$WINE_PID" || true
+done
 shutdown

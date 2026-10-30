@@ -35,7 +35,7 @@ func TestFS25ReviewedTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(vars) != 20 || entry.RequiredPorts != 2 || entry.Verification == "runtime_verified" {
+	if len(vars) != 21 || entry.RequiredPorts != 2 || entry.Verification == "runtime_verified" {
 		t.Fatal("invalid FS25 metadata")
 	}
 	for _, variable := range vars {

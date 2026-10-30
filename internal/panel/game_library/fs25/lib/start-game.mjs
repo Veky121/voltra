@@ -16,6 +16,8 @@ const HOST = `${process.env.WEB_HOST || '127.0.0.1'}:${process.env.WEB_PORT || '
 const USERNAME = process.env.WEB_USERNAME || 'admin';
 const PASSWORD = process.env.WEB_PASSWORD || 'changeme';
 const STOP = process.argv.includes('--stop');
+const STATUS = process.argv.includes('--is-stopped');
+const stopped = page => /<input\b[^>]*name\s*=\s*"start_server"/i.test(page.body) && !/<input\b[^>]*name\s*=\s*"stop_server"/i.test(page.body);
 
 function encode(data) {
   return Object.entries(data)
@@ -41,7 +43,7 @@ function request(method, data = {}, cookie = '') {
     const req = http.request(`http://${HOST}${path}`, { method, headers, agent: false }, (res) => {
       let buf = '';
       res.on('data', (c) => { buf += c; if (buf.length > 2*1024*1024) req.destroy(new Error('Portal response too large')); });
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: buf }));
+      res.on('end', () => res.statusCode >= 400 ? reject(new Error(`Portal HTTP ${res.statusCode}`)) : resolve({ status: res.statusCode, headers: res.headers, body: buf }));
     });
     req.setTimeout(15000, () => req.destroy(new Error('Portal request timed out')));
     req.on('error', reject);
@@ -101,10 +103,22 @@ async function run() {
   const cookie = await login();
   let page = await request('GET', {}, cookie);
 
-  if (STOP) {
-    await request('POST', { stop_server: 'Stop' }, cookie);
-    console.log('[fs25] Game session stop requested.');
+  if (STATUS) {
+    if (!stopped(page)) throw Error('Game session is running or its state is unknown');
+    console.log('[fs25] Game session is stopped.');
     return;
+  }
+
+  if (STOP) {
+    if (stopped(page)) { console.log('[fs25] Game session is stopped.'); return; }
+    await request('POST', { stop_server: 'Stop' }, cookie);
+    const deadline=Date.now()+15000;
+    while(Date.now()<deadline) {
+      page=await request('GET',{},cookie);
+      if(stopped(page)) { console.log('[fs25] Game session stop confirmed.'); return; }
+      await new Promise(resolve=>setTimeout(resolve,250));
+    }
+    throw Error('Game session did not confirm stopping');
   }
 
   const inactive=page.body.match(/<form\b[^>]*name\s*=\s*"InactiveMods"[^>]*>([\s\S]*?)<\/form>/i)?.[1]||'';
