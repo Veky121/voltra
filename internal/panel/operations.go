@@ -1264,6 +1264,11 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 		fail(w, eggErr)
 		return
 	}
+	var changed M
+	if e = a.maskIntegrationVariables(ctx, num(s["id"]), rows); e != nil {
+		fail(w, e)
+		return
+	}
 	if fs25Egg(startupEgg) {
 		for _, v := range rows {
 			switch str(v["env_variable"]) {
@@ -1271,11 +1276,6 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 				v["user_viewable"], v["user_editable"] = true, true
 			}
 		}
-	}
-	var changed M
-	if e = a.maskIntegrationVariables(ctx, num(s["id"]), rows); e != nil {
-		fail(w, e)
-		return
 	}
 	if e = a.steamCatalogMaskVariables(ctx, s, rows); e != nil {
 		fail(w, e)

@@ -140,7 +140,7 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 		fail(w, secretErr)
 		return
 	}
-	if secretErr == nil && str(secret["source"]) != "server" {
+	if secretErr == nil && str(secret["source"]) != "server" && !a.isFS25Password(ctx, server, str(changed["env_variable"])) {
 		fail(w, forbidden())
 		return
 	}
@@ -248,7 +248,7 @@ func (a *App) revealStartupField(w http.ResponseWriter, r *http.Request) {
 		key := r.PathValue("key")
 		visible = e == nil && fs25Egg(egg) && (key == "WEB_PASSWORD" || key == "GAME_PASSWORD" || key == "ADMIN_PASSWORD")
 	}
-	if !visible || (str(v["source"]) != "" && str(v["source"]) != "server") {
+	if !visible || (str(v["source"]) != "" && str(v["source"]) != "server" && !a.isFS25Password(r.Context(), server, r.PathValue("key"))) {
 		fail(w, forbidden())
 		return
 	}
@@ -262,4 +262,14 @@ func (a *App) revealStartupField(w http.ResponseWriter, r *http.Request) {
 	}
 	a.opAudit(r, server, "server:startup.reveal", M{"variable": r.PathValue("key")})
 	writeJSON(w, 200, item("startup_value", M{"value": value}))
+}
+
+// Early FS25 installs marked user passwords as integration-owned. These three
+// game credentials remain owner-editable, independently of licence credentials.
+func (a *App) isFS25Password(ctx context.Context, server M, key string) bool {
+	if key != "WEB_PASSWORD" && key != "GAME_PASSWORD" && key != "ADMIN_PASSWORD" {
+		return false
+	}
+	egg, err := a.one(ctx, "SELECT features FROM eggs WHERE id=$1", server["egg_id"])
+	return err == nil && fs25Egg(egg)
 }

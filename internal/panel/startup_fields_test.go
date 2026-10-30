@@ -175,3 +175,35 @@ func TestStartupRevealSavedValue(t *testing.T) {
 	}
 	operationsExpect(t, f.request("GET", path, nil, f.owner), 403)
 }
+
+func TestFS25LegacyPasswordsEditableAndRevealable(t *testing.T) {
+	f, variable := startupPasswordFixture(t)
+	ctx := context.Background()
+	if err := f.a.exec(ctx, `UPDATE eggs SET features='["voltra_fs25"]'::jsonb WHERE id=$1`, f.server["egg_id"]); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.a.exec(ctx, "UPDATE egg_variables SET env_variable='WEB_PASSWORD',user_editable=false,user_viewable=false WHERE id=$1", variable["id"]); err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := f.a.seal("legacy-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.a.exec(ctx, "INSERT INTO server_integration_secrets(server_id,variable_id,value,source) VALUES($1,$2,$3,'integration')", f.server["id"], variable["id"], sealed); err != nil {
+		t.Fatal(err)
+	}
+	v := startupVariable(t, operationsExpect(t, f.request("GET", f.serverPath("/startup"), nil, f.owner), 200), "WEB_PASSWORD")
+	if !boolean(v["is_editable"]) {
+		t.Fatal("legacy password is read-only")
+	}
+	path := f.serverPath("/startup/variable/WEB_PASSWORD/reveal")
+	v = asMap(operationsExpect(t, f.request("GET", path, nil, f.owner), 200)["attributes"])
+	if str(v["value"]) != "legacy-password" {
+		t.Fatal("legacy password was not revealed")
+	}
+	operationsExpect(t, f.request("PUT", f.serverPath("/startup/variable"), M{"key": "WEB_PASSWORD", "value": "replacement-password"}, f.owner), 200)
+	v = asMap(operationsExpect(t, f.request("GET", path, nil, f.owner), 200)["attributes"])
+	if str(v["value"]) != "replacement-password" {
+		t.Fatal("password was not changed")
+	}
+}
