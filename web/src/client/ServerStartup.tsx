@@ -8,6 +8,12 @@ import { commandPreview, secretVariable, variableCanReset, variableControl, vari
 import type { StartupMeta, StartupVariable, VariableIntent, VariableWrite } from './startupSettingsModel';
 import './startupSettings.css';
 
+function FS25Forwarding({base}: {base: string}) {
+ const [message,setMessage] = useState('');
+ const [busy,setBusy] = useState(false);
+ return <div><Button disabled={busy} onClick={async () => { setBusy(true); try { const result = await api(`${base}/startup/fs25-forward`,{method:'POST'}); const routes = result.attributes.forwarding.routes || []; setMessage(routes.map((route: any) => route.public_host ? `${route.public_host}:${route.public_port} (${route.status})` : route.detail).join(' ? ')); } catch { setMessage('Could not configure forwarding. Check the node gateway setup and your network permissions.'); } finally { setBusy(false); } }}>Forward web dashboard</Button>{message && <p role="status">{message}</p>}</div>;
+}
+
 type VariableProps = {
   variable: StartupVariable;
   permitted: boolean;
@@ -16,6 +22,9 @@ type VariableProps = {
 };
 
 export function StartupVariableField({ variable, permitted, onSave, onDirty }: VariableProps) {
+  const { base } = useServer();
+  const [revealed, setRevealed] = useState<string | null>(null);
+  useEffect(() => { setRevealed(null); }, [base, variable.env_variable]);
   const baseline = variableValue(variable);
   const previous = useRef(baseline);
   const [draft, setDraft] = useState(baseline);
@@ -53,6 +62,7 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
       locked.current = true;
       setBusy(true);
       const saved = await onSave(payload);
+      setRevealed(null);
       setDraft(variableValue(saved));
       setSuccess(intent === 'reset' ? 'Template default restored. Applies next start.' : 'Saved. Applies next start.');
     } catch (cause) {
@@ -85,8 +95,10 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
         placeholder={secret ? configured ? 'Configured. Leave blank to keep unchanged.' : 'Leave blank to keep unchanged.' : undefined}
         aria-describedby={`${id}-help${variable.description ? ` ${id}-description` : ''}`} aria-invalid={!!problem}
         onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }} />}
+      {secret && permitted && <Button variant="secondary" disabled={busy} onClick={async () => { if (revealed !== null) { setRevealed(null); return; } try { const result = await api(`${base}/startup/variable/${encodeURIComponent(variable.env_variable)}/reveal`); setRevealed(String(result.attributes.value)); } catch { setError("Could not show this value. Check your permissions."); } }}>{revealed === null ? "Show saved value" : "Hide saved value"}</Button>}
       {editable && <Button type="submit" disabled={busy || !dirty || !!problem}>{busy ? 'Saving...' : secret ? 'Save value' : 'Save'}</Button>}
     </div>
+    {revealed !== null && <output aria-label={`${label} saved value`}>{revealed || "(empty)"}</output>}
     <div id={`${id}-help`} className="startup-field-help muted">
       {secret ? <span>Value hidden{configured !== undefined ? configured ? ' · Configured' : ' · Not configured' : ''}. Blank leaves it unchanged.</span>
         : <span>Template default: <code>{String(variable.default_value ?? '') || '(empty)'}</code></span>}
@@ -163,7 +175,7 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
   const meta: StartupMeta = { ...(query.data.meta || {}), ...savedMeta };
   const updateAllowed = can(permissions, 'startup.update');
   const imageAllowed = can(permissions, 'startup.docker-image');
-  const farming = variables.some(variable=>variable.env_variable==='GAME_SERIAL') && variables.some(variable=>variable.env_variable==='DLC_PRODUCT_KEY');
+  const farming = ['WEB_PASSWORD', 'WEB_PORT', 'GAME_PASSWORD'].every(key => (items(query.data) as StartupVariable[]).some(variable => variable.env_variable === key));
   const licenceFields = new Set(['GAME_SERIAL','DLC_PRODUCT_KEY','AUTO_DOWNLOAD','DOWNLOAD_DLC']);
   const renderVariable = (variable:StartupVariable) => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
     const response = await api(`${base}/startup/variable`, json('PUT', payload));
@@ -176,6 +188,7 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
   }}/>;
   const OptionsGroup = section === 'runtime' ? 'section' : Card;
   const options = <>
+    {farming && section === 'game' && can(permissions, 'allocation.update') && <FS25Forwarding base={base}/>}
     {farming && <OptionsGroup className="startup-variables"><h3>Game licence and DLC</h3><p className="muted">Game and DLC licences are supplied by the administrator. Contact your administrator to add or change a DLC licence.</p><div className="startup-variable-grid">{variables.filter(variable=>licenceFields.has(variable.env_variable)&&!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)).map(renderVariable)}</div></OptionsGroup>}
     <OptionsGroup className="startup-variables"><h3>{section === 'game' ? 'Game options' : 'Installation & startup options'}</h3>
       {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}

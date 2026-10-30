@@ -155,3 +155,23 @@ func TestStartupFieldsLiteralPreviewMask(t *testing.T) {
 		}
 	}
 }
+
+func TestStartupRevealSavedValue(t *testing.T) {
+	f, variable := startupPasswordFixture(t)
+	path := f.serverPath("/startup/variable/SERVER_PASSWORD/reveal")
+	operationsExpect(t, f.request("GET", path, nil, f.sub), 403)
+	response := f.request("GET", path, nil, f.owner)
+	value := asMap(operationsExpect(t, response, 200)["attributes"])
+	if str(value["value"]) != "template-password" || response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("saved value or cache policy missing")
+	}
+	operationsExpect(t, f.request("PUT", f.serverPath("/startup/variable"), M{"key": "SERVER_PASSWORD", "value": "saved-password"}, f.owner), 200)
+	value = asMap(operationsExpect(t, f.request("GET", path, nil, f.owner), 200)["attributes"])
+	if str(value["value"]) != "saved-password" {
+		t.Fatal("encrypted saved value was not revealed")
+	}
+	if err := f.a.exec(context.Background(), "UPDATE server_integration_secrets SET source='integration' WHERE server_id=$1 AND variable_id=$2", f.server["id"], variable["id"]); err != nil {
+		t.Fatal(err)
+	}
+	operationsExpect(t, f.request("GET", path, nil, f.owner), 403)
+}

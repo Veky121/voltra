@@ -85,6 +85,15 @@ func (a *App) forwardGamePorts(ctx context.Context, node M, server M, entry game
 	manual := 0
 	for _, port := range plan.Ports {
 		protocols := gameForwardProtocols(entry.Path, port.Role)
+		// FS25 dashboard forwarding is explicitly requested and limited to the
+		// configured web listener, never arbitrary auxiliary allocations.
+		if entry.Path == fs25Path {
+			web, err := a.one(ctx, `SELECT COALESCE(sv.variable_value,ev.default_value) AS port FROM egg_variables ev LEFT JOIN server_variables sv ON sv.variable_id=ev.id AND sv.server_id=$1 WHERE ev.egg_id=$2 AND ev.env_variable='WEB_PORT'`, server["id"], server["egg_id"])
+			if err == nil && str(web["port"]) == strconv.FormatInt(port.Port, 10) {
+				protocols = []string{"tcp"}
+			}
+		}
+
 		if entry.Path == "" {
 			switch entry.ID {
 			case "minecraft":
@@ -125,7 +134,7 @@ func (a *App) forwardGamePorts(ctx context.Context, node M, server M, entry game
 	}
 	out["routes"] = routes
 	if eligible > 0 && len(routes) > 0 {
-		out["detail"] = "Only audited gameplay protocols are considered. Unlisted roles require manual forwarding. External reachability is unverified."
+		out["detail"] = "Only reviewed game listeners and the FS25 web dashboard are considered. Unlisted roles require manual forwarding. External reachability is unverified."
 		out["status"] = "manual"
 		if mapped == eligible && manual == 0 {
 			out["status"] = "mapped"
@@ -284,4 +293,36 @@ func (a *App) applyGameFRPRoute(ctx context.Context, route M) (M, error) {
 		return route, fmt.Errorf("desired FRP mapping retained; reconcile required")
 	}
 	return route, applyErr
+}
+
+// Existing installations can request the same durable mappings as new installs.
+func (a *App) forwardFS25Dashboard(w http.ResponseWriter, r *http.Request) {
+	server, err := a.server(r, "allocation.update")
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if _, err = a.server(r, "startup.read"); err != nil {
+		fail(w, err)
+		return
+	}
+	egg, err := a.one(r.Context(), "SELECT features FROM eggs WHERE id=$1", server["egg_id"])
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if !fs25Egg(egg) {
+		fail(w, notFound())
+		return
+	}
+	node, err := a.node(r.Context(), num(server["node_id"]))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	entry := farmingSimulatorTemplate()
+	plan := a.gameInstallPortResponse(r.Context(), server, entry)
+	plan.Forwarding = a.forwardGamePorts(r.Context(), node, server, entry, plan)
+	a.opAudit(r, server, "server:fs25.forward", M{})
+	writeJSON(w, 200, item("game_port_plan", M{"ip": plan.IP, "ports": plan.Ports, "detail": plan.Detail, "forwarding": plan.Forwarding}))
 }

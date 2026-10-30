@@ -221,3 +221,23 @@ func TestFS25SavedLicenseAndSecretOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestFS25PasswordsEditable(t *testing.T) {
+	_, variables, err := parseEggDocument(farmingSimulatorTemplate().Egg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := 0
+	for _, v := range variables {
+		switch str(v["env_variable"]) {
+		case "WEB_PASSWORD", "ADMIN_PASSWORD", "GAME_PASSWORD":
+			found++
+			if !boolean(v["user_viewable"]) || !boolean(v["user_editable"]) {
+				t.Fatal("password must be visible and editable")
+			}
+		}
+	}
+	if found != 3 {
+		t.Fatal("missing FS25 password variables")
+	}
+}

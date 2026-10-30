@@ -72,11 +72,16 @@ func farmingSimulatorTemplate() gameTemplate {
 		case "WEB_PASSWORD":
 			v["default_value"] = ""
 			v["rules"] = "required|string|min:12|max:64"
-			v["description"] = "Choose a strong web manager password."
+			v["description"] = "Web dashboard login password. View or change it in Game settings. Saved changes apply on the next server start."
+			v["user_viewable"], v["user_editable"] = true, true
 		case "WEB_PORT":
+			v["description"] = "Web dashboard listener. Uses an assigned allocation. Forward web dashboard in Game settings configures the existing FRP gateway for public access."
 			v["default_value"] = ""
 			v["rules"] = "nullable|integer|between:1024,65535"
-		case "KEEP_INSTALLER", "AUTO_SAVE_INTERVAL", "STATS_INTERVAL", "PAUSE_IF_EMPTY", "SAVEGAME_INDEX", "SERVER_LANGUAGE", "WEB_USERNAME", "ADMIN_PASSWORD", "GAME_PASSWORD":
+		case "ADMIN_PASSWORD", "GAME_PASSWORD":
+			v["user_viewable"], v["user_editable"] = true, true
+			v["description"] = "View or change this password in Game settings. Saved changes apply on the next server start."
+		case "KEEP_INSTALLER", "AUTO_SAVE_INTERVAL", "STATS_INTERVAL", "PAUSE_IF_EMPTY", "SAVEGAME_INDEX", "SERVER_LANGUAGE", "WEB_USERNAME":
 			v["user_viewable"] = true
 		case "MAP_ID":
 			v["description"] = "Base-game or installed mod map ID."

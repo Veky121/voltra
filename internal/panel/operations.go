@@ -66,6 +66,8 @@ func (a *App) registerOperations(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/client/servers/{server}/network/allocations/{allocation}/primary", a.clientAllocations)
 	mux.HandleFunc("GET /api/client/servers/{server}/startup", a.clientStartup)
 	mux.HandleFunc("PUT /api/client/servers/{server}/startup/variable", a.clientStartup)
+	mux.HandleFunc("GET /api/client/servers/{server}/startup/variable/{key}/reveal", a.revealStartupField)
+	mux.HandleFunc("POST /api/client/servers/{server}/startup/fs25-forward", a.forwardFS25Dashboard)
 	mux.HandleFunc("POST /api/client/servers/{server}/settings/rename", a.clientSettings)
 	mux.HandleFunc("POST /api/client/servers/{server}/settings/reinstall", a.clientSettings)
 	mux.HandleFunc("PUT /api/client/servers/{server}/settings/docker-image", a.clientSettings)
@@ -1256,6 +1258,19 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		fail(w, e)
 		return
+	}
+	startupEgg, eggErr := a.one(ctx, "SELECT features FROM eggs WHERE id=$1", s["egg_id"])
+	if eggErr != nil {
+		fail(w, eggErr)
+		return
+	}
+	if fs25Egg(startupEgg) {
+		for _, v := range rows {
+			switch str(v["env_variable"]) {
+			case "WEB_PASSWORD", "GAME_PASSWORD", "ADMIN_PASSWORD":
+				v["user_viewable"], v["user_editable"] = true, true
+			}
+		}
 	}
 	var changed M
 	if e = a.maskIntegrationVariables(ctx, num(s["id"]), rows); e != nil {

@@ -223,3 +223,43 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 	response["meta"] = M{"applies": "next_start"}
 	writeJSON(w, 200, response)
 }
+
+// Reveal is explicit and requires both startup permissions. Admin integration
+// credentials remain private even when their variable is visible.
+func (a *App) revealStartupField(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	server, err := a.server(r, "startup.read")
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if _, err = a.server(r, "startup.update"); err != nil {
+		fail(w, err)
+		return
+	}
+	v, err := a.one(r.Context(), `SELECT ev.user_viewable,COALESCE(sv.variable_value,ev.default_value) AS value,ss.value AS sealed,ss.source FROM egg_variables ev LEFT JOIN server_variables sv ON sv.variable_id=ev.id AND sv.server_id=$1 LEFT JOIN server_integration_secrets ss ON ss.variable_id=ev.id AND ss.server_id=$1 WHERE ev.egg_id=$2 AND ev.env_variable=$3`, server["id"], server["egg_id"], r.PathValue("key"))
+	if err != nil {
+		fail(w, notFound())
+		return
+	}
+	visible := boolean(v["user_viewable"])
+	if !visible {
+		egg, e := a.one(r.Context(), "SELECT features FROM eggs WHERE id=$1", server["egg_id"])
+		key := r.PathValue("key")
+		visible = e == nil && fs25Egg(egg) && (key == "WEB_PASSWORD" || key == "GAME_PASSWORD" || key == "ADMIN_PASSWORD")
+	}
+	if !visible || (str(v["source"]) != "" && str(v["source"]) != "server") {
+		fail(w, forbidden())
+		return
+	}
+	value := str(v["value"])
+	if str(v["sealed"]) != "" {
+		value, err = a.unseal(str(v["sealed"]))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	a.opAudit(r, server, "server:startup.reveal", M{"variable": r.PathValue("key")})
+	writeJSON(w, 200, item("startup_value", M{"value": value}))
+}
