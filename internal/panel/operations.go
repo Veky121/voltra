@@ -40,7 +40,6 @@ func (a *App) registerOperations(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/client/servers/{server}/resources", a.clientResources)
 	mux.HandleFunc("POST /api/client/servers/{server}/command", a.clientCommand)
 	mux.HandleFunc("POST /api/client/servers/{server}/power", a.clientPower)
-	mux.HandleFunc("POST /api/client/servers/{server}/fs25/save", a.clientFS25Save)
 	mux.HandleFunc("GET /api/client/servers/{server}/websocket", a.clientWebsocket)
 	mux.HandleFunc("GET /api/client/servers/{server}/console-history", a.clientConsoleHistory)
 	mux.HandleFunc("GET /api/client/servers/{server}/ws", a.clientSocketProxy)
@@ -258,11 +257,6 @@ func (a *App) clientPower(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.recordConsolePower(r.Context(), num(s["id"]), signal, "requested")
-	if signal == "stop" || signal == "restart" {
-		enabled, err := a.fs25SaveEnabled(r.Context(), s)
-		if err == nil && enabled { err = a.fs25Save(r.Context(), s, true) }
-		if err != nil { fail(w, err); return }
-	}
 	resp, e := a.daemonServer(r.Context(), s, "POST", "/power", M{"action": signal})
 	if e != nil {
 		a.recordConsolePower(r.Context(), num(s["id"]), signal, "failed")
