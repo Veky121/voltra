@@ -158,14 +158,18 @@ WINE_PID=$!
 
 # ---- 8. Clean shutdown handler ------------------------------------------------
 shutdown() {
-    if [ "${VOLTRA_FS25_SAVE:-false}" = true ] && kill -0 "$WINE_PID" 2>/dev/null; then
+    local confirmed_stop=false
+    if [ "${VOLTRA_FS25_SAVE:-false}" = true ] && node "${FS25_LIB}/save-game.mjs" --has-confirmed-stop; then
+        confirmed_stop=true
+        log "Recent save and session-stop confirmation accepted; closing container."
+    elif [ "${VOLTRA_FS25_SAVE:-false}" = true ] && kill -0 "$WINE_PID" 2>/dev/null; then
         if ! node "${FS25_LIB}/start-game.mjs" --is-stopped >/dev/null 2>&1 && ! node "${FS25_LIB}/save-game.mjs"; then
             err "Save was not confirmed. Keeping FS25 running; a Wings/Docker shutdown deadline can still force termination."
             return 1
         fi
     fi
     log "Shutdown requested — stopping FS25 server..."
-    if ! node "${FS25_LIB}/start-game.mjs" --stop; then
+    if [ "$confirmed_stop" = false ] && ! node "${FS25_LIB}/start-game.mjs" --stop; then
         if [ "${VOLTRA_FS25_SAVE:-false}" = true ]; then
             err "Game session stop was not confirmed. Keeping Wine running."
             return 1

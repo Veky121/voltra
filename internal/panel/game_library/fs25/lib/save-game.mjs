@@ -1,7 +1,17 @@
-import {open, mkdir, readdir, stat, writeFile, rename, unlink} from 'node:fs/promises';
+import {open, mkdir, readFile, readdir, stat, writeFile, rename, unlink} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+
+export async function hasConfirmedStop({docsDir=process.env.DOCS_DIR,now=Date.now()}={}) {
+  if(!docsDir)return false;
+  const dir=join(docsDir,'modSettings','VoltraSave');
+  try {
+    const [state,result,info]=await Promise.all([readFile(join(dir,'state.json'),'utf8').then(JSON.parse),readFile(join(dir,'result.json'),'utf8').then(JSON.parse),stat(join(dir,'result.json'))]);
+    const age=now-info.mtimeMs;
+    return state.protocol===1 && typeof state.session==='string' && state.session.length>0 && result.session===state.session && result.success===true && result.stopped===true && /^[a-f0-9]{32}$/.test(result.id) && age>=0 && age<=15000;
+  } catch {return false;}
+}
 
 // A fresh request marker followed by the engine's own success message is required.
 // Old saves, an accepted request, and modified files alone never mean success.
@@ -54,5 +64,7 @@ export async function saveGame({docsDir=process.env.DOCS_DIR, timeoutMs=60000}={
 }
 
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
-  saveGame().then(result=>console.log(`[VoltraSave] confirmed ${result.id}: ${result.confirmation}`)).catch(error=>{console.error(`[VoltraSave] ${error.message}`);process.exitCode=1;});
+  if(process.argv.includes('--has-confirmed-stop'))process.exitCode=await hasConfirmedStop()?0:2;
+  else if(await hasConfirmedStop()) console.log('[VoltraSave] Recent save and stopped-session proof accepted.');
+  else saveGame().then(result=>console.log(`[VoltraSave] confirmed ${result.id}: ${result.confirmation}`)).catch(error=>{console.error(`[VoltraSave] ${error.message}`);process.exitCode=1;});
 }

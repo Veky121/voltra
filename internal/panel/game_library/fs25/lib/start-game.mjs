@@ -9,6 +9,7 @@
 // unchanged plus the start (or stop) button. Reading all fields generically keeps
 // this working across game versions that add/rename settings.
 import http from 'http';
+import {hasConfirmedStop} from './save-game.mjs';
 import {pendingDLCs} from './dlc-state.mjs';
 
 // The portal binds to the container network IP, not loopback; start.sh exports it.
@@ -100,6 +101,10 @@ function scrapeForm(html) {
 }
 
 async function run() {
+  if ((STOP || STATUS) && await hasConfirmedStop()) {
+    console.log('[fs25] Recent native save and session-stop confirmation accepted.');
+    return;
+  }
   const cookie = await login();
   let page = await request('GET', {}, cookie);
 

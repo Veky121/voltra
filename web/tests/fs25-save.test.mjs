@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,appendFile,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {saveGame} from '../../internal/panel/game_library/fs25/lib/save-game.mjs';
-import {spawn} from 'node:child_process';
+import {saveGame,hasConfirmedStop} from '../../internal/panel/game_library/fs25/lib/save-game.mjs';
+import {spawn,execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import http from 'node:http';
 
@@ -17,6 +17,29 @@ async function requestId(control) {
  for(let n=0;n<100;n++) {try{return /id="([a-f0-9]+)"/.exec(await readFile(join(control,'request.xml'),'utf8'))[1];}catch{}await new Promise(r=>setTimeout(r,10));}
  throw Error('No request');
 }
+test('shutdown proof must be fresh, stopped, successful and from the current worker session',async t=>{
+ const f=await fixture(t);const id='d'.repeat(32);
+ await writeFile(join(f.control,'state.json'),JSON.stringify({protocol:1,session:'current'}));
+ const good={id,session:'current',success:true,stopped:true};
+ await writeFile(join(f.control,'result.json'),JSON.stringify(good));
+ const info=await stat(join(f.control,'result.json'));assert.equal(await hasConfirmedStop({docsDir:f.dir,now:info.mtimeMs+100}),true);
+ assert.equal(await hasConfirmedStop({docsDir:f.dir,now:info.mtimeMs+16000}),false);
+ for(const override of [{success:false},{stopped:false},{session:'old'},{id:'invalid'}]) {
+  await writeFile(join(f.control,'result.json'),JSON.stringify({...good,...override}));
+  assert.equal(await hasConfirmedStop({docsDir:f.dir,now:Date.now()+100}),false);
+ }
+});
+test('legacy shutdown helpers accept fresh stop proof without requesting another save or contacting Wine',async t=>{
+ const f=await fixture(t);
+ await writeFile(join(f.control,'state.json'),JSON.stringify({protocol:1,session:'current'}));
+ await writeFile(join(f.control,'result.json'),JSON.stringify({id:'e'.repeat(32),session:'current',success:true,stopped:true}));
+ const env={...process.env,DOCS_DIR:f.dir,WEB_HOST:'127.0.0.1',WEB_PORT:'1'};
+ for(const [script,args] of [['save-game.mjs',[]],['start-game.mjs',['--stop']]]) {
+  const output=execFileSync(process.execPath,[fileURLToPath(new URL('../../internal/panel/game_library/fs25/lib/'+script,import.meta.url)),...args],{env,encoding:'utf8',timeout:3000});
+  assert.match(output,/Recent/);
+ }
+ await assert.rejects(stat(join(f.control,'request.xml')),e=>e.code==='ENOENT');
+});
 test('requires a fresh engine confirmation after its own request marker',async t=>{
  const f=await fixture(t);const result=saveGame({docsDir:f.dir,timeoutMs:1500});const id=await requestId(f.control);
  await appendFile(f.log,'Game saved successfully (savegame1).\n');
