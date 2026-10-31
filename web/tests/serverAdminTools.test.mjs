@@ -20,7 +20,7 @@ const modules = {
     export const Card=({children})=>jsx('section',{children});
     export const ErrorBox=({children})=>children?jsx('div',{role:'alert',children}):null;
     export const Loading=()=>jsx('p',{role:'status',children:'Loading'});`,
-  common: `export const useServer=()=>globalThis.${fixtureKey}.context;`,
+  common: `export const can=(permissions,key)=>permissions.includes('*')||permissions.includes(key); export const useServer=()=>globalThis.${fixtureKey}.context;`,
   // Keep the real Settings wrapper and its consumers, but isolate the shadcn
   // primitive from this DOM-free React renderer. Model its boolean callback,
   // controlled state and disabled guard instead of a legacy checkbox event.
@@ -29,6 +29,7 @@ const modules = {
       ...props,type:'button',role:'switch','aria-checked':checked,disabled,
       onClick:()=>{if(!disabled)onCheckedChange?.(!checked,{event:{type:'click'}});}
     });`,
+  operations: `import {jsx} from 'react/jsx-runtime'; export const Settings=()=>jsx('fixture-general',{});`,
   startup: `import {jsx} from 'react/jsx-runtime'; export default ({runtimeCommand,...props})=>jsx('fixture-runtime',{...props,children:runtimeCommand});`,
   shared: `export {api,useAPI,unwrap,rows} from 'fixture:lib';
     import {jsx} from 'react/jsx-runtime';
@@ -48,6 +49,7 @@ const bundled = await build({
   stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers'; export {GameLicences} from './src/admin/GameLicences';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
+    builder.onResolve({filter:/^\.\/Operations$/}, () => ({path:'operations',namespace:'fixture'}));
     builder.onResolve({filter:/client\/ServerStartup$|^\.\/ServerStartup$/}, () => ({path:'startup',namespace:'fixture'}));
     builder.onResolve({filter:/components\/ui\/switch$/}, () => ({path:'switch',namespace:'fixture'}));
     builder.onResolve({filter:/^(react(?:\/jsx-runtime)?|react-router-dom|fixture:lib)$|(?:^|\/)lib$|(?:^|\/)common$|(?:^|\/)shared$/}, args => {
@@ -184,7 +186,7 @@ test('account admin gate blocks owners and wildcard permissions before admin dat
 
 test('runtime tools use internal ID, keep top tabs local, and omit raw environment',()=>{
   const f=fixture();f.render();
-  assert.equal(f.nodes(node=>node.props.role==='tab').length,5);
+  assert.equal(f.nodes(node=>node.props.role==='tab').length,6);
   assert.ok(f.queries.includes('/api/application/servers/7?include=allocations,variables,user,node,egg'));
   assert.ok(f.queries.every(path=>!path.includes('untrusted-url')&&!path.includes('999')));
   assert.doesNotMatch(f.text(),/never display this/);
@@ -351,4 +353,14 @@ test('refresh requires confirmation before discarding a configuration draft',()=
   assert.equal(f.field('config_stop').props.disabled,true);
   assert.equal(f.reloads,1);
   assert.equal(f.requests.length,0);
+});
+
+
+test('General is available under Runtime for administrators and users without startup access',()=>{
+ const admin=fixture();admin.render();admin.tab('general');
+ assert.equal(admin.nodes(node=>node.type==='fixture-general').length,1);
+ const user=fixture();user.context.permissions=['settings.rename'];
+ user.data.set('/api/client/account',{data:item({root_admin:false})});user.render();
+ assert.equal(user.nodes(node=>node.type==='fixture-general').length,1);
+ assert.ok(!user.queries.some(path=>path.startsWith('/api/application/')));
 });

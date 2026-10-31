@@ -369,6 +369,22 @@ func (a *App) maskIntegrationVariables(ctx context.Context, serverID int64, vars
 	if err != nil {
 		return err
 	}
+	fs25Passwords := false
+	for _, secret := range secrets {
+		key := str(secret["env_variable"])
+		if key == "WEB_PASSWORD" || key == "GAME_PASSWORD" || key == "ADMIN_PASSWORD" {
+			egg, e := a.one(ctx, `SELECT e.features FROM servers s JOIN eggs e ON e.id=s.egg_id WHERE s.id=$1`, serverID)
+			if e != nil {
+				return e
+			}
+			for _, feature := range asSlice(egg["features"]) {
+				if str(feature) == "voltra_fs25" {
+					fs25Passwords = true
+				}
+			}
+			break
+		}
+	}
 	names := map[string]string{}
 	for _, secret := range secrets {
 		names[str(secret["env_variable"])] = str(secret["source"])
@@ -377,7 +393,7 @@ func (a *App) maskIntegrationVariables(ctx context.Context, serverID int64, vars
 		if source, exists := names[str(v["env_variable"])]; exists {
 			v["server_value"] = integrationPlaceholder
 			v["secret"] = true
-			if source != "server" {
+			if source != "server" && !(fs25Passwords && (str(v["env_variable"]) == "WEB_PASSWORD" || str(v["env_variable"]) == "GAME_PASSWORD" || str(v["env_variable"]) == "ADMIN_PASSWORD")) {
 				v["user_editable"] = false
 			}
 		}

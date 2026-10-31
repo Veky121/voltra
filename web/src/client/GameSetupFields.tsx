@@ -15,7 +15,7 @@ export function GameAgreementField({agreement, value, onChange}: {agreement: Gam
 // Game flows share the same controls and accessibility behavior. These wrappers
 // add setup-specific units and availability without owning the page layout.
 export function GameNameField({value, onChange}: {value: string; onChange: (value: string) => void}) {
-  return <Field label="Server name"><Input id="game-server-name" required maxLength={100} autoComplete="off" value={value} onChange={event => onChange(event.target.value)}/></Field>;
+  return <Field label="Panel name"><Input id="game-server-name" required maxLength={100} autoComplete="off" value={value} onChange={event => onChange(event.target.value)}/></Field>;
 }
 
 export function GameMemoryField({value, onChange, minimum, maximum, describedBy}: {value: string; onChange: (value: string) => void; minimum: number; maximum: number; describedBy?: string}) {

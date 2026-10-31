@@ -87,7 +87,7 @@ function Server() {
   ];
   const managedSteam = managedSteamServer(server);
   if(server.game==="minecraft")groups[2].tabs.unshift(["content","Mods & plugins","eggs","file.read"]);
-  if(administrator || can(permissions, "startup.read")) groups[1].tabs.push(["runtime","Runtime & resources","wrench",""]);
+  groups[1].tabs.push(["runtime","Runtime & resources","wrench",""]);
   if(managedSteam||(Array.isArray(server.egg_features)&&server.egg_features.includes('voltra:steam-private-prepared-v1')))groups[2].tabs.unshift(["steam","Steam maintenance","startup","startup.read"]);
   return (
     <ServerContext.Provider

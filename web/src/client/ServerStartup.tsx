@@ -1,18 +1,14 @@
+import {settingDescription} from './settingDescription';
+import {PendingSettings, usePendingSetting} from './PendingSettings';
 import {GameSwitch} from './GameSwitch';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, Button, Card, Input, Select, useAPI } from '../lib';
 import { can, items, json, PageError, useServer, value } from './common';
 import { JavaSettings } from './JavaSettings';
-import { commandPreview, secretVariable, variableCanReset, variableControl, variableEditable, variableProblem, variableValue, variableWrite, startupVariableSection } from './startupSettingsModel';
+import { commandPreview, secretVariable, variableControl, variableEditable, variableProblem, variableValue, variableWrite, startupVariableSection } from './startupSettingsModel';
 import type { StartupMeta, StartupVariable, VariableIntent, VariableWrite } from './startupSettingsModel';
 import './startupSettings.css';
-
-function FS25Forwarding({base}: {base: string}) {
- const [message,setMessage] = useState('');
- const [busy,setBusy] = useState(false);
- return <div><Button disabled={busy} onClick={async () => { setBusy(true); try { const result = await api(`${base}/startup/fs25-forward`,{method:'POST'}); const routes = result.attributes.forwarding.routes || []; setMessage(routes.map((route: any) => route.public_host ? `${route.public_host}:${route.public_port} (${route.status})` : route.detail).join(' ? ')); } catch { setMessage('Could not configure forwarding. Check the node gateway setup and your network permissions.'); } finally { setBusy(false); } }}>Forward web dashboard</Button>{message && <p role="status">{message}</p>}</div>;
-}
 
 type VariableProps = {
   variable: StartupVariable;
@@ -22,9 +18,6 @@ type VariableProps = {
 };
 
 export function StartupVariableField({ variable, permitted, onSave, onDirty }: VariableProps) {
-  const { base } = useServer();
-  const [revealed, setRevealed] = useState<string | null>(null);
-  useEffect(() => { setRevealed(null); }, [base, variable.env_variable]);
   const baseline = variableValue(variable);
   const previous = useRef(baseline);
   const [draft, setDraft] = useState(baseline);
@@ -32,11 +25,12 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
   const locked = useRef(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [clear, setClear] = useState(false);
   const secret = secretVariable(variable);
   const editable = variableEditable(variable, permitted);
   const control = variableControl(variable);
-  const dirty = secret ? draft.length > 0 : draft !== baseline;
-  const problem = dirty ? variableProblem(variable, draft) : '';
+  const dirty = clear || (secret ? draft.length > 0 : draft !== baseline);
+  const problem = dirty && !clear ? variableProblem(variable, draft) : '';
   const configured = variable.secret_configured ?? variable.configured;
   const label = variable.name || variable.env_variable;
   const id = `startup-${variable.env_variable}`;
@@ -62,57 +56,47 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
       locked.current = true;
       setBusy(true);
       const saved = await onSave(payload);
-      setRevealed(null);
-      setDraft(variableValue(saved));
-      setSuccess(intent === 'reset' ? 'Template default restored. Applies next start.' : 'Saved. Applies next start.');
+      setDraft(variableValue(saved)); setClear(false);
+
     } catch (cause) {
       // Validation responses can echo submitted values. Keep secret errors value-free.
-      setError(secret ? 'Could not save this secret. Check its rules and your permissions, then retry.' : cause instanceof Error ? cause.message : 'Could not save this setting.');
+      setError(secret ? 'Could not save this value.' : cause instanceof Error ? cause.message : 'Could not save this setting.');
+      throw cause;
     } finally {
       locked.current = false;
       setBusy(false);
     }
   }
 
-  return <form className={`startup-variable${dirty ? ' is-dirty' : ''}`} aria-label={label} aria-busy={busy} onSubmit={event => { event.preventDefault(); void save('save'); }}>
+  usePendingSetting(variable.env_variable, dirty, {blocked: !!problem || !editable || busy, save: () => save(clear ? 'clear' : 'save'), discard: () => {setDraft(baseline); setClear(false); setError('');}});
+  return <div className={`startup-variable${dirty ? ' is-dirty' : ''}`} aria-label={label} aria-busy={busy}>
     <div className="startup-variable-heading">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}>{label}</label><code className="startup-variable-key">{variable.env_variable}</code>
       <div className="startup-badges">
-        <span className="badge">{editable ? 'Editable' : 'Read-only'}</span>
-        {variable.is_overridden !== undefined && <span className="badge">{variable.is_overridden ? 'Server override' : 'Template default'}</span>}
+        {!editable && <span className="badge">Read-only</span>}
         {dirty && <span className="startup-pending">Unsaved</span>}
       </div>
     </div>
-    {variable.description && <p className="muted startup-description" id={`${id}-description`}>{variable.description}</p>}
+    {variable.description && <p className="muted startup-description">{settingDescription(variable.description)}</p>}
     <div className="startup-control-row">
-      {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy} aria-describedby={`${id}-help`} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
+      {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy} aria-describedby={problem ? `${id}-help` : undefined} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
         {!control.options.includes(draft) && <option value={draft}>{draft || 'Choose a value'}</option>}
         {!control.required && draft !== '' && <option value="">Empty</option>}
         {control.options.map(option => <option key={option} value={option}>{control.boolean ? option === '1' ? 'Enabled' : 'Disabled' : option}</option>)}
-      </Select> : <Input id={id} name={variable.env_variable} type={control.type} value={draft} disabled={!editable || busy}
+      </Select> : <Input id={id} name={variable.env_variable} type={control.type} value={draft} disabled={!editable || busy || clear}
         min={control.min} max={control.max} step={control.step} minLength={control.minLength} maxLength={control.maxLength}
         required={control.required && !secret} autoComplete={secret ? 'new-password' : 'off'} spellCheck={false}
         placeholder={secret ? configured ? 'Configured. Leave blank to keep unchanged.' : 'Leave blank to keep unchanged.' : undefined}
-        aria-describedby={`${id}-help${variable.description ? ` ${id}-description` : ''}`} aria-invalid={!!problem}
+        aria-describedby={problem ? `${id}-help` : undefined} aria-invalid={!!problem}
         onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }} />}
-      {secret && permitted && <Button variant="secondary" disabled={busy} onClick={async () => { if (revealed !== null) { setRevealed(null); return; } try { const result = await api(`${base}/startup/variable/${encodeURIComponent(variable.env_variable)}/reveal`); setRevealed(String(result.attributes.value)); } catch { setError("Could not show this value. Check your permissions."); } }}>{revealed === null ? "Show saved value" : "Hide saved value"}</Button>}
-      {editable && <Button type="submit" disabled={busy || !dirty || !!problem}>{busy ? 'Saving...' : secret ? 'Save value' : 'Save'}</Button>}
     </div>
-    {revealed !== null && <output aria-label={`${label} saved value`}>{revealed || "(empty)"}</output>}
-    <div id={`${id}-help`} className="startup-field-help muted">
-      {secret ? <span>Value hidden{configured !== undefined ? configured ? ' · Configured' : ' · Not configured' : ''}. Blank leaves it unchanged.</span>
-        : <span>Template default: <code>{String(variable.default_value ?? '') || '(empty)'}</code></span>}
-      {problem && <span className="startup-validation">{problem}</span>}
-    </div>
-    {editable && <div className="startup-field-actions">
-      {dirty && <Button variant="secondary" disabled={busy} onClick={() => { setDraft(baseline); setError(''); setSuccess(''); }}>Discard draft</Button>}
-      {secret && !control.required && configured !== false && <Button variant="secondary" disabled={busy} onClick={() => { void save('clear'); }}>Clear value</Button>}
-      {variableCanReset(variable) && <Button variant="secondary" disabled={busy} onClick={() => { void save('reset'); }}>Reset to template default</Button>}
-    </div>}
+    {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><input type="checkbox" checked={clear} disabled={busy} onChange={event => {setClear(event.target.checked); setDraft('');}}/> Clear saved value</label>}
+    {problem && <p id={`${id}-help`} className="startup-validation" role="alert">{problem}</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {success && <p role="status" className="success">{success}</p>}
-    <details className="startup-field-details"><summary>Field details</summary><p><code>{variable.env_variable}</code></p><p className="muted">Validation rules: {secret ? 'Checked by the server. Secret rule values are hidden.' : variable.rules || 'No additional rules.'}</p></details>
-  </form>;
+    <details className="startup-field-details"><summary>Details</summary><p>Rules: {variable.rules || 'None'}</p><p>Default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p></details>
+  </div>;
+
 }
 
 function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyChange, onSaved }: {
@@ -175,30 +159,24 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
   const meta: StartupMeta = { ...(query.data.meta || {}), ...savedMeta };
   const updateAllowed = can(permissions, 'startup.update');
   const imageAllowed = can(permissions, 'startup.docker-image');
-  const farming = ['WEB_PASSWORD', 'WEB_PORT', 'GAME_PASSWORD'].every(key => (items(query.data) as StartupVariable[]).some(variable => variable.env_variable === key));
-  const licenceFields = new Set(['GAME_SERIAL','DLC_PRODUCT_KEY','AUTO_DOWNLOAD','DOWNLOAD_DLC']);
+  const licenceFields = new Set(['GAME_SERIAL', 'DLC_PRODUCT_KEY']);
   const renderVariable = (variable:StartupVariable) => <StartupVariableField key={variable.env_variable} variable={variable} permitted={updateAllowed} onDirty={onDirty} onSave={async payload => {
     const response = await api(`${base}/startup/variable`, json('PUT', payload));
     const updated = value(response) as StartupVariable;
     if (!updated || updated.env_variable !== variable.env_variable) throw new Error('The server did not confirm the saved setting. Reload startup settings to verify it.');
     setSaved(current => ({ ...current, [variable.env_variable]: updated }));
     if (response.meta) setSavedMeta(response.meta);
-    query.reload();
     return updated;
   }}/>;
   const OptionsGroup = section === 'runtime' ? 'section' : Card;
   const options = <>
-    {farming && section === 'game' && can(permissions, 'allocation.update') && <FS25Forwarding base={base}/>}
-    {farming && <OptionsGroup className="startup-variables"><h3>Game licence and DLC</h3><p className="muted">Game and DLC licences are supplied by the administrator. Contact your administrator to add or change a DLC licence.</p><div className="startup-variable-grid">{variables.filter(variable=>licenceFields.has(variable.env_variable)&&!['GAME_SERIAL','DLC_PRODUCT_KEY'].includes(variable.env_variable)).map(renderVariable)}</div></OptionsGroup>}
     <OptionsGroup className="startup-variables"><h3>{section === 'game' ? 'Game options' : 'Installation & startup options'}</h3>
       {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}
-      <div className="startup-variable-grid">{variables.filter(variable=>!farming || !licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
+      <div className="startup-variable-grid">{variables.filter(variable=>!licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
     </OptionsGroup>
   </>;
   return <section className="startup-settings games-ui">
-    {section === 'game' && <header className="startup-heading"><div><h2>Additional game options</h2><p className="muted">Saved changes apply the next time the server starts. Saving does not restart or reinstall it.</p></div></header>}
     <PageError error={query.error} />
-    {section === 'game' && <div className="startup-save-note" role="status">{pending ? `${pending} unsaved ${pending === 1 ? 'field' : 'fields'}. Save each field separately.` : 'Each field saves separately.'}{!updateAllowed && ' You have read-only access to variables.'}</div>}
     {section === 'runtime' ? <Card className="startup-runtime-card">
       {runtimeCommand}
       {showCommandPreview && <section className="startup-preview"><h3>Startup command</h3><p className="muted">Preview of saved settings. Secret values are hidden. Unsaved drafts are excluded.</p><pre>{commandPreview(meta, (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable))}</pre></section>}
@@ -211,6 +189,6 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
 
 export default function ServerStartup({section = 'runtime', administrator = false, showCommandPreview = true, runtimeCommand, onDirtyChange}: Partial<SettingsProps>) {
   const { base } = useServer();
-  return <StartupContent key={`${base}:${section}`} section={section} administrator={administrator} showCommandPreview={showCommandPreview} runtimeCommand={runtimeCommand} onDirtyChange={onDirtyChange} />;
+  return <PendingSettings><StartupContent key={`${base}:${section}`} section={section} administrator={administrator} showCommandPreview={showCommandPreview} runtimeCommand={runtimeCommand} onDirtyChange={onDirtyChange} /></PendingSettings>;
 }
 

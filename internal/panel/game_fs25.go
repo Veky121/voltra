@@ -59,6 +59,9 @@ func farmingSimulatorTemplate() gameTemplate {
 	vars := asSlice(egg["variables"])
 	for _, raw := range vars {
 		v := asMap(raw)
+		if str(v["env_variable"]) != "GAME_SERIAL" && str(v["env_variable"]) != "DLC_PRODUCT_KEY" {
+			v["user_editable"] = true
+		}
 		switch str(v["env_variable"]) {
 		case "GAME_SERIAL":
 			v["name"] = "GIANTS server licence"
@@ -72,16 +75,11 @@ func farmingSimulatorTemplate() gameTemplate {
 		case "WEB_PASSWORD":
 			v["default_value"] = ""
 			v["rules"] = "required|string|min:12|max:64"
-			v["description"] = "Web dashboard login password. View or change it in Game settings. Saved changes apply on the next server start."
-			v["user_viewable"], v["user_editable"] = true, true
+			v["description"] = "Choose a strong web manager password."
 		case "WEB_PORT":
-			v["description"] = "Web dashboard listener. Uses an assigned allocation. Forward web dashboard in Game settings configures the existing FRP gateway for public access."
 			v["default_value"] = ""
 			v["rules"] = "nullable|integer|between:1024,65535"
-		case "ADMIN_PASSWORD", "GAME_PASSWORD":
-			v["user_viewable"], v["user_editable"] = true, true
-			v["description"] = "View or change this password in Game settings. Saved changes apply on the next server start."
-		case "KEEP_INSTALLER", "AUTO_SAVE_INTERVAL", "STATS_INTERVAL", "PAUSE_IF_EMPTY", "SAVEGAME_INDEX", "SERVER_LANGUAGE", "WEB_USERNAME":
+		case "KEEP_INSTALLER", "AUTO_SAVE_INTERVAL", "STATS_INTERVAL", "PAUSE_IF_EMPTY", "SAVEGAME_INDEX", "SERVER_LANGUAGE", "WEB_USERNAME", "ADMIN_PASSWORD", "GAME_PASSWORD":
 			v["user_viewable"] = true
 		case "MAP_ID":
 			v["description"] = "Base-game or installed mod map ID."

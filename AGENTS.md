@@ -31,3 +31,7 @@ Any applicable child delegation needs explicit user or parent authorization. Roo
 ## Memory and storage units
 
 Use GB for user-facing memory, heap, swap, storage, capacity and upload-limit forms and resource summaries. Entering `8` must request 8 GB. Convert at API boundaries with the shared resource-unit helpers; existing Wings/panel limits remain integer MiB, with 1 displayed GB representing 1024 MiB. Preserve zero/unlimited and swap sentinel semantics, existing saved capacities, and appropriate file-size/network units. Never require users to calculate or enter MiB.
+
+## Egg setting descriptions
+
+Write one short, plain-language sentence explaining each setting. Obvious labels need little explanation. Avoid engineering terminology and implementation details. Put rules and defaults in Details. Keep licence credentials admin-only.

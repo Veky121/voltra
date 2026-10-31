@@ -50,3 +50,9 @@
 .startup-settings .java-settings-group .settings-row-layout{grid-template-columns:minmax(0,1fr);gap:10px}
 .startup-settings .java-settings-group .settings-row-control{justify-content:flex-start}
 .startup-settings .java-settings-group textarea{max-width:100%}
+
+.startup-variable-key{margin-left:auto;font-size:11px;color:var(--muted);background:var(--ui-hover);border:1px solid var(--ui-border);border-radius:5px;padding:2px 6px;overflow-wrap:anywhere}
+.startup-variable-grid .startup-variable-heading{justify-content:space-between}
+.settings-pending-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:12px;padding:12px 18px;border:1px solid var(--ui-border);border-radius:12px;background:var(--card,var(--background,#202126));box-shadow:0 6px 28px #0005;max-width:calc(100vw - 32px)}
+.settings-pending-bar>span{font-size:13px;min-width:0}
+@media(max-width:600px){.settings-pending-bar{bottom:12px;width:calc(100vw - 24px);flex-wrap:wrap}.startup-variable-heading{flex-direction:row;align-items:center}}

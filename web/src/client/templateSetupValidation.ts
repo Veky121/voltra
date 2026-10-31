@@ -14,7 +14,6 @@ export function templateSetupProblems(input:TemplateReadiness):SetupProblem[]{
   const add=(field:string|undefined,message:string)=>problems.push({field,message});
   if(!input.name.trim())add('game-server-name','Enter a server name.');
   else if(input.name.length>100)add('game-server-name','Server name must be no more than 100 characters.');
-  else if(input.fs25&&Array.from(input.name.trim()).length>60)add('game-server-name','Farming Simulator server names must be no more than 60 characters.');
   if(!input.node)add('game-server-node','Choose a compatible host machine.');
   else if(input.node.setup_available===false)add('game-server-node',input.node.unavailable_reason||'This host machine is not ready for setup.');
   if(input.memory===null||!Number.isSafeInteger(input.memory)||input.memory<128)add('game-server-memory','Enter at least 0.125 GB of memory.');

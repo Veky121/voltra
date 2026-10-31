@@ -513,3 +513,26 @@ func TestSteamGameConcurrentIndependentProvisioningAndAuxiliaryRollback(t *testi
 		t.Fatal("raced auxiliary allocation left partial server/allocation state")
 	}
 }
+
+func TestSteamGamePanelAndPublicNamesAreIndependent(t *testing.T) {
+	for _, spec := range steamGameSpecs {
+		input := steamGamesInput(spec.ID, M{"id": 1})
+		input["name"] = "Panel label"
+		input["game_name"] = "Public lobby"
+		parsed, err := steamParseGameInput(spec, input)
+		if err != nil || parsed.Name != "Panel label" || parsed.GameName != "Public lobby" {
+			t.Fatalf("%s names were not independent: %+v %v", spec.ID, parsed, err)
+		}
+		delete(input, "game_name")
+		parsed, err = steamParseGameInput(spec, input)
+		if err != nil || parsed.GameName == parsed.Name || parsed.GameName != spec.Name+" server" {
+			t.Fatalf("%s default reused panel label: %+v %v", spec.ID, parsed, err)
+		}
+		for _, badName := range []any{"", "bad\nname", true, strings.Repeat("a", 101)} {
+			input["game_name"] = badName
+			if _, err := steamParseGameInput(spec, input); err == nil {
+				t.Fatalf("%s accepted invalid public name", spec.ID)
+			}
+		}
+	}
+}

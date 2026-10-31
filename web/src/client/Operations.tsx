@@ -491,7 +491,7 @@ export function Settings() {
     <section className="operations-page settings-page server-general-settings">
       <Notice action={a} />
       <div className="server-general-grid">
-        <SettingsSection title="Server details">
+        <SettingsSection title="Panel details">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -508,9 +508,9 @@ export function Settings() {
               );
             }}
           >
-            <SettingsRow label="Name" control={
+            <SettingsRow label="Panel name" description="Shown only in Voltra." control={
               <Input
-                aria-label="Server name"
+                aria-label="Panel name"
                 required
                 disabled={!can(permissions, "settings.rename")}
                 value={name}

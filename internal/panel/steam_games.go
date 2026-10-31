@@ -199,11 +199,13 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 	if spec.UnavailableReason != "" {
 		options["setup_unavailable_reason"] = spec.UnavailableReason
 	}
+	options["supports_game_name"] = spec.ID == "palworld" || spec.ID == "valheim" || spec.ID == "7days"
 	writeJSON(w, 200, item("steam_game_options", options))
 }
 
 type steamGameInput struct {
 	Name, RequestID, Password string
+	GameName                  string `json:",omitempty"`
 	NodeID, Memory, Players   int64
 	Catalog                   *steamCatalogConfiguration
 	StartOnCompletion         bool `json:"-"`
@@ -227,7 +229,7 @@ func steamGameProvisionBytes(game string, input steamGameInput) []byte {
 }
 
 func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
-	v := steamGameInput{Name: strings.TrimSpace(str(in["name"])), RequestID: str(in["request_id"]), StartOnCompletion: true}
+	v := steamGameInput{GameName: spec.Name + " server", Name: strings.TrimSpace(str(in["name"])), RequestID: str(in["request_id"]), StartOnCompletion: true}
 	if raw, exists := in["start_on_completion"]; exists {
 		value, ok := raw.(bool)
 		if !ok {
@@ -237,6 +239,13 @@ func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
 	}
 	if v.Name == "" || len([]rune(v.Name)) > 100 || !quickSingleLine(v.Name) {
 		return v, bad("Enter a server name of at most 100 characters.")
+	}
+	if raw, exists := in["game_name"]; exists {
+		gameName, ok := raw.(string)
+		if !ok || strings.TrimSpace(gameName) == "" || len([]rune(gameName)) > 100 || !quickSingleLine(gameName) {
+			return v, bad("Enter an in-game server name of at most 100 characters.")
+		}
+		v.GameName = strings.TrimSpace(gameName)
 	}
 	if !steamRequestID.MatchString(v.RequestID) {
 		return v, bad("A valid installation request ID is required.")
@@ -367,7 +376,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 	encoded := steamGameProvisionBytes(spec.ID, v)
 	sum := sha256.Sum256(encoded)
 	fingerprint := hex.EncodeToString(sum[:])
-	settings := M{"name": v.Name, "max_players": v.Players}
+	settings := M{"name": v.GameName, "max_players": v.Players}
 	if steamPalworldVariant(spec.ID) {
 		settings["managed_variant"] = spec.ID
 	}

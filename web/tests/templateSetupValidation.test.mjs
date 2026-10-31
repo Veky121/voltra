@@ -53,3 +53,9 @@ test('resource readiness rejects invalid stored units and enforces rounded save 
  assert.ok(templateSetupProblems(ready({disk:204801})).some(p=>p.field==='game-server-storage'));
  assert.deepEqual(templateSetupProblems(ready({memory:1264,disk:1264})),[]);
 });
+
+test('FS25 panel names have their own limit, independent of the public game name',()=>{
+ assert.deepEqual(templateSetupProblems(ready({name:'A'.repeat(80)})),[]);
+ const serverName={env_variable:'SERVER_NAME',name:'In-game server name',rules:'required|string|max:60',default_value:'FS25 Server',user_viewable:true};
+ assert.ok(templateSetupProblems(ready({variables:[serverName],environment:{SERVER_NAME:'A'.repeat(61),GAME_SERIAL:'fixture-serial',AUTO_DOWNLOAD:'true'}})).some(p=>p.field==='game-template-SERVER_NAME'));
+});

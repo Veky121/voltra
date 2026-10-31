@@ -1,5 +1,6 @@
+import {PendingSettings, usePendingSetting} from './PendingSettings';
 import './games-ui.css';
-import {useEffect, useRef, useState, type FormEvent} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {Link, useParams} from 'react-router-dom';
 import {api, Button, Card, ErrorBox, Input, Select, unwrap} from '../lib';
 import {can, json, useServer} from './common';
@@ -11,7 +12,8 @@ import ServerStartup from './ServerStartup';
 import './steamGames.css';
 
 type Settings = QuickSetup & {file: string; documents: {path: string; label: string}[]};
-export default function GameQuickSetup() {
+export default function GameQuickSetup() {return <PendingSettings><GameQuickSetupContent/></PendingSettings>;}
+function GameQuickSetupContent() {
   const {base, permissions, server} = useServer();
   const {id} = useParams();
   const [file, setFile] = useState('');
@@ -55,8 +57,7 @@ function QuickSetupContent({data, search, onSaved, onDirty}: {data: Settings; se
   const dirty = Object.keys(changes).length > 0;
   useEffect(() => {onDirty(dirty);}, [dirty, onDirty]);
   useEffect(() => {if (!dirty) return; const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';}; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);}, [dirty]);
-  async function save(event: FormEvent) {
-    event.preventDefault();
+  async function save() {
     if (blocked || !dirty || submitting.current) return;
     setError(''); setSuccess(''); submitting.current = true; setBusy(true);
     try {
@@ -64,17 +65,18 @@ function QuickSetupContent({data, search, onSaved, onDirty}: {data: Settings; se
       const next = unwrap(await api(`${base}/game-settings?file=${encodeURIComponent(saved.file)}`, json('PUT', {settings, revision: saved.revision}))) as Settings;
       setSaved(next); setDraft({}); onDirty(false);
       setSuccess('Saved. Applies on the next start.');
-    } catch (error) {setError(error instanceof Error ? error.message : String(error));}
+    } catch (error) {setError(error instanceof Error ? error.message : String(error)); throw error;}
     finally {submitting.current = false; setBusy(false);}
   }
   function change(key: string, value: QuickValue) {setDraft(previous => ({...previous, [key]: value})); setSuccess('');}
 
+  usePendingSetting(`native:${saved.file}`, dirty, {blocked: !!blocked || busy, save, discard: () => {setDraft({}); setError('');}});
   return <div className="game-quick-layout">
     <Card className="game-settings-card">
-      {saved.fields.length ? <form onSubmit={save}>
-        <fieldset className="steam-fields" disabled={blocked || busy}><GameSettingsFields fields={saved.fields} game={data.game} file={saved.file} search={search} draft={draft} onChange={change}/><div className="game-settings-save"><Button type="submit" disabled={blocked || !dirty || busy} aria-busy={busy}>{busy ? 'Saving...' : 'Save settings'}</Button>{dirty && <span className="muted">{Object.keys(changes).length} unsaved</span>}</div></fieldset>
+      {saved.fields.length ? <div>
+        <fieldset className="steam-fields" disabled={blocked || busy}><GameSettingsFields fields={saved.fields} game={data.game} file={saved.file} search={search} draft={draft} onChange={change}/></fieldset>
         <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={() => {if (!dirty || window.confirm('Discard your unsaved settings and reload?')) {onDirty(false); onSaved();}}}>Reload current settings</Button>}{success && <p role="status" className="success">{success}</p>}
-      </form> : <p className="muted">No generated server configuration was found. Start the game once to create its settings.</p>}
+      </div> : <p className="muted">No generated server configuration was found. Start the game once to create its settings.</p>}
     </Card>
 
   </div>;

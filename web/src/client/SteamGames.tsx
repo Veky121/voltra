@@ -40,6 +40,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const initialNode=gameInitialNode(options.nodes);
   const initialBudget=gameMemoryBudget(options.maximum_memory,initialNode);
   const [name, setName] = useState(`${options.name} server`);
+  const [gameName, setGameName] = useState(`${options.name} server`);
   const [node, setNode] = useState(String(initialNode?.id ?? ''));
   const [memory, setMemory] = useState(String(miBToGB(initialBudget>=options.minimum_memory ? Math.min(options.defaults.memory,initialBudget) : options.defaults.memory)));
   const players = String(options.defaults.max_players);
@@ -63,13 +64,13 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   const memoryWarning = steamMemoryWarning(options, memoryValue);
   const passwordRules = options.password ?? {enabled: game === 'palworld', required: false, min_length: 0, max_length: 128};
   const passwordValid = !passwordRules.enabled || ((!passwordRules.required && !password) || ([...password].length >= passwordRules.min_length && [...password].length <= passwordRules.max_length));
-  const valid = passwordValid && !!name.trim() && options.nodes.some(item => String(item.id) === node && item.setup_available !== false) && memoryValue !== null && memoryValue >= options.minimum_memory && memoryValue <= memoryMaximum && Number.isInteger(Number(players)) && Number(players) >= options.minimum_players && Number(players) <= options.maximum_players && (!options.presets.length || options.presets.some(item => item.value === preset));
+  const valid = passwordValid && !!gameName.trim() && gameName.length <= 100 && !!name.trim() && options.nodes.some(item => String(item.id) === node && item.setup_available !== false) && memoryValue !== null && memoryValue >= options.minimum_memory && memoryValue <= memoryMaximum && Number.isInteger(Number(players)) && Number(players) >= options.minimum_players && Number(players) <= options.maximum_players && (!options.presets.length || options.presets.some(item => item.value === preset));
   async function install(event: FormEvent) {
     event.preventDefault();
     if (!valid || !ports.data || ports.loading || ports.error || !options.can_install || submitting.current) return;
     let environment: Record<string, string | boolean>;
     try {environment = steamAdvancedEnvironment(advancedFields, advanced);} catch (error) {setError(error instanceof Error ? error.message : String(error)); return;}
-    const body = {name: name.trim(), node_id: Number(node), memory: memoryValue, max_players: Number(players), ...(password ? {server_password: password} : {}), ...(preset ? {preset} : {}), ...(advancedFields.length ? {environment} : {}), ...(options.supports_install_only === true ? {start_on_completion: startAfterInstall} : {})};
+    const body = {name: name.trim(), ...(options.supports_game_name ? {game_name: gameName.trim()} : {}), node_id: Number(node), memory: memoryValue, max_players: Number(players), ...(password ? {server_password: password} : {}), ...(preset ? {preset} : {}), ...(advancedFields.length ? {environment} : {}), ...(options.supports_install_only === true ? {start_on_completion: startAfterInstall} : {})};
     const payload = JSON.stringify(body);
     if (submission.current?.payload !== payload) submission.current = {payload, id: crypto.randomUUID()};
     submitting.current = true; setBusy(true); setError('');
@@ -84,6 +85,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
   return <div className="steam-setup-layout games-ui"><Card><form onSubmit={install}>
     <fieldset className="steam-fields" disabled={busy}>
       <GameNameField value={name} onChange={setName}/>
+      {options.supports_game_name && <Field label="In-game server name"><Input required maxLength={100} autoComplete="off" value={gameName} onChange={event => setGameName(event.target.value)}/></Field>}
       <div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={options.minimum_memory} maximum={Math.max(options.minimum_memory,memoryMaximum)} describedBy={memoryWarning ? "steam-memory-warning" : undefined}/></div>
       
       {selectedNode?.unavailable_reason && <p className="game-stop-note" role="status">{selectedNode.unavailable_reason}</p>}

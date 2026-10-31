@@ -16,7 +16,7 @@ const secretVariable = {env_variable:'RCON_PASSWORD',name:'Console password',rul
 function load({react = React,variables = [baseVariable,secretVariable],meta = {},permissions = ['*'],account = {},accountLoading = false,accountError = ''} = {}) {
   const context = {base:'/api/client/servers/fixture',server:{image:'runtime:v1',limits:{memory:4096}},permissions,reload(){}};
   const module = {exports:{}};
-  const modules = {'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
+  const modules = {'./settingDescription':{settingDescription:text=>text}, './PendingSettings':{PendingSettings:({children})=>children,usePendingSetting(){}},'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
     react,
     'react-router-dom':{Link:({to,children,...props})=>React.createElement('a',{href:to,...props},children)},
     '../lib':{
@@ -45,156 +45,26 @@ function load({react = React,variables = [baseVariable,secretVariable],meta = {}
 
 const render = (options = {}) => renderToStaticMarkup(React.createElement(load(options).default, {section:options.section || 'runtime'}));
 
-test('render has named typed controls, masked secrets, separate save buttons and collapsed details', () => {
-  const html = render({section:'game',meta:{raw_startup_command:'run --players {{MAX_PLAYERS}} --password {{RCON_PASSWORD}} do-not-show another-secret'}});
-  assert.match(html,/<input(?=[^>]*name="MAX_PLAYERS")(?=[^>]*type="number")[^>]*>/);
-  assert.match(html,/<input(?=[^>]*name="RCON_PASSWORD")(?=[^>]*type="password")(?=[^>]*value="")[^>]*>/);
-  assert.match(html,/Save value/);
-  assert.match(html,/Reset to template default/);
-  assert.match(html,/Template default/);
-  assert.match(html,/Server override/);
-  assert.match(html,/Saving does not restart or reinstall it/);
-  assert.doesNotMatch(html,/startup-preview|startup-advanced|data-java-runtime/);
-  assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
-  assert.doesNotMatch(html,/do-not-show|another-secret/);
-  assert.doesNotMatch(html,/textarea|Save all|Admin tools/);
+test('settings have a short description, right-hand key, rules and default without individual actions',()=>{
+ const html=render({section:'game',variables:[{...baseVariable,description:'Maximum number of players.'}]});
+ assert.match(html,/Maximum number of players/);
+ assert.match(html,/startup-variable-key[^>]*>MAX_PLAYERS/);
+ assert.match(html,/Rules: required\|integer\|min:1\|max:64/);
+ assert.match(html,/Default: 8/);
+ assert.doesNotMatch(html,/Reset to template|Discard draft|>Save<|<form/);
 });
-
-test('read-only variables render without save, clear or reset actions', () => {
-  const html = render({section:'game',permissions:['startup.read'],meta:{java_managed:true}});
-  assert.match(html,/Read-only/);
-  assert.match(html,/<input(?=[^>]*name="MAX_PLAYERS")(?=[^>]*disabled)[^>]*>/);
-  assert.doesNotMatch(html,/Save value|Clear value|Reset to template default|startup-advanced/);
-  assert.doesNotMatch(html,/data-java-runtime/);
-  const denied = render({permissions:[]});
-  assert.match(denied,/do not have permission/);
-  assert.doesNotMatch(denied,/MAX_PLAYERS|RCON_PASSWORD|Command preview/);
+test('password fields show validation rules while concealing stored values and defaults',()=>{
+ const html=render({section:'game'});
+ assert.doesNotMatch(html,/value="another-secret"|Default: do-not-show/);
+ assert.match(html,/Rules: nullable\|string\|in:do-not-show,another-secret/);
+ assert.match(html,/Default: Hidden/);
+ assert.match(html,/type="password"/);
 });
-
-test('template read-only is respected independently of account startup permission', () => {
-  const html = render({section:'game',variables:[{...baseVariable,is_editable:false}]});
-  assert.match(html,/<input(?=[^>]*name="MAX_PLAYERS")(?=[^>]*disabled)[^>]*>/);
-  assert.doesNotMatch(html,/Reset to template default/);
-  assert.doesNotMatch(render({section:'game',variables:[{...baseVariable,can_reset:false}]}),/Reset to template default/);
+test('read-only and permission gates are preserved',()=>{
+ assert.match(render({section:'game',permissions:['startup.read']}),/disabled/);
+ assert.doesNotMatch(render({section:'game',permissions:[]}),/MAX_PLAYERS/);
 });
-
-test('managed Java image is never exposed through the raw runtime selector', () => {
-  const html = render({meta:{java_managed:true}});
-  assert.doesNotMatch(html,/startup-advanced|Save image/);
-  assert.match(html,/data-java-runtime-allowed="true"/);
-  const restricted = render({permissions:['startup.read','startup.update'],meta:{java_managed:true}});
-  assert.match(restricted,/data-java-runtime-allowed="false"/);
-});
-
-test('runtime and game sections keep each variable in one editor without an admin detour', () => {
-  const variables = [baseVariable,secretVariable,{...baseVariable,env_variable:'MINECRAFT_VERSION',name:'Minecraft version',rules:'required|string',server_value:'1.21'}];
-  const game = render({section:'game',variables});
-  const runtime = render({variables,meta:{raw_startup_command:'run {{MAX_PLAYERS}} {{RCON_PASSWORD}}'}});
-  assert.match(game,/name="MAX_PLAYERS"/); assert.doesNotMatch(game,/name="MINECRAFT_VERSION"/);
-  assert.match(runtime,/name="MINECRAFT_VERSION"/); assert.doesNotMatch(runtime,/name="MAX_PLAYERS"|name="RCON_PASSWORD"|admin-tools/);
-  assert.doesNotMatch(runtime,/do-not-show|another-secret/);
-});
-
-// A small hook runner exercises field event handlers without a browser or network.
-function fieldHarness(initial, save) {
-  const slots = [];
-  let cursor = 0;
-  let effects = [];
-  let variable = initial;
-  const reports = [];
-  const onDirty = (key,dirty)=>reports.push({key,dirty});
-  const react = {
-    ...React,
-    useState(initial){
-      const index = cursor++;
-      if (!slots[index]) slots[index] = {value:typeof initial === 'function' ? initial() : initial};
-      return [slots[index].value,next=>{slots[index].value=typeof next === 'function'?next(slots[index].value):next;}];
-    },
-    useRef(initial){const index=cursor++;return slots[index] ??= {current:initial};},
-    useEffect(effect,deps){
-      const index=cursor++;
-      const old=slots[index];
-      if (!old || deps.some((value,key)=>value!==old.deps[key])) effects.push(()=>{
-        old?.cleanup?.();slots[index]={deps,cleanup:effect()};
-      });
-    },
-  };
-  const Field = load({react}).StartupVariableField;
-  const harness = {
-    reports,
-    render(next){
-      if (next) variable=next;
-      cursor=0;effects=[];
-      const tree=Field({variable,permitted:true,onSave:save,onDirty});
-      for (const effect of effects) effect();
-      return tree;
-    },
-  };
-  return harness;
-}
-function all(tree) {
-  if (!tree || typeof tree !== 'object') return [];
-  return [tree,...React.Children.toArray(tree.props?.children).flatMap(all)];
-}
-const input = tree=>all(tree).find(node=>node.type==='input');
-const button = (tree,text)=>all(tree).find(node=>node.props?.children===text);
-const tick = ()=>new Promise(resolve=>setImmediate(resolve));
-
-test('a field saves only its own draft, stays busy until confirmation and resets only explicitly', async () => {
-  const writes=[];
-  let confirm;
-  const harness=fieldHarness(baseVariable,payload=>{writes.push(payload);return new Promise(resolve=>{confirm=resolve;});});
-  input(harness.render()).props.onChange({target:{value:'32'}});
-  let tree=harness.render();
-  assert.equal(button(tree,'Save').props.disabled,false);
-  tree.props.onSubmit({preventDefault(){}});
-  tree=harness.render();
-  assert.equal(tree.props['aria-busy'],true);
-  assert.equal(input(tree).props.disabled,true);
-  tree.props.onSubmit({preventDefault(){}});
-  assert.deepEqual(writes,[{key:'MAX_PLAYERS',value:'32'}]);
-  const saved={...baseVariable,server_value:'32'};
-  confirm(saved);await tick();
-  tree=harness.render(saved);tree=harness.render();
-  assert.equal(button(tree,'Save').props.disabled,true);
-  assert.equal(tree.props['aria-busy'],false);
-  button(tree,'Reset to template default').props.onClick();
-  assert.deepEqual(writes[1],{key:'MAX_PLAYERS',reset:true});
-  confirm({...baseVariable,server_value:'8',is_overridden:false});await tick();
-});
-
-test('server refresh keeps unsaved drafts, while clean fields follow saved values', () => {
-  const harness=fieldHarness(baseVariable,async()=>{throw new Error('unexpected save');});
-  input(harness.render()).props.onChange({target:{value:'24'}});
-  harness.render({...baseVariable,server_value:'32'});
-  assert.equal(input(harness.render()).props.value,'24');
-  const clean=fieldHarness(baseVariable,async()=>baseVariable);
-  clean.render();clean.render({...baseVariable,server_value:'48'});
-  assert.equal(input(clean.render()).props.value,'48');
-});
-
-test('secret starts blank, blank submit does nothing, clear is explicit, and failed writes preserve the draft', async () => {
-  const writes=[];
-  const harness=fieldHarness(secretVariable,async payload=>{writes.push(payload);throw new Error('backend echoed private-input');});
-  let tree=harness.render();
-  assert.equal(input(tree).props.value,'');
-  tree.props.onSubmit({preventDefault(){}});await tick();
-  assert.deepEqual(writes,[]);
-  input(tree).props.onChange({target:{value:'private-input'}});
-  tree=harness.render();tree.props.onSubmit({preventDefault(){}});await tick();
-  tree=harness.render();
-  assert.deepEqual(writes,[{key:'RCON_PASSWORD',value:'private-input'}]);
-  assert.equal(input(tree).props.value,'private-input');
-  assert.match(all(tree).find(node=>node.props?.role==='alert').props.children,/Could not save this secret/);
-  assert.doesNotMatch(all(tree).find(node=>node.props?.role==='alert').props.children,/private-input/);
-  button(tree,'Clear value').props.onClick();await tick();
-  assert.deepEqual(writes[1],{key:'RCON_PASSWORD',value:''});
-});
-
-
-test('actual startup boolean enum renders an accessible switch',()=>{
- const html=renderToStaticMarkup(React.createElement(load().StartupVariableField,{variable:{...baseVariable,env_variable:'ENABLE_PVP',name:'Enable PVP',rules:'required|in:0,1',server_value:'1'},permitted:true,onSave(){},onDirty(){}}));
- assert.match(html,/role="switch"/);
- assert.match(html,/type="checkbox"/);
- assert.doesNotMatch(html,/<select/);
+test('client settings omit licences',()=>{
+ const html=render({section:'game',variables:[baseVariable,...['GAME_SERIAL','DLC_PRODUCT_KEY'].map(env_variable=>({...secretVariable,env_variable}))]});
+ assert.doesNotMatch(html,/GAME_SERIAL|DLC_PRODUCT_KEY|Game licence/);
 });

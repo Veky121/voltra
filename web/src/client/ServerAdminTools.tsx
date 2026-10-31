@@ -5,13 +5,15 @@ import {
   Build, DeleteServer, Details, Manage, ServerDatabases, ServerMounts,
   ServerSettingsTabs, RuntimeAssignment, Startup,
 } from "../admin/servers";
+import {useSearchParams} from 'react-router-dom';
+import {Settings} from './Operations';
 import ServerStartup from "./ServerStartup";
-import { useServer } from "./common";
+import { can, useServer } from "./common";
 import {Switch} from '../ui/Settings';
 import "./serverAdminTools.css";
 
 const tabs = [
-  ["runtime", "Runtime"], ["limits", "Resources"], ["mounts", "Mounts"],
+  ["general", "General"], ["runtime", "Runtime"], ["limits", "Resources"], ["mounts", "Mounts"],
   ["configuration", "Advanced"], ["manage", "Management"],
 ] as const;
 
@@ -93,16 +95,29 @@ export default function ServerAdminTools() {
   if (account.error) return <Card><ErrorBox>{account.error}</ErrorBox><Button variant="secondary" onClick={account.reload}>Retry administrator check</Button></Card>;
   // Ownership and wildcard server permissions do not grant panel administration.
   // Each application/admin/configuration endpoint also enforces backend admin auth.
-  if (unwrap(account.data)?.root_admin !== true) return <ServerStartup section="runtime"/>;
+  if (unwrap(account.data)?.root_admin !== true) return <ClientRuntimeTools/>;
   const id = serverAdminID(server.internal_id);
   if (id === null) return <ErrorBox>This server's internal ID is unavailable. Reload the server before opening resource controls.</ErrorBox>;
   return <AuthorizedServerTools key={id} serverID={id} />;
 }
 
+function ClientRuntimeTools() {
+  const {permissions} = useServer();
+  const [search] = useSearchParams();
+  const [active, setActive] = useState(search.get('tab') === 'general' || !can(permissions, 'startup.read') ? 'general' : 'runtime');
+  return <section className="server-admin-tools" aria-label="Runtime and resources">
+    <ServerSettingsTabs scope="client-runtime" tabs={[["general", "General"], ["runtime", "Runtime"]]} active={active} onChange={setActive}/>
+    <section role="tabpanel" id={`client-runtime-panel-${active}`} aria-labelledby={`client-runtime-tab-${active}`} tabIndex={0}>
+      {active === 'general' ? <Settings/> : <ServerStartup section="runtime"/>}
+    </section>
+  </section>;
+}
+
 function AuthorizedServerTools({ serverID }: { serverID: number }) {
   const { reload } = useServer();
   const query = useAPI(`/api/application/servers/${serverID}?include=allocations,variables,user,node,egg`);
-  const [active, setActive] = useState("runtime");
+  const [search] = useSearchParams();
+  const [active, setActive] = useState(search.get("tab") === "general" ? "general" : "runtime");
   const [configurationDirty, setConfigurationDirty] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const record = query.data ? unwrap(query.data) : null;
@@ -127,6 +142,7 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
     {query.loading && !record ? <Loading /> : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
       : record && <section key={`${active}-${refreshVersion}`} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
+        {active === "general" && <Settings/>}
         {active === "limits" && <Build record={record} onSaved={saved} />}
         {active === "runtime" && <ServerStartup section="runtime" administrator showCommandPreview={false} runtimeCommand={<RuntimeAssignment record={record} onSaved={saved}/>} onDirtyChange={setConfigurationDirty}/>}
         {active === "mounts" && <ServerMounts record={record} contextual />}

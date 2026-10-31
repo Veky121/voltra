@@ -88,8 +88,8 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const setupVariables = options.variables.filter(variable => startupVariableSection(variable) === 'runtime'
     || !!templateVariableProblem(variable, defaultEnvironment)
     || /(?:^|\|)required_(?:if|unless|with|without)/.test(variable.rules)
-    || fs25 && ['WEB_PASSWORD', 'AUTO_DOWNLOAD'].includes(variable.env_variable));
-  const checkedVariables=options.variables.filter(variable=>!(fs25&&['SERVER_NAME','WEB_PORT'].includes(variable.env_variable))&&!options.agreements?.some(agreement=>agreement.environment===variable.env_variable)&&(!templateSteamRole(variable.env_variable)||templateSteamRole(variable.env_variable)==='branch')&&!(privateContent&&['SRCDS_APPID','AUTO_UPDATE'].includes(variable.env_variable))&&!options.port_rules?.some(rule=>rule.auto_allocate&&rule.environment===variable.env_variable));
+    || fs25 && ['SERVER_NAME', 'WEB_PASSWORD', 'AUTO_DOWNLOAD'].includes(variable.env_variable));
+  const checkedVariables=options.variables.filter(variable=>!(fs25&&['WEB_PORT'].includes(variable.env_variable))&&!options.agreements?.some(agreement=>agreement.environment===variable.env_variable)&&(!templateSteamRole(variable.env_variable)||templateSteamRole(variable.env_variable)==='branch')&&!(privateContent&&['SRCDS_APPID','AUTO_UPDATE'].includes(variable.env_variable))&&!options.port_rules?.some(rule=>rule.auto_allocate&&rule.environment===variable.env_variable));
   const setupProblems=templateSetupProblems({name,node:selectedNode,memory:memoryValue,memoryMaximum,disk:diskValue,diskMaximum,imageValid:options.images.some(item=>item.value===image),portsReady:!!ports.data,portsLoading:ports.loading,portsError:!!ports.error,steamError:!!steamEnvironmentError,privateContent,privateSupported:options.private_content_supported===true,fs25,savedLicence:!!options.saved_license,variables:checkedVariables,environment,agreements:options.agreements});
   const valid=setupProblems.length===0;
   function focusProblem(id:string){
@@ -99,7 +99,7 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   }
   async function install(event: FormEvent) {
     event.preventDefault(); if (!valid || submitting.current) return;
-    const body = {name: name.trim(), memory: memoryValue, disk: diskValue, image, node_id: Number(node), automatic_ports: true, environment: fs25 ? {...safeEnvironment, SERVER_NAME:name.trim()} : safeEnvironment, ...(privateContent ? {private_content: true} : {})};
+    const body = {name: name.trim(), memory: memoryValue, disk: diskValue, image, node_id: Number(node), automatic_ports: true, environment: safeEnvironment, ...(privateContent ? {private_content: true} : {})};
     const payload = JSON.stringify(body); if (submission.current?.payload !== payload) submission.current = {payload, id: crypto.randomUUID()};
     submitting.current = true; setBusy(true); setError('');
     try {
@@ -111,7 +111,8 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
     finally {submitting.current = false; setBusy(false);}
   }
   const renderVariable = (variable: Variable) => {
-    if (fs25 && ['SERVER_NAME', 'WEB_PORT'].includes(variable.env_variable)) return null;
+    if (fs25 && variable.env_variable === 'SERVER_NAME') variable = {...variable, name: 'In-game server name'};
+    if (fs25 && ['WEB_PORT'].includes(variable.env_variable)) return null;
     if (options.agreements?.some(agreement => agreement.environment === variable.env_variable)) return null;
     const steamRole = templateSteamRole(variable.env_variable);
     if (steamRole && steamRole !== 'branch') return null;
