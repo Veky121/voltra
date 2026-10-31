@@ -86,7 +86,7 @@ func farmingSimulatorTemplate() gameTemplate {
 		}
 	}
 	vars = append(vars, M{"name": "Admin DLC licences", "description": "Encrypted admin-managed DLC credentials. Downloads are matched to their own licence.", "env_variable": "DLC_PRODUCT_KEY", "default_value": "", "user_viewable": false, "user_editable": false, "rules": "nullable|string|max:16384"}, M{"name": "DLC timeout (seconds)", "description": "Maximum time per DLC before reporting failure. Increase for large packs.", "env_variable": "DLC_TIMEOUT", "default_value": "900", "user_viewable": true, "user_editable": true, "rules": "required|integer|between:60,7200"})
-	vars = append(vars, M{"name": "Experimental server save bridge", "description": "Installs Voltra's Lua save bridge on next preparation/start. Requires PC script-mod compatibility; validate before enabling on a shared server.", "env_variable": "VOLTRA_FS25_SAVE", "default_value": "false", "user_viewable": true, "user_editable": true, "rules": "required|in:true,false"})
+	vars = append(vars, M{"name": "VoltraSave", "description": "Saves the world before stopping, even with no players online. Uses the server-side FS25_VoltraSave Lua mod.", "env_variable": "VOLTRA_FS25_SAVE", "default_value": "false", "user_viewable": true, "user_editable": true, "rules": "required|in:true,false"})
 	egg["variables"] = vars
 	body, _ := json.Marshal(egg)
 	sum := sha256.Sum256(body)
