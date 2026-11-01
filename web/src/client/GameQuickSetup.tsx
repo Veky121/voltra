@@ -1,10 +1,11 @@
 import {confirmAction} from '../ui/ConfirmAction';
 import {useErrorState} from '../notifications/useErrorState';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
-import {PendingSettings, usePendingSetting, useDiscardSettings} from './PendingSettings';
+import {PendingSettings, usePendingSetting} from './PendingSettings';
 import './games-ui.css';
 import {useEffect, useRef, useState} from 'react';
-import {Link, useParams} from 'react-router-dom';
+import {Link, useParams, useSearchParams} from 'react-router-dom';
+import {SettingsSkeleton} from '../ui/SettingsSkeleton';
 import {api, Button, Card, ErrorBox, Input, Select, unwrap} from '../lib';
 import {can, json, useServer} from './common';
 import {safeFolderLink, stoppedServer, type QuickSetup, type QuickValue} from './gameSetupModel';
@@ -20,29 +21,36 @@ export default function GameQuickSetup() {return <PendingSettings><GameQuickSetu
 function GameQuickSetupContent() {
   const {base, permissions, server} = useServer();
   const {id} = useParams();
-  const [file, setFile] = useState('');
-  const [refresh, setRefresh] = useState(0);
+  const [params,setParams]=useSearchParams();
+  const file=params.get('file')||'';
   const [search, setSearch] = useState('');
   const dirty = useRef(false);
   const allowed = can(permissions, 'file.read-content');
   const request = useGameRequest<Settings>(base && allowed ? `${base}/game-settings${file ? `?file=${encodeURIComponent(file)}` : ''}` : null);
   const inventory = useGameRequest<Settings>(base && allowed && (server.game === 'minecraft' || request.data?.game === 'minecraft') ? `${base}/game-settings?inventory=all` : null);
-  const folderRequest = useGameRequest<{folders: Settings['folders']}>(base && allowed && can(permissions, 'file.read') ? `${base}/game-settings/folders` : null);
+  const folderRequest = useGameRequest<{folders: Settings['folders']}>(base && can(permissions, 'file.read') ? `${base}/game-settings/folders` : null);
   const documents = [...new Map([...(request.data?.documents || []), ...(inventory.data?.documents || [])].map(doc => [doc.path, doc])).values()];
-  const discard=useDiscardSettings();
+  // Revalidate on return without polling or replacing an in-progress draft.
+  useEffect(()=>{
+    let checkedAt=Date.now();
+    const refreshClean=()=>{if(document.hidden||dirty.current||Date.now()-checkedAt<30000)return;checkedAt=Date.now();request.reload();};
+    window.addEventListener('focus',refreshClean);document.addEventListener('visibilitychange',refreshClean);
+    return()=>{window.removeEventListener('focus',refreshClean);document.removeEventListener('visibilitychange',refreshClean)};
+  },[base,file,request.reload]);
   return <div className="game-quick-page games-ui settings-responsive">
     <header className="page-header game-settings-page-header" aria-label="Game settings controls">
-      {!!documents.length && <Select className="game-settings-document" aria-label="Configuration" value={file || request.data?.file || ''} disabled={request.loading} onChange={async event => {const next=event.target.value;if (await discard()) {dirty.current = false; setSearch(''); setFile(next);}}}>{documents.map(doc => <option key={doc.path} value={doc.path}>{doc.label}</option>)}</Select>}
+      {!!documents.length && <Select className="game-settings-document" aria-label="Configuration" value={file || request.data?.file || ''} disabled={request.loading} onChange={event => {const next=new URLSearchParams(params);next.set('file',event.target.value);setParams(next,{preventScrollReset:true});}}>{documents.map(doc => <option key={doc.path} value={doc.path}>{doc.label}</option>)}</Select>}
       {request.data && request.data.fields.length > 12 && <Input className="game-settings-search" type="search" aria-label="Find a setting" placeholder="Find a setting..." value={search} onChange={event => setSearch(event.target.value)}/>}
-      <Button className="game-settings-refresh" variant="secondary" onClick={async () => {if (await discard()) {dirty.current = false; setRefresh(value => value + 1); request.reload(); inventory.reload(); folderRequest.reload();}}} disabled={!allowed || request.loading}>Refresh</Button></header>
+      </header>
     <ErrorBox>{request.error}</ErrorBox>
+    {request.error&&<MiraAction type="button" onClick={request.reload}>Retry</MiraAction>}
     {inventory.error && <p className="muted">World settings lookup failed. <MiraAction type="button" className="text-button" onClick={inventory.reload}>Retry</MiraAction></p>}
-    {request.loading && !request.data && <p role="status">Loading game settings...</p>}
+    {request.loading && !request.data && <SettingsSkeleton/>}
     {!allowed ? <p className="muted">File content permission is required.</p> : request.data && <>
-      <QuickSetupContent key={`${base}:${request.data.file}:${request.data.revision}:${refresh}`} data={request.data} search={search} onSaved={() => {setRefresh(value => value + 1); request.reload();}} onDirty={value => {dirty.current = value;}}/>
+      <QuickSetupContent key={`${base}:${request.data.file}`} data={request.data} search={search} onSaved={request.reload} onDirty={value => {dirty.current = value;}}/>
     </>}
     <ServerStartup section="game"/>
-    {request.data && <GameFolders folders={request.data.folders} folderRequest={folderRequest} serverID={id || server.identifier || server.uuid || ''}/>}
+    <GameFolders folders={request.data?.folders || []} folderRequest={folderRequest} serverID={id || server.identifier || server.uuid || ''}/>
 
   </div>;
 }
@@ -51,7 +59,7 @@ function QuickSetupContent({data, search, onSaved, onDirty}: {data: Settings; se
   const {permissions, base, server} = useServer();
   const telemetry = useServerTelemetry();
   const [draft, setDraft] = useState<Record<string, QuickValue>>({});
-  const [error, setError] = useErrorState('client/GameQuickSetup.tsx'), [success, setSuccess] = useState(''), [busy, setBusy] = useState(false);
+  const [error, setError] = useErrorState('client/GameQuickSetup.tsx'), [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(data);
   const submitting = useRef(false);
   const writable = can(permissions, 'file.update');
@@ -59,28 +67,28 @@ function QuickSetupContent({data, search, onSaved, onDirty}: {data: Settings; se
   const blocked = !writable || !!server.is_node_under_maintenance || !!server.status || (data.requires_stop && !stopped);
   const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => String(value) !== String(saved.fields.find(field => field.key === key)?.value)));
   const dirty = Object.keys(changes).length > 0;
+  useEffect(()=>{if(!dirty)setSaved(data)},[data]);
   useEffect(() => {onDirty(dirty);}, [dirty, onDirty]);
   useEffect(() => {if (!dirty) return; const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';}; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);}, [dirty]);
   async function save() {
     if (blocked || !dirty || submitting.current) return;
-    setError(''); setSuccess(''); submitting.current = true; setBusy(true);
+    setError(''); submitting.current = true; setBusy(true);
     try {
       const settings = Object.fromEntries(Object.entries(changes).map(([key, value]) => [key, typeof value === 'boolean' ? value : String(value ?? '')]));
       const next = unwrap(await api(`${base}/game-settings?file=${encodeURIComponent(saved.file)}`, json('PUT', {settings, revision: saved.revision}))) as Settings;
       setSaved(next); setDraft({}); onDirty(false);
-      setSuccess('Saved. Applies on the next start.');
     } catch (error) {setError(error instanceof Error ? error.message : String(error)); throw error;}
     finally {submitting.current = false; setBusy(false);}
   }
-  function change(key: string, value: QuickValue) {setDraft(previous => ({...previous, [key]: value})); setSuccess('');}
+  function change(key: string, value: QuickValue) {setDraft(previous => ({...previous, [key]: value}));}
 
-  usePendingSetting(`native:${saved.file}`, dirty, {blocked: !!blocked || busy, save, discard: () => {setDraft({}); setError('');}});
+  usePendingSetting(`native:${base}:${saved.file}`, dirty, {summary:Object.keys(changes).map(key=>saved.fields.find(field=>field.key===key)?.label||key).join(', '),applies:'Next start',blocked: !!blocked || busy, save, afterSave:onSaved, discard: () => {setDraft({}); setError('');}});
   if (!saved.fields.length) return null;
   return <div className="game-quick-layout">
     <Card className="game-settings-card">
       <div>
         <fieldset className="steam-fields" disabled={blocked || busy}><GameSettingsFields fields={saved.fields} game={data.game} file={saved.file} search={search} draft={draft} onChange={change}/></fieldset>
-        <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={async () => {if (!dirty || await confirmAction({title:"Discard changes?",description:'Discard your unsaved settings and reload?',confirmLabel:"Discard changes",danger:false})) {onDirty(false); onSaved();}}}>Reload current settings</Button>}{success && <p role="status" className="success">{success}</p>}
+        <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={async () => {if (!dirty || await confirmAction({title:"Discard changes?",description:'Discard your unsaved settings and reload?',confirmLabel:"Discard changes",danger:false})) {setDraft({});setError('');onDirty(false); onSaved();}}}>Reload current settings</Button>}
       </div>
     </Card>
 

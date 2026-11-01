@@ -16,7 +16,7 @@ import {SteamSetupForm} from './SteamGames';
 import {useGameRequest} from './useGameRequest';
 import {type GameAgreement, templateMemoryWarning, templateStorageWarning, templateVariableControl, templateVariableProblem, type TemplatePortRule} from './gameTemplateModel';
 import {templateSetupProblems,templateSetupDependencyVariables} from './templateSetupValidation';
-import {GamePorts, useGamePortPlan, rememberInstallationPorts} from './GamePorts';
+import {GamePorts, useGamePortPlan} from './GamePorts';
 import {GameLibraryCard,gameArtwork} from './GameLibraryCard';
 import {compareGamePopularity} from './gameLibraryOrder';
 import {isMinecraftTemplate, minecraftProjectKey} from './minecraftCommunityModel';
@@ -115,7 +115,6 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
     try {
       const result = unwrap(await api(`/api/client/game-library/templates/${options.id}/install`, json('POST', {...body, request_id: submission.current.id})));
       if (!result.identifier) throw Error('The response did not include a server. Check Overview before retrying.');
-      rememberInstallationPorts(result.identifier, result.ports);
       navigate(`/server/${encodeURIComponent(result.identifier)}/${privateContent ? 'steam' : 'console'}`);
     } catch (error) {setError(error instanceof Error ? error.message : String(error));}
     finally {submitting.current = false; setBusy(false);}

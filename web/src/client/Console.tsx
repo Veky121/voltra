@@ -50,6 +50,8 @@ export default function Console() {
   const a = useAction();
   const featureAction = useAction();
   const telemetry=useServerTelemetry();
+  const installing=useRef(false);
+  installing.current=!!server.is_installing||server.status==='installing';
   const [history, setHistory] = useState(emptyConsoleHistory),
     [status, setStatus] = useState("unknown"),
     [connection, setConnection] = useState("Connecting"),
@@ -107,7 +109,7 @@ export default function Console() {
     let runStart:string|undefined,replaceRun=false;
     const showingLive = () => historyMode === "live" || historyMode === "legacy";
     const requestLiveLogs = () => {
-      if (socketReady && historyMode === "legacy" && !requestedLiveLogs) {
+      if (!installing.current && socketReady && historyMode === "legacy" && !requestedLiveLogs) {
         current?.send(JSON.stringify({event:"send logs", args:[]}));
         requestedLiveLogs = true;
       }
@@ -256,7 +258,7 @@ export default function Console() {
                 setConnection("Connected");
                 socketReady = true;
                 requestLiveLogs();
-                current?.send(
+                if(!installing.current)current?.send(
                   JSON.stringify({ event: "send stats", args: [] })
                 );
                 break;

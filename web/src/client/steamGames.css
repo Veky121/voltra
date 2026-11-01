@@ -141,3 +141,7 @@
 .template-readiness a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .template-readiness a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .steam-fields .field>.template-field-problem{color:var(--red)}
+
+.steam-maintenance-actions .maintenance-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:100px}
+.steam-maintenance-details{padding:0 12px 12px;font-size:13px}
+.steam-maintenance-details p{margin:6px 4px;color:var(--muted);line-height:1.5}

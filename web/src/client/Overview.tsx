@@ -17,7 +17,6 @@ import {resourceReadingGB,items,PageError,value} from "./common";
 import {fallbackArtwork,getServerBannerArtwork,type ServerArtwork} from "./serverArtwork";
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {getServerSoftwareArtwork} from './serverSoftwareArtwork';
-import {ServerSoftwarePatch} from './ServerSoftwarePatch';
 import {artworkColor} from './artworkColor';
 import "./workspace.css";
 import './shadcn-cards.css';
@@ -197,14 +196,17 @@ function Artwork({art,priority,onColor}:{art:ServerArtwork;priority:boolean;onCo
 function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
   useArtworkLibrary();
   const r=s.resourceError?undefined:s.resources,art=getServerBannerArtwork(s),software=getServerSoftwareArtwork(s);
+  const version=s.relationships?.variables?.data?.map((v:any)=>v.attributes??v).find((v:any)=>v.env_variable==='MINECRAFT_VERSION')?.server_value;
+  const subtitle=s.artwork?.pack_name||(software?[software.name,version].filter(Boolean).join(' ? '):s.description);
+  const profile=software?.src||(art.id==='minecraft'?'/game-icons/minecraft-official.png':art.src);
   const [glow,setGlow]=useState<{source:string;color:string|undefined}>();
   return <Card className="overview-server-card shadcn-card" data-state={s.liveState} data-artwork={art.id} style={{'--artwork-color':glow?.source===art.src?glow.color:undefined} as CSSProperties}>
     <Link className="overview-server-link" to={`/server/${s.identifier||s.uuid}`}>
-    <div className="overview-server-art"><Artwork key={art.src} art={art} priority={priority} onColor={color=>setGlow({source:art.src,color})}/>{software&&<ServerSoftwarePatch key={software.src} artwork={software}/>}</div>
+    <div className="overview-server-art"><Artwork key={art.src} art={art} priority={priority} onColor={color=>setGlow({source:art.src,color})}/></div>
     <CardHeader className="overview-server-header">
       <CardDescription className="overview-game-label">{art.name}</CardDescription>
       <CardAction><span className={`overview-state state-${s.liveState}`}><span className="status-dot"/>{labels[s.liveState]||s.liveState.replaceAll("_"," ")}</span></CardAction>
-      <div className="overview-server-heading"><div className="server-identity-heading"><ServerIdentityIcon artwork={s.artwork} lazy={!priority}/><div className="overview-server-title"><CardTitle><h2>{s.name}</h2></CardTitle>{(s.artwork?.pack_name||s.description)&&<CardDescription title={[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}>{[s.artwork?.pack_name,s.description].filter(Boolean).join(' · ')}</CardDescription>}</div></div></div>
+      <div className="overview-server-heading"><div className="server-identity-heading"><ServerIdentityIcon artwork={s.artwork} lazy={!priority} fallback={profile}/><div className="overview-server-title"><CardTitle><h2>{s.name}</h2></CardTitle>{subtitle&&<CardDescription title={subtitle}>{subtitle}</CardDescription>}</div></div></div>
     </CardHeader>
     <CardContent className="overview-resources">
       <Meter label="CPU" reading={r?`${Number(r.cpu_absolute||0).toFixed(1)}%`:"—"} ratio={Number(r?.cpu_absolute||0)/(s.limits?.cpu||100)}/>

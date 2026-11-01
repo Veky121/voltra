@@ -1,72 +1,66 @@
-import {CopyButton} from '../ui/CopyButton';
-import {ActionButton as MiraAction} from '../ui/ActionButton';
-import {ServerSubdomain} from './ServerSubdomain';
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
+import {RefreshCw} from 'lucide-react';
+import {CopyButton} from '../ui/CopyButton';
+import {ButtonFeedback} from '../ui/ButtonFeedback';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {SettingsSection} from '../ui/Settings';
 import {useTransientMessage} from '../hooks/useTransientMessage';
-import {Button, Modal, useAPI} from '../lib';
-import {can, items, useServer, value} from './common';
-import {connectionAddress as address, connectionDNS} from './connectionAddress';
-import './serverConnection.css';
+import {Button,Modal,useAPI} from '../lib';
+import {can,items,useServer,value} from './common';
+import {connectionAddress as address,connectionDNS} from './connectionAddress';
 import {useServerTelemetry} from './ServerDashboard';
+import './serverConnection.css';
+
+function useConnectionInfo(domainQuery?:ReturnType<typeof useAPI>){
+ const {server,base,permissions}=useServer();
+ const readable=can(permissions,'allocation.read');
+ const query=useAPI(readable?`${base}/proxy-routes`:null),ownDomainQuery=useAPI(readable&&!domainQuery?`${base}/subdomain`:null);
+ const subdomain=domainQuery||ownDomainQuery;
+ useEffect(()=>{const changed=(event:Event)=>{if((event as CustomEvent).detail===base){query.reload();if(!domainQuery)subdomain.reload()}};window.addEventListener('server-proxy-changed',changed);return()=>window.removeEventListener('server-proxy-changed',changed)},[base,query.reload,subdomain.reload]);
+ const allocations=items(server.relationships?.allocations),primary=allocations.find(a=>a.is_default)||allocations[0];
+ const routes=items(query.data).filter(r=>r.desired_present!==false&&Number(r.local_port)===Number(primary?.port));
+ const chosen=routes.find(r=>r.status==='applied')||routes[0];
+ const connection=chosen?address(chosen.public_host,chosen.public_port):primary?address(primary.ip,primary.port):null;
+ const dnsAddress=connectionDNS(primary?{port:primary.port,ip_alias:primary.ip_alias,alias:primary.alias}:undefined,routes.map(r=>({public_host:r.public_host,public_port:r.public_port})),value(subdomain.data));
+ return {server,permissions,readable,query,subdomain,primary,routes,connection,dnsAddress};
+}
+
+export function ConnectionOverview({domainQuery}:{domainQuery:ReturnType<typeof useAPI>}){
+ const info=useConnectionInfo(domainQuery);
+ const [copyError,setCopyError]=useTransientMessage(5000);
+ const loading=info.query.loading||info.subdomain.loading;
+ const failed=info.query.error||info.subdomain.error;
+ return <SettingsSection title="Join address" action={<Button variant="secondary" className="connection-check" aria-label="Refresh connection records" title="Refresh saved connection records" disabled={loading} onClick={()=>{info.query.reload();info.subdomain.reload()}}><ButtonFeedback state={loading?'pending':'idle'}><RefreshCw/></ButtonFeedback></Button>}>
+  <div className="connection-join-row" aria-busy={loading}>
+   {failed?<span role="alert">Connection details unavailable. Retry above.</span>:loading&&!info.query.data?<span role="status">Loading address...</span>:info.connection?<CopyButton className="button secondary" value={info.dnsAddress||info.connection} onCopyError={setCopyError}/>:<span>No port assigned</span>}
+   {!failed&&<span className="badge">{loading&&!info.query.data?'Checking':info.routes.length?info.routes.some(r=>r.status==='applied')?'Gateway applied':'Gateway pending':'Direct'}</span>}
+  </div>
+  {copyError&&<p className="server-proxy-error" role="alert">{copyError}</p>}
+  <Disclosure className="connection-details"><DisclosureTrigger>Details</DisclosureTrigger><p>A saved address does not confirm the game is reachable.</p><dl><dt>Node address</dt><dd>{info.primary?address(info.primary.ip,info.primary.port):'Not assigned'}</dd><dt>Public connection</dt><dd>{info.routes.length?info.connection:'Direct access needs a reachable node address and open game ports.'}</dd><dt>Game reachability</dt><dd>Not checked</dd></dl></Disclosure>
+ </SettingsSection>;
+}
 
 export function ServerConnection(){
-  const {server,base,permissions}=useServer();
-  const telemetry=useServerTelemetry();
-  const readable=can(permissions,'allocation.read');
-  const query=useAPI(readable?`${base}/proxy-routes`:null);
-  const subdomain=useAPI(readable?`${base}/subdomain`:null);
-  useEffect(()=>{const changed=(event:Event)=>{if((event as CustomEvent).detail===base){query.reload();subdomain.reload()}};window.addEventListener('server-proxy-changed',changed);return()=>window.removeEventListener('server-proxy-changed',changed)},[base,query.reload,subdomain.reload]);
-  const [details,setDetails]=useState(false),[dns,setDNS]=useState(false);
-  const [copyError,setCopyError]=useTransientMessage(5000);
-  const allocations=items(server.relationships?.allocations);
-  const primary=allocations.find(a=>a.is_default)||allocations[0];
-  const routes=items(query.data).filter(r=>Number(r.local_port)===Number(primary?.port));
-  const domain=primary?.ip_alias||primary?.alias;
-  const connection=routes[0]?address(routes[0].public_host,routes[0].public_port):primary?address(primary.ip,primary.port):null;
-  const joinDomain=value(subdomain.data);
-  const dnsAddress=connectionDNS(primary?{port:primary.port,ip_alias:primary.ip_alias,alias:primary.alias}:undefined,routes.map(route=>({public_host:route.public_host,public_port:route.public_port})),joinDomain);
-  return <div className="server-connection">
-    <div className="server-connection-summary">
-      <div className="server-connection-addresses">
-        <div><span className="server-meta-label">{routes.length?'Proxy:':'IP:'}</span>{connection?<CopyButton value={connection} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy connection address; reachability is not verified">{connection}</CopyButton>:<span>Not assigned</span>}</div>
-        <div><span className="server-meta-label">DNS:</span>{dnsAddress?<CopyButton value={dnsAddress} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy configured DNS name; DNS resolution is not verified">{dnsAddress}</CopyButton>:<span className="muted">Not configured</span>}</div>
-      </div>
-      <Button variant="secondary" className="server-connection-more" onClick={()=>setDetails(true)}>Connection details</Button>
-    </div>
-    <span className="server-connection-feedback" role="alert">{copyError}</span>
-    {details&&<Modal title="Connection details" onClose={()=>setDetails(false)}><div className="server-connection-details">
-    <p>A running process does not confirm that friends can join.</p>
-    <dl aria-label="Connection checks">
-      <dt>Game process</dt><dd>{!can(permissions,'control.console')?'Console permission required':telemetry.error?'Status unavailable':!telemetry.updated?'Waiting for status':telemetry.state==='running'?'Running':telemetry.state.replaceAll('_',' ')}{telemetry.updated>0&&!telemetry.error&&<small>Updated {new Date(telemetry.updated).toLocaleTimeString()}</small>}</dd>
-      <dt>Local game port</dt><dd>Not checked. Process status does not verify a listening port.</dd>
-      <dt>Forwarding</dt><dd>{!readable?'Allocation permission required':query.error?'Status unavailable':query.loading?'Reading configuration...':routes.some(route=>route.status==='applied')?'Route applied at its last recorded check':routes.length?'Configured, application not confirmed':'No proxy route for the primary port'}</dd>
-      <dt>External reachability</dt><dd>Not checked. No external connection test has run.</dd>
-    </dl>
-    <Button variant="secondary" disabled={query.loading||subdomain.loading||!readable&&!can(permissions,'control.console')} onClick={()=>{if(readable){query.reload();subdomain.reload()}if(can(permissions,'control.console'))telemetry.refresh()}}>Refresh connection status</Button>
-    <p className="muted">Refresh reads process status and saved forwarding configuration. It does not probe the game port or the public address.</p>
-    <dl>
-      {readable&&<><dt>Proxy</dt><dd>{query.loading?'Checking...':query.error?'Unable to check':routes.length?'Configured':'Primary port is not proxied'}{!query.loading&&!query.error&&<Link className="button secondary" to={`/server/${server.identifier||server.uuid}/settings/network`} onClick={()=>setDetails(false)}>Manage connections</Link>}{query.error&&<MiraAction type="button" onClick={query.reload}>Retry</MiraAction>}</dd></>}
-      {routes.map(route=><div className="server-connection-row" key={route.id}><dt>Proxy address</dt><dd><CopyButton value={address(route.public_host,route.public_port)} onCopyError={setCopyError} title="Copy proxy address">{address(route.public_host,route.public_port)}</CopyButton><span>{String(route.protocol).toUpperCase()} � {route.status}</span></dd></div>)}
-      <dt>Node address</dt><dd>{primary?<CopyButton value={address(primary.ip,primary.port)} onCopyError={setCopyError} title="Copy node allocation address; direct reachability is not verified">{address(primary.ip,primary.port)}</CopyButton>:'Not assigned'}</dd>
-      {dnsAddress&&<><dt>DNS address</dt><dd><CopyButton value={dnsAddress} onCopyError={setCopyError} title="Copy configured DNS address">{dnsAddress}</CopyButton></dd></>}
-      <dt>Address alias</dt><dd>{domain&&<CopyButton value={address(domain,primary.port)} onCopyError={setCopyError} title="Copy configured allocation alias; DNS is not verified">{address(domain,primary.port)}</CopyButton>}{readable&&<MiraAction type="button" onClick={()=>setDNS(true)}>Setup guide</MiraAction>}{!domain&&!readable&&'Not configured'}</dd>
-      {readable&&<ServerSubdomain onCopyError={setCopyError}/>}
-      <dt>Server ID</dt><dd><CopyButton value={server.uuid} onCopyError={setCopyError} title="Copy server UUID">{server.uuid}</CopyButton></dd>
-      <dt>Node</dt><dd>{server.node}</dd>
-    </dl>
-    <span className="server-connection-feedback" role="alert">{copyError}</span>
-    </div></Modal>}
-    {dns&&<Modal title="Set up a subdomain" onClose={()=>setDNS(false)}>
-      <p>Create a record at your domain's DNS provider, such as play.example.com.</p>
-      {query.loading?<p>Checking proxy routes...</p>:query.error?<p>Proxy details are unavailable. Check Network before choosing a DNS target.</p>:<>
-        <p>{routes.length?'Use a proxy target below to keep players connecting through the gateway.':'No proxy route is configured for the primary allocation. Use a publicly reachable node address; private or wildcard addresses need forwarding first.'}</p>
-        {(routes.length?routes.map(r=>({host:r.public_host,port:r.public_port,protocol:r.protocol})):primary?[{host:primary.ip,port:primary.port,protocol:''}]:[]).map((target,index)=><p key={index}><strong>{target.protocol.toUpperCase()} target: </strong><code>{target.host}</code> � Port <code>{target.port}</code></p>)}
-        <p>Use an A record for an IPv4 target, AAAA for IPv6, or CNAME for a hostname. Enter only the host in the record, without a port.</p>
-        <p>Players normally join with play.example.com:port. Games that support SRV records can use a separate service record to choose the port.</p>
-        <p>For ordinary game traffic on Cloudflare, choose DNS only. DNS does not open ports or configure forwarding.</p>
-      </>}
-      <p>This guide does not create DNS records. A displayed allocation alias is not proof that DNS resolves or the server is reachable.</p>
-    </Modal>}
-  </div>;
+ const info=useConnectionInfo(),telemetry=useServerTelemetry();
+ const {server,permissions,query,subdomain,primary,routes,connection,dnsAddress}=info;
+ const [details,setDetails]=useState(false),[copyError,setCopyError]=useTransientMessage(5000);
+ return <div className="server-connection">
+  <div className="server-connection-summary"><div className="server-connection-addresses">
+   <div><span className="server-meta-label">{routes.length?'Proxy:':'IP:'}</span>{connection?<CopyButton value={connection} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy address; reachability is not verified"/>:<span>Not assigned</span>}</div>
+   <div><span className="server-meta-label">DNS:</span>{dnsAddress?<CopyButton value={dnsAddress} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy DNS address"/>:<span className="muted">Not configured</span>}</div>
+  </div><Button variant="secondary" className="server-connection-more" onClick={()=>setDetails(true)}>Connections</Button></div>
+  {copyError&&<span className="server-connection-feedback" role="alert">{copyError}</span>}
+  {details&&<Modal title="Connections" onClose={()=>setDetails(false)}><div className="server-connection-details">
+   <dl><dt>Game process</dt><dd>{!can(permissions,'control.console')?'Unavailable':telemetry.error?'Unavailable':!telemetry.updated?'Checking':telemetry.state==='running'?'Running':telemetry.state.replaceAll('_',' ')}</dd>
+   <dt>Forwarding</dt><dd>{!info.readable?'Unavailable':query.error?'Unavailable':query.loading?'Checking':routes.some(r=>r.status==='applied')?'Applied':routes.length?'Pending':'Direct'}</dd>
+   <dt>Game reachability</dt><dd>Not checked</dd></dl>
+   {info.readable&&<Link className="button secondary" to={`/server/${server.identifier||server.uuid}/settings/network`} onClick={()=>setDetails(false)}>Configure connections</Link>}
+   <Disclosure className="connection-details"><DisclosureTrigger>Details</DisclosureTrigger>
+    <p>Process status and saved routes do not prove that players can join.</p>
+    <dl><dt>Node address</dt><dd>{primary?address(primary.ip,primary.port):'Not assigned'}</dd>{routes.map(route=><div className="server-connection-row" key={route.id}><dt>{String(route.protocol).toUpperCase()}</dt><dd><CopyButton value={address(route.public_host,route.public_port)} onCopyError={setCopyError}/></dd></div>)}<dt>Server ID</dt><dd><CopyButton value={server.uuid} onCopyError={setCopyError}/></dd><dt>Node</dt><dd>{server.node}</dd></dl>
+    <Button variant="secondary" disabled={query.loading||subdomain.loading} onClick={()=>{if(info.readable){query.reload();subdomain.reload()}if(can(permissions,'control.console'))telemetry.refresh()}}>Refresh records</Button>
+   </Disclosure>
+  </div></Modal>}
+ </div>;
 }

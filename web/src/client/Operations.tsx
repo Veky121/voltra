@@ -1,3 +1,5 @@
+import {ConnectionOverview} from './ServerConnection';
+import {ServerSubdomain} from './ServerSubdomain';
 import {usePendingSetting} from './PendingSettings';
 import ServerStorageSummary from './ServerStorageSummary';
 import ServerInsights from './ServerInsights';
@@ -65,6 +67,7 @@ export function Backups() {
     );
   return (
     <section className="operations-page backups-page">
+      <ServerStorageSummary backupResponse={r.data} backupError={r.error} extra={<ServerInsights section="backups" backupRequest={r} embedded/>}/>
       <div className="toolbar server-page-toolbar">
         <ServerPageTitle title="Backups" limit={server.feature_limits?.backups}/>
         <Button variant="secondary" onClick={r.reload}>
@@ -76,8 +79,6 @@ export function Backups() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
-      <ServerInsights section="backups" backupRequest={r}/>
-      <ServerStorageSummary backupResponse={r.data} backupError={r.error}/>
       {r.loading && <p role="status">Loading backups...</p>}
       <div className="grid grid-2">
         {items(r.data).map((b) => (
@@ -233,6 +234,7 @@ export function Backups() {
 export function Network() {
   const { base, permissions, server, reload } = useServer();
   const r = useAPI(`${base}/network/allocations`);
+  const domainQuery=useAPI(`${base}/subdomain`);
   const a = useAction();
   const [revision,setRevision]=useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -248,9 +250,12 @@ export function Network() {
     try{for(const [id,text] of changedNotes){await api(`${base}/network/allocations/${id}`,json('POST',{notes:text}));setNotes(current=>{const next={...current};if(next[id]===text)delete next[id];return next})}}
     catch(error){a.setError(error instanceof Error?error.message:String(error));throw error}finally{setSavingNotes(false)}
   }
-  usePendingSetting(`network-notes:${base}`,changedNotes.length>0,{blocked:savingNotes||!can(permissions,'allocation.update'),save:saveNotes,afterSave:r.reload,discard:()=>{setNotes({});a.setError('')}});
-  return <section className="operations-page network-page settings-responsive" aria-label="Network ports">
+  usePendingSetting(`network-notes:${base}`,changedNotes.length>0,{summary:'Port notes',blocked:savingNotes||!can(permissions,'allocation.update'),save:saveNotes,afterSave:r.reload,discard:()=>{setNotes({});a.setError('')}});
+  return <section className="operations-page network-page settings-responsive" aria-label="Connections">
+    <ConnectionOverview domainQuery={domainQuery}/>
     <ProxyEndpoints base={base} revision={revision}/>
+    <ServerSubdomain query={domainQuery}/>
+    <Disclosure className="connection-advanced"><DisclosureTrigger>Advanced ports</DisclosureTrigger>
     <SettingsSection title="Server ports" action={can(permissions,'allocation.create')?<Button disabled={a.busy} onClick={()=>perform('')}>Assign port</Button>:undefined}>
       <p className="server-proxy-note">Ports assigned on the node. Assigning a port does not expose it through a gateway. Limit: {server.feature_limits?.allocations ?? 'Unlimited'}.</p>
       <Notice action={a}/><PageError error={r.error}/>{r.error&&<Button variant="secondary" onClick={r.reload}>Retry loading ports</Button>}
@@ -261,7 +266,7 @@ export function Network() {
        {!n.is_default&&can(permissions,'allocation.delete')&&<Button variant="danger" disabled={a.busy} onClick={async()=>{if(await confirmAction({title:'Unassign port?',description:`Unassign ${n.ip}:${n.port}? Remove its proxy routes first.`,confirmLabel:'Unassign',danger:true}))perform(`/${n.id}`,undefined,'DELETE')}}>Unassign</Button>}
       </div>}><label className="network-port-note">Notes<Input aria-label={`Notes for port ${n.port}`} disabled={!can(permissions,'allocation.update')||savingNotes} value={notes[n.id]??n.notes??''} maxLength={255} onChange={e=>setNotes(old=>({...old,[n.id]:e.target.value}))}/></label></SettingsRow>)}</div>
       {!r.loading&&!items(r.data).length&&<p className="server-proxy-note">No ports assigned.</p>}
-    </SettingsSection>
+    </SettingsSection></Disclosure>
   </section>;
 }
 

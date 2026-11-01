@@ -1,7 +1,6 @@
 import {useErrorState} from '../notifications/useErrorState';
 import {Checkbox} from '../components/ui/checkbox';
 import {SettingsSection as PreferenceSection, SettingsRow} from '../ui/Settings';
-import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {settingDescription} from './settingDescription';
 import {PendingSettings, usePendingSetting} from './PendingSettings';
 import {GameSwitch} from './GameSwitch';
@@ -73,20 +72,14 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
     }
   }
 
-  usePendingSetting(variable.env_variable, dirty, {blocked: !!problem || !editable || busy, save: () => save(reset ? 'reset' : clear ? 'clear' : 'save'), discard: () => {setDraft(baseline); setClear(false); setReset(false); setError('');}});
+  usePendingSetting(variable.env_variable, dirty, {summary:label, applies:'Next start',blocked: !!problem || !editable || busy, save: () => save(reset ? 'reset' : clear ? 'clear' : 'save'), discard: () => {setDraft(baseline); setClear(false); setReset(false); setError('');}});
   return <SettingsRow className={`startup-variable${dirty ? ' is-dirty' : ''}`} aria-label={label} aria-busy={busy} label={<span className="startup-variable-heading">
       <label htmlFor={id}>{label}</label>
       <span className="startup-badges">
         {!editable && <span className="badge">Read-only</span>}
-        {typeof variable.is_overridden === 'boolean' && <span className="badge">{variable.is_overridden ? 'Custom override' : 'Template default'}</span>}
         {dirty && <span className="startup-pending">Unsaved</span>}
       </span>
-    </span>} description={variable.description ? settingDescription(variable.description) : undefined}
-    details={<Disclosure className="startup-field-details"><DisclosureTrigger>Details</DisclosureTrigger><p><code>{variable.env_variable}</code></p><p>Rules: {variable.rules || 'None'}</p><p>Template default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p>
-      {!editable && <p>{!permitted ? 'You do not have permission to edit startup settings.' : 'This setting is managed by the server template.'}</p>}
-      {editable && variableCanReset(variable) && <Button variant="secondary" disabled={busy} onClick={()=>{setReset(current=>!current);setClear(false);setDraft(baseline);setError('')}}>{reset ? 'Undo reset' : 'Reset to template default'}</Button>}
-      {reset && <p role="status">Reset pending. Save to remove the custom override.</p>}
-    </Disclosure>} control={<>
+    </span>} description={variable.description ? settingDescription(variable.description) : undefined} control={<>
       {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy || reset} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy || reset} aria-describedby={problem ? `${id}-help` : undefined} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
         {!control.options.includes(draft) && <option value={draft}>{draft || 'Choose a value'}</option>}
         {!control.required && draft !== '' && <option value="">Empty</option>}
@@ -97,9 +90,11 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
         placeholder={secret ? configured ? 'Saved. Leave blank to keep.' : 'Not configured' : undefined}
         aria-describedby={problem ? `${id}-help` : undefined} aria-invalid={!!problem}
         onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }} />}
+      {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><Checkbox checked={clear} disabled={busy} onCheckedChange={checked => {setClear(checked); setDraft('');}}/> Clear saved value</label>}
     </>}>
-    {(secret && editable && !control.required && configured !== false || problem || error || success) ? <>
-    {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><Checkbox checked={clear} disabled={busy || reset} onCheckedChange={checked => {setClear(checked); setDraft('');}}/> Clear saved value</label>}
+    {(reset || clear || problem || error || success) ? <>
+    {reset && <p role="status" className="startup-field-help">Reset pending. Save to use the template default.</p>}
+    {clear && <p role="status" className="startup-field-help">Saved value will be cleared on save.</p>}
     {problem && <p id={`${id}-help`} className="startup-validation" role="alert">{problem}</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {success && <p role="status" className="success">{success}</p>}
@@ -128,7 +123,7 @@ function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyCh
     try{await api(`${base}/settings/docker-image`,json('PUT',{docker_image:draft}));setSavedImage(draft);setSuccess('Saved. Applies on the next start.')}
     catch(error){setError(error instanceof Error?error.message:String(error));throw error}finally{locked.current=false;setBusy(false)}
   }
-  usePendingSetting(`image:${base}`,dirty,{blocked:busy||!permitted||!draft.trim(),save:saveImage,afterSave:()=>onSaved(draft),discard:()=>{setDraft(savedImage);setError('')}});
+  usePendingSetting(`image:${base}`,dirty,{summary:'Runtime image',applies:'Next start',blocked:busy||!permitted||!draft.trim(),save:saveImage,afterSave:()=>onSaved(draft),discard:()=>{setDraft(savedImage);setError('')}});
   return <PreferenceSection title="Runtime image" className="startup-advanced">
     <p className="settings-section-note">Applies on the next start. Saving does not reinstall.</p>
     <form aria-busy={busy} onSubmit={event=>{event.preventDefault();void saveImage().catch(()=>{})}}>

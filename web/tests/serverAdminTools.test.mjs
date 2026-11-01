@@ -6,16 +6,17 @@ import {fileURLToPath} from 'node:url';
 // In-memory TSX fixtures. No browser, server, real fetch, or dist output.
 const fixtureKey = '__serverAdminToolsFixture';
 const modules = {
+  icons: `export const Info='svg';`,
   errors: `import {useState} from 'react'; export const useErrorState=()=>useState('');`,
   pending: `export const usePendingSetting=(key,dirty,change)=>globalThis.${fixtureKey}.pending.set(key,{...change,dirty}); export const useDiscardSettings=()=>async()=>{const f=globalThis.${fixtureKey};const entries=[...f.pending.values()].filter(x=>x.dirty);if(!entries.length)return true;f.confirmations.push('Discard changes?');if(!f.confirm)return false;for(const item of entries)item.discard();return true};`,
   confirm: `export const confirmAction=async options=>{const f=globalThis.${fixtureKey};f.confirmations.push(options.description);return f.confirm;};`,
-  primitives: `export const Card='section',Field='div',Input='input',Textarea='textarea',ActionButton='button';`,
+  primitives: `export const Card='section',Field='div',Input='input',Textarea='textarea',ActionButton='button',Button='button';`,
   tabs: `import {jsx} from 'react/jsx-runtime';export const SectionTabs=({items,scope,active,onChange})=>jsx('nav',{children:items.map(item=>jsx('button',{role:'tab',id:scope+'-tab-'+item.id,'aria-selected':active===item.id,onClick:()=>onChange(item.id),children:item.label}))});`,
   integrationHeader: `export const IntegrationHeader=({children})=>children;`,
 
   react: `export const useState=(...args)=>globalThis.${fixtureKey}.useState(...args); export const useEffect=(...args)=>globalThis.${fixtureKey}.useEffect(...args); export const useId=()=>globalThis.${fixtureKey}.useId(); export const useRef=initial=>useState(()=>({current:initial}))[0]; export const createContext=initial=>{const context={value:initial};context.Provider=({value,children})=>{context.value=value;return children};return context}; export const useContext=context=>context.value;`,
   'react/jsx-runtime': `export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key}); export const jsxs=jsx;`,
-  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useSearchParams=()=>[new URLSearchParams()]; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a'; export const Navigate=props=>({type:'fixture-redirect',props});`,
+  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useSearchParams=()=>{const f=globalThis.${fixtureKey};const [search,setSearch]=f.useState(()=>new URLSearchParams(f.initialSearch||''));f.setSearch=setSearch;return [search,next=>{const dirty=[...f.pending.values()].filter(x=>x.dirty);if(dirty.length){f.confirmations.push('Discard changes?');if(!f.confirm)return;for(const change of dirty)change.discard();}f.navigations.push('?'+next.toString());setSearch(next);}];}; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a'; export const Navigate=props=>({type:'fixture-redirect',props});`,
   lib: `import {jsx} from 'react/jsx-runtime';
     export const api=(...args)=>globalThis.${fixtureKey}.api(...args);
     export const useAPI=path=>globalThis.${fixtureKey}.query(path);
@@ -56,11 +57,12 @@ const bundled = await build({
   stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers'; export {GameLicences} from './src/admin/GameLicences';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
+    builder.onResolve({filter:/^lucide-react$/},()=>({path:'icons',namespace:'fixture'}));
     builder.onResolve({filter:/notifications\/useErrorState$/},()=>({path:'errors',namespace:'fixture'}));
     builder.onResolve({filter:/PendingSettings$/},()=>({path:'pending',namespace:'fixture'}));
     builder.onResolve({filter:/ui\/ConfirmAction$/},()=>({path:'confirm',namespace:'fixture'}));
     builder.onResolve({filter:/ui\/SectionTabs$/},()=>({path:'tabs',namespace:'fixture'}));
-    builder.onResolve({filter:/components\/ui\/(card|field|input|textarea)$|ui\/ActionButton$/},()=>({path:'primitives',namespace:'fixture'}));
+    builder.onResolve({filter:/components\/ui\/(card|field|input|textarea|button)$|ui\/ActionButton$/},()=>({path:'primitives',namespace:'fixture'}));
     builder.onResolve({filter:/^\.\/integrations$/},()=>({path:'integrationHeader',namespace:'fixture'}));
     builder.onResolve({filter:/^\.\/Operations$/}, () => ({path:'operations',namespace:'fixture'}));
     builder.onResolve({filter:/client\/ServerStartup$|^\.\/ServerStartup$/}, () => ({path:'startup',namespace:'fixture'}));
@@ -330,7 +332,7 @@ test('General retains lifecycle safeguards and Transfer contains only transfer a
   const transfer=f.nodes(node=>node.type==='form')[0];
   f.confirm=false;await transfer.props.onSubmit({preventDefault(){}});
   assert.match(f.confirmations.at(-1),/server will stop/);assert.equal(f.requests.length,0);
-  actions.find(node=>node.props.path.endsWith('/force')).props.onDone();assert.deepEqual(f.navigations,['/']);
+  actions.find(node=>node.props.path.endsWith('/force')).props.onDone();assert.deepEqual(f.navigations,['?tab=manage','/']);
 });
 
 test('empty restricted options omit the form; real restricted secrets remain masked',async()=>{
@@ -373,4 +375,20 @@ test('General is available under Runtime for administrators and users without st
  user.data.set('/api/client/account',{data:item({root_admin:false})});user.render();
  assert.equal(user.nodes(node=>node.type==='fixture-general').length,1);
  assert.ok(!user.queries.some(path=>path.startsWith('/api/application/')));
+});
+
+
+test('runtime tabs restore URL selection, preserve other parameters and respond to history changes',async()=>{
+ const f=fixture();f.initialSearch='?tab=limits&keep=1';f.render();
+ assert.ok(f.nodes(n=>n.props.role==='tab'&&n.props['aria-selected']&&n.props.id.endsWith('-limits')).length);
+ await f.tab('runtime');assert.equal(f.navigations.at(-1),'?tab=runtime&keep=1');
+ f.setSearch(new URLSearchParams('tab=mounts&keep=1'));f.render();
+ assert.ok(f.nodes(n=>n.props.role==='tab'&&n.props['aria-selected']&&n.props.id.endsWith('-mounts')).length);
+});
+test('unknown and unauthorized tab URLs fall back to General without exposing controls',()=>{
+ for(const tab of ['unknown','limits']){
+  const f=fixture();f.initialSearch='?tab='+tab;f.context.permissions=[];f.data.set('/api/client/account',{data:item({root_admin:false})});f.render();
+  assert.equal(f.nodes(n=>n.props.role==='tab').length,1);
+  assert.equal(f.nodes(n=>n.type==='fixture-general').length,1);
+ }
 });

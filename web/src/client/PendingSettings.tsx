@@ -5,8 +5,12 @@ import {Button} from '../lib';
 import './startupSettings.css';
 import {useBlocker} from 'react-router-dom';
 import {confirmAction} from '../ui/ConfirmAction';
+import {Save} from 'lucide-react';
+import {ButtonFeedback} from '../ui/ButtonFeedback';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {useTransientMessage} from '../hooks/useTransientMessage';
 
-type Change = {blocked: boolean; save: () => Promise<void>; discard: () => void; afterSave?:()=>void};
+type Change = {blocked: boolean; save: () => Promise<void>; discard: () => void; afterSave?:()=>void; summary?:string; applies?:string};
 const PendingContext = createContext<((key: string, change?: Change) => void) | null>(null);
 const GuardContext = createContext<()=>Promise<boolean>>(async()=>true);
 export const useDiscardSettings=()=>useContext(GuardContext);
@@ -14,9 +18,9 @@ export function usePendingSetting(key: string, dirty: boolean, change: Change) {
   const register = useContext(PendingContext);
   const latest = useRef(change); latest.current = change;
   useEffect(() => {
-    register?.(key, dirty ? {blocked: change.blocked, save: () => latest.current.save(), discard: () => latest.current.discard(),afterSave:()=>latest.current.afterSave?.()} : undefined);
+    register?.(key, dirty ? {blocked: change.blocked, summary:change.summary, applies:change.applies, save: () => latest.current.save(), discard: () => latest.current.discard(),afterSave:()=>latest.current.afterSave?.()} : undefined);
     return () => register?.(key);
-  }, [register, key, dirty, change.blocked]);
+  }, [register, key, dirty, change.blocked, change.summary, change.applies]);
   return !!register;
 }
 export function PendingSettings({children}: {children: ReactNode}) {
@@ -27,12 +31,15 @@ function PendingSettingsOwner({children}: {children: ReactNode}) {
   const [changes, setChanges] = useState<Record<string, Change>>({});
   const [busy, setBusy] = useState(false), [error, setError] = useErrorState('client/PendingSettings.tsx');
   const locked = useRef(false);
+  const [saved,setSaved]=useTransientMessage(2000);
+  const session=useRef(0);
+  useEffect(()=>()=>{session.current++},[]);
   const register = useCallback((key: string, change?: Change) => setChanges(current => {
     if (!change && !current[key]) return current;
     const next = {...current}; if (change) next[key] = change; else delete next[key]; return next;
   }), []);
   const pending = Object.values(changes);
-  const blocker=useBlocker(pending.length>0);
+  const blocker=useBlocker(pending.length>0||busy);
   const discard=useCallback(async()=>{
     if(locked.current)return false;
     const current=Object.values(changes);
@@ -43,7 +50,7 @@ function PendingSettingsOwner({children}: {children: ReactNode}) {
   const leaving=useRef(false);
   const currentBlocker=useRef(blocker);currentBlocker.current=blocker;
   useEffect(()=>{
-    const reset=()=>{setChanges({});setError('');if(currentBlocker.current.state==='blocked')currentBlocker.current.reset()};
+    const reset=()=>{session.current++;locked.current=false;setBusy(false);setChanges({});setError('');setSaved('');if(currentBlocker.current.state==='blocked')currentBlocker.current.reset()};
     window.addEventListener('panel-auth-changed',reset);window.addEventListener('desktop-session-rejected',reset);
     return()=>{window.removeEventListener('panel-auth-changed',reset);window.removeEventListener('desktop-session-rejected',reset)};
   },[]);
@@ -58,18 +65,20 @@ function PendingSettingsOwner({children}: {children: ReactNode}) {
     });
   },[blocker,discard]);
   useEffect(() => {
-    if (!pending.length) return;
+    if (!pending.length&&!busy) return;
     const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';};
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
-  }, [pending.length]);
-  return <PendingContext.Provider value={register}><GuardContext.Provider value={discard}>{children}{pending.length > 0 && <div className="settings-pending-bar" role="region" aria-label="Unsaved settings" aria-busy={busy}>
-    <span>{error || 'Unsaved changes'}</span>
-    <Button disabled={busy || pending.some(change => change.blocked)} onClick={async () => {
-      if (locked.current) return; locked.current = true; setBusy(true); setError('');
-      try {await saveSettingChanges(pending);}
-      catch {setError('Some changes could not be saved. Check the highlighted settings.');}
-      finally {locked.current = false; setBusy(false);}
-    }}>{busy ? 'Saving...' : 'Save'}</Button>
-    <Button variant="secondary" disabled={busy} onClick={() => {for (const change of pending) change.discard(); setError('');}}>Discard</Button>
+  }, [pending.length,busy]);
+  const completed=!pending.length&&!busy&&!!saved;
+  return <PendingContext.Provider value={register}><GuardContext.Provider value={discard}>{children}{(pending.length > 0||busy||saved) && <div className="settings-pending-bar" role="region" aria-label={completed?'Settings saved':'Unsaved settings'} aria-busy={busy} data-complete={completed}>
+    <span role="status">{error || (completed?'Changes saved':'Unsaved changes')}</span>
+    {!!pending.length&&<Disclosure className="settings-pending-details"><DisclosureTrigger aria-label="Review changes">Details</DisclosureTrigger><ul>{Object.entries(changes).map(([key,change])=><li key={key}><span>{change.summary||'Settings'}</span>{change.applies&&<small>{change.applies}</small>}</li>)}</ul></Disclosure>}
+    <Button className="settings-save-button" disabled={busy || completed || pending.some(change => change.blocked)} onClick={async () => {
+      if (locked.current) return; const currentSession=session.current; locked.current = true; setBusy(true); setError('');setSaved('');
+      try {await saveSettingChanges(pending);if(session.current===currentSession)setSaved('Saved');}
+      catch {if(session.current===currentSession)setError('Could not save. Check the highlighted settings.');}
+      finally {if(session.current===currentSession){locked.current = false; setBusy(false);}}
+    }}><ButtonFeedback state={busy?'pending':completed?'success':'idle'}><Save/></ButtonFeedback>{busy ? 'Saving...' : completed?'Saved':'Save'}</Button>
+    <Button variant="secondary" disabled={busy||completed} onClick={() => {for (const change of pending) change.discard(); setError('');setSaved('');}}>Discard</Button>
   </div>}</GuardContext.Provider></PendingContext.Provider>;
 }

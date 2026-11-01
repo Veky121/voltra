@@ -23,3 +23,6 @@
 .network-page .settings-options-grid>.settings-row:has(>.settings-row-body)>.settings-row-layout{height:auto}
 .network-page .network-port-note{font-size:13px;color:var(--muted)}
 .network-page .network-port-note input{margin-top:6px}
+.network-page .button,.server-proxy-manager .button{min-height:32px;padding:5px 10px;font-size:13px}
+.server-proxy-manager .connection-check{width:30px;height:30px;min-height:30px;padding:6px}
+.server-proxy-footer .button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:105px}

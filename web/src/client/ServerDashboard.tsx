@@ -25,7 +25,6 @@ import './dashboard-ui.css';
 import {fallbackArtwork,getServerArtwork,type ServerArtwork} from './serverArtwork';
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {FavoriteButton} from '../ServerNavigation';
-import {InstallationPortsNotice} from './GamePorts';
 import {visiblePoll} from '../hooks/visiblePoll';
 import {observeLivePath,isLivePathFresh} from '../hooks/liveEvents';
 
@@ -109,9 +108,7 @@ function usePowerOperation(base:string,telemetry:Telemetry){
   return {pending,busy:!!pending&&!pending.accepted,error,success,completedSignal,power,dismissError:()=>setError('')};
 }
 
-function PowerControls({compact=false}:{compact?:boolean}){
-  const {server,permissions}=useServer();
-  const telemetry=useContext(TelemetryContext),action=useContext(PowerContext),pending=action.pending;
+function usePowerElapsed(pending:PowerOperation|null){
   const [clock,setClock]=useState(Date.now());
   useEffect(()=>{
     if(!pending)return;
@@ -119,9 +116,15 @@ function PowerControls({compact=false}:{compact?:boolean}){
     const timer=window.setInterval(()=>setClock(Date.now()),1000);
     return()=>window.clearInterval(timer);
   },[pending?.requestedAt]);
-  const elapsed=pending?Math.max(0,Math.floor((clock-pending.requestedAt)/1000)):0;
+  return pending?Math.max(0,Math.floor((clock-pending.requestedAt)/1000)):0;
+}
+
+function PowerControls({compact=false}:{compact?:boolean}){
+  const {server,permissions}=useServer();
+  const telemetry=useContext(TelemetryContext),action=useContext(PowerContext),pending=action.pending;
+  const elapsed=usePowerElapsed(compact?null:pending);
   const running=telemetry.state==='running',starting=telemetry.state==='starting';
-  const blocked=!!server.status||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
+  const blocked=!!server.status||!!server.is_installing||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
   const controls:[PowerSignal,string,IconName,string,boolean][]=[
     ['start','Start','play','control.start',running||starting||telemetry.state==='stopping'],
     ['restart','Restart','restart','control.restart',!running],
@@ -135,25 +138,33 @@ function PowerControls({compact=false}:{compact?:boolean}){
       const feedback=working?'pending':action.success&&action.completedSignal===signal?'success':'idle';
       return <Button key={signal} className="server-power-button" data-power={signal} data-feedback={feedback} variant="secondary" aria-label={compact?`${label} server`:undefined} title={unavailableReason|| (working&&pending?powerOperationLabel(pending):pending&&signal!=='kill'?'Wait for the current action to finish.':disabled?signal==='start'?'The server is already running or changing state.':'The server must be running for this action.':signal==='kill'?'Immediately terminate the server process':`${label} server`)} aria-busy={working} disabled={blocked||disabled||action.busy||!!pending&&(signal!=='kill'||pending.signal==='kill')} onClick={()=>void action.power(signal)}><ButtonFeedback state={feedback}><Icon name={icon}/></ButtonFeedback>{!compact&&label}</Button>;
     })}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
-    {pending?<div className="server-power-progress">
-      <div role="status" aria-live="polite"><strong>{telemetry.error?'Waiting for connection':powerOperationLabel(pending)}</strong><span className="server-power-elapsed" aria-hidden="true">{elapsed}s</span></div>
-      <p>{powerOperationDetail(pending,elapsed,!!telemetry.error)}</p>
-      {(elapsed>=30||telemetry.error)&&<Button variant="secondary" onClick={telemetry.refresh}>Check status</Button>}
-    </div>:action.success?<p className="server-power-progress" role="status">{action.success}</p>:unavailableReason?<p className="server-power-progress">{unavailableReason}</p>:null}
-    {action.error&&<div className="error server-power-error" role="alert"><span>{action.error}</span><Button variant="secondary" aria-label="Dismiss power action error" onClick={action.dismissError}>Dismiss</Button></div>}
+    <span className="button-feedback-sr" role="status">{pending?powerOperationLabel(pending):action.success}</span>
+    {!compact&&pending&&(elapsed>=30||telemetry.error)&&<Button variant="secondary" title={powerOperationDetail(pending,elapsed,!!telemetry.error)} onClick={telemetry.refresh}>Check status</Button>}
+    {!compact&&action.error&&<div className="error server-power-error" role="alert"><span>{action.error}</span><Button variant="secondary" aria-label="Dismiss power action error" onClick={action.dismissError}>Dismiss</Button></div>}
 
   </div>;
 }
 
-export function ServerStateLine(){
+export function ServerStateLine({compact=false}:{compact?:boolean}){
   const {server}=useServer(),telemetry=useServerTelemetry();
+  const action=useContext(PowerContext);
+  const pending=compact?action.pending:null;
+  const operationElapsed=usePowerElapsed(pending);
+  const operationError=compact?action.error:'';
   const state=server.status||telemetry.state;
   const online=state==='running'&&!telemetry.error;
   const elapsed=online?number(telemetry.resources.uptime):0;
   const label:Record<string,string>={running:'Online',offline:'Offline',stopped:'Offline',starting:'Starting',stopping:'Stopping',unknown:'Connecting',installing:'Installing',install_failed:'Installation failed',reinstall_failed:'Reinstallation failed',suspended:'Suspended',restoring_backup:'Restoring backup'};
+  const stateText=telemetry.error&&!server.status?'Connection unavailable':label[state]||state.replaceAll('_',' ');
+  const statusText=operationError?'Action failed':stateText;
+  const statusDetail=operationError||(pending?powerOperationDetail(pending,operationElapsed,!!telemetry.error):stateText);
+  const statusState=operationError?'install_failed':telemetry.error&&!server.status?'unknown':pending?'starting':state;
   return <div className="server-state-line">
-          <span className={`server-state state-${telemetry.error&&!server.status?'unknown':state}`}><span className="server-meta-label">Status:</span><span className="status-dot"/>{telemetry.error&&!server.status?'Connection unavailable':label[state]||state.replaceAll('_',' ')}</span>
-          <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}>Uptime: <strong>{telemetry.error?'—':formatUptime(elapsed)}</strong></span>
+    <span className={`server-state state-${statusState}`} title={statusDetail} role={operationError?'alert':compact?'status':undefined} aria-live={compact?'polite':undefined}>
+      <span className="server-meta-label">Status:</span><span className="status-dot"/>
+      <span className="server-state-text">{statusText}</span>
+    </span>
+    <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}>Uptime: <strong>{telemetry.error?'\u2014':formatUptime(elapsed)}</strong></span>
   </div>;
 }
 
@@ -168,10 +179,11 @@ export function ServerWorkspace({children}:{children:ReactNode}){
   const art=getServerArtwork({...server,name:server.name});
   const pathname=useLocation().pathname;
   const dashboardPage=/^\/server\/[^/]+\/?$/.test(pathname);
-  const telemetry=useTelemetry(base,!server.status);
+  const telemetry=useTelemetry(base,!server.status&&!server.is_installing);
   const power=usePowerOperation(base,telemetry);
+  const transition=power.pending?.signal||(!telemetry.error?(telemetry.state==='starting'?'start':telemetry.state==='stopping'?'stop':undefined):undefined);
   return <TelemetryContext.Provider value={telemetry}><PowerContext.Provider value={power}>
-    {!dashboardPage?<header className="server-topbar"><div className="server-summary"><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div><ServerStateLine/></div><PowerControls compact/></header>:<header><Card className="server-hero server-hero-with-artwork shadcn-card" data-artwork={art.id}>
+    {!dashboardPage?<header className="server-topbar" data-power-transition={transition} data-power-paused={!!telemetry.error}><div className="server-summary"><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div><ServerStateLine compact/></div><PowerControls compact/></header>:<header><Card className="server-hero server-hero-with-artwork shadcn-card" data-artwork={art.id} data-power-transition={transition} data-power-paused={!!telemetry.error}>
       <DashboardArtwork key={art.src} art={art}/>
       <CardHeader className="server-hero-info">
         <div className="server-hero-title"><CardTitle><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div></CardTitle></div>
@@ -181,7 +193,6 @@ export function ServerWorkspace({children}:{children:ReactNode}){
       <CardAction className="server-hero-controls"><PowerControls/></CardAction>
     </Card></header>}
 
-    <InstallationPortsNotice key={server.identifier || server.uuid_short} identifier={server.identifier || server.uuid_short}/>
     <PageError error={telemetry.error}/>
     {children}
   </PowerContext.Provider></TelemetryContext.Provider>;

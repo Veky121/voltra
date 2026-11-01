@@ -4,3 +4,5 @@
 .server-hero .server-identity-heading .server-identity-icon{width:44px;height:44px}
 .server-topbar .server-identity-heading .server-identity-icon{width:30px;height:30px;border-radius:6px}
 .server-pack-name{margin:3px 0 0;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));line-height:1.5;overflow-wrap:anywhere}
+
+.overview-server-card .server-identity-icon[data-icon-source=game]{object-fit:cover}

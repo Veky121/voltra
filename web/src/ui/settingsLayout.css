@@ -15,6 +15,17 @@
 .settings-row[data-settings-row]:has(textarea)>.settings-row-layout{grid-template-columns:minmax(0,1fr);gap:10px}
 .settings-row[data-settings-row] .settings-row-control:has(textarea){max-width:none}
 .settings-row[data-settings-row]>.settings-row-body{padding:0 16px 14px}
+.settings-row[data-settings-row]>.settings-row-details{padding:0 16px 14px}
+.settings-row-heading{display:flex;align-items:center;gap:6px;min-width:0}
+.settings-row-heading>.settings-row-label{min-width:0}
+.settings-row-heading>.settings-info-toggle{flex-shrink:0;color:var(--muted)}
+.settings-row-info{padding:0 16px 14px;color:var(--muted);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.settings-row-info p{margin:0 0 8px}
+.settings-row-info p:last-child{margin-bottom:0}
+.settings-row-info code{white-space:pre-wrap}
+/* Stacked fields keep controls close to their labels in option grids. */
+.settings-row[data-settings-row][data-settings-layout=stacked]>.settings-row-layout{grid-template-columns:minmax(0,1fr);align-content:start;gap:10px}
+.settings-row[data-settings-row][data-settings-layout=stacked]:has([role=switch])>.settings-row-layout{grid-template-columns:minmax(0,1fr) auto;align-items:center}
 .app-content .settings-fields[data-slot=field-group]{display:block;max-width:880px;width:100%;padding:0;margin:0;gap:0}
 .app-content .settings-field[data-settings-field]{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,280px);align-items:center;gap:24px;min-width:0;margin:0;padding:14px 16px;border:0;border-radius:0}
 .app-content .settings-field[data-settings-field]:has([role=switch]){grid-template-columns:minmax(0,1fr) auto}

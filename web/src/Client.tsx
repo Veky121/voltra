@@ -58,11 +58,12 @@ function Server() {
   const opened=value(r.data)?.uuid;
   useEffect(()=>{if(opened)navigation.visit(opened)},[opened,navigation.visit]);
   const lifecycleState=value(r.data)?.status;
+  const installationPending=!!value(r.data)?.is_installing&&!['install_failed','reinstall_failed'].includes(lifecycleState);
   useEffect(()=>{
-    if(!['installing','restoring_backup'].includes(lifecycleState))return;
+    if(!installationPending&&!['installing','restoring_backup'].includes(lifecycleState))return;
     const timer=setInterval(()=>{if(!document.hidden&&!isLivePathFresh(base))r.reload()},1000);
     return()=>clearInterval(timer);
-  },[base,lifecycleState,r.reload]);
+  },[base,lifecycleState,installationPending,r.reload]);
   if (r.loading && !r.data)
     return (
       <div className="page" role="status">

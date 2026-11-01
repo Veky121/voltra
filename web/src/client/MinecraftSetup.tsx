@@ -16,7 +16,7 @@ import {MinecraftCatalog, MinecraftPackIcon} from "./MinecraftCatalog";
 import {gibToMiB, minecraftAPI, useMinecraftRequest} from "./MinecraftLibrary";
 import type {MinecraftOptions, MinecraftPackSelection, MinecraftRuntime} from "./MinecraftLibrary";
 import {MinecraftSegments} from "./MinecraftSegments";
-import {GamePorts, useGamePortPlan, rememberInstallationPorts} from "./GamePorts";
+import {GamePorts, useGamePortPlan} from "./GamePorts";
 import {gameNodeAvailable} from "./gamePortsModel";
 import {GameNameField, GameNodeField} from "./GameSetupFields";
 import {json, value} from "./common";
@@ -90,7 +90,6 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
     try {
       const result = value(await api(`${minecraftAPI}/install`, json("POST", {...body, request_id: submission.current.id})));
       if (!result?.identifier) throw new Error("The install response did not include a server. Check Overview before retrying.");
-      rememberInstallationPorts(result.identifier, result.ports);
       if (active.current) navigate(`/server/${encodeURIComponent(result.identifier)}/console`);
     } catch (error) {
       if (active.current) setError(error instanceof Error ? error.message : String(error));

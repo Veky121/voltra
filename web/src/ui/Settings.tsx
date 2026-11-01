@@ -3,6 +3,8 @@ import {Field} from '../components/ui/field';
 import './settingsLayout.css';
 import {createContext,useContext,useEffect,useId,useRef,useState,type ComponentProps,type HTMLAttributes,type ReactNode} from 'react';
 import {Switch as ShadcnSwitch} from '../components/ui/switch';
+import {Button} from '../components/ui/button';
+import {Info} from 'lucide-react';
 
 const SettingsLayoutContext=createContext(false);
 export function SettingsLayout({children}:{children:ReactNode}){return <SettingsLayoutContext.Provider value={true}>{children}</SettingsLayoutContext.Provider>;}
@@ -13,10 +15,27 @@ export function SettingsSection({title,action,plain=false,children,className='',
  const heading=useId();
  return <section {...props} data-settings-section="" aria-labelledby={heading} className={`settings-section ${className}`}><header className="settings-section-heading"><h2 id={heading}>{title}</h2>{action}</header><Card data-settings-group={plain?undefined:''} className={plain?'settings-plain':'settings-group'}>{children}</Card></section>;
 }
-type RowProps=Omit<HTMLAttributes<HTMLDivElement>,'title'>&{label:ReactNode;description?:ReactNode;details?:ReactNode;control:ReactNode;children?:ReactNode};
-export function SettingsRow({label,description,details,control,children,className='',...props}:RowProps){
- const heading=useId();
- return <div {...props} data-settings-row="" role="group" aria-labelledby={heading} className={`settings-row ${className}`}><div className="settings-row-layout"><div className="settings-row-copy"><span className="settings-row-label" id={heading}>{label}</span>{description&&<p className="settings-row-description">{description}</p>}{details}</div><div className="settings-row-control">{control}</div></div>{children&&<div className="settings-row-body">{children}</div>}</div>;
+type RowProps=Omit<HTMLAttributes<HTMLDivElement>,'title'>&{label:ReactNode;description?:ReactNode;details?:ReactNode;info?:ReactNode;infoLabel?:string;control:ReactNode;children?:ReactNode;layout?:'inline'|'stacked'};
+export function SettingsRow({label,description,details,info,infoLabel='Setting details',control,children,className='',layout='inline',...props}:RowProps){
+ const heading=useId(),infoId=useId();
+ const [infoOpen,setInfoOpen]=useState(false);
+ const labelElement=<span className="settings-row-label" id={heading}>{label}</span>;
+ return <div {...props} data-settings-row="" data-settings-layout={layout} role="group" aria-labelledby={heading} className={`settings-row ${className}`}>
+  <div className="settings-row-layout">
+   <div className="settings-row-copy">
+    {info ? <div className="settings-row-heading">
+     {labelElement}
+     <Button type="button" variant="ghost" size="icon-sm" className="settings-info-toggle" aria-label={infoLabel} aria-expanded={infoOpen} aria-controls={infoId} onClick={()=>setInfoOpen(open=>!open)}><Info aria-hidden="true"/></Button>
+    </div> : labelElement}
+    {description&&<p className="settings-row-description">{description}</p>}
+    {layout!=='stacked'&&details}
+   </div>
+   <div className="settings-row-control">{control}</div>
+  </div>
+  {info&&<div id={infoId} className="settings-row-info" hidden={!infoOpen}>{info}</div>}
+  {layout==='stacked'&&details&&<div className="settings-row-details">{details}</div>}
+  {children&&<div className="settings-row-body">{children}</div>}
+ </div>;
 }
 // Preserve implicit labels for generated forms, including the select adapter.
 export function SettingsField({label,description,children,className=''}:{label:ReactNode;description?:ReactNode;children:ReactNode;className?:string}){

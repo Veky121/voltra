@@ -1,8 +1,8 @@
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import './games-ui.css';
 import {useEffect, useState} from 'react';
-import {api, Button, ErrorBox, rows, unwrap} from '../lib';
-import {gamePortAddress, gamePortLabel, gamePortSummary, refreshInstallationForwarding, unknownInstallationForwarding, type CurrentProxyRoute, type GamePortPlan} from './gamePortsModel';
+import {api, Button, ErrorBox, unwrap} from '../lib';
+import {gamePortAddress, gamePortLabel, gamePortSummary, type GamePortPlan} from './gamePortsModel';
 import './gamePorts.css';
 
 export function useGamePortPlan(path: string, node: string, environment: Record<string, string | boolean> = {}, enabled = true) {
@@ -39,36 +39,3 @@ export function GamePorts({plan, loading = false, error = '', retry}: {plan?: Ga
   </section>;
 }
 
-const noticeKey = (identifier: string) => `voltra:installation-ports:${identifier}`;
-export function rememberInstallationPorts(identifier: string, plan?: GamePortPlan) {
-  if (!plan) return;
-  try {sessionStorage.setItem(noticeKey(identifier), JSON.stringify(plan));} catch { /* Storage may be disabled. The setup preview still explains ports. */ }
-}
-export function InstallationPortsNotice({identifier}: {identifier: string}) {
-  const [plan, setPlan] = useState<GamePortPlan | null>(() => {
-    try {const stored = sessionStorage.getItem(noticeKey(identifier)); return stored ? unknownInstallationForwarding(JSON.parse(stored)) : null;} catch {return null;}
-  });
-  const hasPlan = plan !== null;
-  useEffect(() => {
-    let active = true, timer: ReturnType<typeof setTimeout>;
-    const controller = new AbortController();
-    let stored: GamePortPlan | null = null;
-    try { const raw = sessionStorage.getItem(noticeKey(identifier)); stored = raw ? JSON.parse(raw) : null; } catch {}
-    setPlan(stored ? unknownInstallationForwarding(stored) : null);
-    if (!stored) return;
-    const refresh = async () => {
-      try {
-        const data = await api(`/api/client/servers/${encodeURIComponent(identifier)}/proxy-routes`,{signal:controller.signal});
-        if (!active) return;
-        setPlan(previous => previous ? refreshInstallationForwarding(previous,rows(data) as CurrentProxyRoute[]) : null);
-      } catch {
-        if (active) setPlan(previous => previous ? unknownInstallationForwarding(previous) : null);
-      }
-      if (active) timer = setTimeout(refresh,5000);
-    };
-    void refresh();
-    return () => {active=false;controller.abort();clearTimeout(timer);};
-  },[identifier,hasPlan]);
-  if (!plan) return null;
-  return <div className="installation-ports-notice"><GamePorts plan={plan}/><Button variant="secondary" onClick={() => {try {sessionStorage.removeItem(noticeKey(identifier));} catch {} setPlan(null);}}>Dismiss port details</Button></div>;
-}

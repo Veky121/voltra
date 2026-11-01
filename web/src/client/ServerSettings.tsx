@@ -16,7 +16,7 @@ export default function ServerSettings() {
   const {permissions,server}=useServer();
   const databasesEnabled=Number(server.feature_limits?.databases)>0;
   const root=`/server/${id}/settings`;
-  const tabs=[['','Game settings',''],['network','Network','allocation.read'],...(databasesEnabled?[['databases','Databases','database.read']]:[])];
+  const tabs=[['','Game settings',''],['network','Connections','allocation.read'],...(databasesEnabled?[['databases','Databases','database.read']]:[])];
   return <div className="server-settings-shell">
     <SectionTabs label="Server settings" items={tabs.filter(([, ,permission])=>!permission||can(permissions,permission)).map(([path,label])=>({id:path,label,to:`${root}${path?`/${path}`:''}`,end:!path}))}/>
     <Routes>

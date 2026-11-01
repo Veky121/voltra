@@ -14,7 +14,7 @@ import {memoryMiB, gameInitialNode, gameMemoryBudget, steamMemoryWarning, steamA
 import {useGameRequest} from './useGameRequest';
 import {GameNameField, GameMemoryField, GameNodeField} from './GameSetupFields';
 import './steamGames.css';
-import {GamePorts, useGamePortPlan, rememberInstallationPorts} from './GamePorts';
+import {GamePorts, useGamePortPlan} from './GamePorts';
 
 export function GameHelpLinks({help}: {help: GameHelp[]}) {
   return <div className="game-help">{help.map((item, index) => <div key={`${item.label}-${index}`}><strong>{item.url && /^https?:\/\//.test(item.url) ? <a href={item.url} target="_blank" rel="noreferrer">{item.label} ↗</a> : item.label}</strong>{item.text && <p>{item.text}</p>}</div>)}</div>;
@@ -79,7 +79,6 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
     try {
       const result = unwrap(await api(`/api/client/game-library/steam/${game}/install`, json('POST', {...body, request_id: submission.current.id})));
       if (!result?.identifier) throw new Error('The install response did not include a server. Check Overview before retrying.');
-      rememberInstallationPorts(result.identifier, result.ports);
       navigate(`/server/${encodeURIComponent(result.identifier)}/steam`);
     } catch (error) {setError(error instanceof Error ? error.message : String(error));}
     finally {submitting.current = false; setBusy(false);}

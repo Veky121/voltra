@@ -1,0 +1,6 @@
+.settings-skeleton{border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);overflow:hidden}
+.settings-skeleton>div{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:82px;padding:18px 16px;border-bottom:1px solid var(--ui-divider)}
+.settings-skeleton>div:last-child{border-bottom:0}
+.settings-skeleton-label{width:32%;height:14px}
+.settings-skeleton-control{width:38%;max-width:280px;height:34px}
+@media(prefers-reduced-motion:reduce){.settings-skeleton [data-slot=skeleton]{animation:none}}
