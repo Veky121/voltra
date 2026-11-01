@@ -11,7 +11,7 @@ import './serverStorage.css';
 
 // Backups passes its existing paginated response; other pages use the existing
 // live backup subscription. The API summary always covers every retained page.
-export default function ServerStorageSummary({backupResponse,backupError='',compact=false}:{backupResponse?:any;backupError?:string;compact?:boolean}) {
+export default function ServerStorageSummary({backupResponse,backupError='',compact=false,strip=false}:{backupResponse?:any;backupError?:string;compact?:boolean;strip?:boolean}) {
   const {server,permissions,base}=useServer(),telemetry=useServerTelemetry();
   const readable=can(permissions,'backup.read');
   const request=useAPI(readable&&backupResponse===undefined?`${base}/backups`:null);
@@ -25,6 +25,11 @@ export default function ServerStorageSummary({backupResponse,backupError='',comp
   const countLimit=server.feature_limits?.backups;
   const fileState=storageLimit(files,fileLimit),backupState=storageLimit(count,countLimit,'disabled');
   const size=(value:number|null)=>value===null?'Unavailable':formatBytesGB(value);
+  if(strip)return <section className="file-storage-strip" aria-label="Storage usage"><ResourceSummary label="File storage">
+    <ResourceMetric label="Files" value={<>{size(files)}{fileLimit!==undefined&&fileLimit>0&&<small> / {formatBytesGB(fileLimit)}</small>}</>} percent={fileState.percent} note={['warning','full'].includes(fileState.level)?<span className={`storage-limit storage-limit-${fileState.level}`}>{fileState.message}</span>:null}/>
+    <ResourceMetric label="Backups" value={size(backups?.total_bytes??null)} percent={backupState.percent} note={<span className={`storage-limit storage-limit-${backupState.level}`}>{backups?`${count??'?'} / ${countLimit??'?'} slots${backupState.message?` \u00b7 ${backupState.message}`:''}`:!readable?'Access required':'Unavailable'}</span>}/>
+    <ResourceMetric label="Total" value={size(totals.recorded)} note={totals.incomplete?'Incomplete backup sizes':null}/>
+  </ResourceSummary></section>;
   if(compact)return <Card className="dashboard-panel shadcn-card storage-card" role="region" aria-label="Storage">
     <CardHeader className="dashboard-panel-heading"><CardTitle><div className="chart-heading"><h2>Storage</h2><p className="chart-reading"><strong>{size(totals.recorded)}</strong><span> total</span></p></div></CardTitle></CardHeader>
     <CardContent className="storage-card-body">

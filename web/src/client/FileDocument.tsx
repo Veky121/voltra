@@ -11,7 +11,7 @@ import {commitDraft,discardDraft,isDraftDirty,loadedDraft} from './fileDraft';
 import {EDIT_LIMIT,VIEW_CHUNK,mixedNewlines,previewKind,readBounded,responseSize} from './fileDocumentSupport';
 import './fileDocument.css';
 const FileEditor=lazy(()=>import('./FileEditor'));
-type Props={base:string;path:string;permissions:string[];onClose:()=>void;onDirtyChange?:(dirty:boolean)=>void;navigationGuard:{attention:number;bar:RefObject<HTMLDivElement|null>}};
+type Props={base:string;path:string;permissions:string[];onClose:()=>void;onDelete?:()=>void;deleting?:boolean;onDirtyChange?:(dirty:boolean)=>void;navigationGuard:{attention:number;bar:RefObject<HTMLDivElement|null>}};
 
 async function checkResponse(response:Response){
   if(response.ok)return;
@@ -24,7 +24,7 @@ export default function FileDocument(props:Props){
   return <DocumentSession key={`${props.base}:${props.path}`} {...props}/>;
 }
 
-function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigationGuard}:Props){
+function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirtyChange,navigationGuard}:Props){
   const [draft,setDraft]=useState(()=>loadedDraft(path,''));
   const [loading,setLoading]=useState(true),[opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/FileDocument.tsx'),[notice,setNotice]=useState('');
   const [kind,setKind]=useState<'text'|'image'|'audio'|'video'|'pdf'|'binary'|'large'>(previewKind(path));
@@ -106,6 +106,7 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
   return <section className="file-document" aria-label={`File: ${path}`}>
     <header className="file-document-toolbar"><strong title={path}>{path}</strong><div>
       {readable&&<a className="button secondary" href={download} download={path.split('/').at(-1)}>Download</a>}
+      {onDelete&&can(permissions,'file.delete')&&<Button variant="danger" disabled={busy||loading||dirty||deleting} title={dirty?'Save or discard changes before deleting':`Delete ${path}`} onClick={onDelete}><Icon name="trash"/>Delete</Button>}
       <IconButton type="button" className="file-document-close" aria-label="Close file" title="Close file" onClick={close}><Icon name="close"/></IconButton>
     </div></header>
     <div className="file-document-content">

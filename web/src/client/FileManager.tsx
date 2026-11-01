@@ -1,6 +1,6 @@
+import {confirmAction} from '../ui/ConfirmAction';
 import {transferDestination} from './fileTransferPaths';
 import {useErrorState} from '../notifications/useErrorState';
-import {PageHeading} from '../ui/PageHeading';
 import './gameSwitch.css';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
@@ -22,7 +22,7 @@ import './fileWorkspace.css';
 import './fileMenu.css';
 import './files-ui.css';
 
-type Dialog={kind:'folder'|'new'|'rename'|'move'|'chmod'|'delete'|'pull'|'details';paths:string[];target:string};
+type Dialog={kind:'folder'|'new'|'rename'|'move'|'chmod'|'pull'|'details';paths:string[];target:string};
 export default function FileManager(){const {base,permissions}=useServer();return <Workspace key={base} base={base} permissions={permissions}/>}
 function Workspace({base,permissions}:{base:string;permissions:string[]}){
   const [query,setQuery]=useSearchParams();
@@ -44,7 +44,8 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
   const [dialog,setDialog]=useState<Dialog|null>(null),[name,setName]=useState(''),[url,setURL]=useState(''),[mode,setMode]=useState('644'),[useHeader,setUseHeader]=useState(false),[dragging,setDragging]=useState(false);
   const transfers=useRef<FileTransfersHandle>(null),folderInput=useRef<HTMLInputElement>(null),fileInput=useRef<HTMLInputElement>(null),records=useRef(new Map<string,FileEntry>()),directoryEntries=useRef(new Map<string,FileEntry[]>()),latest=useRef({directory,opened,query,permissions});
   latest.current={directory,opened,query,permissions};
-  const busyRef=useRef(false);
+  const busyRef=useRef(false),active=useRef(true);
+  useEffect(()=>{active.current=true;return()=>{active.current=false}},[]);
   const allowed=(permission:string)=>can(latest.current.permissions,permission);
   const rememberEntries=useCallback((path:string,files:FileEntry[])=>{
     for(const old of directoryEntries.current.get(path)||[])records.current.delete(childPath(path,old.name));
@@ -82,30 +83,41 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
         case 'rename':await api(`${base}/files/rename`,json('PUT',{root:parentPath(paths[0]),files:[{from:fileName(paths[0]),to:newName(name)}]}));break;
         case 'move':{const target=filePath(name.startsWith('/')?name:`${directory}/${name}`);await api(`${base}/files/rename`,json('PUT',{root:'/',files:paths.map(path=>({from:path.slice(1),to:childPath(target,fileName(path)).slice(1)}))}));break}
         case 'chmod':await api(`${base}/files/chmod`,json('POST',{root:'/',files:paths.map(path=>({file:path.slice(1),mode}))}));break;
-        case 'delete':await api(`${base}/files/delete`,json('POST',{root:'/',files:paths.map(path=>path.slice(1))}));break;
         case 'pull':if(!transfers.current)throw new Error('Transfers are starting. Try again.');await transfers.current.addRemote({url,directory:dialog.target,filename:name||undefined,use_header:useHeader});break;
       }
     },kind==='pull'?`Download queued to ${dialog.target}. Follow its progress in Transfers.`:'Changes saved.');
   }
+  async function deletePaths(paths:string[]){
+    if(!paths.length||busyRef.current||!allowed('file.delete')||(documentDirty&&paths.includes(latest.current.opened||'')))return;
+    const targets=[...paths];
+    if(!await confirmAction({title:targets.length===1?'Delete file?':`Delete ${targets.length} items?`,description:`Permanently delete ${targets.join(', ')}? This cannot be undone.`,confirmLabel:targets.length===1?'Delete file':'Delete items',danger:true}))return;
+    if(!active.current||busyRef.current||!allowed('file.delete'))return;
+    await run(async()=>{
+      await api(`${base}/files/delete`,json('POST',{root:'/',files:targets.map(path=>path.slice(1))}));
+      const current=latest.current.opened;
+      if(current&&targets.some(path=>current===path||current.startsWith(path+'/'))){setRetainedFile(null);navigate(parentPath(current));}
+    },targets.length===1?'File deleted.':'Items deleted.');
+  }
   const single=selected.length===1?records.current.get(selected[0]):undefined,detail=dialog?.paths[0]?records.current.get(dialog.paths[0]):undefined;
   const menuFile=rowMenu?records.current.get(rowMenu.id):undefined;
   function menuAction(label:string,icon:IconName,action:()=>void,danger=false){return <DropdownMenuItem className={`file-menu-item${danger?' is-danger':''}`} variant={danger?'destructive':'default'} disabled={busy} onClick={()=>{setRowMenu(null);action()}}><Icon name={icon}/>{label}</DropdownMenuItem>}
-  const titles={folder:'Create folder',new:'Create file',rename:'Rename',move:'Move items',chmod:'Unix permissions',delete:'Delete items',pull:'Download from URL',details:'File details'};
+  const titles={folder:'Create folder',new:'Create file',rename:'Rename',move:'Move items',chmod:'Unix permissions',pull:'Download from URL',details:'File details'};
   return <section className="fm-workspace" aria-label="File manager">
-    <header className="fm-heading server-page-toolbar"><PageHeading title={<>Files</>}/>
+    <FileStorageSummary/>
+    <header className="fm-heading server-page-toolbar">
     <div className="fm-actions" role="toolbar" aria-label="File tools">
+      {!opened&&selected.length>0&&allowed('file.delete')&&<Button variant="danger" disabled={busy} onClick={()=>void deletePaths(selected)}><Icon name="trash"/>Delete{selected.length>1?` (${selected.length})`:''}</Button>}
       <Button variant="secondary" disabled={busy} onClick={refresh}><Icon name="restart"/>Refresh</Button>
       {allowed('file.create')&&<><Button variant="secondary" disabled={busy} onClick={()=>show('folder',[])}><Icon name="folderPlus"/>New folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('new',[])}><Icon name="newFile"/>New file</Button><Button onClick={()=>{uploadDirectory.current=destination();fileInput.current?.click()}}><Icon name="upload"/>Upload files</Button><Button variant="secondary" onClick={()=>{uploadDirectory.current=destination();folderInput.current?.click()}}>Upload folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('pull',[])}><Icon name="download"/>From URL</Button></>}
       <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),false,uploadDirectory.current);e.target.value=''}}/>
       <input ref={folderInput} type="file" multiple hidden {...{webkitdirectory:'',directory:''}} aria-label="Choose folder to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),true,uploadDirectory.current);e.target.value=''}}/>
     </div>
     </header>
-    <FileStorageSummary/>
     <PageError error={error}/>{notice&&<p className="fm-notice" role="status">{notice}</p>}
     <div className={`fm-file-layout${opened?' is-editing':''}`} onDragOverCapture={event=>{if(allowed('file.create')&&event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(true)}}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false)}} onDropCapture={event=>{if(event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(false);if(allowed('file.create'))void dropFiles(event.dataTransfer)}}}>
       <FileExplorer base={base} activeFile={opened||''} activeDirectory={directory} dirty={documentDirty} permissions={permissions} onOpen={open} onBrowse={()=>navigate(directory)} onDirectory={navigate} refreshKey={epoch} onEntries={rememberEntries} controls={!opened?{selected,onSelect:path=>setSelected(current=>current.includes(path)?current.filter(id=>id!==path):[...current,path]),onMenu:(id,anchor)=>setRowMenu(current=>current?.id===id?null:{id,anchor})}:undefined}/>
       <div className="fm-file-content" aria-hidden={!opened||undefined} inert={!opened}>
-        {displayedFile&&<div className={`fm-document-pane${!opened?' is-closing':''}`}><FileDocument key={`${base}:${displayedFile}`} base={base} path={displayedFile} permissions={permissions} onClose={()=>navigate(directory)} onDirtyChange={setDocumentDirty} navigationGuard={navigationGuard}/></div>}
+        {displayedFile&&<div className={`fm-document-pane${!opened?' is-closing':''}`}><FileDocument key={`${base}:${displayedFile}`} base={base} path={displayedFile} permissions={permissions} onClose={()=>navigate(directory)} onDelete={allowed('file.delete')?()=>void deletePaths([displayedFile]):undefined} deleting={busy} onDirtyChange={setDocumentDirty} navigationGuard={navigationGuard}/></div>}
       </div>
       {dragging&&<div className="fm-drop">Drop files to add them to the upload queue</div>}
     </div>
@@ -118,7 +130,6 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
       {allowed('file.archive')&&<Button variant="secondary" disabled={busy} onClick={()=>void run(()=>api(`${base}/files/compress`,json('POST',{root:'/',files:selected.map(path=>path.slice(1))})),'Archive created.')}><Icon name="archive"/>Archive</Button>}
       {single&&isArchive(single)&&allowed('file.create')&&<Button variant="secondary" disabled={busy} onClick={()=>void run(()=>api(`${base}/files/decompress`,json('POST',{root:parentPath(selected[0]),file:fileName(selected[0])})),'Archive extracted.')}>Extract</Button>}
       {selected.length===1&&<Button variant="secondary" disabled={busy} onClick={()=>show('details')}>Details</Button>}
-      {allowed('file.delete')&&<Button variant="danger" disabled={busy} onClick={()=>show('delete')}><Icon name="trash"/>Delete</Button>}
       <Button variant="secondary" onClick={()=>setSelected([])}>Clear selection</Button>
     </div>}
     {pendingTransfers&&!documentDirty&&navigationGuard.attention>0&&<div ref={navigationGuard.bar} tabIndex={-1} role="alert" className="fm-notice">Finish or cancel your queued transfers before leaving Files. Folder navigation remains available.</div>}
@@ -131,17 +142,17 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
       {allowed('file.archive')&&menuAction('Archive','archive',()=>{void run(()=>api(`${base}/files/compress`,json('POST',{root:parentPath(rowMenu.id),files:[fileName(rowMenu.id)]})),'Archive created.')})}
       {isArchive(menuFile)&&allowed('file.create')&&menuAction('Extract archive','archive',()=>{void run(()=>api(`${base}/files/decompress`,json('POST',{root:parentPath(rowMenu.id),file:fileName(rowMenu.id)})),'Archive extracted.')})}
       {menuAction('Details','info',()=>show('details',[rowMenu.id]))}
-      {allowed('file.delete')&&<><div className="file-menu-separator" role="separator"/>{menuAction('Delete','trash',()=>show('delete',[rowMenu.id]),true)}</>}
+      {allowed('file.delete')&&<><div className="file-menu-separator" role="separator"/>{menuAction('Delete','trash',()=>void deletePaths([rowMenu.id]),true)}</>}
     </FileMenu>}
     {dialog&&<Modal title={titles[dialog.kind]} onClose={()=>{if(!busy)setDialog(null)}}>
       <PageError error={error}/>
       {dialog.kind==='details'?<dl className="fm-details">{[['Name',detail?.name],['Path',dialog.paths[0]],['Size',detail?.is_file?bytes(Number(detail.size)):'Folder'],['MIME type',detail?.mimetype],['Permissions',detail?.mode_bits],['Symbolic link',detail?.is_symlink?'Yes':'No'],['Modified',date(detail?.modified_at)]].map(([label,text])=><div key={label}><dt>{label}</dt><dd>{String(text||'—')}</dd></div>)}</dl>:<form onSubmit={event=>{event.preventDefault();void submit()}}>
-        {dialog.kind==='delete'?<><p>Delete {dialog.paths.length} selected {dialog.paths.length===1?'item':'items'}? This cannot be undone.</p><ul>{dialog.paths.slice(0,10).map(path=><li key={path}>{path}</li>)}</ul></>:dialog.kind==='chmod'?<Field label="Octal mode"><Input required pattern="[0-7]{3,4}" autoFocus value={mode} onChange={e=>setMode(e.target.value)}/></Field>:<>
+        {dialog.kind==='chmod'?<Field label="Octal mode"><Input required pattern="[0-7]{3,4}" autoFocus value={mode} onChange={e=>setMode(e.target.value)}/></Field>:<>
           {dialog.kind==='pull'&&<Field label="Source URL"><Input required type="url" value={url} onChange={e=>setURL(e.target.value)}/></Field>}
           <Field label={dialog.kind==='move'?'Destination directory':dialog.kind==='pull'?'File name, optional':'Name'}><Input autoFocus required={dialog.kind!=='pull'} value={name} onChange={e=>setName(e.target.value)}/></Field>
           {dialog.kind==='pull'&&<><p>Download to <strong>{dialog.target}</strong>. Progress and errors appear in Transfers.</p><label className="fm-check"><Switch checked={useHeader} onCheckedChange={checked => setUseHeader(checked)}/>Use the filename supplied by the download site</label></>}
         </>}
-        <div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setDialog(null)}>Cancel</Button><Button type="submit" disabled={busy} variant={dialog.kind==='delete'?'danger':'default'}>{busy?'Working…':dialog.kind==='delete'?'Delete':dialog.kind==='pull'?'Download':'Save'}</Button></div>
+        <div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setDialog(null)}>Cancel</Button><Button type="submit" disabled={busy} variant="default">{busy?'Working…':dialog.kind==='pull'?'Download':'Save'}</Button></div>
       </form>}
     </Modal>}
   </section>;

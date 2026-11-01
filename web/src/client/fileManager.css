@@ -134,3 +134,12 @@
 }
 
 .fm-notice[role=alert]{background:color-mix(in srgb,var(--amber) 6%,var(--ui-surface));border-color:color-mix(in srgb,var(--amber) 30%,var(--ui-border));color:var(--amber)}
+
+/* Keep actions attached to the explorer, with storage above them. */
+.fm-workspace>.fm-heading{justify-content:flex-end;margin:8px 0 6px;gap:8px}
+.fm-heading .fm-actions{margin:0;gap:6px}
+.fm-actions .button,.fm-selection .button,.fm-workspace .file-document-toolbar .button{min-height:30px;height:30px;padding:4px 9px;font-size:calc(12px * var(--ui-font-scale,1));gap:6px}
+.fm-actions .button>svg,.fm-workspace .file-document-toolbar .button>svg{width:14px;height:14px;flex-shrink:0}
+.fm-workspace .file-document-toolbar{padding:7px 10px;gap:8px}
+.fm-workspace .file-document-toolbar>div{gap:6px}
+.fm-workspace .file-document-toolbar>div>.file-document-close{flex-basis:28px;min-height:28px;width:28px;height:28px;padding:5px}

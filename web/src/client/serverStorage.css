@@ -19,3 +19,12 @@
 .server-dashboard .storage-card{min-height:188px}
 
 .storage-card .resource-metric-note:empty{display:none}
+
+.file-storage-strip .resource-summary-grid{padding:10px 14px;gap:24px}
+.file-storage-strip .resource-metric{gap:4px;font-size:12px}
+.file-storage-strip .resource-metric-heading,.file-storage-strip .resource-metric-heading strong{font-size:13px}
+.file-storage-strip .resource-metric-note:empty{display:none}
+.file-storage-strip .resource-metric:last-child .resource-meter{display:none}
+.file-storage-strip .storage-limit-full{color:var(--danger,#f38ba8)}
+.file-storage-strip .storage-limit-warning{color:var(--warning,#f4bc72)}
+@media(max-width:700px){.file-storage-strip .resource-summary-grid{gap:10px}}
