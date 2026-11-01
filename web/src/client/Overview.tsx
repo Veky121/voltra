@@ -1,4 +1,7 @@
+import {AdminResourceSummary} from '../admin/FleetSummary';
 import {ResourceSummary,ResourceMetric} from '../ui/ResourceSummary';
+import {queryCacheEpoch} from '../hooks/queryCache';
+import {readOverviewSnapshot,writeOverviewSnapshot} from './overviewSnapshot';
 import {formatMiBGB} from '../resourceUnits';
 import {useErrorState} from '../notifications/useErrorState';
 import {compareServers} from './serverOrder';
@@ -6,7 +9,7 @@ import {Progress} from '../components/ui/progress';
 import {useArtworkLibrary} from './ArtworkProvider';
 import {useEffect,useState,type CSSProperties} from "react";
 import {Link,useSearchParams} from "react-router-dom";
-import {api,Button,Input} from "../lib";
+import {api,Button,Input,useAPI} from "../lib";
 import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
 import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
 import {Icon} from "../Icons";
@@ -26,14 +29,16 @@ type ServerRecord=Record<string,any> & {name?:string;liveState:string;resources?
 const labels:Record<string,string>={running:"Running",offline:"Stopped",stopped:"Stopped",unknown:"Checking",unavailable:"Unavailable",installing:"Installing",starting:"Starting",stopping:"Stopping",suspended:"Suspended",install_failed:"Install failed",reinstall_failed:"Reinstall failed",restoring_backup:"Restoring"};
 
 function useOverview(){
-  const [servers,setServers]=useState<ServerRecord[]>([]),[error,setError]=useErrorState('client/Overview.tsx'),[loading,setLoading]=useState(true);
+  const [servers,setServers]=useState<ServerRecord[]>(()=>readOverviewSnapshot()??[]),[error,setError]=useErrorState('client/Overview.tsx'),[loading,setLoading]=useState(()=>!readOverviewSnapshot());
   useEffect(()=>{
+    const epoch=queryCacheEpoch();
     let active=true,metadataAt=0;
     let stateTimer:ReturnType<typeof setTimeout>,resourceTimer:ReturnType<typeof setTimeout>,flushTimer:ReturnType<typeof setTimeout>|undefined;
     let stateAbort=new AbortController(),resourceAbort=new AbortController();
-    let records:ServerRecord[]=[];
+    let records:ServerRecord[]=readOverviewSnapshot()??[];
     let statePolling=false,resourcePolling=false;
     const generations=new Map<string,object>();
+    for(const server of records)generations.set(server.uuid,{});
     const pending=new Map<string,{generation:object;patch:Partial<ServerRecord>}>();
     const subscriptions=new Map<string,()=>void>(),resourceVersions=new Map<string,number>();
     const statesPath='/api/client?summary=overview&states=1';
@@ -54,21 +59,24 @@ function useOverview(){
       }
     }
     function publish(next:ServerRecord[]){
+      if(!active||epoch!==queryCacheEpoch())return;
       const previous=new Map(records.map(s=>[s.uuid,s]));
       const present=new Set(next.map(s=>s.uuid));
       for(const uuid of generations.keys())if(!present.has(uuid))generations.delete(uuid);
       for(const s of next)if(!generations.has(s.uuid)||previous.get(s.uuid)?.status!==s.status)generations.set(s.uuid,{});
       records=next;
       syncSubscriptions();
+      writeOverviewSnapshot(records,epoch);
       setServers(records);
     }
     function flush(){
       flushTimer=undefined;
-      if(active&&!document.hidden&&pending.size){
+      if(active&&epoch===queryCacheEpoch()&&!document.hidden&&pending.size){
         records=records.map(s=>{
           const update=pending.get(s.uuid);
           return update&&update.generation===generations.get(s.uuid)&&!s.status&&!s.is_installing?{...s,...update.patch}:s;
         });
+        writeOverviewSnapshot(records,epoch);
         setServers(records);
       }
       pending.clear();
@@ -131,7 +139,7 @@ function useOverview(){
           }
           if(!active||controller.signal.aborted)return;
           const previous=new Map(records.map(s=>[s.uuid,s]));
-          publish(all.map(s=>({...s,liveState:s.status||(s.is_installing?'installing':previous.get(s.uuid)?.liveState||'unknown'),resources:previous.get(s.uuid)?.resources})));
+          publish(all.map(s=>({...s,liveState:s.status||(s.is_installing?'installing':previous.get(s.uuid)?.liveState||'unknown'),resources:previous.get(s.uuid)?.resources,resourceError:previous.get(s.uuid)?.resourceError})));
           metadataAt=Date.now();
         }else if(!isLivePathFresh(statesPath)){
           const states=new Map(items(await api('/api/client?summary=overview&states=1',{signal:controller.signal})).map(s=>[s.uuid,s]));
@@ -144,7 +152,10 @@ function useOverview(){
         setError('');
         // Resource workers have their own schedule and never hold up membership/status.
         if(!resourcePolling){clearTimeout(resourceTimer);void collectResources();}
-      }catch(err){if(active&&!controller.signal.aborted)setError(err instanceof Error?err.message:String(err));}
+      }catch(err){if(active&&!controller.signal.aborted){
+        if([401,403,404].includes(Number((err as any)?.status)))publish([]);
+        setError(err instanceof Error?err.message:String(err));
+      }}
       finally{
         statePolling=false;
         if(active){setLoading(false);if(!document.hidden)stateTimer=setTimeout(poll,1000);}
@@ -206,6 +217,8 @@ function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
 }
 export default function Overview(){
   const q=useOverview(),[search,setSearch]=useState("");
+  const account=useAPI('/api/client/account');
+  const administrator=!account.error&&value(account.data)?.root_admin===true;
   const navigation=useServerNavigation(),[params,setParams]=useSearchParams();
   const view=params.get('view');
   const emptySavedView=(view==='favorites'&&!navigation.servers.some(s=>s.favorite))||(view==='recent'&&!navigation.servers.some(s=>s.last_visited_at));
@@ -218,7 +231,7 @@ export default function Overview(){
   filtered.sort(compareServers);
   return <div className="page workspace-page overview-page">
     <h1 className="overview-accessible-title">Servers</h1>
-    <ResourceSummary>{(['cpu','memory','disk'] as const).map(key=>{
+    {administrator?<AdminResourceSummary/>:<ResourceSummary>{(['cpu','memory','disk'] as const).map(key=>{
       const available=q.servers.filter(s=>s.resources&&!s.resourceError);
       const complete=!q.loading&&!q.error&&available.length===q.servers.length;
       const used=available.reduce((total,s)=>total+Number(s.resources?.[key==='cpu'?'cpu_absolute':key==='memory'?'memory_bytes':'disk_bytes']||0),0)/(key==='cpu'?100:1024**2);
@@ -230,7 +243,7 @@ export default function Overview(){
         percent={complete&&!unlimited&&limit>0?used/limit*100:undefined}
         title="Live usage across your accessible servers. Limits are server allocations, not node capacity."
         note={!complete?`Readings from ${available.length}/${q.servers.length} servers`:<>{unlimited?'Unlimited server limits':`${format(limit)} allocated`} {"\u00b7"} {running} online / {q.servers.length} servers</>}/>;
-    })}</ResourceSummary>
+    })}</ResourceSummary>}
     <PageError error={q.error}/>
     {(view==='favorites'||view==='recent')&&<div className="overview-view-heading"><h2>{view==='favorites'?'Favorites':'Recent servers'}</h2><Button variant="secondary" onClick={()=>setParams({})}>Show all servers</Button></div>}
     <div className="overview-search-toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" className="overview-search-input" aria-label="Search servers" placeholder="Find a server or node" value={search} onChange={e=>setSearch(e.target.value)}/></div>{search.trim()&&<Button variant="secondary" onClick={()=>setSearch('')}>Clear search</Button>}</div>

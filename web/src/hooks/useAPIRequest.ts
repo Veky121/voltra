@@ -1,13 +1,13 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 
-import {observeQuery,applyLiveQuery,invalidateQueryCache} from './queryCache';
+import {observeQuery,applyLiveQuery,invalidateQueryCache,readQuerySnapshot} from './queryCache';
 import {observeLivePath,isLivePathFresh} from './liveEvents';
 
 type Request = <T>(path:string,options?:RequestInit)=>Promise<T>;
 type RequestState<T> = {path:string|null;data:T|null;error:string;loading:boolean};
 
 export function useAPIRequest<T>(path:string|null,request:Request) {
-  const [state,setState]=useState<RequestState<T>>({path,data:null,error:'',loading:!!path});
+  const [state,setState]=useState<RequestState<T>>(()=>({path,...(readQuerySnapshot(path,request)??{data:null,error:'',loading:!!path})}));
   const refresh=useRef<()=>void>(()=>{});
   const reload=useCallback(()=>refresh.current(),[]);
   const liveVersion=useRef(0);

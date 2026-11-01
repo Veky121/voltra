@@ -42,7 +42,7 @@
 .game-settings-section .game-setting-managed{margin-left:8px}
 @container(max-width:560px){
  .settings-row[data-settings-row]>.settings-row-layout{grid-template-columns:minmax(0,1fr);gap:10px}
- .settings-row[data-settings-row]:has([role=switch])>.settings-row-layout,.settings-row[data-settings-row]:has([role=checkbox])>.settings-row-layout{grid-template-columns:minmax(0,1fr) auto;gap:16px}
+ .settings-row[data-settings-row]:has(>.settings-row-layout>.settings-row-control :is([role=switch],[role=checkbox]))>.settings-row-layout{grid-template-columns:minmax(0,1fr) auto;gap:16px}
  .settings-row[data-settings-row]>.settings-row-layout>.settings-row-control{justify-content:flex-start}
 }
 @media(max-width:600px){
@@ -67,20 +67,18 @@
 }
 .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:last-child,.app-content .settings-responsive .settings-fields>.settings-field:last-child{border-bottom:0}
 .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:focus-within,.settings-responsive .settings-fields>.settings-field:focus-within{background:var(--ui-hover)}
-.settings-responsive .startup-variable-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
 .settings-responsive .game-folders{max-width:880px}
 @container settings-page (min-width:960px){
  .app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]){grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
  .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:has(textarea),.app-content .settings-responsive .settings-fields>.settings-field:has(textarea){grid-column:1/-1}
  .app-content .settings-responsive .settings-field[data-settings-field]{grid-template-columns:minmax(0,1fr);gap:10px;align-content:center}
  .app-content .settings-responsive .settings-field[data-settings-field]:has([role=switch]){grid-template-columns:minmax(0,1fr) auto}
- .settings-responsive .startup-variable-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @container settings-page (min-width:1200px){
  .app-content .settings-responsive .settings-field[data-settings-field]:not(:has(textarea,[role=switch])){grid-template-columns:minmax(0,1fr) minmax(160px,280px);gap:24px}
 }
 @container settings-page (min-width:1680px){
- .app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]),.settings-responsive .startup-variable-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]){grid-template-columns:repeat(3,minmax(0,1fr))}
  .app-content .settings-responsive .settings-field[data-settings-field]:not(:has(textarea,[role=switch])){grid-template-columns:minmax(0,1fr);gap:10px}
 }
 @media(hover:hover){

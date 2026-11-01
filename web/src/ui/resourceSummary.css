@@ -9,4 +9,5 @@
 .resource-meter [data-slot=progress-indicator]{background:var(--theme-accent-a,var(--accent))}
 .resource-metric:last-child .resource-meter [data-slot=progress-indicator]{background:var(--theme-accent-b,var(--accent))}
 .resource-metric-note{overflow-wrap:anywhere}
+.resource-metric .fleet-warning{color:var(--warning,#f4bc72)}
 @media(max-width:700px){.resource-summary-grid[data-slot=card-content]{grid-template-columns:1fr;gap:18px;padding:16px}}

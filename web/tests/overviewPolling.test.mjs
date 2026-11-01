@@ -7,7 +7,8 @@ const hook=source.slice(source.indexOf('function useOverview()'),source.indexOf(
 const compiled=ts.transpile(hook,{target:ts.ScriptTarget.ES2022});
 const settle=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
 const stats={attributes:{current_state:'running',resources:{cpu_absolute:42}}};
-function harness(count,resource){
+function harness(count,resource,initial){
+ let snapshot=initial;
  let effect,visibility,now=20000,id=0,servers=[],writes=0;
  let states=Array.from({length:count},(_,i)=>({uuid:`u${i}`,identifier:`s${i}`,name:'Original',status:null}));
  const timers=new Map(),requests=[],signals=[];
@@ -18,9 +19,9 @@ function harness(count,resource){
   signals.push(options.signal);
   return resource(path,options.signal);
  };
- const run=new Function('useState','useEffect','api','items','value','document','setTimeout','clearTimeout','Date','useErrorState','observeLivePath','observeLiveNavigation','isLivePathFresh',compiled+';return useOverview();');
+ const run=new Function('useState','useEffect','api','items','value','document','setTimeout','clearTimeout','Date','useErrorState','observeLivePath','observeLiveNavigation','isLivePathFresh','queryCacheEpoch','readOverviewSnapshot','writeOverviewSnapshot',compiled+';return useOverview();');
  let stateIndex=0;
- run(initial=>{const index=stateIndex++;return [initial,value=>{if(index===0){servers=value;writes++;}}];},fn=>effect=fn,api,r=>r.data.map(s=>s.attributes),r=>r.attributes,document,(fn,delay)=>{timers.set(++id,{fn,at:now+delay});return id;},key=>timers.delete(key),{now:()=>now},()=>['',()=>{}],()=>()=>{},()=>()=>{},()=>false);
+ run(initial=>{const index=stateIndex++;if(typeof initial==='function')initial=initial();if(index===0)servers=initial;return [initial,value=>{if(index===0){servers=value;writes++;}}];},fn=>effect=fn,api,r=>r.data.map(s=>s.attributes),r=>r.attributes,document,(fn,delay)=>{timers.set(++id,{fn,at:now+delay});return id;},key=>timers.delete(key),{now:()=>now},()=>['',()=>{}],()=>()=>{},()=>()=>{},()=>false,()=>0,()=>snapshot,value=>snapshot=value);
  const cleanup=effect();
  return {requests,signals,timers,cleanup,get servers(){return servers;},get writes(){return writes;},setStates(value){states=value;},get states(){return states;},
   async advance(ms){const end=now+ms;await settle();while(true){const next=[...timers.entries()].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;now=next[1].at;timers.delete(next[0]);next[1].fn();await settle();}now=end;await settle();},
@@ -80,4 +81,16 @@ test('metadata retains slower cadence and resources publish as a batch',async()=
  await h.advance(1000);
  assert.equal(h.requests.filter(p=>p.includes('per_page=100')).length,2);
  h.cleanup();await settle();assert.equal(h.timers.size,0);
+});
+
+test('returning to the list retains known status and readings while refreshing membership',async()=>{
+ const cached=[{uuid:'u0',identifier:'s0',name:'Original',status:null,liveState:'running',resources:{cpu_absolute:42}}];
+ const h=harness(1,()=>new Promise(()=>{}),cached);
+ assert.equal(h.servers[0].liveState,'running');
+ await h.advance(0);
+ assert.equal(h.servers[0].liveState,'running');
+ assert.equal(h.servers[0].resources.cpu_absolute,42);
+ assert.equal(h.requests.filter(p=>p.includes('per_page=100')).length,1);
+ h.setStates([]);await h.advance(1000);assert.equal(h.servers.length,0);
+ h.cleanup();
 });

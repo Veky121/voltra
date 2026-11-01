@@ -1,4 +1,4 @@
-import {ResourceSummary,ResourceMetric} from '../ui/ResourceSummary';
+import {Capacity,FleetSummary} from './FleetSummary';
 import FleetCPU,{FleetCPUProvider} from './FleetCPU';
 import {useState} from 'react';
 import {Link} from 'react-router-dom';
@@ -17,13 +17,6 @@ type RecordData = Record<string, any>;
 const nodeID = (s: RecordData) => String(s.node_id ?? s.node);
 const limit = (s: RecordData, key: string) => Number(s.limits?.[key] ?? s[key] ?? 0);
 
-function Capacity({label, capacity, allocated, unlimited}: {label:string;capacity:number;allocated:number;unlimited:boolean}) {
-  const free = Math.max(0, capacity - allocated);
-  return <ResourceMetric label={label} value={<>{formatMiBGB(free)} <small>free</small></>} percent={allocated/Math.max(capacity,1)*100}
-    title="Configured capacity minus allocations; not live usage. Excludes over-allocation."
-    note={<>{formatMiBGB(allocated)} allocated / {formatMiBGB(capacity)}{allocated>capacity&&<span className="fleet-warning"> {"\u00b7"} {formatMiBGB(allocated-capacity)} over capacity</span>}{unlimited&&<span className="fleet-warning"> {"\u00b7"} Unlimited limits</span>}</>}/>;
-}
-
 export default function Overview() {
   const servers = useAPI('/api/application/servers?per_page=100');
   const nodes = useAPI('/api/application/nodes?per_page=100');
@@ -31,10 +24,8 @@ export default function Overview() {
   const list: RecordData[] = servers.data ? rows(servers.data) : [];
   const hosts: RecordData[] = nodes.data ? rows(nodes.data) : [];
   const ready = !servers.loading && !nodes.loading && !servers.error && !nodes.error;
-  const total = (key:string) => hosts.reduce((sum,n) => sum + Number(n[key] ?? 0),0);
-  const reserved = (key:string) => hosts.reduce((sum,n) => sum + Number(n.allocated_resources?.[key] ?? 0),0);
   const matches = (s:RecordData) => `${s.name} ${s.identifier ?? ''}`.toLowerCase().includes(search.trim().toLowerCase());
-  const capacity = (host?:RecordData) => (['memory','disk'] as const).map(key => <Capacity key={key} label={key === 'memory' ? 'Memory' : 'Storage'} capacity={host ? Number(host[key]) : total(key)} allocated={host ? Number(host.allocated_resources?.[key] ?? 0) : reserved(key)} unlimited={list.some(s => (!host || nodeID(s) === String(host.id)) && limit(s,key) === 0)}/>);
+  const capacity = (host:RecordData) => (['memory','disk'] as const).map(key => <Capacity key={key} label={key === 'memory' ? 'Memory' : 'Storage'} capacity={Number(host[key])} allocated={Number(host.allocated_resources?.[key] ?? 0)} unlimited={list.some(s => nodeID(s) === String(host.id) && limit(s,key) === 0)}/>);
   function serverRows(items:RecordData[]) {
     return <><div className="fleet-columns" aria-hidden="true"><span>Server</span><span>Memory limit</span><span>Storage limit</span><span>State</span><span/></div>
       <ItemGroup className="fleet-servers">{items.filter(matches).sort((a,b)=>String(a.name).localeCompare(String(b.name),undefined,{numeric:true,sensitivity:'base'})).map(s => <Item size="xs" className="fleet-server" key={s.id} render={<Link to={`/server/${s.identifier || s.uuid}`}/>}>
@@ -47,7 +38,7 @@ export default function Overview() {
   return <FleetCPUProvider nodes={hosts as {id:number|string}[]} servers={list}><div className="admin-fleet">
     <ErrorMessage error={servers.error || nodes.error}/>
     {!ready ? (servers.error || nodes.error ? <p role="status">Unavailable</p> : <Skeleton className="scn:h-24 scn:w-full" aria-label="Loading infrastructure" role="status"/>) : <>
-      <ResourceSummary label="CPU usage and node capacity"><FleetCPU nodes={hosts as {id:number|string}[]} servers={list}/>{capacity()}</ResourceSummary>
+      <FleetSummary nodes={hosts} servers={list}/>
       <div className="fleet-toolbar"><h2>Nodes & servers</h2><Input type="search" aria-label="Search servers" placeholder="Find a server" value={search} onChange={e=>setSearch(e.target.value)}/></div>
       {!hosts.length && <p className="muted">No nodes. <Button variant="link" render={<Link to="/admin/nodes"/>}>Manage nodes</Button></p>}
       {hosts.map(n => {

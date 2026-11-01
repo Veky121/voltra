@@ -4,6 +4,12 @@ type Entry = {path:string;request:QueryRequest;state:Snapshot;expires:number;lis
 const entries=new Map<string,Entry>();
 let epoch=0;
 let sessionScope:unknown;
+/** In-memory view state must be fenced by the same authentication boundary as reads. */
+export function queryCacheEpoch(){return epoch;}
+export function readQuerySnapshot(path:string|null,request:QueryRequest){
+  const entry=path?entries.get(path):undefined;
+  return entry?.request===request?entry.state:undefined;
+}
 /** Pass a stable account/session identity on every session refresh. */
 export function setQueryCacheScope(scope:unknown){if(!Object.is(scope,sessionScope)){sessionScope=scope;purgeQueryCache();}}
 export function normalizedQueryPath(path:string):string {
@@ -15,6 +21,7 @@ export function queryTTL(path:string):number {
   if(/^\/api\/client\/(account|settings)$/.test(path))return 15000;
   if(/^\/api\/client\/servers\/[^/?#]+\/files\/list\?directory=[^#]*$/.test(path))return 2000;
   if(/^\/api\/(admin|application)\/locations(?:\?[^#]*)?$/.test(path))return 15000;
+  if(/^\/api\/application\/(nodes|servers)\?per_page=100$/.test(path))return 5000;
   if(/^\/api\/client(?:\?[^#]*)?$/.test(path))return 5000;
   if(/^\/api\/client\/servers\/[^/?#]+$/.test(path))return 5000;
   if(/^\/api\/client\/game-library\/(templates|steam)(?:\?[^#]*)?$/.test(path))return 30000;

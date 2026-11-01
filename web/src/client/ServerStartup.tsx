@@ -1,6 +1,6 @@
 import {useErrorState} from '../notifications/useErrorState';
 import {Checkbox} from '../components/ui/checkbox';
-import {SettingsSection as PreferenceSection} from '../ui/Settings';
+import {SettingsSection as PreferenceSection, SettingsRow} from '../ui/Settings';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {settingDescription} from './settingDescription';
 import {PendingSettings, usePendingSetting} from './PendingSettings';
@@ -73,16 +73,13 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
   }
 
   usePendingSetting(variable.env_variable, dirty, {blocked: !!problem || !editable || busy, save: () => save(clear ? 'clear' : 'save'), discard: () => {setDraft(baseline); setClear(false); setError('');}});
-  return <div className={`startup-variable${dirty ? ' is-dirty' : ''}`} aria-label={label} aria-busy={busy}>
-    <div className="startup-variable-heading">
+  return <SettingsRow className={`startup-variable${dirty ? ' is-dirty' : ''}`} aria-label={label} aria-busy={busy} label={<span className="startup-variable-heading">
       <label htmlFor={id}>{label}</label><code className="startup-variable-key">{variable.env_variable}</code>
-      <div className="startup-badges">
+      <span className="startup-badges">
         {!editable && <span className="badge">Read-only</span>}
         {dirty && <span className="startup-pending">Unsaved</span>}
-      </div>
-    </div>
-    {variable.description && <p className="muted startup-description">{settingDescription(variable.description)}</p>}
-    <div className="startup-control-row">
+      </span>
+    </span>} description={variable.description ? settingDescription(variable.description) : undefined} control={<>
       {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy} aria-describedby={problem ? `${id}-help` : undefined} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
         {!control.options.includes(draft) && <option value={draft}>{draft || 'Choose a value'}</option>}
         {!control.required && draft !== '' && <option value="">Empty</option>}
@@ -93,13 +90,13 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
         placeholder={secret ? configured ? 'Configured. Leave blank to keep unchanged.' : 'Leave blank to keep unchanged.' : undefined}
         aria-describedby={problem ? `${id}-help` : undefined} aria-invalid={!!problem}
         onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }} />}
-    </div>
+    </>}>
     {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><Checkbox checked={clear} disabled={busy} onCheckedChange={checked => {setClear(checked); setDraft('');}}/> Clear saved value</label>}
     {problem && <p id={`${id}-help`} className="startup-validation" role="alert">{problem}</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {success && <p role="status" className="success">{success}</p>}
     <Disclosure className="startup-field-details"><DisclosureTrigger>Details</DisclosureTrigger><p>Rules: {variable.rules || 'None'}</p><p>Default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p></Disclosure>
-  </div>;
+  </SettingsRow>;
 
 }
 
@@ -175,7 +172,7 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
   const options = <>
     <PreferenceSection className="startup-variables" title={section === 'game' ? 'Game options' : 'Installation & startup options'}>
       {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}
-      <div className="startup-variable-grid">{variables.filter(variable=>!licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
+      <div className="game-properties-grid">{variables.filter(variable=>!licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
     </PreferenceSection>
   </>;
   return <section className="startup-settings games-ui">
