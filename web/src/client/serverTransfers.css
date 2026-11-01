@@ -1,0 +1,23 @@
+.server-transfer-dock{position:fixed;bottom:16px;right:20px;z-index:90;width:min(480px,calc(100vw - 40px));background:var(--ui-surface,var(--card));border:1px solid var(--ui-border);border-radius:var(--ui-card-radius,12px);box-shadow:0 6px 28px #0005;overflow:hidden;font-size:13px}
+.server-transfer-heading{display:flex;gap:8px;align-items:center;padding:8px}
+.server-transfer-heading>button:first-child{flex:1;justify-content:flex-start;min-width:0}
+.server-transfer-heading>button:first-child>span:last-child{margin-left:auto}
+.server-transfer-heading>button:first-child>span:not(.server-transfer-pulse){color:var(--muted);font-size:12px}
+.server-transfer-list{max-height:min(420px,50vh);overflow:auto;border-top:1px solid var(--ui-border)}
+.server-transfer-help{padding:10px 12px;margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.server-transfer-row{display:flex;flex-direction:column;gap:8px;padding:12px;border-top:1px solid var(--ui-border)}
+.server-transfer-title,.server-transfer-meta,.server-transfer-actions{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.server-transfer-title strong{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.server-transfer-title>span{flex-shrink:0}
+.server-transfer-meta{font-size:12px;color:var(--muted);flex-wrap:wrap;overflow-wrap:anywhere}
+.server-transfer-row small{color:var(--muted)}
+.server-transfer-failure{margin:0;color:var(--destructive,var(--red));overflow-wrap:anywhere}
+.server-transfer-refresh{padding:12px;color:var(--muted)}
+.server-transfer-pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:server-transfer-pulse 1.4s ease-in-out infinite}
+.server-transfer-indeterminate [data-slot=progress-indicator]{width:35%;animation:server-transfer-travel 1.6s ease-in-out infinite}
+body:has(.settings-pending-bar) .server-transfer-dock{bottom:100px}
+.server-page:has(.server-transfer-dock){padding-bottom:90px}
+@keyframes server-transfer-pulse{50%{opacity:.35}}
+@keyframes server-transfer-travel{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
+@media(prefers-reduced-motion:reduce){.server-transfer-pulse,.server-transfer-indeterminate [data-slot=progress-indicator]{animation:none}.server-transfer-row [data-slot=progress-indicator]{transition:none}}
+@media(max-width:600px){.server-transfer-dock{bottom:12px;right:12px;width:calc(100vw - 24px)}body:has(.settings-pending-bar) .server-transfer-dock{bottom:136px}.server-transfer-title{align-items:flex-start}}

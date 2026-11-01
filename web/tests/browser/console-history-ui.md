@@ -1,24 +1,29 @@
 # Console history browser verification
 
-Run `node tests/browser/console-history-server.mjs`, then open
-`http://127.0.0.1:5197/tests/browser/console-history-ui.html`.
-The fixture renders the actual Terminal with an isolated ServerContext; every
-API request fails locally. No backend, game, or command is involved.
+The isolated fixture renders the real Terminal with ServerContext. API requests
+are blocked; no game, command, or live service is involved.
 
-`window.consoleFixture.replace(100000)` renders all100,000 rows. Verified in
-the T3 browser:3.240s initial render, first line000000 and last line099999.
-Create a native DOM Range from line0 through line4000, dispatch selectionchange,
-and scroll the output. The selected text is232,020 characters. Record the
-first row Node, Selection.toString(), and scrollTop. Append1,000 lines with
-`window.consoleFixture.append(...)`: all three remain identical, all100,000
-rows stay mounted, and the toolbar says Selection held. Observed143ms update.
-Remove the selection and dispatch selectionchange: current history resumes
-at line001000 and ends at the new output999, with100,000 retained rows.
+Current behavior:
 
-Additional manual checks: dragging over text pauses follow; scrolling up pauses
-follow; scrolling to the bottom or Resume auto-scroll resumes it. Copy uses
-plain retained output, and Save console log downloads the same history.
-The model tests verify limits, immutable chunk identity, ANSI state, and clear.
+- Retain the newest 5,000 lines, bounded by 2,097,152 UTF-16 characters, or 4 MiB
+  of text. The replay overlap buffers use the same limits.
+- Render the viewport plus 40 lines on either side. The full retained buffer
+  remains available to Copy console output and Save console log.
+- Hold the history snapshot and keep the selection anchor mounted while a
+  selection exists. Scrolling can expand that rendered range until selection
+  is released. Resume auto-scroll returns to the current buffer and tail.
 
-This is DOM Range/scroll proof, not a native OS clipboard or prolonged physical
-mouse-drag acceptance claim. The console does not virtualize or recycle rows.
+Verified with an offline headless Edge fixture on 2026-11-01:
+
+- Loading 6,000 lines retains lines 1,000 through 5,999 and mounts fewer than
+  150 rows at the tested viewport size.
+- Copy returns all 5,000 retained lines, including offscreen output.
+- Scrolling upward pauses auto-scroll. A DOM Range survives scrolling away
+  and appending new output, and its original anchor stays mounted.
+- Resume shows the latest output and returns to a bounded rendering window.
+- Download includes the full current retained log. Clear empties the view.
+- No page errors occurred.
+
+These are synthetic browser checks. Native OS clipboard access, prolonged
+physical mouse dragging, and the installed desktop app have not been verified.
+The previous 100,000-row acceptance receipt describes superseded behavior.

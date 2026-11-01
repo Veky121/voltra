@@ -2,14 +2,15 @@ import {confirmAction} from '../ui/ConfirmAction';
 import {IconButton} from '../ui/IconButton';
 import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuItem} from '../components/ui/dropdown-menu';
 import {requestServerPower} from './serverPower';
-import {memo,useEffect,useRef,useState} from 'react';
+import {memo,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import {consoleViewport,consoleViewportChunks,type ConsoleRange} from './consoleViewport';
 import {Icon} from '../Icons';
 import {can,Notice,useAction,useServer} from './common';
-import {CONSOLE_HISTORY_LINES,consoleHistoryText,type ConsoleHistory,type ConsoleHistoryChunk} from './consoleHistory';
+import {CONSOLE_HISTORY_LINES,CONSOLE_HISTORY_CHARACTERS,consoleHistoryText,type ConsoleHistory,type ConsoleHistoryChunk} from './consoleHistory';
 import {stripConsoleControls} from './consoleOutput';
 
 const HistoryChunk=memo(function HistoryChunk({chunk}:{chunk:ConsoleHistoryChunk}){
-  return <>{chunk.lines.map(line=><span key={line.id} className={`console-line console-level-${line.formatted.level}`}>{line.formatted.segments.map((segment,i)=><span key={i} style={segment.style}>{segment.text}</span>)}{'\n'}</span>)}</>;
+  return <>{chunk.lines.map(line=><span key={line.id} className={`console-line console-level-${line.formatted.level}`}>{line.formatted.segments.map((segment,i)=><span key={i} style={segment.style}>{segment.text}</span>)}</span>)}</>;
 });
 
 export default function Terminal({history:logHistory,status,connection,busy,onClear,onSend}:{history:ConsoleHistory;status:string;connection:string;busy:boolean;onClear:()=>void;onSend:(command:string,done:()=>void)=>void}){
@@ -21,12 +22,23 @@ export default function Terminal({history:logHistory,status,connection,busy,onCl
   const historyIndex=useRef(-1),draft=useRef('');
   const [heldHistory,setHeldHistory]=useState<ConsoleHistory|null>(null);
   const currentHistory=useRef(logHistory),pointerSelecting=useRef(false);
+  const selectionWindow=useRef<ConsoleRange|null>(null);
+  const [viewport,setViewport]=useState({top:0,height:400,lineHeight:20.8});
   currentHistory.current=logHistory;
   const displayed=heldHistory??logHistory;
+  const range=consoleViewport(displayed.count,viewport.top,viewport.height,viewport.lineHeight,heldHistory?selectionWindow.current:null);
+  const currentRange=useRef(range);currentRange.current=range;
+  const visibleChunks=useMemo(()=>consoleViewportChunks(displayed,range),[displayed,range.start,range.end]);
+  const measureViewport=()=>{
+    const element=output.current;if(!element)return;
+    const next={top:element.scrollTop,height:element.clientHeight,lineHeight:parseFloat(getComputedStyle(element).lineHeight)||20.8};
+    setViewport(old=>old.top===next.top&&old.height===next.height&&old.lineHeight===next.lineHeight?old:next);
+  };
+  useLayoutEffect(()=>{measureViewport();const observer=new ResizeObserver(measureViewport);if(output.current)observer.observe(output.current);return()=>observer.disconnect()},[]);
   useEffect(()=>{pointerSelecting.current=false;setHeldHistory(null);setAutoScroll(true)},[base]);
   const working=busy||action.busy,running=status==='running';
   const plainLog=()=>stripConsoleControls(consoleHistoryText(displayed));
-  useEffect(()=>{if(autoScroll&&!heldHistory&&output.current)output.current.scrollTop=output.current.scrollHeight},[displayed,autoScroll,heldHistory]);
+  useLayoutEffect(()=>{if(autoScroll&&!heldHistory&&output.current){output.current.scrollTop=output.current.scrollHeight;measureViewport()}},[displayed,autoScroll,heldHistory]);
   useEffect(()=>{
     const selectionInOutput=()=>{
       const selection=window.getSelection();
@@ -35,8 +47,8 @@ export default function Terminal({history:logHistory,status,connection,busy,onCl
     };
     const syncSelection=()=>{
       if(pointerSelecting.current)return;
-      if(selectionInOutput()){setHeldHistory(old=>old??currentHistory.current);setAutoScroll(false)}
-      else setHeldHistory(null);
+      if(selectionInOutput()){selectionWindow.current??=currentRange.current;setHeldHistory(old=>old??currentHistory.current);setAutoScroll(false)}
+      else {selectionWindow.current=null;setHeldHistory(null)}
     };
     const releasePointer=()=>{pointerSelecting.current=false;syncSelection()};
     document.addEventListener('selectionchange',syncSelection);
@@ -74,7 +86,7 @@ export default function Terminal({history:logHistory,status,connection,busy,onCl
           <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen} modal={false}>
             <DropdownMenuTrigger render={<IconButton className="console-icon-button" aria-label="More console tools" title="More console tools"/>}><Icon name="more"/></DropdownMenuTrigger>
             <DropdownMenuContent className="console-dropdown" align="end">
-              <p className="console-history-budget">{logHistory.count.toLocaleString()} / {CONSOLE_HISTORY_LINES.toLocaleString()} lines | up to 32 MiB</p>
+              <p className="console-history-budget">{logHistory.count.toLocaleString()} / {CONSOLE_HISTORY_LINES.toLocaleString()} lines | up to {CONSOLE_HISTORY_CHARACTERS*2/1024**2} MiB</p>
               <DropdownMenuItem disabled={!displayed.count} onClick={saveLog}><Icon name="download"/>Save console log</DropdownMenuItem>
               {can(permissions,'control.stop')&&<DropdownMenuItem className="console-force-stop" disabled={working||!['running','starting','stopping'].includes(status)} onClick={async ()=>{
                 if(await confirmAction({title:"Force stop?",description:'Immediately kill the server process? Unsaved data may be lost.',confirmLabel:"Force stop",danger:true}))void action.run(()=>requestServerPower(base,'kill'),()=>action.setSuccess('Force stop requested.'));
@@ -84,7 +96,7 @@ export default function Terminal({history:logHistory,status,connection,busy,onCl
         </div>
       </div>
       <div className="console-terminal-body">
-        <pre ref={output} className="console-output" aria-label="Server console output" tabIndex={0} onPointerDown={event=>{if(event.button===0){pointerSelecting.current=true;setHeldHistory(old=>old??logHistory);setAutoScroll(false)}}} onScroll={()=>{const element=output.current;if(element&&!pointerSelecting.current&&!heldHistory)setAutoScroll(element.scrollHeight-element.scrollTop-element.clientHeight<32)}}>{displayed.count?displayed.chunks.map(chunk=><HistoryChunk key={chunk.id} chunk={chunk}/>):'Waiting for console output…'}</pre>
+        <pre ref={output} className="console-output" aria-label="Server console output" tabIndex={0} onPointerDown={event=>{if(event.button===0){selectionWindow.current=currentRange.current;pointerSelecting.current=true;setHeldHistory(old=>old??logHistory);setAutoScroll(false)}}} onScroll={()=>{measureViewport();const element=output.current;if(element&&!pointerSelecting.current&&!heldHistory)setAutoScroll(element.scrollHeight-element.scrollTop-element.clientHeight<32)}}>{displayed.count?<><span className="console-spacer" aria-hidden="true" style={{height:range.start*viewport.lineHeight}}/>{visibleChunks.map(chunk=><HistoryChunk key={chunk.id} chunk={chunk}/>)}<span className="console-spacer" aria-hidden="true" style={{height:(displayed.count-range.end)*viewport.lineHeight}}/></>:'Waiting for console output…'}</pre>
       </div>
       {server.console_input_supported===false?<div className="console-readonly">This launcher provides logs only. Use Game settings and the power controls to manage the server.</div>:can(permissions,'control.console')?<form className="console-command-bar" onSubmit={event=>{
         event.preventDefault();

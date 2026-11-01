@@ -49,6 +49,9 @@ func farmingSimulatorTemplate() gameTemplate {
 	if err != nil {
 		panic(err)
 	}
+	reporterDigest := sha256.Sum256([]byte(gameOperationReporter))
+	reporterDelimiter := "VOLTRA_" + hex.EncodeToString(reporterDigest[:])
+	script += fmt.Sprintf("mkdir -p '.voltra/scripts'\ncat > '.voltra/scripts/operation-report.mjs' <<'%s'\n%s\n%s\n", reporterDelimiter, gameOperationReporter, reporterDelimiter)
 	script += "echo 'FS25 prepared. Start from Console to download and activate your licensed game.'\n"
 	egg["startup"] = "bash .voltra/fs25/start.sh"
 	egg["docker_images"] = M{"WineHQ 11 (pinned)": "ghcr.io/nn-home-com/farming-simulator-25-egg@sha256:10073fd00ab197e36c45dd8af94ca297c04ae2a4288d4b3bd65c16aa468b8dc8"}

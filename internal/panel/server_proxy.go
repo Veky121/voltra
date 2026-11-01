@@ -1,6 +1,9 @@
 package panel
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
 
 // Server-local setup uses the same durable routes and tested clients as library
 // installation. It never edits allocations or guesses protocols for unknown games.
@@ -40,7 +43,12 @@ func (a *App) serverProxySetup(w http.ResponseWriter, r *http.Request) {
 		}
 		route, err := a.createSelectedGameFRPRoute(ctx, M{"id": server["node_id"]}, server, str(assigned["ip"]), num(assigned["port"]), protocol, client, public)
 		if err != nil {
-			fail(w, proxyConflict(err.Error()))
+			var known *APIError
+			if errors.As(err, &known) {
+				fail(w, known)
+			} else {
+				fail(w, proxyConflict(err.Error()))
+			}
 			return
 		}
 		writeJSON(w, 200, item("proxy_route", M{"id": route["id"], "gateway_id": route["gateway_id"], "public_host": route["public_host"], "public_port": route["public_port"], "protocol": route["protocol"], "status": route["status"]}))

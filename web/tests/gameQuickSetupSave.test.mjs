@@ -42,7 +42,7 @@ function fixture({permissions=['*'], state='offline', reply}={}) {
     './gameSetupModel':model,
     './ServerDashboard':{useServerTelemetry:()=>({state,updated:1,error:''})},
     './GameSettingsFields':{GameSettingsFields:'settings-fields'},
-    './ServerStartup':{}, './useGameRequest':{},
+    './ServerStartup':{}, './useGameRequest':{}, '../ui/Settings':{SettingsSection:'section'},
     './games-ui.css':{}, './steamGames.css':{},
   };
   const module={exports:{}};

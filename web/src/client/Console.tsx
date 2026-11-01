@@ -10,6 +10,7 @@ import {requestServerPower, consolePowerEvent, type ConsolePowerEvent} from './s
 import {appendConsoleHistory, emptyConsoleHistory} from './consoleHistory';
 import {ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS} from './consoleQueue';
 import {ConsoleReplayOverlap} from './consoleReplay';
+import {consoleRunChanged,consoleRunID} from './consoleRun';
 import './console.css';
 import {
   can,
@@ -103,6 +104,7 @@ export default function Console() {
     const overlap = new ConsoleReplayOverlap();
     const savedOverlap = new ConsoleReplayOverlap();
     let cursor = "0", socketReady = false, replayedSaved = false, requestedLiveLogs = false;
+    let runStart:string|undefined,replaceRun=false;
     const showingLive = () => historyMode === "live" || historyMode === "legacy";
     const requestLiveLogs = () => {
       if (socketReady && historyMode === "legacy" && !requestedLiveLogs) {
@@ -116,6 +118,14 @@ export default function Console() {
     const historyPath = `${base}/console-history`;
     let replayPending = false;
     const consumeSaved = (saved: any) => {
+        if(consoleRunChanged(runStart,saved.run_start)){
+          runStart=consoleRunID(saved.run_start)!;
+          cursor='0';replayedSaved=false;replaceRun=true;
+          pendingLines.current.clear();overlap.clear();savedOverlap.clear();
+          return false; // Reload the retained previous tail and new run together.
+        }
+        const nextRun=consoleRunID(saved.run_start);if(nextRun!==null)runStart=nextRun;
+        if(replaceRun){setHistory(emptyConsoleHistory());replaceRun=false}
         historyMode = saved.capture?.connected ? "persistent" : "live";
         if (historyMode === 'persistent') savedOverlap.clear();
         if (saved.reset) {
@@ -142,6 +152,7 @@ export default function Console() {
         replayedSaved = true;
         cursor = saved.cursor;
         setHistoryError("");
+        return true;
     };
     const replay = async (recover = false) => {
       if (!active || replayPending) return;
@@ -156,8 +167,7 @@ export default function Console() {
       try {
         const saved = await api(`${historyPath}?after=${cursor}`, {signal: replayAbort.signal});
         if (!active) return;
-        consumeSaved(saved);
-        if (saved.more) delay = 10;
+        if (!consumeSaved(saved) || saved.more) delay = 10;
       } catch (error) {
         if (!active || replayAbort.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -179,7 +189,7 @@ export default function Console() {
       // cursor detects missed frames without mistaking another server's IDs for gaps.
       if (saved.reset || BigInt(saved.after ?? '0') > BigInt(cursor) || BigInt(saved.head ?? saved.cursor) < BigInt(cursor)) { void replay(true); return; }
       if (BigInt(saved.cursor) < BigInt(cursor)) return;
-      consumeSaved({...saved, data:(saved.data ?? []).filter((entry:any)=>BigInt(entry.id)>BigInt(cursor))});
+      if(!consumeSaved({...saved, data:(saved.data ?? []).filter((entry:any)=>BigInt(entry.id)>BigInt(cursor))}))void replay(true);
     });
     void replay();
     const observeState = (next: string) => {

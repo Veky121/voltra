@@ -92,5 +92,7 @@ test('navigation resets a failed boundary without reloading the document',()=>{
  const boundary=new RouteRecovery({children:'new route',resetKey:'/account'});
  boundary.state={failed:true};boundary.setState=next=>{boundary.state={...boundary.state,...next};};
  boundary.componentDidUpdate({children:'old route',resetKey:'/server/one'});
- assert.equal(boundary.render(),'new route');
+ const rendered=boundary.render();
+ assert.equal(rendered.props.children[1],'new route');
+ assert.equal(rendered.props.children[0].props.hidden,true);
 });

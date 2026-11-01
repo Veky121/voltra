@@ -101,7 +101,7 @@ export function demoResponse(url:URL,method:string,body?:BodyInit|null):Response
   if(section==='websocket')return unavailable('Static demo. Live console and commands are unavailable.',503);
   if(section==='console-history')return json({data:url.searchParams.get('after')==='2'?[]:[{id:'1',event:'panel message',line:'[Demo preview] Static sample output. No game server is connected.',created_at:date},{id:'2',event:'console output',line:`[Demo preview] ${server.name}: ${demoResources(client[1])!.current_state}`,created_at:date}],cursor:'2',more:false,capture:{connected:false},limits:{lines:5000}});
   if(section==='startup')return json({...collection([]),meta:{startup_command:'Demo preview',raw_startup_command:'Demo preview',docker_images:{Demo:'demo-image'},docker_image:'demo-image'}});
-  if(section==='backups')return json(collection([{uuid:`${server.uuid}-backup`,name:'Before update',is_successful:true,is_locked:false,bytes:268435456,created_at:date,completed_at:date}]));
+  if(section==='backups')return json({...collection([{uuid:`${server.uuid}-backup`,name:'Before update',is_successful:true,is_locked:false,bytes:268435456,created_at:date,completed_at:date}]),meta:{backup_count:1,storage:{local_bytes:268435456,remote_bytes:0,other_bytes:0,total_bytes:268435456,pending_count:0,failed_count:0}}});
   if(section==='schedules')return json(collection([{id:9301,name:'Daily backup',is_active:true,only_when_online:false,cron:{minute:'0',hour:'4',day_of_month:'*',month:'*',day_of_week:'*'},tasks:[],last_run_at:date,next_run_at:'2026-11-01T04:00:00Z'}]));
   if(['users','activity','databases','proxy-routes'].includes(section))return json(collection([]));
   if(section==='network/allocations')return json(collection([server.allocation]));

@@ -35,7 +35,7 @@ export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
   catch(error){if(error instanceof SyntaxError)throw Object.assign(new Error('The panel returned an invalid JSON response.'),{status:response.status});throw error}
   if(!response.ok){
     const message=typeof data==='object'?(data.errors?.map((e:any)=>e.detail||e.message).join('\n')||data.message||(typeof data.error==='string'?data.error:undefined)):data;
-    throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status});
+    throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status,code:data?.errors?.[0]?.code,requestId:response.headers.get("X-Request-ID")||data?.errors?.[0]?.request_id});
   }
   if(path==='/api/admin/settings'&&options.method&&options.method.toUpperCase()!=='GET')window.dispatchEvent(new Event('panel-settings-changed'));
   if(mutationPath==='/api/auth/session'){setQueryCacheScope(queryCacheSessionIdentity(data));setNotificationScope(queryCacheSessionIdentity(data));}

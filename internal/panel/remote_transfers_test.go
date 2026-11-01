@@ -33,5 +33,7 @@ func TestRemoteTransfersProtocolAndPermission(t *testing.T) {
 	if response.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("cached transfer status")
 	}
-	operationsExpect(t, f.request("GET", f.serverPath("/files/pulls"), nil, f.sub), 403)
+	// Read-only collaborators see progress initiated by the owner.
+	operationsExpect(t, f.request("GET", f.serverPath("/files/pulls"), nil, f.sub), 200)
+	operationsExpect(t, f.request("POST", f.serverPath("/files/pull"), M{"url": "https://example.com/mod.zip"}, f.sub), 403)
 }

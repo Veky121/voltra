@@ -1,22 +1,24 @@
 import {confirmAction} from '../ui/ConfirmAction';
 import {useErrorState} from '../notifications/useErrorState';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
-import {Progress} from '../components/ui/progress';
+import ServerStorageSummary from './ServerStorageSummary';
+import ServerInsights from './ServerInsights';
 import {useTransientMessage} from '../hooks/useTransientMessage';
 import {formatUptime} from './uptime';
 import {formatBytesGB} from '../resourceUnits';
 import {requestServerPower} from './serverPower';
 import type {PowerSignal} from './consoleLifecycle';
-import {advancePowerOperation,beginPowerOperation,powerOperationLabel,type PowerOperation} from './powerOperation';
+import {advancePowerOperation,beginPowerOperation,powerOperationLabel,powerOperationDetail,type PowerOperation} from './powerOperation';
 import {useArtworkLibrary} from './ArtworkProvider';
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useLocation} from 'react-router-dom';
 import {api,Button} from '../lib';
 import {Card,CardHeader,CardTitle,CardDescription,CardAction,CardContent,CardFooter} from '../components/ui/card';
-import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../components/ui/item';
+import {Item,ItemMedia,ItemContent,ItemDescription} from '../components/ui/item';
 import {Icon,type IconName} from '../Icons';
 import {bytes,resourceUsageGB,resourceLimitGB,can,items,PageError,useServer,value} from './common';
 import './serverHeader.css';
+import './powerProgress.css';
 import {ServerConnection} from './ServerConnection';
 import './shadcn-cards.css';
 import './dashboard-ui.css';
@@ -54,8 +56,10 @@ function useTelemetry(base:string,enabled:boolean):Telemetry{
       if(sample.status===200)consume(sample.data);
       else setData({base,value:{...emptyTelemetry(),error:sample.data?.errors?.[0]?.detail||'Live resources unavailable.'}});
     });
+    let forceRead=version>0;
     const stop=visiblePoll(async signal=>{
-      if(isLivePathFresh(path))return;
+      if(!forceRead&&isLivePathFresh(path))return;
+      forceRead=false;
       const generation=liveVersion;
       try{
         const response=await api(path,{signal});
@@ -71,10 +75,10 @@ function useTelemetry(base:string,enabled:boolean):Telemetry{
   return {...(enabled&&data.base===base?data.value:emptyTelemetry()),refresh:()=>setVersion(v=>v+1)};
 }
 
-const PowerContext=createContext<{pending:PowerOperation|null;busy:boolean;error:string;success:string;completedSignal:PowerSignal|null;power:(signal:PowerSignal)=>Promise<void>}>({pending:null,busy:false,error:'',success:'',completedSignal:null,power:async()=>{}});
+const PowerContext=createContext<{pending:PowerOperation|null;busy:boolean;error:string;success:string;completedSignal:PowerSignal|null;power:(signal:PowerSignal)=>Promise<void>;dismissError:()=>void}>({pending:null,busy:false,error:'',success:'',completedSignal:null,power:async()=>{},dismissError:()=>{}});
 
 function usePowerOperation(base:string,telemetry:Telemetry){
-  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useErrorState('client/ServerDashboard.tsx');
+  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useErrorState('client/ServerDashboard.tsx',{transient:true});
   const [success,setSuccess]=useTransientMessage(2000);
   const [completedSignal,setCompletedSignal]=useState<PowerSignal|null>(null);
   const requestInFlight=useRef<PowerOperation|null>(null),operationRef=useRef<PowerOperation|null>(null),active=useRef(true);
@@ -102,12 +106,20 @@ function usePowerOperation(base:string,telemetry:Telemetry){
     }catch(error){if(active.current&&operationRef.current===operation){update(null);setError(error instanceof Error?error.message:String(error))}}
     finally{if(requestInFlight.current===operation)requestInFlight.current=null}
   }
-  return {pending,busy:!!pending&&!pending.accepted,error,success,completedSignal,power};
+  return {pending,busy:!!pending&&!pending.accepted,error,success,completedSignal,power,dismissError:()=>setError('')};
 }
 
 function PowerControls({compact=false}:{compact?:boolean}){
   const {server,permissions}=useServer();
   const telemetry=useContext(TelemetryContext),action=useContext(PowerContext),pending=action.pending;
+  const [clock,setClock]=useState(Date.now());
+  useEffect(()=>{
+    if(!pending)return;
+    setClock(Date.now());
+    const timer=window.setInterval(()=>setClock(Date.now()),1000);
+    return()=>window.clearInterval(timer);
+  },[pending?.requestedAt]);
+  const elapsed=pending?Math.max(0,Math.floor((clock-pending.requestedAt)/1000)):0;
   const running=telemetry.state==='running',starting=telemetry.state==='starting';
   const blocked=!!server.status||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
   const controls:[PowerSignal,string,IconName,string,boolean][]=[
@@ -116,14 +128,20 @@ function PowerControls({compact=false}:{compact?:boolean}){
     ['stop','Stop','stop','control.stop',!running],
     ['kill','Force stop','close','control.stop',!running&&!starting&&telemetry.state!=='stopping'&&!pending],
   ];
+  const unavailableReason=server.is_node_under_maintenance?'The node is under maintenance.':server.status?`Server controls are unavailable while ${String(server.status).replaceAll('_',' ')}.`:telemetry.error?'Server status is unavailable. Check the connection before sending another action.':!telemetry.updated?'Waiting for the first server status update.':'';
   return <div className="server-power">
     <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=>{
       const working=pending?pending.signal===signal:!telemetry.error&&(signal==='start'&&starting||signal==='stop'&&telemetry.state==='stopping');
       const feedback=working?'pending':action.success&&action.completedSignal===signal?'success':'idle';
-      return <Button key={signal} className="server-power-button" data-power={signal} data-feedback={feedback} variant="secondary" aria-label={compact?`${label} server`:undefined} title={working&&pending?powerOperationLabel(pending):signal==='kill'?'Immediately terminate the server process':compact?`${label} server`:undefined} aria-busy={working} disabled={blocked||disabled||action.busy||!!pending&&(signal!=='kill'||pending.signal==='kill')} onClick={()=>void action.power(signal)}><ButtonFeedback state={feedback}><Icon name={icon}/></ButtonFeedback>{!compact&&label}</Button>;
+      return <Button key={signal} className="server-power-button" data-power={signal} data-feedback={feedback} variant="secondary" aria-label={compact?`${label} server`:undefined} title={unavailableReason|| (working&&pending?powerOperationLabel(pending):pending&&signal!=='kill'?'Wait for the current action to finish.':disabled?signal==='start'?'The server is already running or changing state.':'The server must be running for this action.':signal==='kill'?'Immediately terminate the server process':`${label} server`)} aria-busy={working} disabled={blocked||disabled||action.busy||!!pending&&(signal!=='kill'||pending.signal==='kill')} onClick={()=>void action.power(signal)}><ButtonFeedback state={feedback}><Icon name={icon}/></ButtonFeedback>{!compact&&label}</Button>;
     })}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
-    <span className="button-feedback-sr" role="status">{pending?(telemetry.error?'Connection interrupted. Waiting for server status.':powerOperationLabel(pending)):action.success}</span>
-    {action.error&&<div className="error" role="alert">{action.error}</div>}
+    {pending?<div className="server-power-progress">
+      <div role="status" aria-live="polite"><strong>{telemetry.error?'Waiting for connection':powerOperationLabel(pending)}</strong><span className="server-power-elapsed" aria-hidden="true">{elapsed}s</span></div>
+      <p>{powerOperationDetail(pending,elapsed,!!telemetry.error)}</p>
+      {(elapsed>=30||telemetry.error)&&<Button variant="secondary" onClick={telemetry.refresh}>Check status</Button>}
+    </div>:action.success?<p className="server-power-progress" role="status">{action.success}</p>:unavailableReason?<p className="server-power-progress">{unavailableReason}</p>:null}
+    {action.error&&<div className="error server-power-error" role="alert"><span>{action.error}</span><Button variant="secondary" aria-label="Dismiss power action error" onClick={action.dismissError}>Dismiss</Button></div>}
+
   </div>;
 }
 
@@ -219,9 +237,6 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
   const {resources:r,samples,updated}=useServerTelemetry();
   const address=serverAddress(server);
   const limit=(key:string)=>resourceLimitGB(server.limits?.[key]);
-  const cards:{label:string;icon:IconName;value:string;limit?:string}[]=[
-    {label:'Disk',icon:'disk',value:updated?resourceUsageGB(r.disk_bytes):'—',limit:limit('disk')},
-  ];
   const network=samples.slice(1).map((sample,index)=>{
     const previous=samples[index],elapsed=Math.max((sample.at-previous.at)/1000,.001);
     // A restart resets Wings' byte counters. Never display that reset as traffic.
@@ -233,13 +248,8 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
       <UsageChart title="CPU" reading={updated?`${number(r.cpu_absolute).toFixed(2)}%`:'\u2014'} limit={server.limits?.cpu?`${server.limits.cpu}%`:'\u221e'} series={[{name:'CPU',color:'var(--accent)',values:samples.map(s=>s.cpu)}]} maximum={number(server.limits?.cpu)||1} format={n=>`${n<1?n.toFixed(2):n.toFixed(0)}%`}/>
       <UsageChart title="Memory" reading={updated?resourceUsageGB(r.memory_bytes):'\u2014'} limit={limit('memory')} series={[{name:'Memory',color:'var(--theme-accent-b,var(--accent))',values:samples.map(s=>s.memory)}]} maximum={number(server.limits?.memory)*1024**2} format={formatBytesGB}/>
       <UsageChart title="Network" address={address} series={[{name:'In',color:'var(--accent)',values:network.map(s=>s.rx)},{name:'Out',color:'var(--theme-accent-b,var(--muted))',values:network.map(s=>s.tx)}]} maximum={1} format={n=>`${bytes(n)}/s`}/>
-    {cards.map(card=><Card className="metric-card shadcn-card" data-metric={card.icon} key={card.label}>
-      <CardHeader className="metric-header"><CardTitle><h2>{card.label}</h2></CardTitle><CardAction><span className="metric-icon"><Icon name={card.icon}/></span></CardAction></CardHeader>
-      <CardContent className="metric-content"><p className={card.label==='Address'?'metric-address':''} title={`${card.value}${card.limit?` / ${card.limit}`:''}`}><span className="metric-reading">{card.value}</span>{card.limit&&<span className="metric-limit"> / {card.limit}</span>}</p>
-        {card.label==='Disk'?<div className="metric-disk-usage">{updated&&number(server.limits?.disk)>0?<Progress className="overview-meter" aria-label={`Disk usage ${card.value} of ${card.limit}`} value={Math.min(100,number(r.disk_bytes)/(number(server.limits.disk)*1024**2)*100)}/>:<span>{updated?'Current usage':'Waiting for live samples'}</span>}</div>:null}
-      </CardContent>
-      <CardFooter className="metric-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name={card.icon}/></ItemMedia><ItemContent><ItemDescription>{card.limit?'Limit':'Server allocation'}</ItemDescription></ItemContent>{card.limit&&<ItemActions>{card.limit}</ItemActions>}</Item></CardFooter>
-    </Card>)}</div>
+    </div>
+    <ServerStorageSummary/>
     {children}
   </>;
 }
@@ -247,6 +257,7 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
 export default function ServerDashboard({children}:{children?:ReactNode}){
   const {permissions}=useServer();
   return <div className="server-dashboard">
+    <ServerInsights/>
     <ServerResourcePanels>{can(permissions,'control.console')&&children}</ServerResourcePanels>
   </div>;
 }

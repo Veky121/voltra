@@ -1,0 +1,9 @@
+.operation-status-list{display:grid;gap:.4rem;margin-bottom:.65rem}
+.operation-status{border:1px solid var(--border);border-radius:.5rem;padding:.55rem .75rem;font-size:.85rem}
+.operation-status summary{cursor:pointer;display:flex;flex-wrap:wrap;justify-content:space-between;gap:.35rem .75rem}
+.operation-status summary small,.operation-status-details small{color:var(--muted-foreground)}
+.operation-status-details{display:grid;gap:.5rem;margin-top:.65rem;overflow-wrap:anywhere}
+.operation-status-details p{margin:0}
+.operation-status-details button{justify-self:start}
+.operation-status [data-slot=progress]{margin-top:.5rem}
+@media(prefers-reduced-motion:reduce){.operation-status [data-slot=progress-indicator]{transition:none}}

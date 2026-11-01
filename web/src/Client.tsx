@@ -14,6 +14,7 @@ import {NavIcon,type IconName} from "./Icons";
 import {managedSteamServer} from "./client/gameSetupModel";
 import {useServerNavigation} from './ServerNavigation';
 import {isLivePathFresh} from './hooks/liveEvents';
+import {ServerTransfers} from './client/ServerTransfers';
 
 const Account = lazy(() => import("./client/Account").then(module => ({default: module.Account})));
 const Activity = lazy(() => import("./client/Account").then(module => ({default: module.Activity})));
@@ -95,6 +96,7 @@ function Server() {
       value={{ server, permissions, base, reload: r.reload }}
     >
       <div className="page server-page">
+        <ServerTransfers key={server.uuid} base={base} permissions={permissions}>
         <ServerWorkspace key={server.uuid}>
         <PageError error={r.error} />
         {server.is_node_under_maintenance && (
@@ -139,6 +141,7 @@ function Server() {
           <Route path="*" element={<p>Page not found.</p>} />
         </Routes>
         </ServerWorkspace>
+        </ServerTransfers>
       </div>
     </ServerContext.Provider>
   );

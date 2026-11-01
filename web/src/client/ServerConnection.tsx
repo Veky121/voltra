@@ -6,12 +6,13 @@ import {Link} from 'react-router-dom';
 import {useTransientMessage} from '../hooks/useTransientMessage';
 import {Button, Modal, useAPI} from '../lib';
 import {can, items, useServer, value} from './common';
+import {connectionAddress as address, connectionDNS} from './connectionAddress';
 import './serverConnection.css';
-
-function address(host:string,port:unknown){return `${host.includes(':')?`[${host}]`:host}:${port}`;}
+import {useServerTelemetry} from './ServerDashboard';
 
 export function ServerConnection(){
   const {server,base,permissions}=useServer();
+  const telemetry=useServerTelemetry();
   const readable=can(permissions,'allocation.read');
   const query=useAPI(readable?`${base}/proxy-routes`:null);
   const subdomain=useAPI(readable?`${base}/subdomain`:null);
@@ -24,7 +25,7 @@ export function ServerConnection(){
   const domain=primary?.ip_alias||primary?.alias;
   const connection=routes[0]?address(routes[0].public_host,routes[0].public_port):primary?address(primary.ip,primary.port):null;
   const joinDomain=value(subdomain.data);
-  const dnsAddress=joinDomain?.hostname&&joinDomain?.route?address(joinDomain.hostname,joinDomain.route.public_port):domain&&primary?address(domain,primary.port):null;
+  const dnsAddress=connectionDNS(primary?{port:primary.port,ip_alias:primary.ip_alias,alias:primary.alias}:undefined,routes.map(route=>({public_host:route.public_host,public_port:route.public_port})),joinDomain);
   return <div className="server-connection">
     <div className="server-connection-summary">
       <div className="server-connection-addresses">
@@ -35,10 +36,20 @@ export function ServerConnection(){
     </div>
     <span className="server-connection-feedback" role="alert">{copyError}</span>
     {details&&<Modal title="Connection details" onClose={()=>setDetails(false)}><div className="server-connection-details">
+    <p>A running process does not confirm that friends can join.</p>
+    <dl aria-label="Connection checks">
+      <dt>Game process</dt><dd>{!can(permissions,'control.console')?'Console permission required':telemetry.error?'Status unavailable':!telemetry.updated?'Waiting for status':telemetry.state==='running'?'Running':telemetry.state.replaceAll('_',' ')}{telemetry.updated>0&&!telemetry.error&&<small>Updated {new Date(telemetry.updated).toLocaleTimeString()}</small>}</dd>
+      <dt>Local game port</dt><dd>Not checked. Process status does not verify a listening port.</dd>
+      <dt>Forwarding</dt><dd>{!readable?'Allocation permission required':query.error?'Status unavailable':query.loading?'Reading configuration...':routes.some(route=>route.status==='applied')?'Route applied at its last recorded check':routes.length?'Configured, application not confirmed':'No proxy route for the primary port'}</dd>
+      <dt>External reachability</dt><dd>Not checked. No external connection test has run.</dd>
+    </dl>
+    <Button variant="secondary" disabled={query.loading||subdomain.loading||!readable&&!can(permissions,'control.console')} onClick={()=>{if(readable){query.reload();subdomain.reload()}if(can(permissions,'control.console'))telemetry.refresh()}}>Refresh connection status</Button>
+    <p className="muted">Refresh reads process status and saved forwarding configuration. It does not probe the game port or the public address.</p>
     <dl>
       {readable&&<><dt>Proxy</dt><dd>{query.loading?'Checking...':query.error?'Unable to check':routes.length?'Configured':'Primary port is not proxied'}{!query.loading&&!query.error&&<Link className="button secondary" to={`/server/${server.identifier||server.uuid}/settings/network`} onClick={()=>setDetails(false)}>Manage connections</Link>}{query.error&&<MiraAction type="button" onClick={query.reload}>Retry</MiraAction>}</dd></>}
       {routes.map(route=><div className="server-connection-row" key={route.id}><dt>Proxy address</dt><dd><CopyButton value={address(route.public_host,route.public_port)} onCopyError={setCopyError} title="Copy proxy address">{address(route.public_host,route.public_port)}</CopyButton><span>{String(route.protocol).toUpperCase()} � {route.status}</span></dd></div>)}
       <dt>Node address</dt><dd>{primary?<CopyButton value={address(primary.ip,primary.port)} onCopyError={setCopyError} title="Copy node allocation address; direct reachability is not verified">{address(primary.ip,primary.port)}</CopyButton>:'Not assigned'}</dd>
+      {dnsAddress&&<><dt>DNS address</dt><dd><CopyButton value={dnsAddress} onCopyError={setCopyError} title="Copy configured DNS address">{dnsAddress}</CopyButton></dd></>}
       <dt>Address alias</dt><dd>{domain&&<CopyButton value={address(domain,primary.port)} onCopyError={setCopyError} title="Copy configured allocation alias; DNS is not verified">{address(domain,primary.port)}</CopyButton>}{readable&&<MiraAction type="button" onClick={()=>setDNS(true)}>Setup guide</MiraAction>}{!domain&&!readable&&'Not configured'}</dd>
       {readable&&<ServerSubdomain onCopyError={setCopyError}/>}
       <dt>Server ID</dt><dd><CopyButton value={server.uuid} onCopyError={setCopyError} title="Copy server UUID">{server.uuid}</CopyButton></dd>

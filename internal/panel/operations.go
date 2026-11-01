@@ -812,7 +812,7 @@ func (a *App) clientBackups(w http.ResponseWriter, r *http.Request) {
 	if pages < 1 {
 		pages = 1
 	}
-	result["meta"] = M{"backup_count": count, "pagination": M{"total": len(out), "count": end - start, "per_page": per, "current_page": page, "total_pages": pages, "links": M{}}}
+	result["meta"] = M{"backup_count": count, "storage": backupStorageSummary(rows), "pagination": M{"total": len(out), "count": end - start, "per_page": per, "current_page": page, "total_pages": pages, "links": M{}}}
 	writeJSON(w, 200, result)
 }
 func (a *App) opSetting(ctx context.Context, key string) any {

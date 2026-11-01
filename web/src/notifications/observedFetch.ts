@@ -7,7 +7,7 @@ export async function observedFetch(input:string|URL,options:RequestInit={},expe
  const context=captureErrorContext('HTTP',{endpoint:path,method:options.method||'GET'});
  try{
   const response=await fetch(path,options);
-  if(!response.ok&&!expectedStatuses.includes(response.status))reportPanelError(`Request failed (${response.status}).`,{...context,status:response.status});
+  if(!response.ok&&!expectedStatuses.includes(response.status))reportPanelError(`Request failed (${response.status}).`,{...context,status:response.status,requestId:response.headers.get('X-Request-ID')||undefined});
   else if(response.ok)resolvePanelErrors(path,options.method||'GET',context.epoch);
   return response;
  }catch(error){if(!options.signal?.aborted)reportPanelError(error,context);throw error}

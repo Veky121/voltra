@@ -136,3 +136,26 @@ The following existing error states now report globally:
   campaign was performed.
 
 Reconnect notices are retained in history without interrupting the user with a toast while HTTP fallback remains available. See `UI_UX_CONSISTENCY.md` for the shared UI follow-up. The error inventory is a source snapshot from the initial notification audit; subsequent edits can shift its line numbers.
+
+
+## Action error recovery and request references
+
+Temporary proxy action errors use `useErrorState(source, {transient: true})`:
+the inline message clears after ten seconds or can be dismissed immediately.
+The notification history remains available. Loading failures, saved route failures,
+validation and pending-setting errors do not automatically disappear. Shared
+`Notice` action errors can be dismissed without changing operation status.
+
+Notifications retain validated UUID request references from JSON API errors or the
+`X-Request-ID` response header. The request details include a copy control, and
+exports retain the reference for matching server logs. Error codes are limited to
+short identifier strings. Known `ProxyLocalPortReserved` and daemon timeout, interruption, DNS and connection
+failures use fixed safe recovery explanations even on sensitive endpoints. Local
+error setters and expiry timers reject results for a different page or session,
+while same-session notifications retain the original page. Unknown errors use the
+existing sensitive-response redaction. This does not retain request bodies or
+credentials, and clearing an inline message does not mark the action recovered.
+
+Validation for this change: eleven notification store tests passed, including safe
+recovery copy, repeat grouping, redaction and invalid-reference exclusion. Focused
+backend game-network tests passed. Live gateway behavior was not exercised.

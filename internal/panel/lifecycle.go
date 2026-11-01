@@ -169,6 +169,9 @@ func (a *App) daemon(ctx context.Context, node M, method, path string, body any)
 	}
 	req.Header.Set("Authorization", "Bearer "+str(node["daemon_token"]))
 	req.Header.Set("Accept", "application/json")
+	if reference := diagnosticRequestID(ctx); reference != "" {
+		req.Header.Set("X-Request-ID", reference)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -218,7 +221,7 @@ func (a *App) daemon(ctx context.Context, node M, method, path string, body any)
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, &APIError{Status: 502, Code: "DaemonConnectionException", Detail: "Could not communicate with Wings: " + err.Error()}
+		return nil, daemonConnectionFailure(err)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		defer res.Body.Close()

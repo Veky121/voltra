@@ -2,6 +2,7 @@ import {createContext,useContext,useEffect,useState,useSyncExternalStore,type Re
 import {Link} from 'react-router-dom';
 import {Bell,Download,Trash2,X,CheckCircle2,AlertCircle} from 'lucide-react';
 import {Button} from '../components/ui/button';
+import {CopyButton} from '../ui/CopyButton';
 import {IconButton} from '../ui/IconButton';
 import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from '../components/ui/sheet';
 import {Toaster,toast} from '../components/ui/toast';
@@ -38,7 +39,7 @@ export function NotificationLayer({children}:{children:ReactNode}){
     <p className="notification-message">{entry.message}</p>
     <div className="notification-meta"><time dateTime={new Date(entry.lastAt).toISOString()} title={new Date(entry.firstAt).toLocaleString()}>{new Date(entry.lastAt).toLocaleTimeString()}</time><span>{entry.source.split('/').pop()?.replace(/\.(tsx?|jsx?)$/,'').replace(/([a-z])([A-Z])/g,'$1 $2')}</span>{entry.count>1&&<span>{entry.count} occurrences</span>}{entry.resolved&&<span>Recovered</span>}</div>
     {entry.page&&<Link to={entry.page} onClick={()=>setOpen(false)}>Open {entry.page==='/'?'overview':entry.page.replace(/^\//,'')}</Link>}
-    {entry.endpoint&&<details><summary>Request details</summary><code>{entry.method} {entry.endpoint}{entry.status?` · ${entry.status}`:''}</code></details>}
+    {(entry.endpoint||entry.requestId||entry.code)&&<details><summary>Request details</summary><code>{entry.method} {entry.endpoint}{entry.status?` · ${entry.status}`:''}</code>{entry.code&&<code>Error: {entry.code}</code>}{entry.requestId&&<CopyButton value={entry.requestId} aria-label="Copy request reference">Request {entry.requestId}</CopyButton>}</details>}
    </article>)}</div>
   </SheetContent></Sheet>
  </Toaster></NotificationContext.Provider>;

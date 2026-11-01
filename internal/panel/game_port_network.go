@@ -196,7 +196,7 @@ func (a *App) createSelectedGameFRPRoute(ctx context.Context, node, server M, ip
 		return nil, err
 	}
 	if reservedGamePort(reservations.nodePorts(num(node["id"])), port) {
-		return nil, fmt.Errorf("FRP local port is reserved for another service")
+		return nil, &APIError{Status: http.StatusConflict, Code: "ProxyLocalPortReserved", Detail: fmt.Sprintf("Public forwarding cannot use node port %d because Voltra reserves it for another service. Choose a different assigned game port in Network, or ask an administrator to review the node port reservations. No new proxy route was created.", port)}
 	}
 	var aid int64
 	if err = tx.QueryRow(ctx, `SELECT id FROM allocations WHERE node_id=$1 AND server_id=$2 AND ip=$3 AND port=$4 FOR SHARE`, num(node["id"]), num(server["id"]), ip, port).Scan(&aid); err != nil {

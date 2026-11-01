@@ -10,7 +10,7 @@
 .startup-variable{padding:16px 0;border-bottom:1px solid var(--ui-divider);min-width:0}
 .startup-variable:last-child{border-bottom:0;padding-bottom:0}
 .startup-variable.is-dirty{border-left:2px solid var(--accent);padding-left:12px}
-.startup-variable-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:7px}
+.startup-variable-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .startup-variable-heading>label{font-size:calc(13px * var(--ui-font-scale,1));font-weight:550;overflow-wrap:anywhere}
 .startup-badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .startup-badges .badge,.startup-pending{font-size:calc(10px * var(--ui-font-scale,1));line-height:1.5}
@@ -38,7 +38,8 @@
 .startup-variable.settings-row[data-settings-row].is-dirty{box-shadow:inset 2px 0 var(--accent)}
 .startup-variable .startup-variable-heading>label{font:inherit}
 .startup-variable .startup-badges:empty{display:none}
-.startup-variable .startup-field-details{margin-top:0}
+.startup-variable .startup-field-details{margin-top:6px}
+.startup-variable .startup-field-details>[data-voltra-disclosure-trigger]{min-height:24px;height:auto;padding:0;gap:5px;font-size:12px;color:var(--muted)}
 .startup-variable .startup-field-help{margin:0 0 10px}
 .startup-settings .java-settings-group textarea{max-width:100%}
 

@@ -1,3 +1,5 @@
+import {CONSOLE_HISTORY_LINES,CONSOLE_HISTORY_CHARACTERS} from './consoleHistory.ts';
+
 // Wings live events have no collector IDs. Match exact event + ANSI text,
 // once per displayed occurrence. This is a bounded heuristic: identical repeated
 // output can be mistaken for a delayed copy; evicted matches can display twice.
@@ -19,7 +21,7 @@ export class ConsoleReplayOverlap {
   private characters = 0;
   private maxLines: number;
   private maxCharacters: number;
-  constructor(maxLines = 100_000, maxCharacters = 16 * 1024 * 1024) {
+  constructor(maxLines = CONSOLE_HISTORY_LINES, maxCharacters = CONSOLE_HISTORY_CHARACTERS) {
     this.maxLines = maxLines; this.maxCharacters = maxCharacters;
   }
   clear() {

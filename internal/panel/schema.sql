@@ -332,3 +332,4 @@ CREATE TABLE IF NOT EXISTS console_log_collectors (
  lease_owner text NOT NULL DEFAULT '', lease_until timestamptz NOT NULL DEFAULT '-infinity',
  connected boolean NOT NULL DEFAULT false, last_event_at timestamptz
 );
+ALTER TABLE console_log_collectors ADD COLUMN IF NOT EXISTS run_start_id bigint NOT NULL DEFAULT 0;

@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {appendConsoleHistory,emptyConsoleHistory,consoleHistoryText,CONSOLE_HISTORY_LINES,CONSOLE_HISTORY_CHARACTERS} from '../src/client/consoleHistory.ts';
 
-test('retains one hundred thousand lines and evicts only the oldest excess',()=>{
+test('retains five thousand lines and evicts only the oldest excess',()=>{
   const h=appendConsoleHistory(emptyConsoleHistory(),Array.from({length:CONSOLE_HISTORY_LINES+10},(_,i)=>`line ${i}`));
-  assert.equal(h.count,100000);
+  assert.equal(h.count,5000);
   assert.equal(h.chunks[0].lines[0].text,'line 10');
-  assert.equal(h.chunks.at(-1).lines.at(-1).text,'line 100009');
+  assert.equal(h.chunks.at(-1).lines.at(-1).text,'line 5009');
 });
 test('existing history snapshots and completed chunks stay immutable while output arrives',()=>{
   const h=appendConsoleHistory(emptyConsoleHistory(),Array.from({length:501},(_,i)=>`old ${i}`));

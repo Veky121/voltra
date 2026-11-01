@@ -25,7 +25,6 @@ const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function 
   const remote=useRemoteTransfers(props.base,props.permissions,props.onComplete);
   const [uppy,setUppy]=useState<Queue|null>(null),[error,setError]=useErrorState('client/FileTransfers.tsx'),[expanded,setExpanded]=useState(false),[count,setCount]=useState(0);
   const [finalizations,setFinalizations]=useState<Record<string,Finalization>>({});
-  useEffect(()=>{if(remote.transfers.length)setExpanded(true)},[remote.transfers.length]);
   const records=useRef<Record<string,Finalization>>({});
   const finalizeRef=useRef<(entry:Finalization)=>Promise<void>>(async()=>{});
   useEffect(()=>{
@@ -99,11 +98,9 @@ const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function 
   const pending=Object.values(finalizations).filter(entry=>entry.state!=='complete');
   if(!can(props.permissions,'file.create')&&!count&&!pending.length)return null;
   return <section className="file-transfers" aria-label="File transfers">
-    <button type="button" className="file-transfers-toggle" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}><span>Transfers{count+remote.transfers.length?` (${count+remote.transfers.length})`:''}</span><span>{pending.length?`${pending.length} awaiting save`:'Uploads and remote downloads'} {expanded?'Hide':'Show'}</span></button>
+    <button type="button" className="file-transfers-toggle" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}><span>Uploads{count?` (${count})`:''}</span><span>{pending.length?`${pending.length} awaiting save`:'Files from this browser'} {expanded?'Hide':'Show'}</span></button>
     {error&&<div role="alert" className="file-transfers-error">{error}</div>}
     <div hidden={!expanded}>
-      {remote.error&&<div role="alert" className="file-transfers-error">Could not refresh remote downloads: {remote.error}</div>}
-      {remote.transfers.map(entry=><div key={entry.identifier} className={`file-transfer-result is-${entry.state}`}><span><strong>{entry.name}</strong><small>To {entry.directory}</small></span><span>{entry.state==='complete'?'Saved to server':entry.state==='failed'?entry.error:entry.state==='queued'?'Queued':`${Math.round(entry.progress*100)}% downloaded`}</span>{entry.state==='downloading'&&<progress aria-label={`Downloading ${entry.name}`} value={entry.progress} max={1}/>}</div>)}
       <p className="file-transfers-help">Files go to the folder open when you add them. Keep this page open to preserve your queue. Paused uploads resume from their last uploaded chunk. Uploaded files appear after saving to the server finishes.</p>
       {uppy&&<Dashboard uppy={uppy} theme="dark" height={320} width="100%" proudlyDisplayPoweredByUppy={false} hideProgressDetails={false} hideRetryButton={false} hidePauseResumeButton={false} hideCancelButton={false} disabled={!can(props.permissions,'file.create')} note={`Add files to ${props.directory}`} />}
       {Object.values(finalizations).map(entry=><div key={entry.id} className={`file-transfer-result is-${entry.state}`}><span><strong>{entry.name}</strong><small>{entry.directory}</small></span><span>{entry.state==='saving'?'Saving to server':entry.state==='complete'?'Saved to server':entry.error}</span>{entry.state==='failed'&&<><button type="button" onClick={()=>void finalizeRef.current(entry)}>Retry save</button><button type="button" onClick={()=>void discard(entry)}>Discard</button></>}</div>)}

@@ -203,8 +203,9 @@ func (a *App) consoleHistory(w http.ResponseWriter, r *http.Request, streamLimit
 		cursor, _ = strconv.ParseInt(str(data[len(data)-1]["id"]), 10, 64)
 	}
 	var connected bool
+	var runStart int64
 	var lastEvent *time.Time
-	err = tx.QueryRow(r.Context(), "SELECT connected AND lease_until>now(),last_event_at FROM console_log_collectors WHERE server_id=$1", s["id"]).Scan(&connected, &lastEvent)
+	err = tx.QueryRow(r.Context(), "SELECT connected AND lease_until>now(),last_event_at,run_start_id FROM console_log_collectors WHERE server_id=$1", s["id"]).Scan(&connected, &lastEvent, &runStart)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		fail(w, err)
 		return
@@ -215,7 +216,7 @@ func (a *App) consoleHistory(w http.ResponseWriter, r *http.Request, streamLimit
 	}
 	writeJSON(w, 200, M{"data": data, "after": strconv.FormatInt(after, 10), "head": strconv.FormatInt(newest, 10), "cursor": strconv.FormatInt(cursor, 10), "more": more, "reset": reset,
 		"truncated": after > 0 && oldest > after, "limits": M{"lines": a.consoleLogLimit(), "bytes": consoleLogBytes},
-		"capture": M{"connected": connected, "last_event_at": lastEvent}})
+		"run_start": strconv.FormatInt(runStart, 10), "capture": M{"connected": connected, "last_event_at": lastEvent}})
 }
 
 // One read-only Wings connection per server continues collecting with no browser
@@ -616,7 +617,18 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 						if state == "" {
 							color, message = "94", "Current server state: "+text+"."
 						}
-						add("panel message", "\x1b[0m\x1b["+color+"m[Voltra]: "+message+"\x1b[0m")
+						line := "\x1b[0m\x1b[" + color + "m[Voltra]: " + message + "\x1b[0m"
+						if consoleNewRun(state, text) {
+							// Final shutdown/crash output must commit before trimming.
+							if err = flush(ctx); err != nil {
+								return err
+							}
+							if err = a.beginConsoleRun(ctx, num(server["id"]), owner, consoleLogEntry{"panel message", line}); err != nil {
+								return err
+							}
+						} else {
+							add("panel message", line)
+						}
 						state = text
 						capture.serverState = text
 					}

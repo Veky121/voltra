@@ -59,6 +59,24 @@ func (a *App) registerFileTransfers(mux *http.ServeMux) {
 		dir = filepath.Join(base, "voltra", "uploads", hex.EncodeToString(key[:8]))
 	}
 	m, initErr := newFileTransferManager(a, dir)
+	mux.HandleFunc("GET /api/client/servers/{server}/files/transfer-progress", func(w http.ResponseWriter, r *http.Request) {
+		s, err := a.transferViewServer(r)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if initErr != nil {
+			fail(w, &APIError{Status: 503, Code: "UploadStorageUnavailable", Detail: "Upload progress is unavailable because the panel cannot access upload storage. Ask an administrator to check the panel storage."})
+			return
+		}
+		entries, err := m.sharedProgress(r.Context(), str(s["uuid"]), num(s["node_id"]))
+		if err != nil {
+			fail(w, &APIError{Status: 503, Code: "UploadProgressUnavailable", Detail: "The panel could not read upload progress. Refresh to check again."})
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusOK, M{"transfers": entries})
+	})
 	handle := func(w http.ResponseWriter, r *http.Request) {
 		if initErr != nil {
 			fail(w, &APIError{Status: 503, Code: "UploadStorageUnavailable", Detail: "Upload staging storage is unavailable"})

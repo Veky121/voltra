@@ -78,7 +78,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	}
 }
 func fail(w http.ResponseWriter, err error) {
-	status, code, detail := 500, "InternalServerError", "The request could not be completed."
+	status, code, detail := 500, "InternalServerError", "Voltra could not finish this request. Check whether the action took effect before retrying. If this continues, share the request reference with an administrator."
 	var api APIError
 	var apiPointer *APIError
 	if errors.As(err, &api) {
@@ -100,10 +100,24 @@ func fail(w http.ResponseWriter, err error) {
 			}
 		}
 	}
-	if status >= 500 {
-		slog.Error("request failed", "error", err)
+	reference := w.Header().Get("X-Request-ID")
+	if _, parseErr := uuid.Parse(reference); parseErr != nil {
+		reference = uuid.NewString()
+		w.Header().Set("X-Request-ID", reference)
 	}
-	writeJSON(w, status, M{"errors": []M{{"code": code, "status": strconv.Itoa(status), "detail": detail}}})
+	// Error strings can contain SQL parameters, signed URLs or credentials.
+	// Keep machine classification and a reference, never an unfiltered payload.
+	fields := []any{"request_id", reference, "status", status, "code", code, "error_type", fmt.Sprintf("%T", err), "handler", diagnosticFailureCaller()}
+	var databaseError *pgconn.PgError
+	if errors.As(err, &databaseError) {
+		fields = append(fields, "database_code", databaseError.Code)
+	}
+	if status >= 500 {
+		slog.Error("panel request failed", fields...)
+	} else {
+		slog.Warn("panel request rejected", fields...)
+	}
+	writeJSON(w, status, M{"errors": []M{{"code": code, "status": strconv.Itoa(status), "detail": detail, "request_id": reference}}})
 }
 func item(object string, attributes M) M { return M{"object": object, "attributes": attributes} }
 func collection(object string, rows []M) M {
@@ -505,11 +519,13 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, notFound()) })
 	mux.HandleFunc("/", a.serveWeb)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r, finishDiagnostics := beginRequestDiagnostics(w, r)
+		defer func() { finishDiagnostics(r) }()
 		r = withRequestReads(r)
 		defer func() {
 			if p := recover(); p != nil {
-				slog.Error("handler panic", "panic", p)
-				fail(w, fmt.Errorf("panic: %v", p))
+				slog.Error("handler panic", "request_id", diagnosticRequestID(r.Context()), "panic_type", fmt.Sprintf("%T", p))
+				fail(w, errors.New("handler panic"))
 			}
 		}()
 		w.Header().Set("X-Content-Type-Options", "nosniff")

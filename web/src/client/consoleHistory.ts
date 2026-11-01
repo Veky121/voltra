@@ -1,8 +1,8 @@
 import {formatConsoleBatch, type ConsoleStyle, type FormattedConsoleLine} from './consoleFormatting.ts';
 
-export const CONSOLE_HISTORY_LINES = 100_000;
+export const CONSOLE_HISTORY_LINES = 5_000;
 // UTF-16 text budget, separate from the browser's rendering overhead.
-export const CONSOLE_HISTORY_CHARACTERS = 16 * 1024 * 1024;
+export const CONSOLE_HISTORY_CHARACTERS = 2 * 1024 * 1024;
 const CHUNK_LINES = 500;
 export type ConsoleHistoryLine = {id: number; text: string; formatted: FormattedConsoleLine};
 export type ConsoleHistoryChunk = {id: number; lines: ConsoleHistoryLine[]};

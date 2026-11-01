@@ -1,28 +1,69 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import ts from 'typescript';
+import {mergeTransfers,reconcileTransfers,transferActive,transferRecentlyActive,transferPollDelay,transferProgress} from '../src/client/remoteTransferModel.ts';
 
-test('socket failures remain visible, completion refreshes once, and stale polling cannot undo it',async()=>{
- const source=readFileSync(new URL('../src/client/useRemoteTransfers.ts',import.meta.url),'utf8');
- const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const states=[],effects=[],calls=[];let socket,refreshes=0,cleanup;
- class Socket {constructor(){socket=this}send(){}close(){this.onclose?.()}}
- const react={useState(initial){const n=states.length;states.push(initial);return[initial,v=>{states[n]=v}]},useRef:current=>({current}),useEffect:effect=>effects.push(effect)};
- const api=async(path,options)=>{calls.push({path,options});if(path.endsWith('/websocket'))return{attributes:{socket:'http://example.test/ws',token:'test'}};if(options)return{identifier:'new'};return{transfers:[]}};
- const module={exports:{}};
- new Function('require','module','exports','WebSocket','location','setInterval','clearInterval','setTimeout','clearTimeout',compiled)(name=>name==='react'?react:name==='../lib'?{api}:{can:()=>true,value:d=>d.attributes??d},module,module.exports,Socket,{href:'http://example.test/'},()=>1,()=>{},()=>1,()=>{});
- const hook=module.exports.default('/api/client/servers/a',['*'],()=>refreshes++);
- cleanup=effects[0]();await new Promise(resolve=>setImmediate(resolve));
- const send=r=>socket.onmessage({data:JSON.stringify({event:'download progress',args:[JSON.stringify(r)]})});
- send({identifier:'failed',state:'failed',directory:'/mods',name:'a.zip',error:'Download site returned 403 Forbidden',updated:1});
- assert.equal(states[0].failed.state,'failed');assert.equal(refreshes,0);
- send({identifier:'ok',state:'complete',directory:'/mods',name:'b.zip',progress:1,updated:3});
- send({identifier:'ok',state:'downloading',directory:'/mods',name:'b.zip',progress:.5,updated:3});
- send({identifier:'ok',state:'complete',directory:'/mods',name:'b.zip',progress:1,updated:3});
- assert.equal(states[0].ok.state,'complete');assert.equal(refreshes,1);
- await hook.start({url:'https://example.test/c.zip',directory:'/selected',use_header:true});
- const request=JSON.parse(calls.find(c=>c.options)?.options.body);
- assert.equal(request.directory,'/selected');assert.equal(request.foreground,false);assert.equal(request.tracked,true);assert.equal(request.use_header,true);
- cleanup();send({identifier:'after-unmount',state:'complete',updated:4});assert.equal(refreshes,1);
+const transfer={identifier:'one',name:'world.zip',directory:'/',state:'downloading',updated:100};
+
+test('unknown and legacy size reports do not manufacture a percentage',()=>{
+  assert.equal(transferProgress({...transfer,progress:0.7}),null);
+  assert.equal(transferProgress({...transfer,size_known:false,total_bytes:100,received_bytes:70}),null);
+  assert.equal(transferProgress({...transfer,size_known:true,total_bytes:0,received_bytes:0}),null);
+  assert.equal(transferProgress({...transfer,size_known:true,total_bytes:100,received_bytes:NaN}),null);
+});
+
+test('known transfer byte counts produce bounded progress, awaiting save does not imply completion',()=>{
+  assert.equal(transferProgress({...transfer,size_known:true,total_bytes:200,received_bytes:50}),25);
+  assert.equal(transferProgress({...transfer,size_known:true,total_bytes:200,received_bytes:201}),100);
+  assert.equal(transferProgress({...transfer,state:'awaiting_save',size_known:true,total_bytes:200,received_bytes:200}),null);
+  assert.equal(transferActive({...transfer,state:'awaiting_save'}),true);
+  assert.equal(transferActive({...transfer,state:'failed'}),false);
+  assert.equal(transferProgress({...transfer,state:'complete'}),100);
+});
+
+test('late socket or polling events never regress completed work',()=>{
+  const complete={...transfer,state:'complete',updated:200};
+  assert.deepEqual(mergeTransfers({one:complete},[{...transfer,updated:250}]),{one:complete});
+  assert.deepEqual(mergeTransfers({one:transfer},[{...transfer,updated:50,received_bytes:0}]),{one:transfer});
+});
+
+test('shared records combine upload and download producers without overwriting each other',()=>{
+  const upload={...transfer,identifier:'upload-two',kind:'upload',state:'uploading'};
+  const records=mergeTransfers({one:transfer},[upload]);
+  assert.deepEqual(Object.keys(records),['one','upload-two']);
+  assert.equal(records['upload-two'].kind,'upload');
+  assert.deepEqual(mergeTransfers(records,[{...transfer,identifier:'',updated:900}]),records);
+});
+
+test('optimistic queued record does not override server time when client clock is ahead',()=>{
+  const queued={...transfer,state:'queued',updated:0};
+  assert.equal(mergeTransfers({one:queued},[transfer]).one.state,'downloading');
+});
+
+test('authoritative snapshots remove canceled uploads and expired outcomes without inventing completion',()=>{
+  const upload={...transfer,identifier:'upload-two',kind:'upload',state:'uploading'};
+  const started={one:transfer,'upload-two':upload};
+  assert.deepEqual(reconcileTransfers(started,[],'upload',started),{one:transfer});
+  const completed={...transfer,state:'complete'};
+  assert.deepEqual(reconcileTransfers({one:completed},[],'download',{one:completed}),{});
+});
+
+test('an older snapshot cannot remove jobs started or updated while its request was in flight',()=>{
+  const started={one:transfer};
+  const update={...transfer,received_bytes:12,updated:101};
+  const queued={...transfer,identifier:'new',state:'queued',updated:0};
+  const current={one:update,new:queued};
+  assert.deepEqual(reconcileTransfers(current,[],'download',started),current);
+});
+
+
+test('paused uploads remain resumable without active animation or frequent idle polling',()=>{
+  const now=100000,upload={...transfer,kind:'upload',state:'uploading',updated:now-31000};
+  assert.equal(transferActive(upload),true);
+  assert.equal(transferRecentlyActive(upload,now),false);
+  assert.equal(transferPollDelay([upload],true,now),30000);
+  assert.equal(transferPollDelay([{...upload,updated:now}],true,now),5000);
+  assert.equal(transferPollDelay([],false,now),30000);
+  assert.equal(transferPollDelay([transfer],true,now),30000);
+  assert.equal(transferPollDelay([transfer],false,now),5000);
+  assert.equal(mergeTransfers({[upload.identifier]:upload},[{...upload,updated:now,received_bytes:20}])[upload.identifier].received_bytes,20);
 });

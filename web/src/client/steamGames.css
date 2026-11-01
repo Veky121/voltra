@@ -83,6 +83,8 @@
 .game-boolean>span{overflow-wrap:anywhere;font-size:calc(12px * var(--ui-font-scale,1))}
 .game-boolean small{display:block;font-size:calc(11px * var(--ui-font-scale,1))}
 .game-folders ul{padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px;margin:0}
+.game-folders[data-settings-section]>.settings-group[data-slot=card]{padding:14px 16px}
+.game-folders[data-settings-section]>.settings-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .game-folders li{display:flex;padding:0;border:0;min-width:0}
 .game-folders li>a{display:flex;gap:12px;font-size:calc(13px * var(--ui-font-scale,1));align-items:center;justify-content:center;width:100%;min-height:62px;box-sizing:border-box;padding:14px 16px;border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-hover);color:var(--text);text-decoration:none;transition:background 160ms,border-color 160ms}
 .game-folders li>a:hover{background:var(--ui-hover);border-color:var(--line-strong);text-decoration:none}

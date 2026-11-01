@@ -14,6 +14,8 @@
 .console-view .console-terminal-body{position:relative;min-width:0;background:var(--surface-muted)}
 .console-view .console-terminal .console-output{display:block;width:100%;height:clamp(320px,44vh,520px);min-width:0;margin:0;padding:14px;border:0;border-radius:0;background:var(--surface-muted);color:var(--text);overflow:auto;overflow-anchor:none;white-space:pre;user-select:text;font:400 13px/1.6 'IBM Plex Mono',monospace;tab-size:4;scrollbar-color:var(--line-strong) transparent;scrollbar-width:thin}
 .console-view .console-terminal .console-output:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.console-view .console-line{display:block;height:1lh}
+.console-view .console-spacer{display:block;pointer-events:none;user-select:none}
 .console-view .console-level-error{color:#ff8c9a}
 .console-view .console-level-warning{color:#f4cf83}
 .console-view .console-level-debug{color:#a0a4b3}

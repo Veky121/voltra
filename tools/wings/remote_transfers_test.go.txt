@@ -1,36 +1,121 @@
 package downloader
 
 import (
- "io"
- "net/http"
- "net/url"
- "strings"
- "testing"
- "time"
+	"context"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
 
- "github.com/pterodactyl/wings/server"
+	"github.com/pterodactyl/wings/server"
 )
 
-type transferTransport func(*http.Request)(*http.Response,error)
-func(f transferTransport) RoundTrip(r *http.Request)(*http.Response,error){return f(r)}
+func TestVoltraTransferMeasuredBytes(t *testing.T) {
+	s, err := server.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.CleanupForDestroy()
+	u, _ := url.Parse("https://example.com/mod.zip")
+	dl := New(s, DownloadRequest{URL: u, Directory: "/mods"})
+	defer dl.Cancel()
+	counter := dl.counter(1024)
+	_, _ = counter.Write(make([]byte, 256))
+	history := TransferHistory(s.ID())
+	var found *TransferRecord
+	for i := range history {
+		if history[i].Identifier == dl.Identifier {
+			found = &history[i]
+		}
+	}
+	if found == nil || found.ReceivedBytes != 256 || found.TotalBytes != 1024 || !found.SizeKnown || found.Progress != 0.25 {
+		t.Fatalf("wrong measured progress: %#v", found)
+	}
+	dl.recordTransfer("failed", dl.Progress(), io.ErrUnexpectedEOF)
+	history = TransferHistory(s.ID())
+	for _, r := range history {
+		if r.Identifier == dl.Identifier && (r.ReceivedBytes != 256 || !strings.Contains(r.Error, "partial file")) {
+			t.Fatal(r)
+		}
+	}
+}
 
-func TestVoltraRemoteFailureRetainedAndEmitted(t *testing.T){
- s,err:=server.New(nil);if err!=nil {t.Fatal(err)}
- defer s.CleanupForDestroy()
- events:=make(chan []byte,16);s.Events().On(events);defer s.Events().Off(events)
- saved:=client;defer func(){client=saved}()
- client=&http.Client{Transport:transferTransport(func(r *http.Request)(*http.Response,error){return &http.Response{StatusCode:403,Body:io.NopCloser(strings.NewReader("private source body")),Header:make(http.Header)},nil})}
- u,_:=url.Parse("https://example.com/mod.zip?secret=never-expose")
- dl:=New(s,DownloadRequest{Directory:"/mods",URL:u})
- if dl.Execute()==nil {t.Fatal("403 reported success")}
- if ByID(dl.Identifier)!=nil {t.Fatal("failed download still occupies a concurrency slot")}
- history:=TransferHistory(s.ID());var found *TransferRecord
- for i:=range history {if history[i].Identifier==dl.Identifier {found=&history[i]}}
- if found==nil||found.State!="failed"||found.Error!="Download site returned 403 Forbidden"||found.Directory!="/mods" {t.Fatalf("missing terminal outcome: %#v",found)}
- // The terminal event must be delivered even when no bytes were downloaded.
- timer:=time.NewTimer(time.Second);defer timer.Stop()
- for {select {case data:=<-events:
-  if strings.Contains(string(data),"never-expose")||strings.Contains(string(data),"private source body"){t.Fatal("source secret leaked")}
-  if strings.Contains(string(data),"failed"){return}
- case <-timer.C:t.Fatal("missing failure event")}}
+func TestVoltraTransferSizeLookup(t *testing.T) {
+	saved := client
+	defer func() { client = saved }()
+	calls := 0
+	client = &http.Client{Transport: transferTransport(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if r.Method != http.MethodHead {
+			t.Fatal(r.Method)
+		}
+		if _, ok := r.Context().Deadline(); !ok {
+			t.Fatal("unbounded size lookup")
+		}
+		return &http.Response{StatusCode: 200, ContentLength: 2048, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}, nil
+	})}
+	u, _ := url.Parse("https://example.com/mod.zip")
+	dl := &Download{req: DownloadRequest{URL: u}}
+	if size := dl.lookupSize(context.Background()); size != 2048 || calls != 1 {
+		t.Fatal(size, calls)
+	}
+	if message := transferFailureMessage(errRemoteSizeUnknown); !strings.Contains(message, "direct download link") {
+		t.Fatal(message)
+	}
+}
+
+type transferTransport func(*http.Request) (*http.Response, error)
+
+func (f transferTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestVoltraRemoteFailureRetainedAndEmitted(t *testing.T) {
+	s, err := server.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.CleanupForDestroy()
+	events := make(chan []byte, 16)
+	s.Events().On(events)
+	defer s.Events().Off(events)
+	saved := client
+	defer func() { client = saved }()
+	client = &http.Client{Transport: transferTransport(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 403, Body: io.NopCloser(strings.NewReader("private source body")), Header: make(http.Header)}, nil
+	})}
+	u, _ := url.Parse("https://example.com/mod.zip?secret=never-expose")
+	dl := New(s, DownloadRequest{Directory: "/mods", URL: u})
+	if dl.Execute() == nil {
+		t.Fatal("403 reported success")
+	}
+	if ByID(dl.Identifier) != nil {
+		t.Fatal("failed download still occupies a concurrency slot")
+	}
+	history := TransferHistory(s.ID())
+	var found *TransferRecord
+	for i := range history {
+		if history[i].Identifier == dl.Identifier {
+			found = &history[i]
+		}
+	}
+	if found == nil || found.State != "failed" || found.Error != "Download site returned 403 Forbidden" || found.Directory != "/mods" {
+		t.Fatalf("missing terminal outcome: %#v", found)
+	}
+	// The terminal event must be delivered even when no bytes were downloaded.
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case data := <-events:
+			if strings.Contains(string(data), "never-expose") || strings.Contains(string(data), "private source body") {
+				t.Fatal("source secret leaked")
+			}
+			if strings.Contains(string(data), "failed") {
+				return
+			}
+		case <-timer.C:
+			t.Fatal("missing failure event")
+		}
+	}
 }

@@ -12,6 +12,7 @@ import {useGameRequest} from './useGameRequest';
 import {useServerTelemetry} from './ServerDashboard';
 import {GameSettingsFields} from './GameSettingsFields';
 import ServerStartup from './ServerStartup';
+import {SettingsSection} from '../ui/Settings';
 import './steamGames.css';
 
 type Settings = QuickSetup & {file: string; documents: {path: string; label: string}[]};
@@ -74,12 +75,13 @@ function QuickSetupContent({data, search, onSaved, onDirty}: {data: Settings; se
   function change(key: string, value: QuickValue) {setDraft(previous => ({...previous, [key]: value})); setSuccess('');}
 
   usePendingSetting(`native:${saved.file}`, dirty, {blocked: !!blocked || busy, save, discard: () => {setDraft({}); setError('');}});
+  if (!saved.fields.length) return null;
   return <div className="game-quick-layout">
     <Card className="game-settings-card">
-      {saved.fields.length ? <div>
+      <div>
         <fieldset className="steam-fields" disabled={blocked || busy}><GameSettingsFields fields={saved.fields} game={data.game} file={saved.file} search={search} draft={draft} onChange={change}/></fieldset>
         <ErrorBox>{error}</ErrorBox>{error && <Button variant="secondary" onClick={async () => {if (!dirty || await confirmAction({title:"Discard changes?",description:'Discard your unsaved settings and reload?',confirmLabel:"Discard changes",danger:false})) {onDirty(false); onSaved();}}}>Reload current settings</Button>}{success && <p role="status" className="success">{success}</p>}
-      </div> : <p className="muted">No generated server configuration was found. Start the game once to create its settings.</p>}
+      </div>
     </Card>
 
   </div>;
@@ -89,10 +91,10 @@ function GameFolders({folders: nativeFolders, folderRequest, serverID}: {folders
   const {permissions} = useServer();
   const folders = [...new Map([...nativeFolders, ...(folderRequest.data?.folders || [])].map(folder => [folder.path, folder])).values()].map(folder => ({...folder, to: safeFolderLink(serverID, folder.path)})).filter(folder => folder.to);
   return <>
-    {can(permissions, 'file.read') && <Card className="game-folders"><div className="game-settings-heading"><h3>Game folders</h3><Link className="game-files-link" to={`/server/${encodeURIComponent(serverID)}/files`}>All files</Link></div>
+    {can(permissions, 'file.read') && <SettingsSection className="game-folders" title="Game folders" action={<Link className="game-files-link" to={`/server/${encodeURIComponent(serverID)}/files`}>All files</Link>}>
       {folders.length ? <ul>{folders.map(folder => <li key={folder.path}><Link to={folder.to!}><span className="game-folder-identity"><span>{folder.label}</span><code>{folder.path}</code></span></Link></li>)}</ul> : <p className="muted">Folders appear after the game creates them.</p>}
       {folderRequest.loading && <p className="muted" role="status">Finding game folders...</p>}
       {folderRequest.error && <p className="muted">Folder lookup failed. <MiraAction type="button" className="text-button" onClick={folderRequest.reload}>Retry</MiraAction></p>}
-    </Card>}
+    </SettingsSection>}
   </>;
 }

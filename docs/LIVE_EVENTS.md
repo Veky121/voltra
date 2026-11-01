@@ -83,6 +83,21 @@ Reset buffers also trigger HTTP recovery. Overlapping entry IDs are ignored.
 New subscriptions start at the current head rather than replaying the whole
 buffer. Each batch has at most eight entries to fit escaped maximum-length
 lines within the frame bound. Installer output remains administrator-only.
+
+Console history responses also carry `run_start`, a decimal-string boundary ID
+persisted in `console_log_collectors.run_start_id`. On a confirmed new start,
+the capture worker flushes pending shutdown output, keeps up to 250 previous
+lines, and writes a new-run marker plus the observed state in one transaction.
+Power requests, initial attachment, duplicate status and starting-to-running
+do not rotate history. Stopped/crashed servers retain the current buffer until
+the next start. Game-owned log files are unaffected.
+
+A changed `run_start` tells an open console to reload from cursor zero and
+replace its displayed buffer with the retained tail and new output. The same
+check applies to HTTP fallback. The previous tail remains part of the ordinary
+rolling history budget; it is not a permanent crash archive. Browser history is
+bounded at 5,000 lines and 4 MiB of UTF-16 text. Older panels without `run_start`
+continue using cursor recovery without inferred run boundaries.
 These entries come from the existing persistent Wings collector, including
 panel and installer messages. The direct Wings socket remains for status,
 feature handling and live fallback. Hidden consoles pause HTTP history polling.

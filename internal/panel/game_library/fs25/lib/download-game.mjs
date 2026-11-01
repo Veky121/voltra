@@ -6,6 +6,7 @@ import {pipeline} from 'node:stream/promises';
 import {pathToFileURL} from 'node:url';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {dlcLicences} from './dlc-licences.mjs';
+import {createOperationReporter} from '../../scripts/operation-report.mjs';
 const env = process.env, dlcOnly = process.argv.includes('--dlc-only');
 const enabled = value => !['false','0','off','no'].includes(String(value).toLowerCase());
 const portal = 'https://eshop.giants-software.com/downloads.php';
@@ -61,11 +62,17 @@ function portalSession(fetchImpl=fetch) {
   };
 }
 async function download(url, folder, maximum) {
+  const report=createOperationReporter({source:'fs25'});
+  report({state:'running',phase:'download',code:'DOWNLOAD_CONNECTING'});
+  try {await downloadWithProgress(url,folder,maximum,report);}
+  catch(error){report({state:'failed',phase:'download',code:error?.code==='ENOSPC'?'DISK_FULL':'DOWNLOAD_FAILED'});throw error;}
+}
+async function downloadWithProgress(url, folder, maximum, report) {
   if (!allowed(url)) throw Error('Unexpected download host');
   const name = basename(new URL(url).pathname);
   if (!/^FarmingSimulator25_[A-Za-z0-9_.-]+\.(img|exe)$/i.test(name)) throw Error('Unexpected installer filename');
   const target=join(folder,name), partial=target+'.partial';
-  if (statSync(target,{throwIfNoEntry:false})?.size > 0) return log(name+' already downloaded.');
+  if (statSync(target,{throwIfNoEntry:false})?.size > 0) {report({state:'completed',phase:'download',code:'DOWNLOAD_EXISTING'});return log(name+' already downloaded.');}
   let response;
   for(let hop=0; hop<4; hop++) {
     response=await fetch(url,{headers,redirect:'manual',signal:AbortSignal.timeout(2*60*60*1000)});
@@ -79,14 +86,16 @@ async function download(url, folder, maximum) {
   }
   if(!response?.ok || !response.body) throw Error('Download request failed');
   if(/(?:text\/|application\/(?:json|xml))/i.test(response.headers.get('content-type')||'')) {await response.body.cancel();throw failure('ticket');}
-  const total=Number(response.headers.get('content-length')||0);
+  const length=Number(response.headers.get('content-length')||0);
+  const total=Number.isSafeInteger(length)&&length>0?length:0;
   if(total>maximum) {await response.body.cancel(); throw Error('Installer exceeds download limit');}
   let bytes=0, last=Date.now();
   const source=Readable.fromWeb(response.body);
-  source.on('data',chunk=>{bytes+=chunk.length; if(bytes>maximum) source.destroy(Error('Download limit exceeded')); if(Date.now()-last>20000){log(name+': '+Math.round(bytes/1048576)+' MiB');last=Date.now();}});
-  try {await pipeline(source,createWriteStream(partial,{mode:0o600})); if(!bytes || total && bytes!==total) throw Error('Incomplete download'); renameSync(partial,target);}
+  source.on('data',chunk=>{bytes+=chunk.length; if(bytes>maximum || total && bytes>total){source.destroy(Error('Download limit exceeded'));return;} report({state:'running',phase:'download',code:'DOWNLOAD_RECEIVING',bytes,total:total||null});if(Date.now()-last>20000){log(name+': '+Math.round(bytes/1048576)+' MiB');last=Date.now();}});
+  try {await pipeline(source,createWriteStream(partial,{mode:0o600}));report({state:'running',phase:'verify',code:'DOWNLOAD_VERIFYING',bytes,total:total||null},{force:true}); if(!bytes || total && bytes!==total) throw Error('Incomplete download'); renameSync(partial,target);}
   catch(error){rmSync(partial,{force:true});throw error;}
   log(name+' downloaded.');
+  report({state:'completed',phase:'download',code:'DOWNLOAD_COMPLETE',bytes,total:total||null});
 }
 async function portalText(response) {
   const reader=response.body.getReader(),decoder=new TextDecoder();let html='',size=0;
@@ -136,4 +145,4 @@ async function run({environment=env,fetchImpl=fetch,downloadFile=download,onlyDL
   }
 }
 export {allowed, download, run, portalDownloads, portalSession, safeDownloadError};
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run().catch(error=>{console.error('[fs25/download] '+safeDownloadError(error));process.exitCode=dlcOnly?0:1;});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run().catch(error=>{const codes={missing:'LICENCE_REQUIRED',portal:'PROVIDER_UNAVAILABLE',ticket:'DOWNLOAD_NOT_AUTHORIZED',installer:'DOWNLOAD_UNSUPPORTED'};if(codes[error?.downloadCode])createOperationReporter({source:'fs25'})({state:'failed',phase:'authorize',code:codes[error.downloadCode]});console.error('[fs25/download] '+safeDownloadError(error));process.exitCode=dlcOnly?0:1;});

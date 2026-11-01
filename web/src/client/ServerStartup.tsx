@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 import { api, Button, Input, Select, useAPI } from '../lib';
 import { can, items, json, PageError, useServer, value } from './common';
 import { JavaSettings } from './JavaSettings';
-import { commandPreview, secretVariable, variableControl, variableEditable, variableProblem, variableValue, variableWrite, startupVariableSection } from './startupSettingsModel';
+import { commandPreview, secretVariable, variableCanReset, variableControl, variableEditable, variableProblem, variableValue, variableWrite, startupVariableSection } from './startupSettingsModel';
 import type { StartupMeta, StartupVariable, VariableIntent, VariableWrite } from './startupSettingsModel';
 import './startupSettings.css';
 
@@ -30,11 +30,12 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
   const [error, setError] = useErrorState('client/ServerStartup.tsx');
   const [success, setSuccess] = useState('');
   const [clear, setClear] = useState(false);
+  const [reset, setReset] = useState(false);
   const secret = secretVariable(variable);
   const editable = variableEditable(variable, permitted);
   const control = variableControl(variable);
-  const dirty = clear || (secret ? draft.length > 0 : draft !== baseline);
-  const problem = dirty && !clear ? variableProblem(variable, draft) : '';
+  const dirty = reset || clear || (secret ? draft.length > 0 : draft !== baseline);
+  const problem = dirty && !clear && !reset ? variableProblem(variable, draft) : '';
   const configured = variable.secret_configured ?? variable.configured;
   const label = variable.name || variable.env_variable;
   const id = `startup-${variable.env_variable}`;
@@ -60,7 +61,7 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
       locked.current = true;
       setBusy(true);
       const saved = await onSave(payload);
-      setDraft(variableValue(saved)); setClear(false);
+      setDraft(variableValue(saved)); setClear(false); setReset(false);
 
     } catch (cause) {
       // Validation responses can echo submitted values. Keep secret errors value-free.
@@ -72,30 +73,37 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
     }
   }
 
-  usePendingSetting(variable.env_variable, dirty, {blocked: !!problem || !editable || busy, save: () => save(clear ? 'clear' : 'save'), discard: () => {setDraft(baseline); setClear(false); setError('');}});
+  usePendingSetting(variable.env_variable, dirty, {blocked: !!problem || !editable || busy, save: () => save(reset ? 'reset' : clear ? 'clear' : 'save'), discard: () => {setDraft(baseline); setClear(false); setReset(false); setError('');}});
   return <SettingsRow className={`startup-variable${dirty ? ' is-dirty' : ''}`} aria-label={label} aria-busy={busy} label={<span className="startup-variable-heading">
-      <label htmlFor={id}>{label}</label><code className="startup-variable-key">{variable.env_variable}</code>
+      <label htmlFor={id}>{label}</label>
       <span className="startup-badges">
         {!editable && <span className="badge">Read-only</span>}
+        {typeof variable.is_overridden === 'boolean' && <span className="badge">{variable.is_overridden ? 'Custom override' : 'Template default'}</span>}
         {dirty && <span className="startup-pending">Unsaved</span>}
       </span>
-    </span>} description={variable.description ? settingDescription(variable.description) : undefined} control={<>
-      {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy} aria-describedby={problem ? `${id}-help` : undefined} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
+    </span>} description={variable.description ? settingDescription(variable.description) : undefined}
+    details={<Disclosure className="startup-field-details"><DisclosureTrigger>Details</DisclosureTrigger><p><code>{variable.env_variable}</code></p><p>Rules: {variable.rules || 'None'}</p><p>Template default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p>
+      {!editable && <p>{!permitted ? 'You do not have permission to edit startup settings.' : 'This setting is managed by the server template.'}</p>}
+      {editable && variableCanReset(variable) && <Button variant="secondary" disabled={busy} onClick={()=>{setReset(current=>!current);setClear(false);setDraft(baseline);setError('')}}>{reset ? 'Undo reset' : 'Reset to template default'}</Button>}
+      {reset && <p role="status">Reset pending. Save to remove the custom override.</p>}
+    </Disclosure>} control={<>
+      {control.boolean ? <GameSwitch id={id} aria-label={label} checked={draft === '1' || draft === 'true'} disabled={!editable || busy || reset} onCheckedChange={checked => {setDraft(control.options?.includes('true') ? String(checked) : checked ? '1' : '0'); setSuccess(''); setError('');}}/> : control.options ? <Select id={id} name={variable.env_variable} value={draft} disabled={!editable || busy || reset} aria-describedby={problem ? `${id}-help` : undefined} onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }}>
         {!control.options.includes(draft) && <option value={draft}>{draft || 'Choose a value'}</option>}
         {!control.required && draft !== '' && <option value="">Empty</option>}
         {control.options.map(option => <option key={option} value={option}>{control.boolean ? option === '1' ? 'Enabled' : 'Disabled' : option}</option>)}
-      </Select> : <Input id={id} name={variable.env_variable} type={control.type} value={draft} disabled={!editable || busy || clear}
+      </Select> : <Input id={id} name={variable.env_variable} type={control.type} value={draft} disabled={!editable || busy || clear || reset}
         min={control.min} max={control.max} step={control.step} minLength={control.minLength} maxLength={control.maxLength}
         required={control.required && !secret} autoComplete={secret ? 'new-password' : 'off'} spellCheck={false}
-        placeholder={secret ? configured ? 'Configured. Leave blank to keep unchanged.' : 'Leave blank to keep unchanged.' : undefined}
+        placeholder={secret ? configured ? 'Saved. Leave blank to keep.' : 'Not configured' : undefined}
         aria-describedby={problem ? `${id}-help` : undefined} aria-invalid={!!problem}
         onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }} />}
     </>}>
-    {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><Checkbox checked={clear} disabled={busy} onCheckedChange={checked => {setClear(checked); setDraft('');}}/> Clear saved value</label>}
+    {(secret && editable && !control.required && configured !== false || problem || error || success) ? <>
+    {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><Checkbox checked={clear} disabled={busy || reset} onCheckedChange={checked => {setClear(checked); setDraft('');}}/> Clear saved value</label>}
     {problem && <p id={`${id}-help`} className="startup-validation" role="alert">{problem}</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {success && <p role="status" className="success">{success}</p>}
-    <Disclosure className="startup-field-details"><DisclosureTrigger>Details</DisclosureTrigger><p>Rules: {variable.rules || 'None'}</p><p>Default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p></Disclosure>
+    </> : null}
   </SettingsRow>;
 
 }
@@ -169,12 +177,12 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
     if (response.meta) setSavedMeta(response.meta);
     return updated;
   }}/>;
-  const options = <>
+  const visibleVariables = variables.filter(variable=>!licenceFields.has(variable.env_variable));
+  const options = visibleVariables.length ? <>
     <PreferenceSection className="startup-variables" title={section === 'game' ? 'Game options' : 'Installation & startup options'}>
-      {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}
-      <div className="game-properties-grid">{variables.filter(variable=>!licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
+      <div className="game-properties-grid">{visibleVariables.map(renderVariable)}</div>
     </PreferenceSection>
-  </>;
+  </> : null;
   return <section className="startup-settings games-ui">
     <PageError error={query.error} />
     {section === 'runtime' ? <div className="startup-runtime-sections">

@@ -67,7 +67,7 @@
 }
 .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:last-child,.app-content .settings-responsive .settings-fields>.settings-field:last-child{border-bottom:0}
 .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:focus-within,.settings-responsive .settings-fields>.settings-field:focus-within{background:var(--ui-hover)}
-.settings-responsive .game-folders{max-width:880px}
+.settings-responsive .game-folders{max-width:none;width:100%}
 @container settings-page (min-width:960px){
  .app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]){grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
  .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:has(textarea),.app-content .settings-responsive .settings-fields>.settings-field:has(textarea){grid-column:1/-1}

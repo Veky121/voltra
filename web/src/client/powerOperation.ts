@@ -42,8 +42,21 @@ export function advancePowerOperation(operation: PowerOperation, state: string, 
 }
 
 export function powerOperationLabel(operation: PowerOperation): string {
+  if (!operation.accepted) return 'Sending request...';
   if (operation.signal === 'kill') return 'Force stopping…';
   if (operation.signal === 'stop') return 'Stopping…';
   if (operation.signal === 'start') return 'Starting…';
   return operation.phase === 'starting' ? 'Starting…' : 'Waiting for exit…';
+}
+
+// A long wait is an unknown outcome, not proof that the operation failed.
+export function powerOperationDetail(operation: PowerOperation, elapsedSeconds: number, connectionLost = false): string {
+  if (connectionLost) return 'The connection to the node was interrupted. The server action may still be running.';
+  if (!operation.accepted) return elapsedSeconds >= 30
+    ? 'The node has not confirmed this request. Check status before trying another action.'
+    : 'Waiting for the node to accept the request.';
+  if (elapsedSeconds >= 120) return 'The node accepted the request, but completion is still unconfirmed. Check status and console output. No retry has been sent.';
+  if (operation.signal === 'stop' || operation.signal === 'restart' && operation.phase !== 'starting') return 'Request accepted. Waiting for the game to save and exit.';
+  if (operation.signal === 'kill') return 'Request accepted. Waiting for the process to exit.';
+  return 'Request accepted. Waiting for the node to report the server running.';
 }

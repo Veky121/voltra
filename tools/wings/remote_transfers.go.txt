@@ -1,8 +1,13 @@
 package downloader
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net"
+	"net/http"
+	"os"
 	"path"
 	"sort"
 	"sync"
@@ -10,13 +15,16 @@ import (
 )
 
 type TransferRecord struct {
-	Identifier string  `json:"identifier"`
-	Directory  string  `json:"directory"`
-	Name       string  `json:"name"`
-	State      string  `json:"state"`
-	Progress   float64 `json:"progress"`
-	Error      string  `json:"error,omitempty"`
-	Updated    int64   `json:"updated"`
+	Identifier    string  `json:"identifier"`
+	Directory     string  `json:"directory"`
+	Name          string  `json:"name"`
+	State         string  `json:"state"`
+	Progress      float64 `json:"progress"`
+	ReceivedBytes int64   `json:"received_bytes"`
+	TotalBytes    int64   `json:"total_bytes"`
+	SizeKnown     bool    `json:"size_known"`
+	Error         string  `json:"error,omitempty"`
+	Updated       int64   `json:"updated"`
 }
 type transferHistory struct {
 	sync.Mutex
@@ -49,12 +57,19 @@ func (dl *Download) recordTransfer(state string, progress float64, err error) {
 		name = dl.path
 	}
 	r := TransferRecord{Identifier: dl.Identifier, Directory: dl.req.Directory, Name: name, State: state, Progress: progress, Updated: time.Now().UnixMilli()}
+	dl.mu.RLock()
+	r.ReceivedBytes, r.TotalBytes = dl.receivedBytes, dl.totalBytes
+	dl.mu.RUnlock()
+	r.SizeKnown = r.TotalBytes >= 0 && state != "queued"
+	if !r.SizeKnown {
+		r.TotalBytes = 0
+	}
 	if err != nil {
 		var source *RemoteStatusError
 		if errors.As(err, &source) {
 			r.Error = source.Error()
 		} else {
-			r.Error = "Download failed. Check the node logs for details."
+			r.Error = transferFailureMessage(err)
 		}
 	}
 	sid := dl.server.ID()
@@ -87,4 +102,51 @@ func (dl *Download) recordTransfer(state string, progress float64, err error) {
 	transfers.Unlock()
 	data, _ := json.Marshal(r)
 	dl.server.Events().Publish("download progress", string(data))
+}
+
+var errRemoteSizeUnknown = errors.New("download source did not provide a file size")
+var errRemoteSizeMismatch = errors.New("download source provided an inconsistent file size")
+
+// A bounded HEAD fallback uses the same SSRF and redirect policy as the actual
+// download. It cannot turn an untrusted URL into a request from the panel host.
+func (dl *Download) lookupSize(ctx context.Context) int64 {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, dl.req.URL.String(), nil)
+	if err != nil {
+		return -1
+	}
+	req.Header.Set("User-Agent", "Pterodactyl Panel (https://pterodactyl.io)")
+	if applyRemoteHeaders(req, dl.req.RemoteHeaders) != nil {
+		return -1
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return -1
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return -1
+	}
+	return res.ContentLength
+}
+
+func transferFailureMessage(err error) string {
+	var network net.Error
+	switch {
+	case errors.Is(err, errRemoteSizeUnknown):
+		return "The download site did not provide a file size. This node needs the size to enforce your disk limit. Use a direct download link or download the file locally and upload it."
+	case errors.Is(err, errRemoteSizeMismatch):
+		return "The download site reported a size that did not match the file. A partial file may remain. Download the file locally and upload it."
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return "The download ended before the whole file arrived. A partial file may remain. Retry the download."
+	case errors.Is(err, context.Canceled):
+		return "The download was canceled. A partial file may remain. Start it again if needed."
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &network) && network.Timeout():
+		return "The download connection timed out. Check the source is available and retry."
+	case errors.Is(err, os.ErrPermission):
+		return "The node could not write the downloaded file. Ask an administrator to check folder permissions."
+	default:
+		return "The node could not finish the download. A partial file may remain. Check free disk space and the node logs before retrying."
+	}
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {beginPowerOperation,advancePowerOperation,powerOperationLabel} from '../src/client/powerOperation.ts';
+import {beginPowerOperation,advancePowerOperation,powerOperationLabel,powerOperationDetail} from '../src/client/powerOperation.ts';
 const accepted=signal=>({...beginPowerOperation(signal,100,60000,100),accepted:true});
 
 test('request acceptance and stale running samples do not complete restart',()=>{
@@ -42,4 +42,17 @@ test('start stays pending until running, and detects an observed startup failure
 test('restart startup failure reports failure instead of success',()=>{
  const operation=advancePowerOperation(accepted('restart'),'starting',100,200).operation;
  assert.equal(advancePowerOperation(operation,'offline',0,300).outcome,'error');
+});
+
+test('power progress distinguishes sending, acceptance, and unconfirmed completion',()=>{
+ const sending=beginPowerOperation('start',100,0,100);
+ assert.equal(powerOperationLabel(sending),'Sending request...');
+ assert.match(powerOperationDetail(sending,0),/accept the request/);
+ assert.match(powerOperationDetail(sending,30),/not confirmed/);
+ const operation=accepted('restart');
+ assert.match(powerOperationDetail(operation,5),/save and exit/);
+ assert.match(powerOperationDetail({...operation,phase:'starting'},20),/report the server running/);
+ assert.match(powerOperationDetail(operation,120),/completion is still unconfirmed/);
+ assert.match(powerOperationDetail(operation,120,true),/may still be running/);
+ assert.notEqual(advancePowerOperation(operation,'running',62000,200).outcome,'success');
 });

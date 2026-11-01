@@ -7,6 +7,7 @@ import {emptyConsoleHistory,appendConsoleHistory,consoleHistoryText} from '../sr
 import {ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS} from '../src/client/consoleQueue.ts';
 import {consoleOutput} from '../src/client/consoleOutput.ts';
 import {consoleStateLine} from '../src/client/consoleLifecycle.ts';
+import {consoleRunID,consoleRunChanged} from '../src/client/consoleRun.ts';
 
 function fixture() {
   const effects=[], timers=new Map(), requests=[], sockets=[];
@@ -26,6 +27,7 @@ function fixture() {
   const api=path=>new Promise((resolve,reject)=>requests.push({path,resolve,reject}));
   const modules={react,'../hooks/liveEvents':{observeLivePath:(_path,fn)=>{subscriber=fn;return()=>{subscriber=undefined}},isLivePathFresh:()=>fresh},'../notifications/useErrorState':{useErrorState:()=>react.useState('')},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib':{api},'./ServerDashboard':{useServerTelemetry:()=>({state:'unknown'})},'./consoleHistory':{emptyConsoleHistory,appendConsoleHistory},'./consoleQueue':{ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS},'./consoleReplay':{ConsoleReplayOverlap},'./consoleOutput':{consoleOutput},'./consoleLifecycle':{consoleStateLine},'./serverPower':{consolePowerEvent:'power'},'./common':{useServer:()=>({base:'/server',server:{},permissions:[]}),useAction:()=>({}),value:r=>r}};
   const code=ts.transpileModule(readFileSync(new URL('../src/client/Console.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+  modules['./consoleRun']={consoleRunID,consoleRunChanged};
   const exports={};
   new Function('require','exports','window','document','WebSocket','location','setTimeout','clearTimeout',code)(name=>modules[name]??{},exports,{matchMedia:()=>({matches:true}),addEventListener(){},removeEventListener(){}},doc,Socket,{href:'http://localhost'},(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},id=>timers.delete(id));
   exports.default();
@@ -164,4 +166,38 @@ test('hidden console pauses HTTP fallback and recovers on return',async()=>{
   assert.equal(f.requests.filter(r=>r.path.includes('console-history')).length,0);
   f.visibility(false);assert.ok(f.requests.some(r=>r.path.endsWith('after=10')));
  }finally{f.cleanup()}
+});
+
+
+test('new run reloads the retained tail for an already connected console',async()=>{
+  const f=fixture();
+  try{
+    await f.respond({run_start:'0',cursor:'600',capture:{connected:true},data:[entry('old unwanted output'),entry('final crash diagnostic')]});
+    f.setFresh(true);
+    f.emit({run_start:'601',after:'600',head:'603',cursor:'603',capture:{connected:true},data:[{id:'601',event:'panel message',line:'New run.'},{id:'603',...entry('fresh startup')}]});
+    await f.tick();
+    assert.ok(f.requests.some(r=>r.path.endsWith('console-history?after=0')));
+    await f.respond({run_start:'601',cursor:'603',capture:{connected:true},data:[entry('final crash diagnostic'),{event:'panel message',line:'New run.'},entry('fresh startup')]});
+    assert.doesNotMatch(f.text(),/old unwanted/);
+    assert.match(f.text(),/final crash diagnostic/);
+    assert.match(f.text(),/fresh startup/);
+    assert.equal(f.text().split('New run.').length-1,1);
+    await f.run(1000);
+    assert.equal(f.requests.filter(r=>r.path.includes('console-history')).length,0);
+  }finally{f.cleanup()}
+});
+
+test('HTTP fallback detects a new run without a socket and reloads once',async()=>{
+  const f=fixture();
+  try{
+    await f.respond({run_start:'10',cursor:'50',capture:{connected:true},data:[entry('old unwanted')]});
+    await f.run(1000);
+    await f.respond({run_start:'51',cursor:'52',capture:{connected:true},data:[entry('fresh startup')]});
+    await f.run(10);
+    assert.ok(f.requests.some(r=>r.path.endsWith('console-history?after=0')));
+    await f.respond({run_start:'51',cursor:'52',capture:{connected:true},data:[entry('previous tail'),entry('fresh startup')]});
+    assert.equal(f.text(),'previous tail\nfresh startup');
+    await f.run(1000);
+    assert.ok(f.requests.some(r=>r.path.endsWith('console-history?after=52')));
+  }finally{f.cleanup()}
 });

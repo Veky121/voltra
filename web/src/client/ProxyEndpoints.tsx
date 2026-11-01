@@ -16,14 +16,14 @@ export function ProxyEndpoints({base,revision=0}:{base:string;revision?:number})
  if(account.loading)return <p role="status">Loading proxy settings...</p>;
  if(admin)return <ServerProxyManager key={`${base}:${revision}`} base={base}/>;
  return <SettingsSection title="Public connections"><PageError error={account.error||query.error}/>
-  {query.error?null:query.loading?<p className="server-proxy-note">Loading connections...</p>:items(query.data).length?items(query.data).map(r=><SettingsRow key={r.id} label={address(r.public_host,r.public_port)} description={`${String(r.protocol).toUpperCase()} · ${r.status}`} control={<CopyButton value={address(r.public_host,r.public_port)}>Copy address</CopyButton>}/>):<p className="server-proxy-note">No proxy routes. An administrator can connect this server to a gateway.</p>}
+  {query.error?null:query.loading?<p className="server-proxy-note">Loading connections...</p>:items(query.data).length?<div className="settings-options-grid server-proxy-routes">{items(query.data).map(r=><SettingsRow key={r.id} label={address(r.public_host,r.public_port)} description={`${String(r.protocol).toUpperCase()} · ${r.status}`} control={<CopyButton value={address(r.public_host,r.public_port)}>Copy address</CopyButton>}/>)}</div>:<p className="server-proxy-note">No proxy routes. An administrator can connect this server to a gateway.</p>}
  </SettingsSection>;
 }
 function ServerProxyManager({base}:{base:string}) {
  const {server,reload}=useServer(),path=`/api/admin/servers/${encodeURIComponent(server.uuid||server.identifier)}/proxy`;
  const query=useAPI(path),data=value(query.data);
  const [allocationID,setAllocation]=useState(''),[clientID,setClient]=useState(''),[protocol,setProtocol]=useState(''),[publicPort,setPublicPort]=useState('');
- const [customPort,setCustomPort]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/ProxyEndpoints.tsx');
+ const [customPort,setCustomPort]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/ProxyEndpoints.tsx',{transient:true});
  const allocations:any[]=data?.allocations||[],clients:any[]=data?.clients||[],routes:any[]=data?.routes||[];
  const allocation=allocations.find(p=>String(p.id)===allocationID)||(!allocationID?allocations[0]:undefined);
  const eligible=clients.filter(c=>c.setup_complete&&c.test_status==='complete'&&allocation&&allocation.port>=c.local_port_start&&allocation.port<=c.local_port_end);
@@ -44,11 +44,13 @@ function ServerProxyManager({base}:{base:string}) {
   await run(async()=>{const route=value(await api(path,{method:'POST',body:JSON.stringify({client_id:client.id,allocation_id:allocation.id,protocol:selectedProtocol,public_port:customPort?Number(publicPort):0})}));await apply(route)});
  }
  return <div className="server-proxy-manager">
-  <SettingsSection title="Public connections" action={<Button variant="secondary" disabled={busy||query.loading} onClick={query.reload}>Refresh status</Button>}>
-   <PageError error={query.error||error}/>
+  <SettingsSection title="Public connections" action={<div className="server-proxy-actions"><Link className="button secondary" to="/admin/integrations/proxy-gateways">Manage gateways</Link><Button variant="secondary" disabled={busy||query.loading} onClick={query.reload}>Refresh status</Button></div>}>
+   <PageError error={query.error}/><PageError error={error} onDismiss={()=>setError('')}/>
    {query.error&&!data?null:query.loading&&!data?<p className="server-proxy-note" role="status">Loading connections...</p>:<>
-    <SettingsRow label={primaryRoutes.some(r=>r.status==='applied')?'Primary port has a proxy route':primaryRoutes.length?'Primary proxy needs attention':'Primary port is not proxied'} description="A node port or address alias alone does not create forwarding." control={<Link className="button secondary" to="/admin/integrations/proxy-gateways">Manage gateways</Link>}/>
+    <p className="server-proxy-note server-proxy-summary">{primaryRoutes.some(r=>r.status==='applied')?'Primary port has a proxy route':primaryRoutes.length?'Primary proxy needs attention':'Primary port is not proxied'}</p>
+    <div className="settings-options-grid server-proxy-routes">
     {routes.map(route=><SettingsRow key={route.id} label={<CopyButton value={address(route.public_host,route.public_port)} onCopyError={setError}>{address(route.public_host,route.public_port)}</CopyButton>} description={`${route.gateway_name} · ${route.protocol.toUpperCase()} to ${address(route.local_ip,route.local_port)}${route.allocation_id===primary?.id?' · Primary':''}`} control={<div className="server-proxy-actions"><span className="badge" data-status={route.status}>{status(route)}</span><Button variant="secondary" disabled={busy} onClick={()=>void run(()=>apply(route))}>{route.desired_present?'Retry':'Retry removal'}</Button>{route.desired_present&&<Button variant="danger" disabled={busy} onClick={async()=>{if(await confirmAction({title:'Remove public connection?',description:`Disconnect ${address(route.public_host,route.public_port)}? Players using this route will lose access. The server keeps its node port.`,confirmLabel:'Remove route',danger:true}))void run(async()=>{await api(`/api/admin/proxy-gateways/${route.gateway_id}/routes/${route.id}`,{method:'DELETE'});await apply(route)})}}>Remove</Button>}</div>}>{route.last_error&&<p role="alert" className="server-proxy-error">{route.last_error}</p>}</SettingsRow>)}
+    </div>
     <p className="server-proxy-note">Applied means the gateway accepted the route at its last check. It does not confirm that the game is reachable from the internet.</p>
    </>}
   </SettingsSection>

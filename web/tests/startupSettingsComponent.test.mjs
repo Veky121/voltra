@@ -16,7 +16,7 @@ const secretVariable = {env_variable:'RCON_PASSWORD',name:'Console password',rul
 function load({react = React,variables = [baseVariable,secretVariable],meta = {},permissions = ['*'],account = {},accountLoading = false,accountError = ''} = {}) {
   const context = {base:'/api/client/servers/fixture',server:{image:'runtime:v1',limits:{memory:4096}},permissions,reload(){}};
   const module = {exports:{}};
-  const modules = {'../notifications/useErrorState':{useErrorState:()=>react.useState('')},'../components/ui/checkbox':{Checkbox:'input'},'../ui/Settings':{SettingsRow:({label,description,control,children,...props})=>React.createElement('div',props,label,description,control,children),SettingsSection:({title,children})=>React.createElement('section',null,title,children)},'../ui/Disclosure':{Disclosure:'details',DisclosureTrigger:'summary'},'./settingDescription':{settingDescription:text=>text}, './PendingSettings':{PendingSettings:({children})=>children,usePendingSetting(){}},'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
+  const modules = {'../notifications/useErrorState':{useErrorState:()=>react.useState('')},'../components/ui/checkbox':{Checkbox:'input'},'../ui/Settings':{SettingsRow:({label,description,details,control,children,...props})=>React.createElement('div',props,label,description,details,control,children),SettingsSection:({title,children})=>React.createElement('section',null,title,children)},'../ui/Disclosure':{Disclosure:'details',DisclosureTrigger:'summary'},'./settingDescription':{settingDescription:text=>text}, './PendingSettings':{PendingSettings:({children})=>children,usePendingSetting(){}},'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
     react,
     'react-router-dom':{Link:({to,children,...props})=>React.createElement('a',{href:to,...props},children)},
     '../lib':{
@@ -45,23 +45,26 @@ function load({react = React,variables = [baseVariable,secretVariable],meta = {}
 
 const render = (options = {}) => renderToStaticMarkup(React.createElement(load(options).default, {section:options.section || 'runtime'}));
 
-test('settings have a short description, right-hand key, rules and default without individual actions',()=>{
+test('settings expose default provenance and a reset draft without individual save buttons',()=>{
  const html=render({section:'game',variables:[{...baseVariable,description:'Maximum number of players.'}]});
  assert.match(html,/Maximum number of players/);
- assert.match(html,/startup-variable-key[^>]*>MAX_PLAYERS/);
+ assert.match(html,/<code>MAX_PLAYERS/);
+ assert.match(html,/Custom override/);
+ assert.match(html,/Reset to template default/);
  assert.match(html,/Rules: required\|integer\|min:1\|max:64/);
- assert.match(html,/Default: 8/);
- assert.doesNotMatch(html,/Reset to template|Discard draft|>Save<|<form/);
+ assert.match(html,/Template default: 8/);
+ assert.doesNotMatch(html,/Discard draft|>Save<|<form/);
 });
 test('password fields show validation rules while concealing stored values and defaults',()=>{
  const html=render({section:'game'});
  assert.doesNotMatch(html,/value="another-secret"|Default: do-not-show/);
  assert.match(html,/Rules: nullable\|string\|in:do-not-show,another-secret/);
- assert.match(html,/Default: Hidden/);
+ assert.match(html,/Template default: Hidden/);
  assert.match(html,/type="password"/);
 });
 test('read-only and permission gates are preserved',()=>{
  assert.match(render({section:'game',permissions:['startup.read']}),/disabled/);
+ assert.doesNotMatch(render({section:'game',permissions:['startup.read']}),/Reset to template default/);
  assert.doesNotMatch(render({section:'game',permissions:[]}),/MAX_PLAYERS/);
 });
 test('client settings omit licences',()=>{

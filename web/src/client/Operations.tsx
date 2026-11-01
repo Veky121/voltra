@@ -1,4 +1,5 @@
 import {usePendingSetting} from './PendingSettings';
+import ServerStorageSummary from './ServerStorageSummary';
 import {confirmAction} from '../ui/ConfirmAction';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import { useEffect, useState, type ReactNode } from "react";
@@ -74,6 +75,7 @@ export function Backups() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
+      <ServerStorageSummary backupResponse={r.data} backupError={r.error}/>
       {r.loading && <p role="status">Loading backups...</p>}
       <div className="grid grid-2">
         {items(r.data).map((b) => (

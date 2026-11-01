@@ -63,7 +63,7 @@ export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
   return (
     <>
       {action.error && (
-        <Alert variant="destructive" className="error"><AlertDescription>{action.error}</AlertDescription></Alert>
+        <PageError error={action.error} onDismiss={()=>action.setError('')}/>
       )}
       {action.success && (
         <div role="status" className="success">
@@ -73,9 +73,9 @@ export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
     </>
   );
 }
-export function PageError({ error }: { error: string }) {
+export function PageError({ error,onDismiss }: { error: string;onDismiss?:()=>void }) {
   return error ? (
-    <Alert variant="destructive" className="error"><AlertDescription>{error}</AlertDescription></Alert>
+    <Alert variant="destructive" className="error"><AlertDescription className="scn:flex scn:items-start scn:justify-between scn:gap-3"><span>{error}</span>{onDismiss&&<Button variant="secondary" onClick={onDismiss} aria-label="Dismiss error">Dismiss</Button>}</AlertDescription></Alert>
   ) : null;
 }
 export function Pager({

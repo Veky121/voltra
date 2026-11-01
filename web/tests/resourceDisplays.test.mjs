@@ -31,7 +31,8 @@ test('resource cards use GB while network and file sizes retain adaptive units',
   const read=name=>readFileSync(new URL(`../src/client/${name}.tsx`,import.meta.url),'utf8');
   assert.match(read('Overview'),/resourceReadingGB\(r.memory_bytes,s.limits\?\.memory\)/);
   assert.match(read('Overview'),/resourceReadingGB\(r.disk_bytes,s.limits\?\.disk\)/);
-  assert.match(read('FileStorageSummary'),/resourceUsageGB\(used\)/);
+  assert.match(read('FileStorageSummary'),/ServerStorageSummary/);
+  assert.match(read('ServerStorageSummary'),/formatBytesGB\(value\)/);
   assert.match(read('ServerDashboard'),/format=\{formatBytesGB\}/);
   assert.match(read('ServerDashboard'),/bytes\(n\).*\/s/);
   assert.match(read('Operations'),/bytes\(b.bytes\)/);
