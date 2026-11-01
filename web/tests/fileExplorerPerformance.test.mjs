@@ -10,7 +10,7 @@ const bundled=await build({
   plugins:[{name:'explorer-fixture',setup(builder){
     builder.onResolve({filter:/^\.\.\/ui\/IconButton$|^\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
     builder.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',contents:
-      path==='react'?`export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
+      path==='react'?`export const memo=component=>component; export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
       path==='react/jsx-runtime'?`export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`:
       path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);`:
       path==='../components/ui/checkbox'?`export const Checkbox='input';`:
@@ -61,4 +61,18 @@ test('server changes do not expose previous rows and initial failure keeps retry
   const f=fixture(),old=f.listing('/',[entry('private.txt')]);old.loading=false;f.render();assert.ok(f.button('Open /private.txt'));
   f.props.base='/server/b';f.render();assert.equal(f.button('Open /private.txt'),undefined);
   const q=f.listing('/');q.loading=false;q.error='denied';f.render();assert.match(f.text(),/Could not load this folder/);const retry=f.nodes().find(n=>n.type==='button'&&n.props.children==='Retry');retry.props.onClick();assert.equal(q.calls,1);
+});
+
+// Memoization is measured with the compiled app; this fixture checks row behavior.
+test('compact explorer skips metadata and keeps open, selection and permission behavior',()=>{
+  const f=fixture(),q=f.listing('/',[{...entry('server.properties'),modified_at:'2026-11-01T06:00:00Z'}]);q.loading=false;
+  const opened=[],selected=[],menus=[];f.props.onOpen=path=>opened.push(path);
+  f.props.controls={selected:['/server.properties'],onSelect:path=>selected.push(path),onMenu:(path,anchor)=>menus.push([path,anchor])};
+  f.render();assert.equal(f.nodes().filter(n=>n.type==='time').length,1);
+  const button=f.button('Open /server.properties');
+  button.props.onClick({button:0});assert.deepEqual(opened,['/server.properties']);
+  button.props.onClick({button:0,ctrlKey:true});assert.deepEqual(selected,['/server.properties']);
+  const anchor={};f.button('Options for /server.properties').props.onClick({currentTarget:anchor});assert.deepEqual(menus,[['/server.properties',anchor]]);
+  f.props.activeFile='/server.properties';f.props.dirty=true;f.render();assert.equal(f.nodes().filter(n=>n.type==='time').length,0);assert.match(f.text(),/Unsaved changes/);
+  f.props.permissions=[];f.render();assert.equal(f.button('Open /server.properties').props.disabled,true);
 });

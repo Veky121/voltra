@@ -68,3 +68,7 @@
 }
 @media(prefers-reduced-motion:reduce){.file-draft-bar.is-attention,.file-editor-pane,.file-explorer{animation:none}
 .explorer-chevron{transition:none}}
+
+/* Keep off-screen rows available to keyboard/find without laying out their contents. */
+.file-explorer :is(.explorer-file-row,.explorer-folder-row){content-visibility:auto;contain-intrinsic-block-size:auto max(34px,calc(19.5px * var(--ui-font-scale,1) + 14px))}
+@media(pointer:coarse){.file-explorer :is(.explorer-file-row,.explorer-folder-row){contain-intrinsic-block-size:auto max(40px,calc(19.5px * var(--ui-font-scale,1) + 14px))}}

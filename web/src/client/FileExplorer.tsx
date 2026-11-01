@@ -1,6 +1,6 @@
 import {IconButton} from '../ui/IconButton';
 import {Checkbox} from '../components/ui/checkbox';
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {memo,useEffect,useMemo,useRef,useState} from 'react';
 import {useAPI} from '../lib';
 import {Icon} from '../Icons';
 import {bytes,can,items,type RecordData} from './common';
@@ -12,10 +12,23 @@ type Controls={selected:string[];onSelect:(path:string)=>void;onMenu:(path:strin
 type Shared={base:string;activeFile:string;activeDirectory?:string;refreshToken:string;dirty:boolean;filter:string;permissions:string[];onOpen:(path:string)=>void;onDirectory?:(path:string)=>void;onEntries?:(path:string,files:FileEntry[])=>void;controls?:Controls&{membership:ReadonlySet<string>}};
 function EntryCheck({path,controls}:{path:string;controls?:Controls&{membership:ReadonlySet<string>}}){return controls&&<label className="explorer-check-target" title={`Select ${path}`}><Checkbox className="explorer-check" aria-label={`Select ${path}`} checked={controls.membership.has(path)} onCheckedChange={()=>controls.onSelect(path)}/></label>}
 function EntryMenu({path,controls}:{path:string;controls?:Controls}){return controls&&<IconButton type="button" className="explorer-menu" aria-label={`Options for ${path}`} aria-haspopup="menu" onClick={event=>controls.onMenu(path,event.currentTarget)}><Icon name="more"/></IconButton>}
-function EntryMetadata({entry}:{entry:FileEntry}){
+const modifiedFormat=new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const modifiedTitleFormat=new Intl.DateTimeFormat(undefined,{dateStyle:'short',timeStyle:'medium'});
+const nameOrder=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
+const EntryMetadata=memo(function EntryMetadata({entry}:{entry:FileEntry}){
   const modified=fileModifiedDate(entry.modified_at),size=fileEntrySize(entry),type=fileEntryType(entry);
-  return <span className="explorer-metadata"><span className="explorer-modified" title={modified?.toLocaleString()||'Date modified unavailable'}>{modified?<time dateTime={modified.toISOString()}>{modified.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time>:'—'}</span><span className="explorer-type" title={type}>{type}</span><span className="explorer-size" title={size===null?entry.is_file?'Size unavailable':'Folder contents are not included in directory listing sizes':`${size.toLocaleString()} bytes`}>{size===null?'—':bytes(size)}</span></span>;
-}
+  return <span className="explorer-metadata"><span className="explorer-modified" title={modified?modifiedTitleFormat.format(modified):'Date modified unavailable'}>{modified?<time dateTime={modified.toISOString()}>{modifiedFormat.format(modified)}</time>:'—'}</span><span className="explorer-type" title={type}>{type}</span><span className="explorer-size" title={size===null?entry.is_file?'Size unavailable':'Folder contents are not included in directory listing sizes':`${size.toLocaleString()} bytes`}>{size===null?'—':bytes(size)}</span></span>;
+});
+
+// Keep unchanged file rows out of selection, draft and parent status updates.
+const FileRow=memo(function FileRow({entry,path,depth,selected,active,dirty,compact,readable,onOpen,onSelect,onMenu}:{entry:FileEntry;path:string;depth:number;selected:boolean;active:boolean;dirty:boolean;compact:boolean;readable:boolean;onOpen:Shared['onOpen'];onSelect?:Controls['onSelect'];onMenu?:Controls['onMenu']}){
+  return <li className={`explorer-file-row${selected?' is-selected':''}`}>
+    {onSelect&&<label className="explorer-check-target" title={`Select ${path}`}><Checkbox className="explorer-check" aria-label={`Select ${path}`} checked={selected} onCheckedChange={()=>onSelect(path)}/></label>}
+    <button type="button" className={`explorer-row explorer-file${active?' is-active':''}`} style={{paddingLeft:30+depth*14}} aria-label={`Open ${path}`} aria-current={active?'page':undefined} disabled={!readable} title={path} onClick={event=>{if(onSelect&&!plainFileClick(event)){onSelect(path);return}onOpen(path)}}><Icon name="file"/><span>{entry.name}</span>{active&&dirty&&<i className="explorer-draft-dot" aria-label="Unsaved changes"/>}</button>
+    {!compact&&<EntryMetadata entry={entry}/>}
+    {onMenu&&<IconButton type="button" className="explorer-menu" aria-label={`Options for ${path}`} aria-haspopup="menu" onClick={event=>onMenu(path,event.currentTarget)}><Icon name="more"/></IconButton>}
+  </li>;
+});
 function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:string;entry?:FileEntry;depth?:number}){
   const activePath=shared.activeFile||shared.activeDirectory||'/';
   const containsActive=path==='/'||activePath===path||activePath.startsWith(path+'/');
@@ -30,7 +43,7 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
     listing.reload();
   },[expanded,shared.refreshToken,listing.reload]);
   useEffect(()=>{if(listing.data)shared.onEntries?.(path,items(listing.data) as FileEntry[])},[listing.data,path,shared.onEntries]);
-  const entries=useMemo<RecordData[]>(()=>items(listing.data).sort((a,b)=>Number(a.is_file)-Number(b.is_file)||a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'})),[listing.data]);
+  const entries=useMemo<RecordData[]>(()=>items(listing.data).sort((a,b)=>Number(a.is_file)-Number(b.is_file)||nameOrder.compare(a.name,b.name)),[listing.data]);
   const visible=useMemo(()=>{
     const filter=shared.filter.toLowerCase();
     return entries.filter(entry=>!entry.is_file||entry.name.toLowerCase().includes(filter));
@@ -42,7 +55,7 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
       <button type="button" className={`explorer-row explorer-folder-button${path==='/'?' explorer-root':''}`} aria-expanded={shared.onDirectory?undefined:expanded} aria-label={shared.onDirectory?`Browse ${path}`:`${expanded?'Collapse':'Expand'} ${path}`} aria-current={shared.activeDirectory===path&&!shared.activeFile?'page':undefined} style={{paddingLeft:shared.onDirectory?28+depth*14:10+depth*14}} title={path} onClick={event=>{if(shared.controls&&!plainFileClick(event)&&path!=='/'){shared.controls.onSelect(path);return}if(shared.onDirectory){setExpanded(value=>shared.activeDirectory===path?!value:true);shared.onDirectory(path)}else setExpanded(v=>!v)}}>
         {!shared.onDirectory&&<span className={`explorer-chevron${expanded?' is-expanded':''}`} aria-hidden="true">›</span>}<Icon name="files"/><span>{label}</span>
       </button>
-      {entry&&<EntryMetadata entry={entry}/>}
+      {entry&&!shared.activeFile&&<EntryMetadata entry={entry}/>}
       {path!=='/'&&<EntryMenu path={path} controls={shared.controls}/>}
     </div>
     {expanded&&<ul>
@@ -51,7 +64,7 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
         {listing.error&&<li className="explorer-message is-error">Could not refresh this folder.<button type="button" onClick={listing.reload}>Retry</button></li>}
         {visible.map(entry=>{
           const entryPath=`${path==='/'?'':path}/${entry.name}`;
-          return entry.is_file||depth>=32?<li key={entry.name} className={`explorer-file-row${shared.controls?.membership.has(entryPath)?' is-selected':''}`}><EntryCheck path={entryPath} controls={shared.controls}/><button type="button" className={`explorer-row explorer-file${shared.activeFile===entryPath?' is-active':''}`} style={{paddingLeft:30+(depth+1)*14}} aria-label={`Open ${entryPath}`} aria-current={shared.activeFile===entryPath?'page':undefined} disabled={!can(shared.permissions,'file.read-content')} title={entryPath} onClick={event=>{if(shared.controls&&!plainFileClick(event)){shared.controls.onSelect(entryPath);return}shared.onOpen(entryPath)}}><Icon name="file"/><span>{entry.name}</span>{shared.activeFile===entryPath&&shared.dirty&&<i className="explorer-draft-dot" aria-label="Unsaved changes"/>}</button><EntryMetadata entry={entry as FileEntry}/><EntryMenu path={entryPath} controls={shared.controls}/></li>:<Folder key={entry.name} {...shared} path={entryPath} label={entry.name} entry={entry as FileEntry} depth={depth+1}/>;
+          return entry.is_file||depth>=32?<FileRow key={entry.name} entry={entry as FileEntry} path={entryPath} depth={depth+1} selected={shared.controls?.membership.has(entryPath)||false} active={shared.activeFile===entryPath} dirty={shared.activeFile===entryPath&&shared.dirty} compact={!!shared.activeFile} readable={can(shared.permissions,'file.read-content')} onOpen={shared.onOpen} onSelect={shared.controls?.onSelect} onMenu={shared.controls?.onMenu}/>:<Folder key={entry.name} {...shared} path={entryPath} label={entry.name} entry={entry as FileEntry} depth={depth+1}/>;
         })}
         {!visible.length&&<li className="explorer-message">{shared.filter?'No matching files':'Empty folder'}</li>}
       </>}
@@ -59,13 +72,14 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
   </li>;
 }
 
-export default function FileExplorer({base,activeFile,activeDirectory,dirty,permissions,onOpen,onBrowse,onDirectory,refreshKey=0,onEntries,controls}:{base:string;activeFile:string;activeDirectory?:string;dirty:boolean;permissions:string[];onOpen:(path:string)=>void;onBrowse:()=>void;onDirectory?:(path:string)=>void;refreshKey?:number;onEntries?:Shared['onEntries'];controls?:Controls}){
+const FileExplorer=memo(function FileExplorer({base,activeFile,activeDirectory,dirty,permissions,onOpen,onBrowse,onDirectory,refreshKey=0,onEntries,controls}:{base:string;activeFile:string;activeDirectory?:string;dirty:boolean;permissions:string[];onOpen:(path:string)=>void;onBrowse:()=>void;onDirectory?:(path:string)=>void;refreshKey?:number;onEntries?:Shared['onEntries'];controls?:Controls}){
   const membership=useMemo(()=>new Set(controls?.selected),[controls?.selected]);
-  const treeControls=controls?{...controls,membership}:undefined;
+  const treeControls=useMemo(()=>controls?{...controls,membership}:undefined,[controls,membership]);
   const [filter,setFilter]=useState(''),[version,setVersion]=useState(0);
   return <aside className={`file-explorer ${activeFile?'is-compact':'has-metadata'}`} aria-label="File explorer">
     <div className="file-explorer-header"><span>Explorer</span><div><button type="button" className="file-icon-button" aria-label="Refresh file explorer" title="Refresh files" onClick={()=>setVersion(v=>v+1)}><Icon name="restart"/></button><button type="button" className="file-icon-button" aria-label="Open full file browser" title="Open full file browser" onClick={onBrowse}><Icon name="files"/></button></div></div>
     <div className="file-explorer-search"><Icon name="search"/><input type="search" aria-label="Filter explorer files" placeholder="Filter files…" value={filter} onChange={event=>setFilter(event.target.value)}/></div>
     <nav aria-label="Server files" className="file-explorer-tree"><div className="explorer-columns"><span>Name</span><span className="explorer-metadata"><span>Date modified</span><span>Type</span><span className="explorer-size">Size</span></span><span className="explorer-action-space"/></div><ul><Folder key={base} refreshToken={`${version}:${refreshKey}`} path="/" label="/ home / container" base={base} activeFile={activeFile} activeDirectory={activeDirectory} dirty={dirty} filter={filter} permissions={permissions} onOpen={onOpen} onDirectory={onDirectory} onEntries={onEntries} controls={treeControls}/></ul></nav>
   </aside>;
-}
+});
+export default FileExplorer;

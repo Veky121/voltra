@@ -2,7 +2,7 @@ import {confirmAction} from '../ui/ConfirmAction';
 import {transferDestination} from './fileTransferPaths';
 import {useErrorState} from '../notifications/useErrorState';
 import './gameSwitch.css';
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {getDroppedFiles} from '@uppy/core/utils';
 import {api,Button,Field,Input,Modal} from '../lib';
@@ -54,8 +54,12 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
     if(path===latest.current.directory)setCount(files.length);
   },[]);
   useEffect(()=>{setSelected([]);setCount(directoryEntries.current.get(directory)?.length||0)},[directory]);
-  function navigate(path:string){const next=new URLSearchParams(latest.current.query);next.set('directory',filePath(path));next.delete('file');setQuery(next)}
-  function open(path:string){if(!allowed('file.read-content'))return;const next=new URLSearchParams(latest.current.query);next.set('directory',parentPath(path));next.set('file',path);setQuery(next)}
+  const navigate=useCallback((path:string)=>{const next=new URLSearchParams(latest.current.query);next.set('directory',filePath(path));next.delete('file');setQuery(next)},[setQuery]);
+  const open=useCallback((path:string)=>{if(!can(latest.current.permissions,'file.read-content'))return;const next=new URLSearchParams(latest.current.query);next.set('directory',parentPath(path));next.set('file',path);setQuery(next)},[setQuery]);
+  const browse=useCallback(()=>navigate(latest.current.directory),[navigate]);
+  const selectEntry=useCallback((path:string)=>setSelected(current=>current.includes(path)?current.filter(id=>id!==path):[...current,path]),[]);
+  const showEntryMenu=useCallback((id:string,anchor:HTMLButtonElement)=>setRowMenu(current=>current?.id===id?null:{id,anchor}),[]);
+  const explorerControls=useMemo(()=>!opened?{selected,onSelect:selectEntry,onMenu:showEntryMenu}:undefined,[opened,selected,selectEntry,showEntryMenu]);
   function openEntry(path:string){if(records.current.get(path)?.is_file)open(path);else navigate(path)}
   function refresh(){records.current.clear();directoryEntries.current.clear();setSelected([]);setCount(0);setEpoch(n=>n+1)}
   async function run(action:()=>Promise<unknown>,message:string){
@@ -115,7 +119,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
     </header>
     <PageError error={error}/>{notice&&<p className="fm-notice" role="status">{notice}</p>}
     <div className={`fm-file-layout${opened?' is-editing':''}`} onDragOverCapture={event=>{if(allowed('file.create')&&event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(true)}}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false)}} onDropCapture={event=>{if(event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(false);if(allowed('file.create'))void dropFiles(event.dataTransfer)}}}>
-      <FileExplorer base={base} activeFile={opened||''} activeDirectory={directory} dirty={documentDirty} permissions={permissions} onOpen={open} onBrowse={()=>navigate(directory)} onDirectory={navigate} refreshKey={epoch} onEntries={rememberEntries} controls={!opened?{selected,onSelect:path=>setSelected(current=>current.includes(path)?current.filter(id=>id!==path):[...current,path]),onMenu:(id,anchor)=>setRowMenu(current=>current?.id===id?null:{id,anchor})}:undefined}/>
+      <FileExplorer base={base} activeFile={opened||''} activeDirectory={directory} dirty={documentDirty} permissions={permissions} onOpen={open} onBrowse={browse} onDirectory={navigate} refreshKey={epoch} onEntries={rememberEntries} controls={explorerControls}/>
       <div className="fm-file-content" aria-hidden={!opened||undefined} inert={!opened}>
         {displayedFile&&<div className={`fm-document-pane${!opened?' is-closing':''}`}><FileDocument key={`${base}:${displayedFile}`} base={base} path={displayedFile} permissions={permissions} onClose={()=>navigate(directory)} onDelete={allowed('file.delete')?()=>void deletePaths([displayedFile]):undefined} deleting={busy} onDirtyChange={setDocumentDirty} navigationGuard={navigationGuard}/></div>}
       </div>
