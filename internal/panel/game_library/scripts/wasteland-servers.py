@@ -76,6 +76,63 @@ def verify_plains_eula(root):
   if len(value)!=pin['bytes'] or hashlib.sha256(value).hexdigest()!=pin['sha256']:raise ValueError('Packaged Plains EULA differs from reviewed terms; publisher agreement review required')
  finally:os.close(fd)
 
+def plains_plan(root,env,allow_missing=False):
+ # Validate creation inputs even when an existing native value owns startup.
+ primary,query=ports(env,27016)
+ defaults=dict(serverName=text(env,'SERVER_NAME','A Pterodactyl Hosted Server'),worldId=signed(env,'WORLD_ID',1),mapId=signed(env,'MAP_ID',256),seed=signed(env,'SEED',12345),difficulty=integer(env,'DIFFICULTY',1,1,4),worldSize=int(choice(env,'WORLD_SIZE','21',['11','21','31','41','51'])),maxPlayers=integer(env,'MAX_PLAYERS',10,1,200),password=text(env,'SERVER_PASSWORD','',20))
+ # Check every managed/preserved path before preservation creates staging.
+ for name in [*preserved('plains'),GAMES['plains'][2],'.config',PINS['plains_eula']['path'],'configs/server.json','configs/default.json']:
+  target=path(root,name)
+  if target.exists() and name in [*preserved('plains'),'.config'] and not target.is_dir():raise ValueError('Native directory required')
+ for name in preserved('plains'):
+  target=path(root,name)
+  if target.exists():
+   for parent,dirs,files in os.walk(target,followlinks=False):
+    for leaf in dirs+files:
+     item=path(root,str((Path(parent)/leaf).relative_to(root)))
+     if not item.is_dir() and not item.is_file():raise ValueError('Native regular file required')
+ config=path(root,'configs/server.json');source=config if config.exists() else path(root,'configs/default.json')
+ if not source.exists():
+  if allow_missing:return None
+  raise ValueError('Publisher configs/default.json missing; reinstall original depot')
+ if not source.is_file() or source.stat().st_size>8*1024**2:raise ValueError('Native JSON missing, unsafe or oversized')
+ content=source.read_bytes().decode('utf-8-sig');value=shared.json_unique(content)
+ if not isinstance(value,dict):raise ValueError('Publisher configuration must be a JSON object')
+ for key in value:
+  if key.casefold() in {k.casefold() for k in [*defaults,'port','queryPort']} and key not in [*defaults,'port','queryPort']:raise ValueError('Ambiguous native setting alias')
+ effective={**defaults,**value} if config.exists() else {**value,**defaults}
+ for key in defaults:
+  v=effective[key]
+  if key in ['serverName','password']:
+   text({key:v},key,limit=20 if key=='password' else 255)
+  elif type(v) is not int:raise ValueError('Invalid native '+key)
+  elif key in ['worldId','mapId','seed'] and not -2147483648<=v<=2147483647:raise ValueError('Invalid native '+key)
+  elif key=='difficulty' and not 1<=v<=4:raise ValueError('Invalid native difficulty')
+  elif key=='maxPlayers' and not 1<=v<=200:raise ValueError('Invalid native maxPlayers')
+  elif key=='worldSize' and v not in [11,21,31,41,51]:raise ValueError('Invalid native worldSize')
+ for key in ['port','queryPort']:
+  if key in value and (type(value[key]) is not int or not 1<=value[key]<=65535):raise ValueError('Invalid native '+key)
+ changes={key:v for key,v in defaults.items() if key not in value or not config.exists()}
+ changes.update({key:v for key,v in [('port',primary),('queryPort',query)] if value.get(key)!=v})
+ # Use the standard JSON decoder for value spans; retain all untouched bytes.
+ decoder=json.JSONDecoder();index=content.index('{')+1;edits=[]
+ while True:
+  while content[index].isspace():index+=1
+  if content[index]=='}':break
+  key,end=decoder.raw_decode(content,index);index=end
+  while content[index].isspace():index+=1
+  index+=1
+  while content[index].isspace():index+=1
+  start=index;_,index=decoder.raw_decode(content,index)
+  if key in changes:edits.append((start,index,json.dumps(changes.pop(key))))
+  while content[index].isspace():index+=1
+  if content[index]==',':index+=1
+  elif content[index]=='}':break
+ if changes:edits.append((index,index,(',' if value else '')+','.join(json.dumps(k)+':'+json.dumps(v) for k,v in changes.items())))
+ for start,end,replacement in reversed(edits):content=content[:start]+replacement+content[end:]
+ data=(b'\xef\xbb\xbf' if source.read_bytes().startswith(b'\xef\xbb\xbf') else b'')+content.encode()
+ return data,effective['password']
+
 def configure(root,game,env):
  agreement(game,env)
  root=Path(root).resolve()
@@ -98,16 +155,9 @@ def configure(root,game,env):
   plans.append(ini_plan(root,'WRSH/Saved/Config/WindowsServer/Game.ini',{'ServerSetting':{'SaveName':save_name(env,'SERVER_SAVE_NAME','MySave'),'ServerName':text(env,'SERVER_NAME','Test',32),'NeedPassword':choice(env,'SERVER_NEED_PASSWORD','False',['False','True']),'Password':password,'MaxPlayers':str(integer(env,'SERVER_PLAYERS',50,1,100)),'NumOfZombieSpawn':str(integer(env,'SERVER_NUM_ZOMBIES',50,25,100)),'Region':choice(env,'SERVER_REGION','All',['All','AF','AS','EU','NA','OC','SA']),'AdminPassword':admin}}))
   argv=['xvfb-run','-a','wine',str(path(root,binary)),'-server','-log','-Port='+str(primary),'-QueryPort='+str(query)];log=None
  else:
-  config=path(root,'configs/server.json')
-  if config.exists() and config.stat().st_size>8*1024**2:raise ValueError('Native JSON exceeds budget')
-  if config.exists():value=shared.json_unique(config.read_text(encoding='utf-8-sig'))
-  else:
-   default=path(root,'configs/default.json')
-   if default.exists() and default.stat().st_size<=8*1024**2:value=shared.json_unique(default.read_text(encoding='utf-8-sig'))
-   else:raise ValueError('Publisher configs/default.json missing or oversized; reinstall the original depot')
-  if not isinstance(value,dict):raise ValueError('Publisher configuration must be a JSON object')
-  value.update(serverName=text(env,'SERVER_NAME','A Pterodactyl Hosted Server'),worldId=signed(env,'WORLD_ID',1),mapId=signed(env,'MAP_ID',256),seed=signed(env,'SEED',12345),difficulty=integer(env,'DIFFICULTY',1,1,4),worldSize=int(choice(env,'WORLD_SIZE','21',['11','21','31','41','51'])),port=primary,queryPort=query,maxPlayers=integer(env,'MAX_PLAYERS',10,1,200),password=password)
-  plans.append(('configs/server.json',(json.dumps(value,indent=2)+'\n').encode()))
+  data,effective_password=plains_plan(root,env)
+  secrets=[effective_password]
+  if not path(root,'configs/server.json').exists() or path(root,'configs/server.json').read_bytes()!=data:plans.append(('configs/server.json',data))
   argv=[str(path(root,binary)),'-nographics','-batchmode','-ignorecompilererrors','-cc','-config','configs/server.json','-port',str(primary),'-queryPort',str(query)];log=None
  # Validate every config/field before the first managed file is changed.
  for name,data in plans:write(root,name,data)
@@ -117,13 +167,16 @@ def preserved(game):
 def install(root,game,env):
  agreement(game,env)
  root=Path(root).resolve();app,platform,binary=original_gate(root,game,env);ports(env,27015 if game=='noone' else 27016)
+ if game=='plains':
+  plains_plan(root,env,allow_missing=True)
+  if path(root,PINS['plains_eula']['path']).exists():verify_plains_eula(root)
  with preservation.preserve(root,preserved(game)):receipt=steam.update(root,app,env,platform=platform,force_platform=True,required=(binary,))
  if game=='plains':verify_plains_eula(root)
  if game=='night' and not path(root,'LF/Saved/Config/ServerSettings.ini').exists():write(root,'LF/Saved/Config/ServerSettings.ini',PINS['night_default_ini']['content'].encode())
  if game=='plains' and not path(root,'configs/server.json').exists():
   source=path(root,'configs/default.json')
   if not source.is_file() or source.stat().st_size>8*1024**2:raise ValueError('Publisher default config missing or oversized')
-  data=source.read_bytes();shared.json_unique(data.decode('utf-8-sig'));write(root,'configs/server.json',data)
+  data,_=plains_plan(root,env);write(root,'configs/server.json',data)
  return receipt
 def run(root,game,env):
  agreement(game,env)

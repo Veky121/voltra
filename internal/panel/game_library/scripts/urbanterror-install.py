@@ -11,7 +11,30 @@ RELEASE={'version':'4.3.4','prefix':'UrbanTerror43',
          'paths':['Quake3-UrT-Ded.x86_64','Quake3-UrT-Ded.i386','q3ut4/','COPYING.txt','README.txt','readme.txt','LICENSE.txt']}
 
 
+def preflight(root):
+    root = root.resolve()
+    # Reject existing unsafe geometry before acquisition or publication.
+    for relative in ['.voltra/urbanterror/release.json', 'urbanterror',
+                     'urbanterror/Quake3-UrT-Ded.i386',
+                     'urbanterror/Quake3-UrT-Ded.x86_64',
+                     'urbanterror/q3ut4/server_example.cfg',
+                     'urbanterror/q3ut4/mapcycle_example.txt',
+                     'urbanterror/q3ut4/server.cfg',
+                     'urbanterror/q3ut4/mapcycle.txt']:
+        path = root / relative
+        if not path.resolve().is_relative_to(root):
+            raise ValueError('Urban Terror path escapes volume')
+        for part in [path, *path.parents]:
+            if part == root:break
+            if part.is_symlink():raise ValueError('Urban Terror paths must not use symlinks')
+            if part != path and part.exists() and not part.is_dir():
+                raise ValueError('Urban Terror parent must be a directory')
+        if path.exists() and (not path.is_dir() if relative == 'urbanterror' else not path.is_file()):
+            raise ValueError('Urban Terror destination has incompatible type')
+
+
 def install(root):
+    preflight(root)
     install_release(root,RELEASE,'urbanterror','Quake3-UrT-Ded.x86_64')
     game=root/'urbanterror'
     (game/'Quake3-UrT-Ded.i386').chmod(0o755)

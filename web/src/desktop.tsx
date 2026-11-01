@@ -1,3 +1,7 @@
+import {confirmAction} from './ui/ConfirmAction';
+import {observedFetch} from './notifications/observedFetch';
+import {useErrorState} from './notifications/useErrorState';
+import {ActionButton as MiraAction} from './ui/ActionButton';
 import {useEffect,useState,type ReactNode} from 'react';
 import {Button,Card,ErrorBox,Field,Input,Loading,Modal,Select} from './lib';
 import './desktop.css';
@@ -10,7 +14,7 @@ import {SettingsRow,SettingsSection} from './ui/Settings';
 
 type Status={linked:boolean;panel_url:string;device_name:string;version:string;updates_enabled:boolean;storage_error?:string};
 async function local<T=Status>(path:string,body?:unknown):Promise<T>{
-  const response=await fetch(`/desktop/${path}`,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
+  const response=await observedFetch(`/desktop/${path}`,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||'The desktop request failed.');
   return data;
@@ -28,7 +32,7 @@ function DesktopUpdates({enabled}:{enabled:boolean}){
 
 export function DesktopAppInfo(){
   const navigate=useNavigate();
-  const [app,setApp]=useState<Status|null>(null),[error,setError]=useState('');
+  const [app,setApp]=useState<Status|null>(null),[error,setError]=useErrorState('desktop.tsx');
   const {status,busy,error:updateError,checkedAt}=useDesktopUpdates();
   useEffect(()=>{void local('status').then(setApp).catch(e=>setError(e.message))},[]);
   if(import.meta.env.VITE_DESKTOP!=='true')return null;
@@ -38,7 +42,7 @@ export function DesktopAppInfo(){
     <SettingsSection title="App & updates">
     <SettingsRow label="Version" control={<span className="settings-value">{app?`Voltra ${app.version}`:'…'}</span>}/>
     {app?.updates_enabled?<>
-      <SettingsRow label="Update channel" description="Release includes stable and beta builds. Nightly contains nightly builds only." control={<Select aria-label="Update channel" value={status?.channel||'release'} disabled={busy||status?.state==='ready'} onChange={e=>{if(window.confirm('Switch update channel? The selected channel may offer an older version. You must still choose Install and Restart to apply it.'))void updateAction('update-channel',{channel:e.target.value}).then(changed=>{if(changed)void updateAction('updates')})}}>{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/>
+      <SettingsRow label="Update channel" description="Release includes stable and beta builds. Nightly contains nightly builds only." control={<Select aria-label="Update channel" value={status?.channel||'release'} disabled={busy||status?.state==='ready'} onChange={async e=>{const channel=e.target.value;if(await confirmAction({title:"Switch channel?",description:'Switch update channel? The selected channel may offer an older version. You must still choose Install and Restart to apply it.',confirmLabel:"Switch channel",danger:false}))void updateAction('update-channel',{channel}).then(changed=>{if(changed)void updateAction('updates')})}}>{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/>
       <SettingsRow label="Updates" description={checkedAt?`Last checked ${new Date(checkedAt).toLocaleTimeString()}. Check now bypasses the hourly timer.`:'Check now queries the selected channel immediately.'} control={<div className="desktop-app-actions"><Button variant="secondary" disabled={busy||status?.state==='ready'} onClick={()=>void updateAction('updates')}>{busy?'Checking…':'Check now'}</Button>
       {status?.state==='available'&&<Button disabled={busy} onClick={()=>void updateAction('update-install')}>Install {status.available_version} from {status.channel}</Button>}
       {status?.state==='ready'&&<Button disabled={busy} onClick={()=>void updateAction('update-restart')}>Restart to update</Button>}</div>}>{status?.state==='up-to-date'&&<span className="settings-note" role="status">No newer build on {status.channel==='release'?'Release':'Nightly'}.{status.channel==='release'?' Nightly builds appear only on Nightly.':''}</span>}</SettingsRow>
@@ -58,7 +62,7 @@ export function DesktopRecoveryActions(){
 }
 
 function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaximizedChange:(value:boolean)=>void}){
-  const [error,setError]=useState('');
+  const [error,setError]=useErrorState('desktop.tsx');
   useEffect(()=>{
     let active=true,timer:ReturnType<typeof setTimeout>;
     const refresh=()=>{void local<{maximized:boolean}>('window').then(state=>{if(active)onMaximizedChange(state.maximized)}).catch(()=>{});};
@@ -69,9 +73,9 @@ function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaxim
   async function act(action:string){setError('');try{const state=await local<{maximized:boolean}>(`window/${action}`,{});onMaximizedChange(state.maximized);}catch(failure){setError((failure as Error).message);}}
   return <div className="desktop-window-controls" aria-label="Window controls" title={error||undefined}>
     {error&&<span className="desktop-update-error" role="alert">Window control failed</span>}
-    <button type="button" aria-label="Minimize window" title="Minimize" onClick={()=>void act('minimize')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
-    <button type="button" aria-label={maximized?'Restore window':'Maximize window'} title={maximized?'Restore':'Maximize'} onClick={()=>void act('maximize')}><svg viewBox="0 0 16 16" aria-hidden="true">{maximized?<><path d="M5 5V3h8v8h-2"/><rect x="3" y="5" width="8" height="8"/></>:<rect x="3" y="3" width="10" height="10"/>}</svg></button>
-    <button type="button" className="desktop-window-close" aria-label="Close window" title="Close" onClick={()=>void act('close')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 3 10 10M13 3 3 13"/></svg></button>
+    <MiraAction type="button" aria-label="Minimize window" title="Minimize" onClick={()=>void act('minimize')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></MiraAction>
+    <MiraAction type="button" aria-label={maximized?'Restore window':'Maximize window'} title={maximized?'Restore':'Maximize'} onClick={()=>void act('maximize')}><svg viewBox="0 0 16 16" aria-hidden="true">{maximized?<><path d="M5 5V3h8v8h-2"/><rect x="3" y="5" width="8" height="8"/></>:<rect x="3" y="3" width="10" height="10"/>}</svg></MiraAction>
+    <MiraAction type="button" className="desktop-window-close" aria-label="Close window" title="Close" onClick={()=>void act('close')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 3 10 10M13 3 3 13"/></svg></MiraAction>
   </div>;
 }
 
@@ -91,7 +95,7 @@ export default function DesktopGate({children}:{children:ReactNode}){
     const invoke=(message:string)=>(window as Window&{_wails?:{invoke?:(message:string)=>void}})._wails?.invoke?.(message);
     return installDesktopWindowGestures(window,invoke,()=>!maximized,()=>{void local<{maximized:boolean}>('window/maximize',{}).then(state=>setMaximized(state.maximized)).catch(()=>{});});
   },[maximized]);
-  const [status,setStatus]=useState<Status|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  const [status,setStatus]=useState<Status|null>(null),[error,setError]=useErrorState('desktop.tsx'),[busy,setBusy]=useState(false);
   const [connection,setConnection]=useState(''),[name,setName]=useState('My computer');
   const [disconnected,setDisconnected]=useState(false);
   const [confirmUnlink,setConfirmUnlink]=useState(false);

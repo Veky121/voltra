@@ -1,3 +1,5 @@
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
 import { useId, useState } from "react";
 import { Button, Field, Input, Select } from "../lib";
 import { clampInterval, readSimpleTiming, simpleTimingCron, weekDays } from "./scheduleTimingModel";
@@ -24,35 +26,29 @@ export function ScheduleTiming({ value, onChange }: { value: ScheduleCron; onCha
   };
   return <div className="schedule-timing">
     {!advanced && (parsed ? <>
+      <Field label="Repeat"><Select aria-label="Repeat" value={simple.unit==='hour'&&simple.every===24?'daily':'interval'} onChange={event=>update({...simple,unit:'hour',every:event.target.value==='daily'?24:1})}><option value="daily">Daily or weekly</option><option value="interval">At an interval</option></Select></Field>
       <fieldset className="schedule-days"><legend>Repeat on</legend>
-        <div className="schedule-day-buttons">{weekDays.map(day => <button key={day.value} type="button"
+        <div className="schedule-day-buttons">{weekDays.map(day => <MiraAction key={day.value} type="button"
           aria-label={day.name} aria-pressed={simple.days.includes(day.value)}
           onClick={() => update({ ...simple, days: simple.days.includes(day.value) ? simple.days.filter(d => d !== day.value) : [...simple.days, day.value] })}>
           {day.label}
-        </button>)}</div>
+        </MiraAction>)}</div>
       </fieldset>
-      <div className="schedule-interval"><span aria-hidden="true">Every</span>
+      {!(simple.unit==='hour'&&simple.every===24)&&<div className="schedule-interval"><span aria-hidden="true">Every</span>
         <Input type="number" aria-label="Repeat interval" required min={1} max={simple.unit === "minute" ? 60 : 24} step={1}
           value={simple.every} onChange={event => update({ ...simple, every: clampInterval(event.target.valueAsNumber, simple.unit) })} />
         <Select aria-label="Interval unit" value={simple.unit} onChange={event => {
           const unit = event.target.value as IntervalUnit;
           update({ ...simple, unit, every: clampInterval(simple.every, unit) });
         }}><option value="minute">minutes</option><option value="hour">hours</option></Select>
-      </div>
+      </div>}
       {simple.unit==='hour'&&<div className="schedule-start-time"><label htmlFor={startTimeId}>{simple.every===24?'Run at':'Starting at'}</label><Input id={startTimeId} aria-label="Start time" type="time" step={60} required value={simple.startTime??'00:00'} onInput={event=>{if(event.currentTarget.value)update({...simple,startTime:event.currentTarget.value})}}/></div>}
       {!simple.days.length && <p className="error" role="alert">Select at least one day.</p>}
-      <p className="muted schedule-timing-hint">Uses the panel timezone. {simple.unit==='hour'?(simple.every===24?`Runs once each selected day at ${simple.startTime??'00:00'}.`:`Runs at ${Array.from({length:Math.ceil(24/simple.every)},(_,index)=>{const [hour,minute]=(simple.startTime??'00:00').split(':');return `${String((Number(hour)+index*simple.every)%24).padStart(2,'0')}:${minute}`}).join(', ')} on the selected days.`):'Minute intervals start at minute 0 of each hour.'}
-        {simple.unit === "minute" && simple.every > 1 && simple.every < 60 && 60 % simple.every !== 0 ? ` Every ${simple.every} minutes runs at minutes ${Array.from({ length: Math.ceil(60 / simple.every) }, (_, i) => i * simple.every).join(", ")} of each hour.` : ""}
-        {simple.unit === "hour" && 24 % simple.every !== 0 ? ' This interval does not divide 24 hours evenly, so the daily pattern has a shorter gap.' : ""}
-      </p>
     </> : <div className="schedule-custom"><p>This schedule uses custom cron rules. Open Advanced to edit them.</p>
       <Button type="button" variant="secondary" onClick={() => update({ every: 1, unit: "hour", days: weekDays.map(day => day.value) })}>Use a simple interval</Button>
     </div>)}
-    <details className="schedule-advanced" open={advanced} onToggle={event => {
-      if (event.currentTarget.open === advanced) return;
-      if (event.currentTarget.open) setAdvanced(true); else closeAdvanced();
-    }}>
-      <summary>Advanced</summary>
+    <Disclosure className="schedule-advanced" open={advanced} onOpenChange={opened=>{if(opened)setAdvanced(true);else closeAdvanced()}}>
+      <DisclosureTrigger>Advanced</DisclosureTrigger>
       {advanced && <>
         <div className="form-grid">{cronFields.map(([key, label, range]) => <Field key={key} label={label} hint={`${range}; * means every value`}>
           <Input required value={value[key]} onChange={event => onChange({ ...value, [key]: event.target.value })} />
@@ -67,6 +63,6 @@ export function ScheduleTiming({ value, onChange }: { value: ScheduleCron; onCha
           <p className="muted">Uses the panel timezone. Intervals restart at each hour or day. Use * for day of month when selecting weekdays.</p>
         </div>
       </>}
-    </details>
+    </Disclosure>
   </div>;
 }

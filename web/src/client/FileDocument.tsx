@@ -1,3 +1,7 @@
+import {confirmAction} from '../ui/ConfirmAction';
+import {observedFetch} from '../notifications/observedFetch';
+import {useErrorState} from '../notifications/useErrorState';
+import {IconButton} from '../ui/IconButton';
 import {lazy,Suspense,useEffect,useRef,useState,type RefObject} from 'react';
 import {api,Button} from '../lib';
 import {Icon} from '../Icons';
@@ -22,7 +26,7 @@ export default function FileDocument(props:Props){
 
 function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigationGuard}:Props){
   const [draft,setDraft]=useState(()=>loadedDraft(path,''));
-  const [loading,setLoading]=useState(true),[opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  const [loading,setLoading]=useState(true),[opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/FileDocument.tsx'),[notice,setNotice]=useState('');
   const [kind,setKind]=useState<'text'|'image'|'audio'|'video'|'pdf'|'binary'|'large'>(previewKind(path));
   const [conflict,setConflict]=useState<string|null>(null),[reload,setReload]=useState(0);
   const [chunk,setChunk]=useState(''),[offset,setOffset]=useState(0),[size,setSize]=useState<number|null>(null),[ranged,setRanged]=useState(false),[chunkBusy,setChunkBusy]=useState(false);
@@ -47,7 +51,7 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
         if(initialKind!=='text'){setOpened(true);return;}
         // Fetch inert bytes for text detection so custom game-config extensions
         // can be edited without requiring a browser MIME preview allowlist.
-        const response=await fetch(download,{signal:abort.signal,headers:{Range:`bytes=0-${EDIT_LIMIT}`}});
+        const response=await observedFetch(download,{signal:abort.signal,headers:{Range:`bytes=0-${EDIT_LIMIT}`}},[416]);
         // HTTP byte ranges on a zero-byte file are unsatisfiable. It is still
         // a valid editable document, including a newly created empty file.
         if(response.status===416&&response.headers.get('Content-Range')==='bytes */0'){
@@ -76,7 +80,7 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
     const saving=draftRef.current,expected=forceBaseline??saving.saved;
     setBusy(true);setError('');setNotice('');
     try{
-      const current=await fetch(contents);await checkResponse(current);
+      const current=await observedFetch(contents);await checkResponse(current);
       const bounded=await readBounded(current,EDIT_LIMIT+1);
       if(bounded.truncated||bounded.buffer.byteLength>EDIT_LIMIT)throw new Error('The remote file grew beyond the editor limit. Download it before replacing its contents.');
       const remote=decodeEditorFile(bounded.buffer);
@@ -90,7 +94,7 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
   async function loadChunk(next:number){
     if(chunkBusy)return;setChunkBusy(true);setError('');
     try{
-      const response=await fetch(download,{headers:{Range:`bytes=${next}-${next+VIEW_CHUNK-1}`}});await checkResponse(response);
+      const response=await observedFetch(download,{headers:{Range:`bytes=${next}-${next+VIEW_CHUNK-1}`}});await checkResponse(response);
       if(next>0&&response.status!==206){await response.body?.cancel();throw new Error('This node does not support partial downloads. Download the file to view the remaining contents.');}
       const data=await readBounded(response,VIEW_CHUNK);
       if(alive.current){setChunk(new TextDecoder().decode(data.buffer));setOffset(next);setSize(responseSize(response));setRanged(response.status===206)}
@@ -102,7 +106,7 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
   return <section className="file-document" aria-label={`File: ${path}`}>
     <header className="file-document-toolbar"><strong title={path}>{path}</strong><div>
       {readable&&<a className="button secondary" href={download} download={path.split('/').at(-1)}>Download</a>}
-      <button type="button" className="file-document-close" aria-label="Close file" title="Close file" onClick={close}><Icon name="close"/></button>
+      <IconButton type="button" className="file-document-close" aria-label="Close file" title="Close file" onClick={close}><Icon name="close"/></IconButton>
     </div></header>
     <div className="file-document-content">
     {error&&<div role="alert" className="error">{error}<Button variant="secondary" disabled={dirty||busy} onClick={()=>setReload(n=>n+1)}>Retry opening</Button></div>}
@@ -128,7 +132,7 @@ function DocumentSession({base,path,permissions,onClose,onDirtyChange,navigation
       </>}
     </>}
     {conflict!==null&&<div className="file-document-conflict" role="alert"><h2>The file changed on the server</h2><p>Your draft is still here. Download the current server file before replacing it, or reload to use the server version.</p><div>
-      <Button variant="secondary" disabled={busy} onClick={()=>{if(window.confirm('Discard your draft and load the current server file?')){setDraft(current=>({...loadedDraft(path,conflict),revision:current.revision+1}));setConflict(null)}}}>Use server version</Button>
+      <Button variant="secondary" disabled={busy} onClick={async ()=>{if(await confirmAction({title:"Discard changes?",description:'Discard your draft and load the current server file?',confirmLabel:"Discard changes",danger:false})){setDraft(current=>({...loadedDraft(path,conflict),revision:current.revision+1}));setConflict(null)}}}>Use server version</Button>
       <Button variant="danger" disabled={busy} onClick={()=>void save(conflict)}>Replace server version with my draft</Button>
     </div></div>}
     </div>

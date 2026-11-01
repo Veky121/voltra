@@ -8,11 +8,13 @@ const bundled=await build({
   entryPoints:[fileURLToPath(new URL('../src/client/FileExplorer.tsx',import.meta.url))],
   bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',loader:{'.css':'empty'},
   plugins:[{name:'explorer-fixture',setup(builder){
-    builder.onResolve({filter:/^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
+    builder.onResolve({filter:/^\.\.\/ui\/IconButton$|^\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
     builder.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',contents:
       path==='react'?`export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
       path==='react/jsx-runtime'?`export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`:
       path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);`:
+      path==='../components/ui/checkbox'?`export const Checkbox='input';`:
+      path==='../ui/IconButton'?`export const IconButton='button';`:
       path==='../Icons'?`export const Icon=()=>null;`:
       `export const bytes=n=>String(n);export const can=(p,v)=>p.includes('*')||p.includes(v);export const items=r=>(r?.data||[]).map(x=>x.attributes);`
     }));

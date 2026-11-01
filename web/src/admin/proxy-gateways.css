@@ -3,6 +3,9 @@
 .proxy-gateways__fieldset>.card{margin-bottom:0}
 .proxy-gateways__selector{max-width:420px;min-width:0}
 .proxy-gateways__selector>.field{margin-bottom:0}
+.proxy-gateways .gateway-subdomains form{gap:0}
+.gateway-subdomains .settings-section-note{padding:14px 16px;margin:0;color:var(--muted);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.gateway-subdomains .settings-actions{flex-wrap:wrap}
 .proxy-gateways__row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:18px 0;border-bottom:1px solid var(--ui-divider);overflow-wrap:anywhere;min-width:0}
 .proxy-gateways__row>div:first-child{flex:1;min-width:0}
 .proxy-gateways__row strong{font-size:calc(13px * var(--ui-font-scale,1));font-weight:550}

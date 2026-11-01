@@ -43,10 +43,47 @@ def write_config(root,path,value,label):
  if path.exists() and read_config(path)==value:return
  metadata=path.stat() if path.exists() else None
  if metadata:private_write(confined(root,'.voltra/light-games-next/backups/'+label+'-'+str(time.time_ns())+'.json'),path.read_text(encoding='utf-8-sig'))
+ if label == 'nuclear' and path.exists():
+  content=preserved_json(path.read_bytes().decode('utf-8-sig'),value)
  private_write(path,content)
  if metadata:
   os.chmod(path,metadata.st_mode & 0o777)
   if hasattr(os,'chown'):os.chown(path,metadata.st_uid,metadata.st_gid)
+def preserved_json(source, value):
+    """Replace changed scalar tokens only; retain unknown JSON bytes and numbers."""
+    decoder = json.JSONDecoder()
+    edits = []
+    def white(i):
+        while i < len(source) and source[i].isspace(): i += 1
+        return i
+    def visit(i, wanted):
+        i = white(i)
+        old, end = decoder.raw_decode(source, i)
+        if old == wanted: return end
+        if isinstance(old, dict) and isinstance(wanted, dict):
+            cursor = white(i + 1)
+            found = set()
+            while cursor < end and source[cursor] != '}':
+                key, cursor = decoder.raw_decode(source, cursor)
+                cursor = white(cursor)
+                if source[cursor] != ':': raise ValueError('Invalid JSON object')
+                cursor = white(cursor + 1)
+                if key not in wanted: raise ValueError('JSON key deletion unsupported')
+                cursor = white(visit(cursor, wanted[key]))
+                found.add(key)
+                if source[cursor] == ',': cursor = white(cursor + 1)
+            additions = {k:v for k,v in wanted.items() if k not in found}
+            if additions:
+                content = json.dumps(additions, ensure_ascii=False, allow_nan=False)[1:-1]
+                edits.append((end-1, end-1, (',' if found else '') + content))
+        else:
+            edits.append((i, end, json.dumps(wanted, ensure_ascii=False, allow_nan=False)))
+        return end
+    visit(0, value)
+    for start, end, replacement in sorted(edits, reverse=True):
+        source = source[:start] + replacement + source[end:]
+    return source
+
 def puck_current(root,legacy,values):
  path=confined(root,'server_config.json');current=read_config(path)
  mods=[]
@@ -73,7 +110,7 @@ def config_path(root,game,env):
   if not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',name):raise ValueError('SERVER must be a plain folder name')
   return confined(root,'Servers/'+name+'/Config.json')
  return confined(root,'DedicatedServerConfig.json' if game=='nuclear' else 'server_configuration.json')
-def configure(root,game,env):
+def configure(root,game,env,publish=True):
  root=root.resolve();port=integer(env.get('SERVER_PORT',''),1,65535)
  allocated={integer(v,1,65535) for v in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') if v}
  if port not in allocated:raise ValueError('Primary port must be allocated')
@@ -97,7 +134,15 @@ def configure(root,game,env):
   values={'port':port,'pingPort':query,'maxPlayers':integer(env.get('MAX_PLAYERS','10'),1,32),'password':password,'kickTimeout':integer(env.get('KICK_TIMEOUT','300'),0,2147483647),'targetFrameRate':integer(env.get('FRAME_RATE','120'),1,380),'serverTickRate':integer(env.get('SERVER_TICK_RATE','100'),1,360),'clientTickRate':integer(env.get('CLIENT_TICK_RATE','360'),1,720)}
   if not old:old={'name':'Pterodactyl Puck Server','voip':False,'isPublic':True,'adminSteamIds':[],'reloadBannedSteamIds':False,'usePuckBannedSteamIds':True,'printMetrics':True,'sleepTimeout':60,'joinMidMatchDelay':10,'startPaused':False,'allowVoting':True,'phaseDurationMap':{'Warmup':600,'FaceOff':3,'Playing':300,'BlueScore':5,'RedScore':5,'Replay':10,'PeriodOver':15,'GameOver':15},'mods':[{'id':3493628417,'enabled':False,'clientRequired':False}]}
   argv=['/bin/bash',str(confined(root,'start_server.sh')),'--serverConfigPath',str(confined(root,'server_config.json'))];stop='\x03';ready='is ready to accept clients on';secrets=[password]
+ if game=='nuclear':
+  # Native operator settings are seeded once; managed allocations always win.
+  for key in ['ServerName','Password','MaxPlayers','ModdedServer']:
+   values[key]=old.get(key,values[key])
+  text(values['ServerName'],30);text(values['Password']);integer(values['MaxPlayers'],1,1024)
+  if not isinstance(values['ModdedServer'],bool):raise ValueError('Native ModdedServer must be boolean')
+  secrets=[values['Password']]
  updated=merge(old,values)
+ if game=='nuclear' and not publish:return None
  if game=='puck':
   for target,value,label in puck_current(root,updated,values):write_config(root,target,value,label)
  write_config(root,path,updated,game)
@@ -133,6 +178,7 @@ def check_puck_plugin(root):
 def main():
  from light_games_next_install import install
  game=sys.argv[1];root=Path.cwd().resolve();env=dict(os.environ)
+ if game=='nuclear':configure(root,game,env,publish=False)
  if boolean(env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','1' if game!='puck' else '0'))):install(root,game,env,False)
  argv,environment,stop,secrets,ready=configure(root,game,env)
  if game=='puck':check_puck_plugin(root)

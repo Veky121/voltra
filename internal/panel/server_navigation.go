@@ -52,6 +52,7 @@ func (a *App) serverNavigationFavorite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, item("server_navigation", M{"uuid": s["uuid"], "favorite": favorite}))
+	a.liveEvents.navigationChanged(UserID(r))
 }
 
 func (a *App) serverNavigationVisit(w http.ResponseWriter, r *http.Request) {
@@ -67,4 +68,5 @@ func (a *App) serverNavigationVisit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+	a.liveEvents.navigationChanged(UserID(r))
 }

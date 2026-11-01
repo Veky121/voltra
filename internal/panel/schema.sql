@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS eggs (
  script_is_privileged boolean NOT NULL DEFAULT false,copy_script_from bigint REFERENCES eggs(id),force_outgoing_ip boolean NOT NULL DEFAULT false,update_url text,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE eggs ADD COLUMN IF NOT EXISTS download_headers jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE eggs ADD COLUMN IF NOT EXISTS java_config jsonb NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS egg_variables (
  id bigserial PRIMARY KEY,egg_id bigint NOT NULL REFERENCES eggs(id) ON DELETE CASCADE,name text NOT NULL,description text NOT NULL DEFAULT '',env_variable text NOT NULL,

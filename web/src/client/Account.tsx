@@ -1,3 +1,8 @@
+import {usePendingSetting} from './PendingSettings';
+import {confirmAction} from '../ui/ConfirmAction';
+import {PageHeading} from '../ui/PageHeading';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {Table as MiraTable,TableHeader as MiraTableHeader,TableRow as MiraTableRow,TableHead as MiraTableHead,TableBody as MiraTableBody,TableCell as MiraTableCell} from '../components/ui/table';
 import {SectionTabs} from "../ui/SectionTabs";
 import {DesktopAppInfo} from '../desktop';
 import {NavIcon} from "../Icons";
@@ -70,20 +75,20 @@ export function Activity({ path }: { path: string }) {
       <PageError error={r.error} />
       {r.loading && <p role="status">Loading activity...</p>}
       <div className="table-wrap operations-table">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Event</th>
-              <th>Actor</th>
-              <th>IP address</th>
-              <th>When</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody>
+        <MiraTable className="table">
+          <MiraTableHeader>
+            <MiraTableRow>
+              <MiraTableHead>Event</MiraTableHead>
+              <MiraTableHead>Actor</MiraTableHead>
+              <MiraTableHead>IP address</MiraTableHead>
+              <MiraTableHead>When</MiraTableHead>
+              <MiraTableHead>Details</MiraTableHead>
+            </MiraTableRow>
+          </MiraTableHeader>
+          <MiraTableBody>
             {items(r.data).map((a, i) => (
-              <tr key={a.id || i}>
-                <td>
+              <MiraTableRow key={a.id || i}>
+                <MiraTableCell>
                   <div>
                     {t(
                       a.event.replace(":", "."),
@@ -94,25 +99,25 @@ export function Activity({ path }: { path: string }) {
                   <small className="muted">
                     <code>{a.event}</code>
                   </small>
-                </td>
-                <td>
+                </MiraTableCell>
+                <MiraTableCell>
                   {value(a.relationships?.actor)?.username ||
                     a.actor?.username ||
                     a.actor_id ||
                     "System"}
-                </td>
-                <td>{a.ip}</td>
-                <td>{date(a.timestamp || a.created_at)}</td>
-                <td>
-                  <details>
-                    <summary>Properties</summary>
+                </MiraTableCell>
+                <MiraTableCell>{a.ip}</MiraTableCell>
+                <MiraTableCell>{date(a.timestamp || a.created_at)}</MiraTableCell>
+                <MiraTableCell>
+                  <Disclosure>
+                    <DisclosureTrigger>Properties</DisclosureTrigger>
                     <pre>{JSON.stringify(a.properties, null, 2)}</pre>
-                  </details>
-                </td>
-              </tr>
+                  </Disclosure>
+                </MiraTableCell>
+              </MiraTableRow>
             ))}
-          </tbody>
-        </table>
+          </MiraTableBody>
+        </MiraTable>
       </div>
       {!r.loading && !items(r.data).length && (
         <p className="operations-empty">No activity found.</p>
@@ -127,38 +132,25 @@ function Profile() {
   const a = useAction();
   const [nickname, setNickname] = useState<string|null>(null);
   const currentNickname = nickname ?? accountNickname(user);
+  const [saving,setSaving]=useState(false),[savedNickname,setSavedNickname]=useState<string|null>(null);
+  const baseline=savedNickname??accountNickname(user);
+  async function saveProfile(){
+    setSaving(true);a.setError('');
+    try{await api('/api/client/account',json('PATCH',{nickname:currentNickname.trim()}));setSavedNickname(currentNickname.trim());setNickname(currentNickname.trim());r.reload();window.dispatchEvent(new Event('account-profile-updated'))}
+    catch(error){a.setError(error instanceof Error?error.message:String(error));throw error}finally{setSaving(false)}
+  }
+  usePendingSetting('profile',!!user.id&&currentNickname.trim()!==baseline,{blocked:saving||r.loading||!currentNickname.trim(),save:saveProfile,discard:()=>{setNickname(baseline);a.setError('')}});
   return (
     <section className="settings-page">
       <PageError error={r.error} />
       <Notice action={a} />
       <SettingsSection title="Profile" action={user.id&&<span className="account-profile-role">{user.admin || user.root_admin ? "Administrator" : "User"}</span>}>
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          a.run(
-            () =>
-              api(
-                "/api/client/account",
-                json("PATCH", {
-                  nickname: currentNickname.trim(),
-                })
-              ),
-            () => {
-              r.reload();
-              window.dispatchEvent(new Event('account-profile-updated'));
-              a.setSuccess("Nickname saved.");
-            }
-          );
-        }}
+        onSubmit={e=>{e.preventDefault();void saveProfile().catch(()=>{})}}
       >
         <SettingsRow label="Email" control={<span className="settings-value">{user.email||'—'}</span>}/>
         <SettingsRow label="Username" control={<span className="settings-value">{user.username||'—'}</span>}/>
-        <SettingsRow label="Nickname" control={<Input aria-label="Nickname" name="nickname" autoComplete="nickname" required maxLength={64} value={currentNickname} onChange={event=>setNickname(event.target.value)} disabled={r.loading||a.busy}/>}/>
-        <div className="settings-actions">
-        <Button type="submit" disabled={r.loading||a.busy||!currentNickname.trim()||currentNickname.trim()===accountNickname(user)}>
-          {a.busy?'Saving…':'Save'}
-        </Button>
-        </div>
+        <SettingsRow label="Nickname" control={<Input aria-label="Nickname" name="nickname" autoComplete="nickname" required maxLength={64} value={currentNickname} onChange={event=>setNickname(event.target.value)} disabled={r.loading||saving}/>}/>
       </form>
       </SettingsSection>
     </section>
@@ -265,8 +257,8 @@ function APIKeys() {
               <Button
                 variant="danger"
                 disabled={a.busy}
-                onClick={() => {
-                  if (confirm(`Revoke API key ${k.identifier}?`))
+                onClick={async () => {
+                  if (await confirmAction({title:"Revoke access?",description:`Revoke API key ${k.identifier}?`,confirmLabel:"Revoke access",danger:true}))
                     a.run(
                       () =>
                         api(
@@ -351,16 +343,16 @@ function SSHKeys() {
               <p>
                 <code>{k.fingerprint}</code>
               </p>
-              <details>
-                <summary>Public key</summary>
+              <Disclosure>
+                <DisclosureTrigger>Public key</DisclosureTrigger>
                 <pre>{k.public_key}</pre>
-              </details>
+              </Disclosure>
               <p className="muted">Created {date(k.created_at)}</p>
               <div className="actions operations-record-actions"><Button
                 variant="danger"
                 disabled={a.busy}
-                onClick={() => {
-                  if (confirm(`Remove SSH key ${k.name}?`))
+                onClick={async () => {
+                  if (await confirmAction({title:"Remove?",description:`Remove SSH key ${k.name}?`,confirmLabel:"Remove",danger:true}))
                     a.run(
                       () =>
                         api(
@@ -386,7 +378,7 @@ function SSHKeys() {
 export function Account() {
   return (
     <div className="page account-page">
-      <h1>Your account</h1>
+      <PageHeading title={<>Your account</>}/>
       <SectionTabs label="Account settings" items={[
         {id:'profile',label:<><NavIcon name="users"/><span>Profile</span></>,to:'/account',end:true},
         {id:'appearance',label:<><NavIcon name="settings"/><span>Appearance</span></>,to:'/account/appearance'},

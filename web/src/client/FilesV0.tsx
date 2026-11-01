@@ -1,3 +1,6 @@
+import {observedFetch} from '../notifications/observedFetch';
+import {useErrorState} from '../notifications/useErrorState';
+import {Checkbox} from '../components/ui/checkbox';
 import {lazy,Suspense,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {api,useAPI,Button,Input,Field,Modal} from '../lib';
@@ -43,7 +46,7 @@ export default function Files(){
   const a=useAction();
   const [selected,setSelected]=useState<string[]>([]),[search,setSearch]=useState(''),[sort,setSort]=useState({key:'name',ascending:true});
   const [dialog,setDialog]=useState(''),[name,setName]=useState(''),[source,setSource]=useState(''),[mode,setMode]=useState('644'),[url,setURL]=useState('');
-  const [draft,setDraft]=useState(()=>loadedDraft('','')),[editing,setEditing]=useState(false),[fileError,setFileError]=useState('');
+  const [draft,setDraft]=useState(()=>loadedDraft('','')),[editing,setEditing]=useState(false),[fileError,setFileError]=useErrorState('client/FilesV0.tsx');
   const dirty=!!file&&draft.path===file&&isDraftDirty(draft);
   const {attention,bar}=useFileNavigationGuard(dirty);
   const [menu,setMenu]=useState<OpenMenu|null>(null),[dragging,setDragging]=useState(false),[now,setNow]=useState(Date.now());
@@ -76,7 +79,7 @@ export default function Files(){
     void (async()=>{
       try{
         if(!can(permissions,'file.read-content'))throw new Error('You do not have permission to read this file.');
-        const response=await fetch(`${base}/files/contents?file=${encodeURIComponent(file)}`,{signal:abort.signal});
+        const response=await observedFetch(`${base}/files/contents?file=${encodeURIComponent(file)}`,{signal:abort.signal});
         if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(body?.errors?.[0]?.detail||`Could not open file (${response.status})`)}
         const {decodeEditorFile}=await import('./editorLanguages');
         const text=decodeEditorFile(await response.arrayBuffer());
@@ -123,7 +126,7 @@ export default function Files(){
         const d=value(await api(`${base}/files/upload`)),uploadURL=new URL(d.url,location.href);
         uploadURL.searchParams.set('directory',relativePath?full(relativePath):directory);
         const body=new FormData();for(const f of group)body.append('files',f,f.name);
-        const response=await fetch(uploadURL,{method:'POST',body});
+        const response=await observedFetch(uploadURL,{method:'POST',body});
         if(!response.ok)throw new Error(`Upload failed (${response.status}): ${await response.text()}`);
       }
     },()=>a.setSuccess(`${files.length} ${files.length===1?'file':'files'} uploaded.`));
@@ -153,7 +156,7 @@ export default function Files(){
     <h1 className="sr-only">{file?'File editor':'Files'} · {server.name}</h1>
     <header className="files-toolbar">
       <div className="files-path">
-        {!file&&<input ref={selectAll} type="checkbox" aria-label="Select all visible files" checked={allVisible} disabled={r.loading||a.busy||!visible.length} onChange={event=>selectVisible(event.target.checked)}/>}
+        {!file&&<Checkbox inputRef={selectAll} indeterminate={someVisible&&!allVisible} aria-label="Select all visible files" checked={allVisible} disabled={r.loading||a.busy||!visible.length} onCheckedChange={selectVisible}/>}
         <nav aria-label="Directory breadcrumbs">
           <button type="button" onClick={()=>openDir('/')} aria-label="Container root">/ home / container /</button>
           {crumbs.map((part,index)=><span key={index}><button type="button" onClick={()=>openDir('/'+crumbs.slice(0,index+1).join('/'))}>{part}</button><span aria-hidden="true"> / </span></span>)}
@@ -197,7 +200,7 @@ export default function Files(){
           <tbody>
             {directory!=='/'&&<tr className="file-parent-row"><td/><td><button type="button" className="file-name-button" onClick={()=>openDir('/'+containerPath(directory.split('/').slice(0,-1).join('/')))}><Icon name="back"/><span>Parent directory</span></button></td><td className="file-size-column"/><td className="file-modified-column"/><td className="file-menu-column"/></tr>}
             {visible.map(f=><tr key={f.name} className={selectedNames.has(f.name)?'is-selected':''}>
-              <td><input type="checkbox" aria-label={`Select ${f.name}`} checked={selectedNames.has(f.name)} disabled={a.busy} onChange={event=>setSelected(old=>event.target.checked?[...old,f.name]:old.filter(name=>name!==f.name))}/></td>
+              <td><Checkbox aria-label={`Select ${f.name}`} checked={selectedNames.has(f.name)} disabled={a.busy} onCheckedChange={checked=>setSelected(old=>checked?[...old,f.name]:old.filter(name=>name!==f.name))}/></td>
               <td><button type="button" className={`file-name-button${!f.is_file?' is-folder':''}`} title={f.name} disabled={editing||a.busy||(f.is_file&&!can(permissions,'file.read-content'))} onClick={()=>f.is_file?void openFile(full(f.name)):openDir(full(f.name))}><Icon name={f.is_file?'file':'files'}/><span>{f.name}</span>{f.is_symlink&&<span className="file-symlink" title="Symbolic link">↗</span>}</button></td>
               <td className="file-size-column">{f.is_file?bytes(f.size):'—'}</td>
               <td className="file-modified-column"><time dateTime={f.modified_at} title={date(f.modified_at)}>{modifiedAt(f.modified_at,now)}</time></td>

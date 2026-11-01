@@ -121,8 +121,40 @@ def run(root, argv, environment, credentials):
         display.wait(timeout=5);child.stdout.close()
 
 
+def native_player_limit(root, environment):
+    import json
+    import stat
+    environment = dict(environment)
+    current = root
+    for part in ('CoreKeeperSaves', 'ServerConfig.json'):
+        current = current / part
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            return environment
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ValueError('Unsafe Core Keeper settings path')
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 1024 * 1024:
+        raise ValueError('Invalid Core Keeper settings file')
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('Duplicate Core Keeper settings key')
+            result[key] = value
+        return result
+    data = json.loads(current.read_text(encoding='utf-8'), object_pairs_hook=unique)
+    if not isinstance(data, dict):
+        raise ValueError('Invalid Core Keeper settings object')
+    value = data.get('maxNumberPlayers')
+    if type(value) is not int or not 1 <= value <= 100:
+        raise ValueError('Invalid Core Keeper player limit')
+    environment['MAX_PLAYERS'] = str(value)
+    return environment
+
+
 def main():
-    root = Path.cwd().resolve();environment = dict(os.environ)
+    root = Path.cwd().resolve();environment = native_player_limit(root, os.environ)
     if environment.get('VOLTRA_STEAM_AUTO_UPDATE', environment.get('AUTO_UPDATE', '0')) == '1':
         update(root, 1963720, required=('CoreKeeperServer',))
     argv, child_env, credentials = configure(root, environment)

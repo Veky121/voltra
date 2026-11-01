@@ -1,0 +1,90 @@
+package downloader
+
+import (
+	"encoding/json"
+	"errors"
+	"path"
+	"sort"
+	"sync"
+	"time"
+)
+
+type TransferRecord struct {
+	Identifier string  `json:"identifier"`
+	Directory  string  `json:"directory"`
+	Name       string  `json:"name"`
+	State      string  `json:"state"`
+	Progress   float64 `json:"progress"`
+	Error      string  `json:"error,omitempty"`
+	Updated    int64   `json:"updated"`
+}
+type transferHistory struct {
+	sync.Mutex
+	records map[string]map[string]TransferRecord
+}
+
+var transfers = transferHistory{records: make(map[string]map[string]TransferRecord)}
+
+func TransferHistory(server string) []TransferRecord {
+	transfers.Lock()
+	defer transfers.Unlock()
+	result := []TransferRecord{}
+	for id, r := range transfers.records[server] {
+		if r.State != "downloading" && r.State != "queued" && time.Now().UnixMilli()-r.Updated > 15*60*1000 {
+			delete(transfers.records[server], id)
+			continue
+		}
+		result = append(result, r)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Updated < result[j].Updated })
+	return result
+}
+
+func (dl *Download) recordTransfer(state string, progress float64, err error) {
+	name := dl.req.FileName
+	if name == "" {
+		name = path.Base(dl.req.URL.Path)
+	}
+	if dl.path != "" {
+		name = dl.path
+	}
+	r := TransferRecord{Identifier: dl.Identifier, Directory: dl.req.Directory, Name: name, State: state, Progress: progress, Updated: time.Now().UnixMilli()}
+	if err != nil {
+		var source *RemoteStatusError
+		if errors.As(err, &source) {
+			r.Error = source.Error()
+		} else {
+			r.Error = "Download failed. Check the node logs for details."
+		}
+	}
+	sid := dl.server.ID()
+	transfers.Lock()
+	if transfers.records[sid] == nil {
+		transfers.records[sid] = make(map[string]TransferRecord)
+	}
+	old := transfers.records[sid][dl.Identifier]
+	if state == "downloading" && old.State == state && r.Updated-old.Updated < 500 {
+		transfers.Unlock()
+		return
+	}
+	transfers.records[sid][dl.Identifier] = r
+	// Bound retained outcomes without evicting active transfers.
+	if len(transfers.records[sid]) > 50 {
+		oldest := ""
+		var stamp int64
+		for id, entry := range transfers.records[sid] {
+			if entry.State == "complete" || entry.State == "failed" {
+				if oldest == "" || entry.Updated < stamp {
+					oldest = id
+					stamp = entry.Updated
+				}
+			}
+		}
+		if oldest != "" {
+			delete(transfers.records[sid], oldest)
+		}
+	}
+	transfers.Unlock()
+	data, _ := json.Marshal(r)
+	dl.server.Events().Publish("download progress", string(data))
+}

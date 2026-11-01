@@ -1,0 +1,12 @@
+.confirm-action[data-slot=alert-dialog-content]{width:min(440px,calc(100vw - 32px));max-width:440px;padding:20px;gap:14px;border:1px solid var(--ui-border);border-radius:12px;background:var(--surface-raised,var(--surface));font-size:14px;line-height:1.5}
+.confirm-action [data-slot=alert-dialog-title]{margin:0;font-size:17px;line-height:24px;font-weight:600;color:var(--text)}
+.confirm-action [data-slot=alert-dialog-description]{margin:0;font-size:14px;line-height:21px;color:var(--muted);text-wrap:pretty}
+.confirm-action [data-slot=alert-dialog-footer]{display:flex;flex-direction:row;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:6px}
+.confirm-action :is([data-slot=alert-dialog-action],[data-slot=alert-dialog-cancel]){min-height:34px;height:auto;padding:6px 12px;border-radius:6px;font-size:14px;line-height:20px}
+@media(prefers-reduced-motion:reduce){[data-slot=alert-dialog-content],[data-slot=alert-dialog-overlay]{animation:none!important;transition:none!important}}
+
+.confirm-action [data-slot=alert-dialog-cancel]{background:transparent;border:1px solid var(--ui-border);color:var(--text)}
+.confirm-action [data-slot=alert-dialog-cancel]:hover{background:var(--ui-hover)}
+.confirm-action [data-slot=alert-dialog-action][data-variant=destructive]{background:color-mix(in srgb,var(--red,#ef7385) 15%,transparent);border:1px solid color-mix(in srgb,var(--red,#ef7385) 35%,transparent);color:var(--red,#ef7385)}
+[data-slot=alert-dialog-overlay]{z-index:390}
+.confirm-action[data-slot=alert-dialog-content]{z-index:400}

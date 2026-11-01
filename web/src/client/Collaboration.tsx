@@ -1,3 +1,7 @@
+import {describeSchedule} from './scheduleTimingModel';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {confirmAction} from '../ui/ConfirmAction';
+import {Table as MiraTable,TableHeader as MiraTableHeader,TableRow as MiraTableRow,TableHead as MiraTableHead,TableBody as MiraTableBody,TableCell as MiraTableCell} from '../components/ui/table';
 import { useEffect, useState } from "react";
 import { ScheduleTiming } from "./ScheduleTiming";
 import type { ScheduleCron } from "./scheduleTimingModel";
@@ -21,7 +25,6 @@ import {
   json,
   Notice,
   PageError,
-  ServerPageTitle,
   useAction,
   useServer,
   value,
@@ -37,9 +40,9 @@ export function Databases() {
     [remote, setRemote] = useState("%"),
     [visible, setVisible] = useState<Record<string, boolean>>({});
   return (
-    <section className="operations-page databases-page">
+    <section className="operations-page databases-page" aria-label="Databases">
       <div className="toolbar server-page-toolbar">
-        <ServerPageTitle title="Databases" limit={server.feature_limits?.databases}/>
+        <span className="server-limit-badge">Limit: {server.feature_limits?.databases ?? 'Unlimited'}</span>
         {can(permissions, "database.create") && (
           <Button onClick={() => setOpen(true)}>Create database</Button>
         )}
@@ -85,11 +88,9 @@ export function Databases() {
                   <Button
                     variant="secondary"
                     disabled={a.busy}
-                    onClick={() => {
+                    onClick={async () => {
                       if (
-                        confirm(
-                          "Rotate this database password? Update game configuration afterwards."
-                        )
+                        await confirmAction({title:"Continue?",description:"Rotate this database password? Update game configuration afterwards.",confirmLabel:"Continue",danger:false})
                       )
                         a.run(
                           () =>
@@ -111,13 +112,11 @@ export function Databases() {
                   <Button
                     variant="danger"
                     disabled={a.busy}
-                    onClick={() => {
+                    onClick={async () => {
                       if (
-                        confirm(
-                          `Permanently delete database ${
+                        await confirmAction({title:"Delete?",description:`Permanently delete database ${
                             d.name || d.database
-                          } and all its data?`
-                        )
+                          } and all its data?`,confirmLabel:"Delete",danger:true})
                       )
                         a.run(
                           () =>
@@ -266,12 +265,7 @@ export function Schedules() {
                 ? "Active"
                 : "Disabled"}
             </span>
-            <code className="schedule-cron">
-              {s.cron?.minute || s.cron_minute} {s.cron?.hour || s.cron_hour}{" "}
-              {s.cron?.day_of_month || s.cron_day_of_month}{" "}
-              {s.cron?.month || s.cron_month}{" "}
-              {s.cron?.day_of_week || s.cron_day_of_week}
-            </code>
+            <span className="schedule-summary">{describeSchedule(Object.fromEntries(['minute','hour','day_of_month','month','day_of_week'].map(key=>[key,s.cron?.[key]??s['cron_'+key]??'*'])) as ScheduleCron)}</span>
             <div className="actions">
               {can(permissions, "schedule.update") && (
                 <Button
@@ -319,8 +313,8 @@ export function Schedules() {
                 <Button
                   variant="danger"
                   disabled={a.busy}
-                  onClick={() => {
-                    if (confirm(`Delete schedule ${s.name} and all its tasks?`))
+                  onClick={async () => {
+                    if (await confirmAction({title:`Delete ${s.name}?`,description:"This also deletes every task in the schedule.",confirmLabel:"Delete schedule",danger:true}))
                       a.run(
                         () => api(`${base}/schedules/${s.id}`, json("DELETE")),
                         r.reload
@@ -336,36 +330,37 @@ export function Schedules() {
             Last run: {date(s.last_run_at)} · Next run: {date(s.next_run_at)}
             {s.only_when_online ? " · Only when online" : ""}
           </p>
+          <Disclosure className="schedule-rule-details"><DisclosureTrigger>Advanced timing</DisclosureTrigger><code>{['minute','hour','day_of_month','month','day_of_week'].map(key=>s.cron?.[key]??s['cron_'+key]??'*').join(' ')}</code><span className="muted"> {"\u00b7"} Panel timezone</span></Disclosure>
           <div className="table-wrap operations-table schedule-tasks">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Action</th>
-                  <th>Payload</th>
-                  <th>Delay</th>
-                  <th>Failure behavior</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <MiraTable className="table">
+              <MiraTableHeader>
+                <MiraTableRow>
+                  <MiraTableHead>Order</MiraTableHead>
+                  <MiraTableHead>Action</MiraTableHead>
+                  <MiraTableHead>Payload</MiraTableHead>
+                  <MiraTableHead>Delay</MiraTableHead>
+                  <MiraTableHead>Failure behavior</MiraTableHead>
+                  <MiraTableHead>Actions</MiraTableHead>
+                </MiraTableRow>
+              </MiraTableHeader>
+              <MiraTableBody>
                 {items(s.relationships?.tasks || s.tasks)
                   .sort((a, b) => a.sequence_id - b.sequence_id)
                   .map((t) => (
-                    <tr key={t.id}>
-                      <td>{t.sequence_id}</td>
-                      <td>
+                    <MiraTableRow key={t.id}>
+                      <MiraTableCell>{t.sequence_id}</MiraTableCell>
+                      <MiraTableCell>
                         {t.action}
                         {t.is_queued && <span className="badge">Queued</span>}
-                      </td>
-                      <td>
+                      </MiraTableCell>
+                      <MiraTableCell>
                         <pre>{t.payload}</pre>
-                      </td>
-                      <td>{t.time_offset}s</td>
-                      <td>
+                      </MiraTableCell>
+                      <MiraTableCell>{t.time_offset}s</MiraTableCell>
+                      <MiraTableCell>
                         {t.continue_on_failure ? "Continue" : "Stop schedule"}
-                      </td>
-                      <td>
+                      </MiraTableCell>
+                      <MiraTableCell>
                         {can(permissions, "schedule.update") && (
                           <div className="actions">
                             <Button
@@ -379,8 +374,8 @@ export function Schedules() {
                             <Button
                               variant="danger"
                               disabled={a.busy}
-                              onClick={() => {
-                                if (confirm("Delete this task?"))
+                              onClick={async () => {
+                                if (await confirmAction({title:"Delete task?",description:"This task will be removed from the schedule.",confirmLabel:"Delete task",danger:true}))
                                   a.run(
                                     () =>
                                       api(
@@ -395,11 +390,11 @@ export function Schedules() {
                             </Button>
                           </div>
                         )}
-                      </td>
-                    </tr>
+                      </MiraTableCell>
+                    </MiraTableRow>
                   ))}
-              </tbody>
-            </table>
+              </MiraTableBody>
+            </MiraTable>
           </div>
           {can(permissions, "schedule.update") && (
             <Button
@@ -610,11 +605,9 @@ export function Users() {
                 <Button
                   variant="danger"
                   disabled={a.busy}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      confirm(
-                        `Remove ${u.email || u.username} from this server?`
-                      )
+                      await confirmAction({title:"Remove?",description:`Remove ${u.email || u.username} from this server?`,confirmLabel:"Remove",danger:true})
                     )
                       a.run(
                         () =>

@@ -54,9 +54,25 @@ def install(root,env,validate=True,craftopia_default=None):
     root=Path(root).resolve();kind,app,platform,binary,preserve=selection(env)
     arguments(root,app,env,validate,platform=platform)
     initial_romestead=None
-    if kind=='romestead'and not confined(root,'config.json').exists():
-        from crafting_runtime import romestead_document
-        initial_romestead=romestead_document(env)
+    if kind=='romestead':
+        from crafting_runtime import romestead_document, read_config
+        # Reject invalid operator configuration and destinations before retention
+        # writes or publisher acquisition, including automatic-update launches.
+        previous=read_config(root,'config.json')
+        prepared=romestead_document(env,previous)
+        from tactical_runtime import integer
+        port=integer(env,'SERVER_PORT',8050,1025,65535)
+        allocated={int(p)for p in env.get('VOLTRA_ALLOCATED_PORTS','').split(',')if p}
+        if port not in allocated:raise ValueError('Gameplay port must be allocated')
+        for name in('.local','.local/share','.config','logs'):
+            path=confined(root,name)
+            if path.exists()and not path.is_dir():raise ValueError('Romestead state path must be a directory')
+        for name in preserve:
+            path=confined(root,name)
+            for candidate in path.rglob('*')if path.is_dir()else[path]:
+                confined(root,candidate.relative_to(root))
+                if candidate.exists()and not(candidate.is_file()or candidate.is_dir()):raise ValueError('Romestead state must contain regular files or directories')
+        if not confined(root,'config.json').exists():initial_romestead=prepared
     retained={}
     with tempfile.TemporaryDirectory(prefix='.crafting-retention-',dir=root)as temporary:
         for name in preserve:

@@ -1,8 +1,11 @@
+import {confirmAction} from '../ui/ConfirmAction';
+import {useErrorState} from '../notifications/useErrorState';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {SectionTabs} from "../ui/SectionTabs";
 import { useEffect, useState } from "react";
 import "../client/serverAdminTools.css";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { Switch } from "../ui/Settings";
+import { Switch,SettingsRow,SettingsSection,useSettingsLayout } from "../ui/Settings";
 import {
   Action,
   DataTable,
@@ -101,7 +104,7 @@ function CreateServer() {
       ? `/api/application/nodes/${values.node}/allocations?per_page=100`
       : null
   );
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/servers.tsx');
   const [busy, setBusy] = useState(false);
   const egg = eggQ.data ? unwrap(eggQ.data) : null;
   useEffect(() => {
@@ -157,13 +160,13 @@ function CreateServer() {
         : [],
       default: [],
     }),
-    f("nest", "Nest", "select", {
+    f("nest", "Template group", "select", {
       required: true,
       options: nestsQ.data
         ? rows(nestsQ.data).map((x) => ({ value: x.id, label: x.name }))
         : [],
     }),
-    f("egg", "Egg", "select", {
+    f("egg", "Game template", "select", {
       required: true,
       options: eggsQ.data
         ? rows(eggsQ.data).map((x) => ({ value: x.id, label: x.name }))
@@ -248,7 +251,7 @@ function CreateServer() {
         <Panel title="Feature limits">
           <Fields fields={features} value={values} onChange={setValues} />
         </Panel>
-        <Panel title="Egg environment">
+        <Panel title="Template options">
           {egg?.description && <p className="muted">{egg.description}</p>}
           {Object.keys(integrationDefaults).length > 0 && <p className="muted">Saved global credentials are available for this egg. Values stay hidden and are applied when you create the server. <Link to="/admin/integrations">Manage integrations</Link></p>}
           {eggVars.filter(x => integrationDefaults[x.env_variable]).map(x => <div key={x.id} className="toolbar">
@@ -268,9 +271,9 @@ function CreateServer() {
             }
           />
         </Panel>
-        <div className="actions admin-form-actions"><button disabled={busy || eggQ.loading || integrationQ.loading || Boolean(integrationQ.error)}>
+        <div className="actions admin-form-actions"><MiraAction disabled={busy || eggQ.loading || integrationQ.loading || Boolean(integrationQ.error)}>
           {busy ? "Creating…" : "Create and install server"}
-        </button></div>
+        </MiraAction></div>
       </form>
     </div>
   );
@@ -307,6 +310,7 @@ export function Details({ record, onSaved }: { record: any; onSaved: () => void 
   );
 }
 export function Build({ record, onSaved }: { record: any; onSaved: () => void }) {
+  const settings=useSettingsLayout();
   const allocations = useAPI(
     `/api/application/nodes/${
       record.node ?? record.node_id
@@ -315,6 +319,11 @@ export function Build({ record, onSaved }: { record: any; onSaved: () => void })
   return (
     <Editor
       title="Build configuration"
+      groups={settings?[
+        {title:'Resource limits',keys:limits.map(field=>field.key)},
+        {title:'Feature limits',keys:features.map(field=>field.key)},
+        {title:'Network allocations',keys:['allocation','add_allocations','remove_allocations']},
+      ]:undefined}
       endpoint={`${servers}/${record.id}/build`}
       initial={{
         ...record,
@@ -478,10 +487,13 @@ export function Startup({ record, onSaved, contextual = false, restrictedOnly = 
   );
 }
 export function Manage({ record, onSaved }: { record: any; onSaved: () => void }) {
+  return <><ServerLifecycle record={record} onSaved={onSaved}/><Transfer record={record} onSaved={onSaved}/></>;
+}
+export function ServerLifecycle({ record, onSaved }: { record: any; onSaved: () => void }) {
   return (
-    <>
       <Panel title="Server lifecycle">
-        <div className="actions">
+        <div className="settings-options-grid">
+        <SettingsRow label={record.status === 'suspended' ? 'Unsuspend server' : 'Suspend server'} description="Control whether this server can run." control={
           <Action
             path={`${servers}/${record.id}/${
               record.status === "suspended" ? "unsuspend" : "suspend"
@@ -489,7 +501,7 @@ export function Manage({ record, onSaved }: { record: any; onSaved: () => void }
             confirm={
               record.status === "suspended"
                 ? undefined
-                : "Suspend this server and stop it?"
+                : `Suspend ${record.name} and stop it?`
             }
             onDone={onSaved}
           >
@@ -497,29 +509,32 @@ export function Manage({ record, onSaved }: { record: any; onSaved: () => void }
               ? "Unsuspend server"
               : "Suspend server"}
           </Action>
+        }/>
+        <SettingsRow label="Reinstall server" description="Runs the installer again and may overwrite files." control={
           <Action
             path={`${servers}/${record.id}/reinstall`}
-            confirm="Reinstall this server? Its egg installer will run again and may overwrite files."
+            confirm={`Reinstall ${record.name}? The installer will run again and may overwrite files.`}
             danger
             onDone={onSaved}
           >
             Reinstall server
           </Action>
+        }/>
+        <SettingsRow label="Installation state" description={record.container?.installed ? 'Currently marked as installed.' : 'Currently marked as not installed.'} control={
           <Action
             path={`/api/admin/servers/${record.id}/install`}
             body={{ installed: !record.container?.installed }}
-            confirm="Change the server installation state manually?"
+            confirm={`Change the installation state for ${record.name} manually?`}
             onDone={onSaved}
           >
             Toggle installation state
           </Action>
+        }/>
         </div>
       </Panel>
-      <Transfer record={record} onSaved={onSaved} />
-    </>
   );
 }
-function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
+export function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
   const endpoint = `/api/admin/servers/${record.id}/transfer`;
   const nodes = useAPI("/api/application/nodes?per_page=100"),
     history = useAPI(endpoint);
@@ -534,7 +549,7 @@ function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
       : null
   );
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useErrorState('admin/servers.tsx');
   const available = allocations.data
     ? rows(allocations.data)
         .filter((x) => !x.assigned && !x.server_id)
@@ -565,9 +580,7 @@ function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
           onSubmit={async (e) => {
             e.preventDefault();
             if (
-              !window.confirm(
-                "Transfer this server to the selected node? The server will stop while its files are copied."
-              )
+              !await confirmAction({title:"Transfer server?",description:`Transfer ${record.name} to the selected node? The server will stop while its files are copied.`,confirmLabel:"Transfer server",danger:false})
             )
               return;
             setBusy(true);
@@ -598,9 +611,9 @@ function Transfer({ record, onSaved }: { record: any; onSaved: () => void }) {
               })
             }
           />
-          <div className="actions admin-form-actions"><button disabled={busy}>
+          <div className="actions admin-form-actions"><MiraAction disabled={busy}>
             {busy ? "Transferring…" : "Start transfer"}
-          </button></div>
+          </MiraAction></div>
         </form>
       </Panel>
       <Panel title="Transfer history">
@@ -645,11 +658,8 @@ export function DeleteServer({ record, returnTo = "/admin/servers" }: { record: 
   const navigate = useNavigate();
   return (
     <Panel title="Delete server" className="admin-danger-panel">
-      <p>
-        Deletes the container, server files, backups, database records, and
-        panel configuration. This cannot be undone.
-      </p>
-      <div className="actions">
+      <div className="settings-options-grid">
+      <SettingsRow label="Delete server" description="Permanently deletes files, backups, databases and panel configuration." control={
         <Action
           path={`${servers}/${record.id}`}
           method="DELETE"
@@ -659,6 +669,8 @@ export function DeleteServer({ record, returnTo = "/admin/servers" }: { record: 
         >
           Delete server
         </Action>
+      }/>
+      <SettingsRow label="Force delete" description="Removes the panel record even if Wings is unreachable. Files may remain on the node." control={
         <Action
           path={`${servers}/${record.id}/force`}
           method="DELETE"
@@ -668,6 +680,7 @@ export function DeleteServer({ record, returnTo = "/admin/servers" }: { record: 
         >
           Force delete
         </Action>
+      }/>
       </div>
     </Panel>
   );
@@ -675,6 +688,18 @@ export function DeleteServer({ record, returnTo = "/admin/servers" }: { record: 
 export function ServerMounts({ record, contextual = false }: { record: any; contextual?: boolean }) {
   const endpoint = `/api/admin/servers/${record.id}/mounts`;
   const q = useAPI(endpoint);
+  if(contextual){
+    const mounts=q.data?rows(q.data):[];
+    return <>
+      <ErrorMessage error={q.error}/>
+      <SettingsSection title="Mounts" className="server-mounts-section">
+        {q.loading?<p className="settings-section-note" role="status">Loading mounts...</p>:!mounts.length?<p className="settings-section-note">No mounts available for this server.</p>:mounts.map(mount=><SettingsRow key={mount.id} label={mount.name} description={mount.read_only?'Read-only access':'Read and write access'}
+          control={mount.attached?<Action path={`${endpoint}/${mount.id}`} method="DELETE" confirm="Detach this mount? Restart the server to apply." onDone={q.reload}>Detach</Action>:<Action path={endpoint} body={{mount_id:mount.id}} onDone={q.reload}>Attach</Action>}>
+          <dl className="settings-paths"><div><dt>Source</dt><dd><code>{mount.source}</code></dd></div><div><dt>Target</dt><dd><code>{mount.target}</code></dd></div></dl>
+        </SettingsRow>)}
+      </SettingsSection>
+    </>;
+  }
   return (
     <>
       <ErrorMessage error={q.error} />
@@ -798,11 +823,11 @@ export function ServerDatabases({ record }: { record: any }) {
 }
 function DatabaseCredentials({ path }: { path: string }) {
   const [password, setPassword] = useState<string | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useErrorState('admin/servers.tsx');
   return (
     <div className="admin-credentials management-ui">
       {password === null ? (
-        <button
+        <MiraAction
           className="secondary"
           onClick={async () => {
             try {
@@ -816,19 +841,19 @@ function DatabaseCredentials({ path }: { path: string }) {
           }}
         >
           Reveal password
-        </button>
+        </MiraAction>
       ) : (
         <>
           <code className="admin-secret">{password}</code>
-          <button
+          <MiraAction
             className="secondary"
             onClick={() => navigator.clipboard.writeText(password)}
           >
             Copy
-          </button>
-          <button className="secondary" onClick={() => setPassword(null)}>
+          </MiraAction>
+          <MiraAction className="secondary" onClick={() => setPassword(null)}>
             Hide
-          </button>
+          </MiraAction>
         </>
       )}
       <ErrorMessage error={error} />

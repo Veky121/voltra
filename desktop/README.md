@@ -8,6 +8,30 @@ Voltra panel. Server management still runs on the panel and Wings.
 
 ## Build and run
 
+Windows installation uses `Voltra-Setup.exe`. Setup installs for the current
+user at `%LOCALAPPDATA%\Programs\Voltra\Voltra.exe`, creates a desktop shortcut
+only on initial installation, and opens the app. It needs no administrator
+access. Setup leaves existing installations and shortcuts untouched; use the
+app's update controls for subsequent updates. The setup download can be deleted
+after installation. Existing portable copies are not deleted automatically.
+
+`Voltra.exe` remains available for portable use, or run `Voltra.exe --install`
+to install it. Both builds share the existing `%APPDATA%\Voltra` data directory,
+so installing preserves pairing, preferences and the selected update channel.
+Updates do not create shortcuts, including when a user deletes or moves one.
+
+Before restarting for an update, Voltra saves a pending copy of the current
+executable. Once a different version reaches native application startup, that
+copy becomes `previous\Voltra.exe`, replacing the earlier backup. Failed restart
+attempts preserve the accepted backup. Numeric `.old.*` replacement leftovers
+are removed on startup when Windows releases them. Locked files are retried on
+the next launch. Recovery is manual: close Voltra and copy `previous\Voltra.exe`
+over the installed executable. The backup does not roll back user data.
+
+The build produces both `desktop/bin/Voltra.exe` and
+`desktop/bin/Voltra-Setup.exe`. Update manifests continue to use the ordinary app
+executable. Setup is an additional download, not the update payload.
+
 From the repository root, with Go 1.27.3 and Node/npm installed:
 
 ```powershell

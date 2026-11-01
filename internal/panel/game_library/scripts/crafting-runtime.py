@@ -45,7 +45,8 @@ def romestead_document(env,previous=b''):
             if key in result:raise ValueError('Duplicate native JSON configuration key')
             result[key]=value
         return result
-    data=json.loads(previous.decode('utf-8-sig'),object_pairs_hook=unique)if previous else{}
+    def invalid_constant(value):raise ValueError('Non-finite native JSON number')
+    data=json.loads(previous.decode('utf-8-sig'),object_pairs_hook=unique,parse_constant=invalid_constant)if previous else{}
     if not isinstance(data,dict):raise ValueError('Expected Romestead native config object')
     data.update(AutoStartWorldName=world,AutoCreateWorldSize=size,Password=password,Port=integer(env,'SERVER_PORT',8050,1025,65535),MaxPlayers=players)
     for key,value in{'AutoCreateAndLoadWorld':True,'AutoCreateWorldSeed':seed or None,'EnableCheats':cheats in('1','true','yes','on'),'SleepThresholdMs':10}.items():data.setdefault(key,value)

@@ -16,7 +16,7 @@ func TestSurvivalReviewedSettings(t *testing.T) {
 	}{
 		{"rust/rust_autowipe/egg-rust-autowipe.json", "rust-native-v1", "258550", 4, false, []string{"rust-runtime.py", "rust-install.py"}},
 		{"rust/rust_staging/egg-rust-staging.json", "rust-native-v1", "258550", 4, false, []string{"rust-runtime.py", "rust-install.py"}},
-		{"core_keeper/egg-core-keeper.json", "core-keeper-native-v1", "1963720", 2, true, []string{"core-keeper-runtime.py"}},
+		{"core_keeper/egg-core-keeper.json", "core-keeper-native-settings-v2", "1963720", 2, true, []string{"core-keeper-runtime.py"}},
 	} {
 		t.Run(spec.path, func(t *testing.T) {
 			var entry gameTemplate

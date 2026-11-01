@@ -25,6 +25,15 @@ def confined(root,path):
  return path
 
 def install(root,kind):
+ if kind=='nzportable':
+  from id_family_runtime import configure
+  configure(os.environ,root.resolve(),kind)
+ if kind=='zandronum':
+  from id_family_runtime import zandronum_preflight
+  zandronum_preflight(os.environ,root.resolve(),acquisition=True)
+  game=confined(root.resolve(),root.resolve()/'zandronum')
+  for name in ['zandronum.ini','GeoIP.dat','adminlist.txt','whitelist.txt','banlist.txt']:
+   confined(game,game/name)
  root=root.resolve();game=confined(root,root/kind);state=confined(root,root/'.voltra'/kind);state.mkdir(parents=True,exist_ok=True)
  receipt=confined(root,state/'release.json');old=json.loads(receipt.read_text()) if receipt.is_file() else {}
  binary='zandronum-server' if kind=='zandronum' else 'fteqw-sv64';releases=RELEASES[kind]

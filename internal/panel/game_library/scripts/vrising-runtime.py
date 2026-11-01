@@ -16,7 +16,7 @@ from steam_template import Redactor
 from enshrouded_proton import location
 
 
-def configure(root,env):
+def configure(root,env,preflight=False):
     root=Path(root).resolve();modded=env.get('VOLTRA_VRISING_VARIANT','vanilla')=='bepinex'
     def key(normal,mod):return mod if modded else normal
     def text(normal,mod,default='',maximum=4096):
@@ -32,6 +32,7 @@ def configure(root,env):
         if value not in ('true','false'):raise ValueError('Use true or false for '+key(normal,mod))
         return value=='true'
     allocated={int(p)for p in env.get('VOLTRA_ALLOCATED_PORTS','').split(',')if p};port=int(env['SERVER_PORT'])
+    if not 1<=port<=65535 or any(not 1<=p<=65535 for p in allocated):raise ValueError('Invalid allocated port')
     if port not in allocated:raise ValueError('Gameplay port must be allocated')
     used={port}
     def selected(normal,mod,default):
@@ -49,7 +50,14 @@ def configure(root,env):
     if not all(p.resolve().is_relative_to(root)for p in (target,backup)):raise ValueError('V Rising configuration leaves the volume')
     previous=target.read_text(encoding='utf-8-sig')if target.exists() and target.stat().st_size<8*1024**2 else ''
     if target.exists() and not previous:raise ValueError('Invalid or oversized native host settings')
-    data=json.loads(previous)if previous else {}
+    def unique(pairs):
+        result={}
+        for name,value in pairs:
+            if name.casefold() in {key.casefold() for key in result}:raise ValueError('Ambiguous native JSON key')
+            result[name]=value
+        return result
+    data=json.loads(previous,object_pairs_hook=unique,parse_constant=lambda _:(_ for _ in ()).throw(ValueError('Non-finite native JSON')))if previous else {}
+    original=json.loads(previous)if previous else {}
     if not isinstance(data,dict):raise ValueError('Expected native settings object')
     data.update({'Name':text('VR_NAME','SERVER_NAME','V Rising Dedicated Server',128),'Description':text('VR_DESCRIPTION','DESCRIPTION','Welcome to the server!'),
         'Port':port,'QueryPort':query,'Address':'0.0.0.0','MaxConnectedUsers':number('VR_MAX_USERS','MAX_PLAYERS',40,1,128),'MaxConnectedAdmins':number('VR_MAX_ADMINS','MAX_ADMINS',4,0,128),
@@ -61,13 +69,8 @@ def configure(root,env):
     rcon.update({'Enabled':enabled,'Password':rcon_password,'Port':rcon_port,'BindAddress':'0.0.0.0'})
     if modded:data.update({'AdminOnlyDebugEvents':boolean('','ADMIN_ONLY_DEBUG_EVENTS','true'),'DisableDebugEvents':boolean('','DEBUG_EVENTS')})
     else:data.update({'HideIPAddress':boolean('VR_HIDEIPADDRESS',''),'GameDifficultyPreset':text('VR_DIFFICULTY_PRESET','','Difficulty_Normal'),'LowerFpsWhenEmpty':boolean('VR_LOWER_FPS_WHEN_EMPTY',''),'LowerFpsWhenEmptyValue':number('VR_LOWER_FPS_WHEN_EMPTY_VALUE','',10,1,1000)})
-    updated=json.dumps(data,ensure_ascii=False,indent=2)+'\n'
-    if updated!=previous:
-        if previous:private_write(backup/(str(time.time_ns())+'-ServerHostSettings.json'),previous)
-        private_write(target,updated)
-    else:target.chmod(0o600)
     binary=root/'VRisingServer.exe'
-    if not binary.is_file() or not binary.resolve().is_relative_to(root):raise ValueError('Missing confined V Rising executable')
+    if not preflight and (not binary.is_file() or not binary.resolve().is_relative_to(root)):raise ValueError('Missing confined V Rising executable')
     environment=dict(os.environ)
     for name in list(environment):
         if name in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD') or name.startswith('VR_'):environment.pop(name,None)
@@ -80,14 +83,41 @@ def configure(root,env):
     for name in ('STEAM_COMPAT_CLIENT_INSTALL_PATH','STEAM_COMPAT_DATA_PATH'):
         path=Path(environment[name])
         if not path.resolve().is_relative_to(root):raise ValueError('V Rising Proton prefix leaves volume')
-        path.mkdir(parents=True,exist_ok=True)
+
     if modded:
         if not (root/'winhttp.dll').is_file() or not (root/'BepInEx/core/BepInEx.Unity.IL2CPP.dll').is_file():raise ValueError('V Rising BepInEx installation is incomplete')
         if env.get('VOLTRA_WINETRICKS_RUN')!='mono' or env.get('WINETRICKS_RUN',''):raise ValueError('Private Wine runtime ownership is missing; use the reviewed recipe environment hook')
         environment.update({'WINEDLLOVERRIDES':'winhttp=n,b;mscoree=b','VOLTRA_PRIVATE_MONO':'mono'})
     else:environment['WINEDLLOVERRIDES']='winhttp=b'
+    if not modded:
+        # Existing native settings own operator values. Environment seeds absent keys.
+        seeded=data;data={**seeded,**original}
+        data['Rcon']={**seeded['Rcon'],**original.get('Rcon',{})}
+        for name,value in seeded.items():
+            if type(data[name]) is not type(value):raise ValueError('Invalid native '+name)
+        for name,value in seeded['Rcon'].items():
+            if type(data['Rcon'][name]) is not type(value):raise ValueError('Invalid native Rcon '+name)
+        for name in ('Port','QueryPort'):
+            if type(data[name]) is not int or data[name] not in allocated:raise ValueError('Native port must be allocated')
+        rp=data['Rcon']['Port']
+        if type(rp) is not int or rp not in allocated or len({data['Port'],data['QueryPort'],rp})!=3:raise ValueError('Native ports must be distinct allocations')
+        if data['Port']!=port:raise ValueError('Native gameplay port differs from primary allocation')
+        for name in ('Password','SaveName','Name'):
+            if not isinstance(data[name],str) or any(ord(c)<32 for c in data[name]):raise ValueError('Invalid native '+name)
+        if not data['SaveName'] or data['SaveName'] in ('.','..') or any(c in data['SaveName'] for c in '/\\:'):raise ValueError('Invalid native SaveName')
+        if type(data['Rcon']['Enabled']) is not bool or not isinstance(data['Rcon']['Password'],str):raise ValueError('Invalid native Rcon settings')
+        password=data['Password'];rcon_password=data['Rcon']['Password'];enabled=data['Rcon']['Enabled'];rcon_port=rp
+        if enabled and not rcon_password:raise ValueError('Enabled native RCON needs password')
+    proton=None if preflight else location(root)
+    if preflight:return
+    for name in ('STEAM_COMPAT_CLIENT_INSTALL_PATH','STEAM_COMPAT_DATA_PATH'):Path(environment[name]).mkdir(parents=True,exist_ok=True)
+    updated=json.dumps(data,ensure_ascii=False,indent=2)+'\n'
+    if data!=original or not previous:
+        if previous:private_write(backup/(str(time.time_ns())+'-ServerHostSettings.json'),previous)
+        private_write(target,updated)
+    else:target.chmod(0o600)
     log=root/'.voltra/vrising/native.log';log.parent.mkdir(parents=True,exist_ok=True)
-    args=[str(location(root)),'run',str(binary),'-persistentDataPath','save-data','-address','0.0.0.0','-logFile','Z:'+str(log).replace('/','\\')]
+    args=[str(proton),'run',str(binary),'-persistentDataPath','save-data','-address','0.0.0.0','-logFile','Z:'+str(log).replace('/','\\')]
     credentials=[password,rcon_password]+[env.get(k,'')for k in ('STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')]
     return args,environment,credentials,log,(rcon_port,rcon_password)if enabled else None
 
@@ -234,6 +264,7 @@ def run(root,args,environment,credentials,log,rcon):
 
 def main():
     root=Path.cwd();env=dict(os.environ)
+    if env.get('VOLTRA_VRISING_VARIANT','vanilla')=='vanilla':configure(root,env,preflight=True)
     if env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1':
         from valheim_vrising_install import install
         install(root,'vrising',env)

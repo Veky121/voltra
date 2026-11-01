@@ -45,3 +45,48 @@
 .server-configuration-editor .card>.server-configuration-field:first-of-type{margin-top:12px;padding-top:0;border-top:0}
 .server-runtime-assignment{margin-top:16px}
 @media(max-width:700px){.server-configuration-field{grid-template-columns:minmax(0,1fr)}.server-configuration-inheritance{justify-content:flex-start}}
+
+/* Server forms share the same section titles, rows and footers as Game settings. */
+.server-admin-tools .settings-section[data-settings-section]{max-width:none}
+.server-admin-tools .settings-panel>.settings-group{padding:0}
+.server-admin-tools .settings-panel .admin-form-actions,.server-admin-tools .settings-grouped-form .admin-form-actions{padding:12px 16px;margin:0;justify-content:flex-end;border-top:1px solid var(--ui-divider)}
+.server-admin-tools .settings-grouped-form>.admin-editor-form>.admin-form-actions{border:0;padding:0 0 24px}
+.server-admin-tools .settings-panel>.settings-group>.admin-data{padding:16px}
+.server-admin-tools .settings-panel>.settings-group>.admin-action{padding:0 16px 16px}
+.server-admin-tools .settings-panel>.settings-group>.settings-row{max-width:none}
+.app-content .server-admin-tools .server-general-grid .settings-fields[data-slot=field-group]{grid-template-columns:minmax(0,1fr)}
+.app-content .server-admin-tools .server-general-grid .settings-field[data-settings-field]{grid-template-columns:minmax(0,1fr);gap:10px}
+@container settings-page (min-width:984px) and (max-width:1487px){.server-general-grid>.settings-panel:first-child{grid-row:span 2}}
+.server-admin-tools .server-runtime-assignment{margin:0}
+.server-admin-tools .startup-runtime-sections{display:grid;gap:0;min-width:0}
+.server-admin-tools .startup-variables{padding:0}
+.server-admin-tools .startup-variable-grid{margin:0;gap:0 24px}
+.server-admin-tools .startup-variable-grid>.startup-variable{border:0;border-bottom:1px solid var(--ui-divider);border-radius:0;background:none;padding:16px}
+.server-admin-tools .startup-variable-grid>.startup-variable.is-dirty{box-shadow:inset 2px 0 var(--accent)}
+.server-admin-tools .java-settings-group{margin:0;border:0}
+.server-admin-tools .java-settings-group .settings-row-layout{padding:14px 16px}
+.server-admin-tools .java-settings-actions{margin:0 0 24px;padding:0;justify-content:flex-end}
+.server-admin-tools .java-settings-preview{padding:0;margin-top:0;border:0}
+.server-admin-tools .java-settings-preview pre,.server-admin-tools .startup-preview pre{margin:16px}
+.settings-section-note{padding:14px 16px;margin:0;color:var(--muted);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.server-admin-tools .startup-advanced form{padding:0 16px 16px}
+.server-admin-tools .startup-advanced .startup-field-actions{justify-content:flex-end}
+.server-configuration-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 24px}
+.server-configuration-grid>.settings-row{max-width:none;border-bottom:1px solid var(--ui-divider);display:flex;flex-direction:column}
+.server-configuration-grid>.settings-row+.settings-row{border-top:0}
+.server-configuration-grid>.settings-row>.settings-row-body{margin-top:auto}
+.server-configuration-grid>.server-configuration-script{grid-column:1/-1}
+.server-configuration-option label{font:inherit}
+.server-configuration-state{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:4px}
+.server-configuration-inheritance{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.server-configuration-option textarea{font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.6;resize:vertical}
+.server-configuration-editor>.actions{background:none;border:0;box-shadow:none;padding:0;margin:0 0 24px;flex-direction:row}
+.server-configuration-editor>.actions>.muted{margin-right:auto;order:-1}
+.settings-paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0}
+.settings-paths dt{color:var(--muted);font-size:12px;margin-bottom:4px}
+.settings-paths dd{margin:0;font-size:13px;overflow-wrap:anywhere}
+.server-admin-tools .server-mounts-section[data-settings-section]{max-width:880px}
+.server-admin-tools .server-mounts-section .settings-row{max-width:none}
+@container settings-page (min-width:960px){.server-configuration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container settings-page (min-width:1680px){.server-configuration-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.settings-paths{grid-template-columns:minmax(0,1fr)}.server-configuration-editor>.actions{align-items:flex-start}}

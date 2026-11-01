@@ -1,3 +1,4 @@
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {miBToGB} from "../resourceUnits.ts";
 import './games-ui.css';
 import {Field, Input, Select} from '../lib';
@@ -7,7 +8,7 @@ import type {GameAgreement} from './gameTemplateModel';
 
 export function GameAgreementField({agreement, value, onChange}: {agreement: GameAgreement; value: string; onChange: (value: string) => void}) {
   return <div className="field game-agreement games-ui">
-    <details><summary>Read publisher terms</summary><p className="muted">{agreement.effective_date ? `Effective ${agreement.effective_date}` : `Reviewed ${agreement.reviewed_date}`}</p><pre tabIndex={0} aria-label={agreement.title}>{agreement.text}</pre></details>
+    <Disclosure><DisclosureTrigger>Read publisher terms</DisclosureTrigger><p className="muted">{agreement.effective_date ? `Effective ${agreement.effective_date}` : `Reviewed ${agreement.reviewed_date}`}</p><pre tabIndex={0} aria-label={agreement.title}>{agreement.text}</pre></Disclosure>
     <Field label={agreement.title}><Select value={value === agreement.accept_value ? value : '0'} onChange={event => onChange(event.target.value)}><option value="0">Not agreed</option><option value={agreement.accept_value}>I agree to these publisher terms</option></Select></Field>
   </div>;
 }

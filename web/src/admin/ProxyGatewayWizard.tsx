@@ -1,3 +1,6 @@
+import {confirmAction} from '../ui/ConfirmAction';
+import {observedFetch} from '../notifications/observedFetch';
+import {useErrorState} from '../notifications/useErrorState';
 import { useState } from "react";
 import { Button, Field, Input, Select } from "../lib";
 import { api, rows, unwrap, useAPI, ErrorMessage, Panel } from "./shared";
@@ -7,8 +10,8 @@ import "./proxy-gateways.css";
 const base = "/api/admin/proxy-gateways";
 type Item = Record<string, any>;
 export async function downloadProxyConfig(path:string, filename:string) {
-  if (!window.confirm("This configuration contains secrets. Download only to a trusted device and keep it private.")) return;
-  const response = await fetch(path, {headers:{Accept:"application/toml"}, cache:"no-store"});
+  if (!await confirmAction({title:"Download config?",description:"This configuration contains secrets. Download only to a trusted device and keep it private.",confirmLabel:"Download config",danger:false})) return;
+  const response = await observedFetch(path, {headers:{Accept:"application/toml"}, cache:"no-store"});
   if (!response.ok) throw new Error(`Configuration download failed (${response.status}).`);
   if (!response.headers.get("Content-Type")?.includes("toml")) throw new Error("Expected a TOML configuration download.");
   const url = URL.createObjectURL(await response.blob());
@@ -20,7 +23,7 @@ export function ProxyGatewayWizard({onClose,onSaved}: {onClose: () => void; onSa
   const [step,setStep] = useState(1), [gateway,setGateway] = useState<Item | null>(null), [client,setClient] = useState<Item | null>(null);
   const [details,setDetails] = useState<Item>({name:"",public_host:"",public_port_start:20000,public_port_end:30000,server_host:"",server_port:7000,auth_token:""});
   const [settings,setSettings] = useState<Item>({node_id:"",admin_url:"",admin_user:"",admin_password:"",local_port_start:1024,local_port_end:65535});
-  const [busy,setBusy] = useState(""), [error,setError] = useState("");
+  const [busy,setBusy] = useState(""), [error,setError] = useErrorState('admin/ProxyGatewayWizard.tsx');
   async function run(label:string, action:() => Promise<void>) {setBusy(label); setError(""); try {await action();} catch(e) {setError(e instanceof Error ? e.message : String(e));} finally {setBusy("");}}
   const fields = (value:Item, update:(v:Item) => void, specs: {key:string;label:string;type?:string;hint?:string}[]) => specs.map(f => <Field key={f.key} label={f.label} hint={f.hint}><Input required type={f.type || "text"} autoComplete={f.type === "password" ? "new-password" : "off"} {...(f.type === "number" ? {min:1,max:65535} : {})} value={value[f.key]} onChange={e => update({...value,[f.key]:f.type === "number" ? Number(e.target.value) : e.target.value})}/></Field>);
   return <div className="admin-infrastructure proxy-gateways__wizard"><Panel title="Set up gateway"><div className="proxy-gateways__wizard-heading"><ol className="proxy-gateways__progress" aria-label="Gateway setup progress">{["Gateway", "Node client", "Installation", "Test"].map((label, index) => <li key={label} aria-current={step === index + 1 ? "step" : undefined} data-complete={step > index + 1}><span aria-hidden="true">{index + 1}</span>{label}</li>)}</ol><Button variant="secondary" disabled={!!busy} onClick={onClose}>Close setup</Button></div><ErrorMessage error={error || nodes.error}/><fieldset className="proxy-gateways__fieldset" disabled={!!busy}>

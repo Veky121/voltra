@@ -15,6 +15,7 @@ ARCHIVE_ROOT=VERSION+'-x86_64'
 SHA256='b2cf4a632a70ec321cdb9904fa396a2a45d4061129f9fdc89d8a27ea5ceeb9d6'
 SHA512='30160946a5e4ffdf1f29d6f83a3d27108f6aa71b6aa59095b2c2260fe3a003b62acf8fdcb02a3dfc602b28473f5679d8a3eaee5a8adb141c1dfa01c42888da2d'
 URL='https://github.com/GloriousEggroll/proton-ge-custom/releases/download/'+VERSION+'/'+VERSION+'-x86_64.tar.gz'
+VULKAN_LIBRARY=Path('/usr/lib/x86_64-linux-gnu/libvulkan.so.1')
 
 
 def digest(path):
@@ -71,12 +72,21 @@ def location(root):
 def provision(root):
     root=Path(root).resolve();base=root/'.voltra/proton';target=base/VERSION
     if base.is_symlink() or target.is_symlink() or not base.resolve().is_relative_to(root):raise ValueError('Proton destination leaves the volume')
-    base.mkdir(parents=True,exist_ok=True)
     bridge=target/'files/lib/wine/x86_64-unix/lsteamclient.so';receipt=base/'release.json'
+    # Refuse every publication path before acquisition or publishing the runtime.
+    library=base/'lib'
+    for path in (library, library/'libvulkan.so.1', receipt):
+        if path.is_symlink() or not path.resolve().is_relative_to(root):raise ValueError('Proton publication path leaves the volume')
+    if target.exists() and not receipt.is_file():raise ValueError('Unreceipted existing GE-Proton directory needs operator review')
+
     if receipt.is_file() and target.is_dir():
         previous=json.loads(receipt.read_text())
         if previous.get('sha512')==SHA512 and location(root).is_file() and bridge.is_file() and hashlib.sha256(bridge.read_bytes()).hexdigest()==previous.get('bridge_sha256'):return previous
         raise ValueError('Existing GE-Proton installation differs; keep it for operator review')
+    # This loader is copied below. Refuse its known absence before extraction
+    # or target publication can leave an unreceipted GE distribution behind.
+    if not VULKAN_LIBRARY.is_file():raise ValueError('GE-Proton provisioning requires installer package libvulkan1')
+    base.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.proton-',dir=base) as temporary:
         stage=Path(temporary);archive=stage/'source.tar.gz';cached=root/'.voltra/public-cache'/SHA256
         if cached.exists():
@@ -99,6 +109,6 @@ def provision(root):
         os.replace(ready,target)
     library=base/'lib';library.mkdir(exist_ok=True)
     if library.is_symlink() or not library.resolve().is_relative_to(root):raise ValueError('Proton library path leaves the volume')
-    shutil.copy2('/usr/lib/x86_64-linux-gnu/libvulkan.so.1',library/'libvulkan.so.1')
+    shutil.copy2(VULKAN_LIBRARY,library/'libvulkan.so.1')
     previous={'version':VERSION,'url':URL,'sha256':SHA256,'sha512':SHA512,'bridge_sha256':hashlib.sha256(bridge.read_bytes()).hexdigest(),'licenses':'Included unchanged in the extracted publisher distribution','cache_hit':archive==cached}
     receipt.write_text(json.dumps(previous,indent=2)+'\n');return previous

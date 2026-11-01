@@ -1,3 +1,7 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {PageHeading} from '../ui/PageHeading';
+import {RadioGroup,RadioGroupItem} from '../components/ui/radio-group';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {formatMiBGB, miBToGB} from "../resourceUnits";
 import "./minecraftSetup.css";
 import {GameSwitch} from './GameSwitch';
@@ -28,7 +32,7 @@ export function MinecraftSetup() {
   useEffect(() => {setPack(null);}, [mode]);
   const options = request.data ? {...request.data, loaders: request.data.loaders ?? [{id: "vanilla", name: "Vanilla"}]} : null;
   return <div className="page workspace-page mc-page games-ui">
-    <header className="page-header mc-page-header"><div><Link className="mc-back" to="/game-library">← Game Library</Link><h1>{mode === "modpack" && !pack ? "Minecraft modpacks" : "Create a Minecraft server"}</h1></div>
+    <header className="page-header mc-page-header"><div><Link className="mc-back" to="/game-library">← Game Library</Link><PageHeading title={mode === "modpack" && !pack ? "Minecraft modpacks" : "Create a Minecraft server"}/></div>
       {!pack && <MinecraftSegments label="Minecraft setup" value={mode} options={[{id: "custom", name: "Custom setup"}, {id: "modpack", name: "Modpacks"}]} onChange={next => {setPack(null); setParams(previous => {previous.set("setup", next); return previous;});}}/>}
       {pack && <Button variant="secondary" onClick={() => setPack(null)}>← Browse modpacks</Button>}
     </header>
@@ -43,7 +47,7 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
   const navigate = useNavigate();
   const [form, setForm] = useState<SetupForm>(() => ({name: pack?.project.name ?? "Minecraft Survival", version: pack?.version.game_versions[0] ?? options.latest, loader: pack?.version.loaders[0] ?? "vanilla", loaderChoice: "stable", loaderVersion: "", runtime: "auto", memory: pack ? "4" : "2", xms: "0.25", xmx: "1.75", autoHeap: true, extraArgs: "", node: "", eula: false}));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('client/MinecraftSetup.tsx');
   const [submitted, setSubmitted] = useState(false);
   const submitting = useRef(false);
   const active = useRef(true);
@@ -104,7 +108,7 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
       </Card>
       <Card className="mc-config-card"><div className="mc-section-heading"><span className="mc-section-number">1</span><h2>Game and loader</h2></div>
         {pack ? <><dl className="mc-version-detail"><div><dt>Minecraft</dt><dd>{pack.version.game_versions.join(", ") || "Determined by pack"}</dd></div><div><dt>Loader</dt><dd>{pack.version.loaders.map(loader => loaders.find(option => option.id === loader)?.name ?? loader).join(", ") || "Determined by pack"}</dd></div></dl><p className="muted mc-full">The pack supplies its game and loader versions.</p></> : <>
-          <fieldset className="mc-loader-fieldset"><legend>Loader</legend><div className="mc-loaders">{loaders.map(loader => <label key={loader.id} className={`mc-loader ${form.loader === loader.id ? "is-selected" : ""}`}><input type="radio" name="minecraft-loader" value={loader.id} checked={form.loader === loader.id} onChange={() => setForm(previous => ({...previous, loader: loader.id, loaderChoice: "stable", loaderVersion: ""}))}/><MinecraftLoaderIcon id={loader.id} name={loader.name}/><span>{loader.name}</span></label>)}</div></fieldset>
+          <fieldset className="mc-loader-fieldset"><legend>Loader</legend><RadioGroup className="mc-loaders" name="minecraft-loader" value={form.loader} onValueChange={loader=>setForm(previous=>({...previous,loader:String(loader),loaderChoice:"stable",loaderVersion:""}))}>{loaders.map(loader => <label key={loader.id} className={`mc-loader ${form.loader === loader.id ? "is-selected" : ""}`}><RadioGroupItem value={loader.id} aria-label={loader.name}/><MinecraftLoaderIcon id={loader.id} name={loader.name}/><span>{loader.name}</span></label>)}</RadioGroup></fieldset>
           <Field label="Minecraft version"><Select value={form.version} onChange={e => setForm(previous => ({...previous, version: e.target.value, loaderChoice: "stable", loaderVersion: ""}))}>{versions.map(version => <option key={version} value={version}>{version}{version === options.latest ? " · Latest release" : ""}</option>)}</Select></Field>
           {form.loader !== "vanilla" && <div className="mc-loader-versions">
             <div className="mc-field-heading"><span>{loaderName} version</span><MinecraftSegments label="Loader version selection" value={form.loaderChoice} options={[{id: "stable", name: "Stable"}, {id: "latest", name: "Latest"}, {id: "other", name: "Other"}]} onChange={choice => setForm(previous => ({...previous, loaderChoice: choice, loaderVersion: choice === "other" ? selectedLoaderVersion || loaderVersions[0]?.id || "" : previous.loaderVersion}))}/></div>
@@ -122,12 +126,12 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
         {runtimeRequest.loading && <p className="muted" role="status">Loading registered Java runtimes...</p>}
         <ErrorBox>{runtimeRequest.error}</ErrorBox>{runtimeRequest.error && <Button variant="secondary" onClick={runtimeRequest.reload}>Retry Java runtimes</Button>}
         {!runtimeRequest.loading && !runtimeRequest.error && enabledRuntimes.length === 0 && <p className="muted">No enabled Java runtimes. Ask an administrator to register one.</p>}
-        <details className="mc-advanced"><summary>Advanced memory and Java arguments</summary>
+        <Disclosure className="mc-advanced"><DisclosureTrigger>Advanced memory and Java arguments</DisclosureTrigger>
           <div className="form-grid"><Field label="Initial Java heap" hint={xmsMiB !== null ? `${formatMiBGB(xmsMiB)}` : "Enter a size in GB."}><div className="mc-unit-input"><Input type="number" required min="0.0009765625" step="any" value={form.xms} onChange={e => set("xms", e.target.value)}/><span>GB</span></div></Field>
             <Field label="Maximum Java heap" hint={form.autoHeap ? `${formatMiBGB(Math.max(0, heapBudget))} after memory reserve` : xmxMiB !== null ? `${formatMiBGB(xmxMiB)}` : "Enter a size in GB."}><div className="mc-unit-input"><Input type="number" required={!form.autoHeap} disabled={form.autoHeap} min="0.0009765625" step="any" value={form.autoHeap ? String(miBToGB(Math.max(0, heapBudget))) : form.xmx} onChange={e => set("xmx", e.target.value)}/><span>GB</span></div></Field></div>
           <label className="check"><GameSwitch checked={form.autoHeap} onCheckedChange={checked => setForm(previous => ({...previous, autoHeap: checked, xmx: !checked ? String(miBToGB(Math.max(0, heapBudget))) : previous.xmx}))}/>Set maximum heap automatically</label>
           <Field label="Extra Java arguments" hint="Memory flags are managed by the heap controls."><Input placeholder="-XX:+UseG1GC" value={form.extraArgs} onChange={e => set("extraArgs", e.target.value)}/></Field>
-        </details>
+        </Disclosure>
         {(!validMemory || !validHeap) && <ErrorBox>{validation}</ErrorBox>}
       </Card>
       <Card className="mc-config-card"><div className="mc-section-heading"><span className="mc-section-number">3</span><h2>Host machine</h2></div>

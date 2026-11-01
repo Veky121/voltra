@@ -56,6 +56,12 @@ export function observeQuery(path:string,request:QueryRequest,listener:(state:Sn
     if(!entry.listeners.size&&entry.flight){entry.version++;entry.abort?.abort();entry.abort=undefined;entry.flight=undefined;entry.queued=false;entry.state={...entry.state,loading:false};}
   }};
 }
+/** A socket snapshot fences any older HTTP flight for an already cached read. */
+export function applyLiveQuery(path:string,data:any,error:string){
+  const entry=entries.get(path);if(!entry)return;
+  entry.version++;entry.abort?.abort();entry.abort=undefined;entry.flight=undefined;entry.queued=false;
+  entry.state={data,error,loading:false};entry.expires=error?0:Date.now()+queryTTL(path);emit(entry);
+}
 /** Call after any out-of-band mutation. Conservative invalidation also refreshes active readers. */
 export function invalidateQueryCache(mutationPath?:string){
   const path=mutationPath===undefined?undefined:normalizedQueryPath(mutationPath).split('?')[0];

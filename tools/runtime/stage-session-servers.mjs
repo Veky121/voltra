@@ -6,6 +6,7 @@ const profiles={};
 const previous=process.argv.includes('--kf2-only')?JSON.parse(fs.readFileSync('.local/session-servers/profiles.json')):{};
 for(const [game,path,memory,disk,ports] of [['scp','scpsl/dedicated/egg-scpsl.json',3072,8192,1],['exiled','scpsl/exiled/egg-s-c-p--s-l--exiled.json',4096,8192,1],['kf2','killing_floor_2/egg-killing-floor2.json',4096,65536,3]]){
  if(game!=='kf2' && previous[path]){profiles[path]=previous[path];continue;}
+ if(process.argv.includes('--kf2-source-only') && game!=='kf2')continue;
  const entry=catalog.entries.find(e=>e.path===path);if(!entry)throw Error('Missing original '+path);
  const egg=structuredClone(entry.egg);
  egg.features=[...new Set([...(egg.features||[]),'voltra_steam_template'])];
@@ -35,7 +36,8 @@ for(const [game,path,memory,disk,ports] of [['scp','scpsl/dedicated/egg-scpsl.js
   profiles[path].setup_steps.push('Select three distinct allocations on the same address: game UDP, Steam UDP at game + 12783, and QUERY_PORT UDP. Game port must be <=52752. Enabling WebAdmin requires a fourth distinct TCP allocation. The shared form reserves the fixed Steam companion before selecting query/WebAdmin roles; overflow, missing allocations and collisions fail before writes. Workshop subscriptions, mutators, map cycles and MultiAdmin files remain editable. The documented Steam socket formula still requires native observation before runtime acceptance.');
  }
 }
-fs.mkdirSync('.local/session-servers',{recursive:true});
-fs.writeFileSync('.local/session-servers/profiles.json',JSON.stringify(profiles,null,2)+'\n');
-fs.writeFileSync('.local/session-servers/source-hashes.json',JSON.stringify(Object.fromEntries(sources.map(source=>[source,crypto.createHash('sha256').update(fs.readFileSync('internal/panel/game_library/scripts/'+source)).digest('hex')])),null,2)+'\n');
-console.log('Three source-only profiles staged; shared overrides untouched.');
+const destination=process.argv.find(a=>a.startsWith('--output='))?.slice(9)||'.local/session-servers';
+fs.mkdirSync(destination,{recursive:true});
+fs.writeFileSync(destination+'/profiles.json',JSON.stringify(profiles,null,2)+'\n');
+fs.writeFileSync(destination+'/source-hashes.json',JSON.stringify(Object.fromEntries(sources.map(source=>[source,crypto.createHash('sha256').update(fs.readFileSync('internal/panel/game_library/scripts/'+source)).digest('hex')])),null,2)+'\n');
+console.log(Object.keys(profiles).length+' source-only profiles staged; shared overrides untouched.');

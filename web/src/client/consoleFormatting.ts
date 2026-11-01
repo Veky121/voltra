@@ -17,6 +17,15 @@ function ansiColor(value: number): string | undefined {
 
 // Read severity from log prefixes, rather than matching words in player chat/messages.
 export function detectConsoleLevel(text: string): ConsoleLevel {
+	const nativeExit = text.match(/^(?:[A-Za-z0-9_ -]+ )?native child returncode=(-?\d+)(?: signal=SIG[A-Z0-9]+)?\s*$/);
+	if (nativeExit && Number(nativeExit[1]) !== 0) return 'error';
+  const daemonMessage = text.match(/^\[Voltra\]:?\s*(.*)$/)?.[1];
+  const daemonLevel = severity(daemonMessage?.match(/^\[([a-z]+)\](?=\s|:|$)/i)?.[1] ?? '');
+  if (daemonLevel) return daemonLevel;
+  if (daemonMessage && (/^(?:-+\s*)?Detected server process in a crashed state!/.test(daemonMessage)
+      || /^Exit code:\s*[1-9]\d*\s*$/.test(daemonMessage)
+      || /^Out of memory:\s*true\s*$/i.test(daemonMessage))) return 'error';
+  if (daemonMessage === 'Aborting automatic restart, crash detection is disabled for this instance.') return 'warning';
   try {
     if (text.trimStart().startsWith('{')) {
       const record = JSON.parse(text);
@@ -24,7 +33,7 @@ export function detectConsoleLevel(text: string): ConsoleLevel {
       if (level) return level;
     }
   } catch { /* Regular text logs are expected. */ }
-  const prefix = text.match(/^(?:(?:\d{4}-\d\d-\d\d[T ][\d:.]+Z?\s*)|(?:\d\d:\d\d:\d\d(?:\.\d+)?\s*)|(?:\[[^\]\r\n]{1,100}\]\s*)){0,6}/)?.[0] ?? '';
+  const prefix = text.match(/^(?:(?:\d{4}-\d\d-\d\d[T ][\d:.]+(?:Z|[+-]\d\d:?\d\d)?\s*)|(?:\d\d:\d\d:\d\d(?:\.\d+)?\s*)|(?:\[[^\]\r\n]{1,100}\]\s*)){0,6}/)?.[0] ?? '';
   const tokens = prefix.match(/\b(?:FATAL|SEVERE|CRITICAL|ERROR|ERR|WARNING|WARN|DEBUG|TRACE|INFO)\b/gi);
   const body = text.slice(prefix.length).replace(/^:\s*/, '');
   const direct = body.match(/^(?:Log[\w]+:\s*)?(FATAL|SEVERE|CRITICAL|ERROR|ERR|WARNING|WARN|DEBUG|TRACE|INFO)(?=\s|:|\[|$)/i);
@@ -65,11 +74,20 @@ export function formatConsoleBatch(lines: string[], initialStyle: ConsoleStyle =
         else if (code === 1) style.fontWeight = 700;
         else if (code === 2) style.opacity = .75;
         else if (code === 3) style.fontStyle = 'italic';
-        else if (code === 4) style.textDecoration = 'underline';
-        else if (code === 9) style.textDecoration = 'line-through';
+        else if (code === 4 || code === 9) {
+          const decoration = code === 4 ? 'underline' : 'line-through';
+          const decorations = new Set(style.textDecoration?.split(' ').filter(Boolean));
+          decorations.add(decoration);
+          style.textDecoration = [...decorations].join(' ');
+        }
         else if (code === 22) { delete style.fontWeight; delete style.opacity; }
         else if (code === 23) delete style.fontStyle;
-        else if (code === 24 || code === 29) delete style.textDecoration;
+        else if (code === 24 || code === 29) {
+          const decoration = code === 24 ? 'underline' : 'line-through';
+          const remaining = style.textDecoration?.split(' ').filter(value => value !== decoration).join(' ');
+          if (remaining) style.textDecoration = remaining;
+          else delete style.textDecoration;
+        }
         else if (code === 39) delete style.color;
         else if (code === 49) delete style.backgroundColor;
         else if ((code >= 30 && code <= 37) || (code >= 90 && code <= 97)) style.color = palette[code < 90 ? code - 30 : code - 90 + 8];

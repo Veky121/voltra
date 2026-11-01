@@ -9,9 +9,9 @@ from native_shards import run
 
 def launch(root, env):
     root = Path(root).resolve()
-    configuration = configure(root, env)
     binary = root / BINARY
     if not binary.is_file():raise ValueError('Install the native DST server first')
+    configuration = configure(root, env)
     child_env = dict(env)
     for key in ('PYTHONHOME', 'PYTHONPATH', 'LD_PRELOAD'):child_env.pop(key, None)
     child_env['LD_LIBRARY_PATH'] = str(root / 'bin64/lib64')
@@ -25,12 +25,16 @@ def launch(root, env):
     return specs, child_env, credentials
 
 
-if __name__ == '__main__':
-    root = Path.cwd()
-    automatic = os.environ.get('VOLTRA_STEAM_AUTO_UPDATE', os.environ.get('AUTO_UPDATE', '0'))
+def main(root, env):
+    automatic = env.get('VOLTRA_STEAM_AUTO_UPDATE', env.get('AUTO_UPDATE', '0'))
     if automatic not in ('0','1'):raise ValueError('AUTO_UPDATE must be 0 or 1')
+    configure(root, env, dry_run=True)
     if automatic == '1':update_game(root, validate=False)
-    specs, environment, credentials = launch(root, os.environ)
-    raise SystemExit(run(root / 'bin64', specs, environment, 'c_shutdown()',
+    specs, environment, credentials = launch(root, env)
+    return run(Path(root) / 'bin64', specs, environment, 'c_shutdown()',
                          credentials,
-                         ready_message='VOLTRA_DST_READY'))
+                         ready_message='VOLTRA_DST_READY')
+
+
+if __name__ == '__main__':
+    raise SystemExit(main(Path.cwd(), dict(os.environ)))

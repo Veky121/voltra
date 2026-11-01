@@ -1,3 +1,7 @@
+import {usePendingSetting} from '../client/PendingSettings';
+import {useErrorState} from '../notifications/useErrorState';
+import {Badge as MiraBadge} from '../components/ui/badge';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import { useEffect, useState } from "react";
 import { Button, Field, Input, api, rows, useAPI } from "../lib";
 import { ErrorMessage, Heading, Panel } from "./shared";
@@ -35,16 +39,36 @@ export function JavaRuntimes() {
   const query = useAPI(endpoint);
   const [runtimes, setRuntimes] = useState<JavaRuntime[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/JavaRuntimes.tsx');
   const [saved, setSaved] = useState(false);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [baseline,setBaseline]=useState<JavaRuntime[]>([]);
+  const dirty=JSON.stringify(runtimes)!==JSON.stringify(baseline);
   useEffect(() => {
-    if (query.data) setRuntimes(rows(query.data));
+    if (query.data&&!dirty){const next=rows(query.data);setRuntimes(next);setBaseline(next)}
   }, [query.data]);
   const update = (index: number, patch: Partial<JavaRuntime>) => {
     setRuntimes((old) => old.map((runtime, i) => i === index ? { ...runtime, ...patch } : runtime));
     setSaved(false);
   };
+  async function saveCatalog(){
+          setSaved(false);
+          const normalized = runtimes.map((runtime) => ({ ...runtime, id: runtime.id.trim(), name: runtime.name.trim(), distribution: runtime.distribution.trim(), image: runtime.image.trim() }));
+          const validation = validateCatalog(normalized);
+          setError(validation);
+          if (validation) throw new Error(validation);
+          setBusy(true);
+          try {
+            await api(endpoint, { method: "PUT", body: JSON.stringify({ runtimes: normalized }) });
+            setSaved(true);
+            setRuntimes(normalized);setBaseline(normalized);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));throw err;
+          } finally {
+            setBusy(false);
+          }
+  }
+  usePendingSetting('java-catalog',dirty,{blocked:busy||query.loading||!!query.error,save:saveCatalog,discard:()=>{setRuntimes(baseline);setError('');setSaved(false)}});
   return (
     <div className="admin-management-page management-ui">
       <Heading title="Java runtimes" />
@@ -52,33 +76,16 @@ export function JavaRuntimes() {
       <ErrorMessage error={query.error} />
       {query.error && <Button variant="secondary" onClick={query.reload}>Retry loading runtimes</Button>}
       {query.loading ? <p role="status">Loading Java runtimes...</p> : query.data && (
-        <form onSubmit={async (event) => {
-          event.preventDefault();
-          setSaved(false);
-          const normalized = runtimes.map((runtime) => ({ ...runtime, id: runtime.id.trim(), name: runtime.name.trim(), distribution: runtime.distribution.trim(), image: runtime.image.trim() }));
-          const validation = validateCatalog(normalized);
-          setError(validation);
-          if (validation) return;
-          setBusy(true);
-          try {
-            await api(endpoint, { method: "PUT", body: JSON.stringify({ runtimes: normalized }) });
-            setSaved(true);
-            query.reload();
-          } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
-          } finally {
-            setBusy(false);
-          }
-        }}>
+        <form onSubmit={event=>{event.preventDefault();void saveCatalog().catch(()=>{})}}>
           <ErrorMessage error={error} />
           {saved && <p className="success" role="status">Java runtime catalog saved.</p>}
           <fieldset disabled={busy} className="admin-fieldset">
             {runtimes.map((runtime, index) => (
-              <details className="card admin-disclosure admin-runtime" key={index} open={openIndex === index} onInvalid={() => setOpenIndex(index)}>
-                <summary onClick={(event) => { event.preventDefault(); setOpenIndex((old) => old === index ? null : index); }}>
+              <Disclosure className="card admin-disclosure admin-runtime" key={index} open={openIndex === index} onOpenChange={open=>setOpenIndex(open?index:null)}>
+                <DisclosureTrigger>
                   <span className="admin-disclosure-title">{runtime.name || `Runtime ${index + 1}`}</span>
-                  <span className="admin-disclosure-meta"><span className="badge">Java {runtime.major}</span><span>{runtime.distribution || "No distribution"}</span>{!runtime.enabled && <span className="badge">Disabled</span>}</span>
-                </summary>
+                  <span className="admin-disclosure-meta"><MiraBadge variant="secondary" className="badge">Java {runtime.major}</MiraBadge><span>{runtime.distribution || "No distribution"}</span>{!runtime.enabled && <MiraBadge variant="secondary" className="badge">Disabled</MiraBadge>}</span>
+                </DisclosureTrigger>
                 <div className="form-grid">
                   <Field label="Runtime ID" hint="Keep this stable. Server settings refer to this ID.">
                     <Input required maxLength={80} value={runtime.id} onChange={(e) => update(index, { id: e.target.value })} />
@@ -104,13 +111,13 @@ export function JavaRuntimes() {
                   setOpenIndex(null);
                   setSaved(false);
                 }}>Remove {runtime.name || `runtime ${index + 1}`}</Button></div>
-              </details>
+              </Disclosure>
             ))}
             {!runtimes.length && <Panel>No runtimes registered. Add a runtime to make it available to Java servers.</Panel>}
             <p className="muted">Disabling or removing a runtime can prevent servers that use it from starting.</p>
             <div className="actions admin-form-actions admin-form-actions-split">
               <Button variant="secondary" onClick={() => { setOpenIndex(runtimes.length); setRuntimes((old) => [...old, blankRuntime()]); setSaved(false); }}>Add runtime</Button>
-              <Button type="submit">{busy ? "Saving..." : "Save runtime catalog"}</Button>
+
             </div>
           </fieldset>
         </form>

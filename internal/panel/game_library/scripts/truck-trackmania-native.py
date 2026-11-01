@@ -104,8 +104,23 @@ def preserve(root):
             restore=helper('source-install').restore_file
             for record in records:restore(root,record)
 
+def trackmania_preflight(root,env):
+    # Pure validation before preservation directories or publisher acquisition.
+    for key,default,limit in [('MASTERSERVER_LOGIN','',30),('MASTERSERVER_PASSWORD','',30),('SERVER_PASSWORD','',30),('SERVER_NAME','Trackmania',255),('SERVER_COMMENT','',1024)]:text(env,key,default,limit)
+    raw=env.get('SERVER_PORT','')
+    if not re.fullmatch(r'[0-9]{1,5}',raw) or not 1<=int(raw)<=65535:raise ValueError('Invalid game port')
+    path=text(env,'GAME_CONFIG',r'MatchSettings\example.txt',255).replace('\\','/')
+    if not path or path.startswith('/') or '..' in PurePosixPath(path).parts or ':' in path:raise ValueError('Game settings must remain within server')
+    confined(root,root/'UserData/Maps'/path)
+    target=confined(root,root/'UserData/Config/dedicated_cfg.txt')
+    if target.exists():
+        original=target.read_bytes().decode('utf-8')
+        patch_xml(original,{'masterserver_account':{'login':text(env,'MASTERSERVER_LOGIN','',30),'password':text(env,'MASTERSERVER_PASSWORD','',30)},'server_options':{'name':text(env,'SERVER_NAME','Trackmania'),'comment':text(env,'SERVER_COMMENT','',1024),'password':text(env,'SERVER_PASSWORD','',30)},'system_config':{'server_port':int(raw)}})
+    return path
+
 def install(root,game,env):
     root=Path(root).resolve()
+    if game=='trackmania':trackmania_preflight(root,env)
     with preserve(root):
         if game in GAMES:
             app,_,binary=GAMES[game]
@@ -119,10 +134,13 @@ def install(root,game,env):
                 seen=set();total=0
                 for entry in z.infolist():
                     parts=PurePosixPath(entry.filename).parts
-                    if not parts or entry.filename.startswith('/') or '\\' in entry.filename or any(p in ('..','.') or ':' in p for p in parts):raise ValueError('Unsafe publisher ZIP path')
+                    if not parts or '/'.join(parts)!=entry.filename.rstrip('/') or entry.filename.startswith('/') or '\\' in entry.filename or any(p in ('..','.') or ':' in p for p in parts):raise ValueError('Unsafe publisher ZIP path')
                     if entry.filename in seen or entry.external_attr>>16&0o170000==0o120000:raise ValueError('Duplicate/symlink ZIP member')
+                    confined(root,root/entry.filename)
                     seen.add(entry.filename);total+=entry.file_size
                     if total>2*1024**3:raise ValueError('Oversized publisher ZIP')
+                required={'TrackmaniaServer','UserData/Config/dedicated_cfg.default.txt','UserData/Maps/MatchSettings/example.txt'}
+                if not required.issubset({e.filename for e in z.infolist() if not e.is_dir()}):raise ValueError('Incomplete publisher ZIP')
                 for entry in z.infolist():
                     target=confined(root,root/entry.filename)
                     if entry.is_dir():target.mkdir(parents=True,exist_ok=True);continue
@@ -143,16 +161,17 @@ def configure(root,game,env):
         token=text(env,'STEAM_TOKEN','',32);secrets.append(token)
         updated=patch_sii(target.read_text(),{'connection_dedicated_port':primary,'query_dedicated_port':query,'server_logon_token':token,'lobby_name':text(env,'LOBBY_NAME',folder,64)})
     elif game=='trackmania':
+        path=trackmania_preflight(root,env)
         target=confined(root,root/'UserData/Config/dedicated_cfg.txt')
         login=text(env,'MASTERSERVER_LOGIN','',30);password=text(env,'MASTERSERVER_PASSWORD','',30);secrets.extend((login,password,text(env,'SERVER_PASSWORD','',30)))
         port=int(env['SERVER_PORT'])
         if not 1<=port<=65535:raise ValueError('Invalid game port')
-        updated=patch_xml(target.read_text(),{'masterserver_account':{'login':login,'password':password},'server_options':{'name':text(env,'SERVER_NAME','Trackmania',255),'comment':text(env,'SERVER_COMMENT','',1024),'password':secrets[-1]},'system_config':{'server_port':port}})
+        updated=patch_xml(target.read_bytes().decode('utf-8'),{'masterserver_account':{'login':login,'password':password},'server_options':{'name':text(env,'SERVER_NAME','Trackmania',255),'comment':text(env,'SERVER_COMMENT','',1024),'password':secrets[-1]},'system_config':{'server_port':port}})
         path=text(env,'GAME_CONFIG',r'MatchSettings\example.txt',255).replace('\\','/')
         if Path(path).is_absolute() or '..' in PurePosixPath(path).parts or ':' in path:raise ValueError('Game settings must remain within server')
         confined(root,root/'UserData/Maps'/path)
     else:raise ValueError('Unknown native recipe')
-    original=target.read_text()
+    original=target.read_bytes().decode('utf-8') if game=='trackmania' else target.read_text()
     if original!=updated:native.private_write(confined(root,root/'.voltra/truck-trackmania-config'/str(time.time_ns())),original);native.private_write(target,updated)
     else:target.chmod(0o600)
     return ([str(root/'TrackmaniaServer'),'/dedicated_cfg=dedicated_cfg.txt','/game_settings='+path,'/noDaemon'] if game=='trackmania' else [str(root/'bin/linux_x64'/GAMES[game][2])]),secrets

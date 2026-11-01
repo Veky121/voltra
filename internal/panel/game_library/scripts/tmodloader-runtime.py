@@ -11,6 +11,97 @@ import subprocess
 from terraria_release_install import check_elf, check_runtime, confined, digest
 
 
+def install(root, env, **kwargs):
+    """Refuse known operator conflicts before publisher metadata/acquisition.
+
+    OS package bootstrap and helper emission happen in the recipe before this
+    Python boundary. The shared installer still owns locking and publication.
+    """
+    from terraria_release_install import install as install_release, preflight_operator_paths
+    root = Path(root).resolve()
+    if env.get('VOLTRA_TERRARIA_KIND') != 'tmodloader':
+        raise ValueError('Expected the tModLoader recipe identity')
+    environment_preflight(root, env, kwargs.get('machine', platform.machine()))
+    saves = confined(root, 'saves')
+    if saves.exists() and not saves.is_dir():
+        raise ValueError('Operator data directory conflicts: saves')
+    preflight_operator_paths(root, 'tmodloader', env)
+    return install_release(root, env, **kwargs)
+
+
+def configuration(root, env, write=False):
+    """Native -config serverconfig.txt; reviewed keys seed only when absent."""
+    defaults = {'WORLD_NAME':'world','WORLD_SIZE':'1','DIFFICULTY':'0','MAX_PLAYERS':'8',
+                'SERVER_PASSWORD':'','MOTD':'Please don’t cut the purple trees!','LANGUAGE':'1'}
+    values = {key: env.get(key, value) for key, value in defaults.items()}
+    for key, value in values.items():
+        if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise ValueError('Invalid control input: ' + key)
+    def validate(key, value):
+        patterns = {'worldname':r'[A-Za-z0-9_-]{1,20}', 'autocreate':r'[123]',
+                    'difficulty':r'[0-3]', 'maxplayers':r'[0-9]{1,3}'}
+        if key in patterns and (not re.fullmatch(patterns[key], value) or key == 'maxplayers' and not 1 <= int(value) <= 255):
+            raise ValueError('Invalid native setting: ' + key)
+        if key in ('password','motd') and len(value) > (20 if key == 'password' else 40):
+            raise ValueError('Invalid native setting: ' + key)
+    mapping = {'worldname':'WORLD_NAME','autocreate':'WORLD_SIZE','difficulty':'DIFFICULTY',
+               'maxplayers':'MAX_PLAYERS','password':'SERVER_PASSWORD','motd':'MOTD'}
+    for key, source in mapping.items(): validate(key, values[source])
+    if not re.fullmatch('[1-9]', values['LANGUAGE']): raise ValueError('Invalid LANGUAGE')
+    port = env.get('SERVER_PORT', '7777')
+    if not isinstance(port, str) or not re.fullmatch('[0-9]{1,5}', port) or not 1 <= int(port) <= 65535:
+        raise ValueError('Invalid allocated SERVER_PORT')
+    path = confined(root, 'serverconfig.txt')
+    if path.exists() and (not path.is_file() or path.stat().st_size > 1024**2): raise ValueError('Invalid native config')
+    raw = path.read_bytes() if path.exists() else b''
+    text = raw.decode('utf-8')
+    entries = {}
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(('#',';')): continue
+        if '=' not in stripped: raise ValueError('Ambiguous native config line')
+        key, value = stripped.split('=',1); key = key.strip().lower(); value = value.strip()
+        if key in entries: raise ValueError('Duplicate native config key: ' + key)
+        if any(ord(c) < 32 or ord(c) == 127 for c in value): raise ValueError('Invalid config control')
+        validate(key, value); entries[key] = (index,value)
+    worlddir = '/home/container/saves/Worlds'
+    if 'worldpath' in entries and entries['worldpath'][1] != worlddir: raise ValueError('World path must use managed saves/Worlds')
+    if 'world' in entries:
+        value = entries['world'][1]
+        if not re.fullmatch(re.escape(worlddir) + r'/[A-Za-z0-9_-]{1,20}\.wld', value): raise ValueError('Unsafe native world path')
+        confined(root, 'saves/Worlds/' + value.rsplit('/',1)[1])
+    name = entries.get('worldname',(None,values['WORLD_NAME']))[1]
+    seeds = {key:values[source] for key,source in mapping.items()}
+    seeds.update(worldpath=worlddir, world=worlddir+'/'+name+'.wld', upnp='0')
+    newline = '\r\n' if b'\r\n' in raw else '\n'
+    for key,value in {**seeds, 'port':port}.items():
+        if key in entries:
+            if key in ('port','upnp') and entries[key][1] != value: lines[entries[key][0]] = key+'='+value+newline
+        else:
+            if lines and not lines[-1].endswith(('\n','\r')): lines[-1] += newline
+            lines.append(key+'='+value+newline)
+    result = ''.join(lines).encode('utf-8')
+    if write and result != raw:
+        # In-place write retains ownership and permissions. No multifile atomicity claim.
+        with path.open('wb') as output: output.write(result)
+    return result
+
+
+def environment_preflight(root, env, machine='x86_64'):
+    if machine not in ('x86_64','amd64'): raise ValueError('tModLoader requires Linux x64')
+    if env.get('VOLTRA_TERRARIA_KIND','tmodloader') != 'tmodloader': raise ValueError('Invalid recipe identity')
+    version = env.get('VERSION','v2026.08.3.0')
+    if not isinstance(version,str) or not re.fullmatch(r'latest|v?\d+(?:\.\d+){1,3}',version): raise ValueError('Invalid VERSION')
+    checksum = env.get('RELEASE_SHA256','')
+    if not isinstance(checksum,str) or checksum and not re.fullmatch('[0-9a-f]{64}',checksum): raise ValueError('Invalid RELEASE_SHA256')
+    from terraria_release_install import preflight_operator_paths
+    saves = confined(root, 'saves')
+    if saves.exists() and not saves.is_dir(): raise ValueError('Invalid saves directory')
+    preflight_operator_paths(root,'tmodloader',env)
+    configuration(root,env)
+
+
 def managed_assembly(path):
     if not path.is_file(): return False
     with path.open('rb') as source: return source.read(2) == b'MZ'
@@ -98,6 +189,7 @@ def compatibility_preflight(root, release, env=None):
 
 def plan(root, env, run=subprocess.run, machine=platform.machine()):
     root = Path(root).resolve()
+    environment_preflight(root, env, machine)
     if machine not in ('x86_64', 'amd64'): raise ValueError('These verified tModLoader releases require Linux x64')
     if confined(root, '.voltra/terraria-release/transaction.json').exists(): raise ValueError('Recover the interrupted release before starting tModLoader')
     path = confined(root, '.voltra/terraria-release/release.json')
@@ -143,6 +235,7 @@ def plan(root, env, run=subprocess.run, machine=platform.machine()):
         version = re.escape(framework['framework_version']) if strict else str(major) + r'\.0\.\d+'
         if result.returncode or not re.search(r'^Microsoft\.NETCore\.App ' + version + r' \[', result.stdout, re.M): raise ValueError('Required publisher framework family/patch is unavailable')
         args = [host, str(confined(root, 'tModLoader.dll')), '-server', *common]
+    configuration(root, env, write=True)
     return args, child, {'family': observed['runtime_family'], 'major': observed['runtime_major'], 'version': receipt['version'], 'terraria_version': observed['terraria_version']}
 
 

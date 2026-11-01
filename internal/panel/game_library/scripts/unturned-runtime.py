@@ -16,7 +16,7 @@ def text(value, limit):
 
 
 def patch_commands(content, values):
-    managed = set(values) | {'pvp', 'pve'}
+    managed = set(values) | {'pvp', 'pve', 'difficulty'}
     lines = []
     newline = '\r\n' if '\r\n' in content else '\n'
     for line in content.splitlines(keepends=True):
@@ -43,7 +43,7 @@ def private_write(path, value):
         if os.path.exists(temporary):os.unlink(temporary)
 
 
-def configure(root, env):
+def plan(root, env):
     root = root.resolve()
     identity = env.get('SRV_ID','PterodactylUnturned')
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',identity):
@@ -74,8 +74,8 @@ def configure(root, env):
     values={'name':text(env.get('SRV_NAME','Pterodactyl hosted Server'),200),
             'password':text(env.get('SRV_PW',''),128) or None,
             'port':str(port),'map':game_map,'maxplayers':str(maximum),
-            'difficulty':difficulty,'perspective':perspective,
-            'pvp' if pvp == '1' else 'pve':'', 'gslt':token or None}
+            'mode':difficulty,'perspective':perspective,
+            'pve':None if pvp == '1' else '', 'gslt':token or None}
     owner=env.get('OWNER_ID','')
     if owner:
         if not owner.isascii() or not owner.isdigit() or not 1 <= int(owner) < 2**64:
@@ -85,6 +85,15 @@ def configure(root, env):
     state=root/'.voltra/unturned'
     if any(not path.resolve().is_relative_to(root) for path in (target,state)):
         raise ValueError('Unturned save/configuration path escapes the volume')
+    automatic=env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','1'))
+    if automatic not in ('0','1'):raise ValueError('AUTO_UPDATE must be 0 or 1')
+    interval=int(env.get('AUTOSAVE_SECONDS','300'))
+    if not 0 <= interval <= 86400:raise ValueError('Autosave interval must be zero or up to one day')
+    return root,identity,port,public,offline,values,target,state,automatic,interval
+
+
+def configure(root, env, planned=None):
+    root,identity,port,public,offline,values,target,state,automatic,interval = planned if planned is not None else plan(root,env)
     if target.exists():
         with target.open(encoding='utf-8',newline='') as source:original=source.read()
     else:original=''
@@ -99,6 +108,8 @@ def configure(root, env):
     child_env.pop('PYTHONHOME',None);child_env.pop('PYTHONPATH',None);child_env.pop('LD_PRELOAD',None)
     library_path=env.get('VOLTRA_GAME_LIBRARY_PATH',env.get('LD_LIBRARY_PATH','./Unturned_Headless_Data/Plugins/x86_64/'))
     child_env['LD_LIBRARY_PATH']=library_path
+    child_env['SteamAppId']='304930'
+    child_env['SteamGameId']='304930'
     argv=[str(executable),'-batchmode','-nographics','-bind','0.0.0.0','-port',str(port),
           ('+InternetServer/' if public == '1' else '+LanServer/')+identity]
     if offline=='1':argv.append('-OfflineOnly')
@@ -107,12 +118,10 @@ def configure(root, env):
 
 if __name__=='__main__':
     root=Path.cwd()
-    automatic=os.environ.get('VOLTRA_STEAM_AUTO_UPDATE',os.environ.get('AUTO_UPDATE','1'))
-    if automatic not in ('0','1'):raise ValueError('AUTO_UPDATE must be 0 or 1')
+    planned=plan(root,os.environ)
+    automatic,interval=planned[-2:]
     if automatic=='1':update(root,1110390,validate=False,required=('Unturned_Headless.x86_64',))
-    argv,environment=configure(root,os.environ)
-    interval=int(os.environ.get('AUTOSAVE_SECONDS','300'))
-    if not 0 <= interval <= 86400:raise ValueError('Autosave interval must be zero or up to one day')
+    argv,environment=configure(root,os.environ,planned)
     raise SystemExit(run(root,argv,environment,'shutdown',
                          [os.environ.get(key,'') for key in ('SRV_PW','GSLT','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')],
                          b'Loading level: 100%',interval,'save',terminal_input=True))

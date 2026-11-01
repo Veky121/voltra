@@ -3,7 +3,7 @@
 import hashlib,io,json,os,re,sys,tarfile,urllib.request,stat,fcntl
 from pathlib import Path,PurePosixPath
 import steam_template
-from session_servers_runtime import APPS,confined,kf2_ports
+from session_servers_runtime import APPS,confined,kf2_ports,kf2_plan
 
 EXILED_PIN={'tag_name':'v9.15.2','prerelease':False,'draft':False,'published_at':'2026-10-16T23:32:22Z','assets':[{'name':'Exiled.tar.gz','size':1153101,'digest':'sha256:6b0537f92f911657e2187b079905781c9c0606fc8e6cef0ce8f737f4d8308ec8','browser_download_url':'https://github.com/ExMod-Team/EXILED/releases/download/v9.15.2/Exiled.tar.gz'}]}
 DOTNET={'url':'https://builds.dotnet.microsoft.com/dotnet/Runtime/9.0.21/dotnet-runtime-9.0.21-linux-x64.tar.gz','sha512':'6faa847e25a02b87c737c8222c6f5f9fd5f20945b7d239a080a7e3d99b97af48e6b6121aa55dee2e797cc89fe7eb97d235e12422b1b22786cbf169420156ae1e'}
@@ -165,7 +165,7 @@ def install(root,game,env):
  root=Path(root).resolve();app=APPS[game]
  if env.get('SRCDS_APPID',app)!=app:raise ValueError('Original dedicated-server app ID is required')
  steam_template.arguments(root,int(app),env) # Gate before even resolving/downloading public artifacts.
- if game=='kf2':kf2_ports(env) # Port group validation precedes publisher mutation/config backups.
+ if game=='kf2':kf2_plan(root,env) # Port group validation precedes publisher mutation/config backups.
  release=resolve_exiled(env.get('EXILED_VERSION','latest'),env.get('EXILED_PRE_RELEASES','0')) if game=='exiled' else None
  # Preserve entire publisher configuration tree byte-for-byte during Steam validation,
  # including unknown mods/admin arrays; symlink inputs are refused before mutation.
@@ -175,6 +175,7 @@ def install(root,game,env):
    for name in dirs+files:confined(root,str((Path(parent)/name).relative_to(root)))
    for name in files:
     target=Path(parent)/name
+    if game=='kf2' and not stat.S_ISREG(target.lstat().st_mode):raise ValueError('KF2 configuration must be a regular file')
     if target.stat().st_size>16*1024*1024 or sum(len(row[1]) for row in saved)+target.stat().st_size>128*1024*1024:raise ValueError('Existing configuration tree exceeds preservation budget')
     saved.append((str(target.relative_to(root)),target.read_bytes(),target.stat()))
  try:

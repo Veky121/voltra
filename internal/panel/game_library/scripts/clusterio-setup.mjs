@@ -2,13 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {roleSettings,applySettings} from './clusterio-start.mjs';
+import {preflightSetup,applySettings} from './clusterio-start.mjs';
 
 const role=process.env.SERVER_MODE;
-roleSettings(process.env);
-if(role==='controller'&&!process.env.ADMIN_STRING)throw Error('Choose the initial administrator name.');
-const plugins=(process.env.PLUGINS||'').trim().split(/\s+/).filter(Boolean);
-if(plugins.length>32||plugins.some(p=>!/^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@[0-9][0-9A-Za-z.+-]*)?$/.test(p)))throw Error('Plugins must be npm package names, optionally with exact versions, separated by spaces.');
+const plugins=preflightSetup('.',process.env);
 const core=['controller','host','ctl'].map(n=>`@clusterio/${n}@2.0.2`);
 function execute(binary,args,{privateOutput=false}={}){
   const result=spawnSync(binary,args,{encoding:'utf8',stdio:privateOutput?'pipe':'inherit',maxBuffer:16*1024*1024});

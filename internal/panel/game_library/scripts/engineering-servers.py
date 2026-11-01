@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """MIT. Original Space Engineers/Torch and Nitrox typed setup; no native proof."""
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -184,6 +185,9 @@ def install_zip(root, pin, target_name, key, executable=None, wrapper=False):
             destination = shared.confined(root, target / name)
             if destination.exists():
                 # Unknown and edited program/plugin/config files stay operator owned.
+                mutable = any(part.lower() in ('plugins', 'configs', 'saves', 'worlds') for part in Path(name).parts[:-1]) or destination.suffix.lower() in ('.cfg', '.xml', '.json', '.ini')
+                if mutable:
+                    continue
                 old = previous.get('files', {}).get(name)
                 if not old or release.sha256(destination) != old:
                     if executable == name and release.sha256(destination) != digest:
@@ -214,7 +218,8 @@ def install_zip(root, pin, target_name, key, executable=None, wrapper=False):
                     destination.unlink()
                 else:
                     with backup.open('rb') as inp:
-                        steam._publish(root, destination.relative_to(root).as_posix(), lambda out, stream=inp: shutil.copyfileobj(stream, out))
+                        steam._publish(root, destination.relative_to(root).as_posix(), lambda out, stream=inp: shutil.copyfileobj(stream, out), default_mode=backup.stat().st_mode & 0o777)
+                    destination.chmod(backup.stat().st_mode & 0o777)
             raise
 
 
@@ -339,6 +344,32 @@ def steam_sdk(root):
             # Existing operator DLLs are retained without granting release ownership.
 
 
+@contextlib.contextmanager
+def preserve_engineering(root):
+    """Protect operator data without restoring receipt-owned Torch programs."""
+    receipt = shared.confined(root, root / '.voltra/engineering/torch/release.json')
+    owned = json.loads(receipt.read_text()).get('files', {}) if receipt.exists() else {}
+    excluded = {'.voltra', '.steam', 'steamapps', 'steamcmd', '.cache'}
+    records = []
+    with tempfile.TemporaryDirectory(prefix='engineering-preserve-') as folder:
+        for path in root.rglob('*'):
+            name = path.relative_to(root).as_posix()
+            if any(part in excluded for part in path.relative_to(root).parts) or not path.is_file():
+                continue
+            shared.confined(root, path)
+            mutable = any(part.lower() in ('plugins', 'configs', 'saves', 'worlds') for part in path.relative_to(root).parts[:-1]) or path.suffix.lower() in ('.cfg', '.xml', '.json', '.ini')
+            if not mutable and (path.name == 'SpaceEngineersDedicated.exe' or owned.get(name) == release.sha256(path)):
+                continue
+            info = path.stat(); backup = Path(folder) / str(len(records)); shutil.copyfile(path, backup)
+            records.append({'path': name, 'target': name, 'backup': str(backup), 'uid': info.st_uid, 'gid': info.st_gid, 'mode': info.st_mode & 0o7777, 'atime_ns': info.st_atime_ns, 'mtime_ns': info.st_mtime_ns, 'link': None})
+        try:
+            yield
+        finally:
+            restore = shared.helper('source-install').restore_file
+            for record in records:
+                restore(root, record)
+
+
 def install(root, game, env):
     root = Path(root).resolve()
     mode = choice(env, 'INSTALL_MODE', 'steam', ('steam', 'operator_files'))
@@ -354,15 +385,15 @@ def install(root, game, env):
         # Never launch private credentials through SteamCMD's unverified parser.
         raise ValueError('Private Subnautica Steam transport unsupported; select legitimate operator_files mode')
     steam.arguments(root, 298740, env, platform='windows')
-    with shared.preserve(root):
+    with preserve_engineering(root):
         steam.update(root, 298740, env, required=('DedicatedServer64/SpaceEngineersDedicated.exe',), platform='windows')
         steam_sdk(root)
-        if game == 'torch':
-            install_zip(root, PINS['torch'], '.', 'torch', 'Torch.Server.exe')
         instance = 'Instance' if game == 'torch' else 'config'
         target = shared.confined(root, root / instance / 'Saves/World')
         if not target.exists():
             install_zip(root, PINS['world'], instance + '/Saves', 'default-world')
+        if game == 'torch':
+            install_zip(root, PINS['torch'], '.', 'torch', 'Torch.Server.exe')
 
 
 def prepare_wine(root, game, env):
@@ -393,7 +424,12 @@ def run(root, game, env):
     credentials += [env.get(k, '') for k in ('STEAM_USER', 'STEAM_PASS', 'STEAM_AUTH', 'STEAM_USERNAME', 'STEAM_PASSWORD', 'STEAM_GUARDCODE', 'SRCDS_BETAPASS')]
     if game == 'nitrox':
         (root / '.config').mkdir(exist_ok=True)
-    code = helper('native-console').run(root, argv, environment, '\x03', credentials, terminal_input=True)
+    shutdown = {}
+    if game in ('space', 'torch'):
+        import signal
+        print('Native shutdown uses bounded owned-child SIGINT fallback; save completion is unconfirmed.', flush=True)
+        shutdown = {'stop_signal': signal.SIGINT, 'stop_signal_timeout': 30}
+    code = helper('native-console').run(root, argv, environment, '\x03', credentials, terminal_input=True, **shutdown)
     return code if code >= 0 else 128 - code
 
 

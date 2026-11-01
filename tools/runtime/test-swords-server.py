@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest import mock
 
-ROOT=Path(__file__).resolve().parents[2];BASE=ROOT/'internal/panel/game_library/scripts'
+ROOT=Path(__file__).resolve().parents[2];BASE=Path(os.environ.get('SWORDS_SCRIPT_ROOT',ROOT/'internal/panel/game_library/scripts'))
 spec=importlib.util.spec_from_file_location('swords_server',BASE/'swords-server.py');adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
 SECTION='/Game/Blueprints/GameModes/BP_GameInstance.BP_GameInstance_C'
 # Functional field facts from actual publisher config; not guessed schema.
@@ -50,6 +50,21 @@ class SwordsSourceTests(unittest.TestCase):
                 with mock.patch.object(adapter,'install')as install,mock.patch.object(adapter,'helper')as helper,self.assertRaises(ValueError):adapter.run(Path(folder),env(**values))
                 install.assert_not_called();helper.assert_not_called()
 
+    def test_direct_install_invalid_controls_and_ports_leave_workspace_unchanged(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);sentinel=put(root,'operator.txt',b'keep exact bytes\r\n')
+            for values in ({'SNM_OWNER_STEAM_ID':''},{'SNM_RESET_TIME_OF_DAY':'24:00'},
+                           {'SNM_MAX_PLAYERS':'0'},{'PORT_MODE':'invalid'},
+                           {'VOLTRA_ALLOCATED_PORTS':'28020'},
+                           {'PORT_MODE':'original','QUERY_PORT':'28020'},
+                           {'STEAM_USER':'private','STEAM_PASS':'secret'}):
+                before={p.relative_to(root).as_posix():p.read_bytes() for p in root.rglob('*') if p.is_file()}
+                with mock.patch.object(adapter.steam,'update') as update, self.assertRaises(ValueError):
+                    adapter.install(root,env(**values))
+                update.assert_not_called()
+                self.assertEqual({p.relative_to(root).as_posix():p.read_bytes() for p in root.rglob('*') if p.is_file()},before)
+                self.assertEqual(list(root.iterdir()),[sentinel])
+
     def test_original_and_allocated_ports_actual_documented_cli_before_writes(self):
         with tempfile.TemporaryDirectory()as folder:
             root=Path(folder);put(root,adapter.BINARY,pe())
@@ -64,7 +79,7 @@ class SwordsSourceTests(unittest.TestCase):
     def test_first_install_copies_actual_template_bytes_never_moves(self):
         with tempfile.TemporaryDirectory()as folder:
             root=Path(folder);template=put(root,adapter.TEMPLATE,CONFIG);before=template.read_bytes()
-            with mock.patch.object(adapter.steam,'update')as update:adapter.install(root,{})
+            with mock.patch.object(adapter.steam,'update')as update:adapter.install(root,env())
             self.assertEqual(update.call_args.args[1],2058450);self.assertEqual(update.call_args.kwargs['platform'],'windows');self.assertEqual((root/adapter.CONFIG).read_bytes(),before);self.assertEqual(template.read_bytes(),before)
 
     def test_reinstall_success_and_failure_retain_native_admin_reset_saves_and_plugins(self):
@@ -78,8 +93,8 @@ class SwordsSourceTests(unittest.TestCase):
                     if fail:raise OSError('fixture partial update failure')
                 with mock.patch.object(adapter.steam,'update',side_effect=update):
                     if fail:
-                        with self.assertRaises(OSError):adapter.install(root,{})
-                    else:adapter.install(root,{})
+                        with self.assertRaises(OSError):adapter.install(root,env())
+                    else:adapter.install(root,env())
                 for p,expected in zip(paths,before):self.assertEqual((p.read_bytes(),p.stat().st_mode&0o777,p.stat().st_uid,p.stat().st_gid),expected)
 
     def test_private_acquisition_platform_and_x86_fail_closed(self):
@@ -93,7 +108,7 @@ class SwordsSourceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory()as folder:
             root=Path(folder);put(root,'SNM2020/Content/Paks/fixture.pak','not a real game asset');put(root,adapter.TEMPLATE,CONFIG)
             for name in(adapter.BINARY,'SNM2020/Binaries/Win64/steam_api64.dll','SNM2020/Binaries/Win64/steamclient64.dll'):put(root,name,pe())
-            with mock.patch.object(adapter.steam,'update')as update:adapter.install(root,{'INSTALL_MODE':'operator_files','STEAM_PASS':'unused'})
+            with mock.patch.object(adapter.steam,'update')as update:adapter.install(root,env(INSTALL_MODE='operator_files',STEAM_PASS='unused'))
             update.assert_not_called();inventory=json.loads((root/'.voltra/swords/operator-files.json').read_text());self.assertFalse(inventory['publisher_authenticity_verified']);self.assertFalse(inventory['runtime_verified']);self.assertEqual(len(inventory['files']),4)
             self.assertEqual((root/adapter.TEMPLATE).read_bytes(),CONFIG.encode())
 

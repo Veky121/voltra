@@ -1,3 +1,8 @@
+import {ResourceSummary,ResourceMetric} from '../ui/ResourceSummary';
+import {formatMiBGB} from '../resourceUnits';
+import {useErrorState} from '../notifications/useErrorState';
+import {compareServers} from './serverOrder';
+import {Progress} from '../components/ui/progress';
 import {useArtworkLibrary} from './ArtworkProvider';
 import {useEffect,useState,type CSSProperties} from "react";
 import {Link,useSearchParams} from "react-router-dom";
@@ -15,12 +20,13 @@ import "./workspace.css";
 import './shadcn-cards.css';
 import "./overview.css";
 import {useServerNavigation} from '../ServerNavigation';
+import {observeLivePath,observeLiveNavigation,isLivePathFresh} from '../hooks/liveEvents';
 
 type ServerRecord=Record<string,any> & {name?:string;liveState:string;resources?:Record<string,any>;resourceError?:boolean};
 const labels:Record<string,string>={running:"Running",offline:"Stopped",stopped:"Stopped",unknown:"Checking",unavailable:"Unavailable",installing:"Installing",starting:"Starting",stopping:"Stopping",suspended:"Suspended",install_failed:"Install failed",reinstall_failed:"Reinstall failed",restoring_backup:"Restoring"};
 
 function useOverview(){
-  const [servers,setServers]=useState<ServerRecord[]>([]),[error,setError]=useState(""),[loading,setLoading]=useState(true);
+  const [servers,setServers]=useState<ServerRecord[]>([]),[error,setError]=useErrorState('client/Overview.tsx'),[loading,setLoading]=useState(true);
   useEffect(()=>{
     let active=true,metadataAt=0;
     let stateTimer:ReturnType<typeof setTimeout>,resourceTimer:ReturnType<typeof setTimeout>,flushTimer:ReturnType<typeof setTimeout>|undefined;
@@ -29,12 +35,31 @@ function useOverview(){
     let statePolling=false,resourcePolling=false;
     const generations=new Map<string,object>();
     const pending=new Map<string,{generation:object;patch:Partial<ServerRecord>}>();
+    const subscriptions=new Map<string,()=>void>(),resourceVersions=new Map<string,number>();
+    const statesPath='/api/client?summary=overview&states=1';
+    function syncSubscriptions(){
+      const wanted=new Set(records.filter(s=>!s.status&&!s.is_installing).map(s=>s.uuid));
+      for(const [uuid,stop] of subscriptions)if(!wanted.has(uuid)){stop();subscriptions.delete(uuid);resourceVersions.delete(uuid)}
+      for(const server of records){
+        if(!wanted.has(server.uuid)||subscriptions.has(server.uuid))continue;
+        const stop=observeLivePath(`/api/client/servers/${server.identifier||server.uuid}/resources`,snapshot=>{
+          if(!active||document.hidden)return;
+          resourceVersions.set(server.uuid,(resourceVersions.get(server.uuid)||0)+1);
+          const stats=snapshot.status===200?value(snapshot.data):null;
+          const patch=stats?{liveState:stats.is_suspended?'suspended':stats.current_state||'unavailable',resources:stats.resources,resourceError:false}:{liveState:'unavailable',resources:undefined,resourceError:true};
+          pending.set(server.uuid,{generation:generations.get(server.uuid)!,patch});
+          if(flushTimer===undefined)flushTimer=setTimeout(flush,50);
+        });
+        if(stop)subscriptions.set(server.uuid,stop);
+      }
+    }
     function publish(next:ServerRecord[]){
       const previous=new Map(records.map(s=>[s.uuid,s]));
       const present=new Set(next.map(s=>s.uuid));
       for(const uuid of generations.keys())if(!present.has(uuid))generations.delete(uuid);
       for(const s of next)if(!generations.has(s.uuid)||previous.get(s.uuid)?.status!==s.status)generations.set(s.uuid,{});
       records=next;
+      syncSubscriptions();
       setServers(records);
     }
     function flush(){
@@ -73,12 +98,14 @@ function useOverview(){
           while(next<queue.length&&!controller.signal.aborted){
             const {server,generation}=queue[next++];
             if(generations.get(server.uuid)!==generation)continue;
+            if(isLivePathFresh(`/api/client/servers/${server.identifier||server.uuid}/resources`))continue;
+            const version=resourceVersions.get(server.uuid)||0;
             let patch:Partial<ServerRecord>;
             try{
               const stats=await resourceRequest(server,controller.signal);
               patch={liveState:stats.is_suspended?'suspended':stats.current_state||'unavailable',resources:stats.resources,resourceError:false};
             }catch{patch={liveState:'unavailable',resourceError:true};}
-            if(active&&!controller.signal.aborted){
+            if(active&&!controller.signal.aborted&&version===(resourceVersions.get(server.uuid)||0)){
               pending.set(server.uuid,{generation,patch});
               if(flushTimer===undefined)flushTimer=setTimeout(flush,50);
             }
@@ -106,7 +133,7 @@ function useOverview(){
           const previous=new Map(records.map(s=>[s.uuid,s]));
           publish(all.map(s=>({...s,liveState:s.status||(s.is_installing?'installing':previous.get(s.uuid)?.liveState||'unknown'),resources:previous.get(s.uuid)?.resources})));
           metadataAt=Date.now();
-        }else{
+        }else if(!isLivePathFresh(statesPath)){
           const states=new Map(items(await api('/api/client?summary=overview&states=1',{signal:controller.signal})).map(s=>[s.uuid,s]));
           if(!active||controller.signal.aborted)return;
           publish(records.filter(s=>states.has(s.uuid)).map(s=>{
@@ -132,14 +159,25 @@ function useOverview(){
       if(!document.hidden){metadataAt=0;void poll();}
     }
     document.addEventListener('visibilitychange',visibility);
+    const stopStates=observeLivePath(statesPath,snapshot=>{
+      if(!active||document.hidden||snapshot.status!==200)return;
+      const states=new Map(items(snapshot.data).map(s=>[s.uuid,s]));
+      const known=new Set(records.map(s=>s.uuid));
+      if([...states.keys()].some(id=>!known.has(id)))metadataAt=0;
+      publish(records.filter(s=>states.has(s.uuid)).map(s=>{
+        const state=states.get(s.uuid)!;
+        return {...s,status:state.status,is_installing:['installing','install_failed'].includes(state.status),liveState:state.status||(s.status?'unknown':s.liveState)};
+      }));
+    });
+    const stopInvalidations=observeLiveNavigation(()=>{metadataAt=0;if(active&&!document.hidden){clearTimeout(stateTimer);void poll()}});
     void poll();
-    return()=>{active=false;stop();document.removeEventListener('visibilitychange',visibility);};
+    return()=>{active=false;stop();stopStates?.();stopInvalidations();for(const unsubscribe of subscriptions.values())unsubscribe();document.removeEventListener('visibilitychange',visibility);};
   },[]);
   return {servers,error,loading};
 }
 
 function Meter({label,reading,ratio}:{label:string;reading:string;ratio:number}){
-  return <div className={`overview-resource resource-${label.toLowerCase()}`} data-pressure={ratio>=.95?'high':ratio>=.8?'elevated':undefined}><span>{label}</span><strong title={reading}>{reading}</strong><div className="overview-meter" aria-hidden="true"><span style={{width:`${Math.min(100,Math.max(0,ratio*100))}%`}}/></div></div>;
+  return <div className={`overview-resource resource-${label.toLowerCase()}`} data-pressure={ratio>=.95?'high':ratio>=.8?'elevated':undefined}><span>{label}</span><strong title={reading}>{reading}</strong><Progress className="overview-meter" aria-label={`${label} usage`} value={Math.min(100,Math.max(0,ratio*100))}/></div>;
 }
 function Artwork({art,priority,onColor}:{art:ServerArtwork;priority:boolean;onColor:(color:string|undefined)=>void}){
   const [failed,setFailed]=useState(false);
@@ -167,31 +205,36 @@ function ServerCard({server:s,priority}:{server:ServerRecord;priority:boolean}){
   </Card>;
 }
 export default function Overview(){
-  const q=useOverview(),[search,setSearch]=useState(""),[filter,setFilter]=useState('all');
+  const q=useOverview(),[search,setSearch]=useState("");
   const navigation=useServerNavigation(),[params,setParams]=useSearchParams();
   const view=params.get('view');
   const emptySavedView=(view==='favorites'&&!navigation.servers.some(s=>s.favorite))||(view==='recent'&&!navigation.servers.some(s=>s.last_visited_at));
   const running=q.servers.filter(s=>s.liveState==="running").length;
-  const stopped=q.servers.filter(s=>["offline","stopped"].includes(s.liveState)).length;
-  const other=q.servers.length-running-stopped;
-  const matchesState=(s:ServerRecord)=>filter==='all'||(filter==='running'?s.liveState==='running':filter==='stopped'?['offline','stopped'].includes(s.liveState):!['running','offline','stopped'].includes(s.liveState));
   const preferences=new Map(navigation.servers.map(s=>[s.uuid,s]));
   const filtered=q.servers.filter(s=>{
     const preference=preferences.get(s.uuid);
-    return (view!=='favorites'||preference?.favorite)&&(view!=='recent'||preference?.last_visited_at)&&matchesState(s)&&`${s.name} ${s.description||''} ${s.node||''}`.toLowerCase().includes(search.trim().toLowerCase());
+    return (view!=='favorites'||preference?.favorite)&&(view!=='recent'||preference?.last_visited_at)&&`${s.name} ${s.description||''} ${s.node||''}`.toLowerCase().includes(search.trim().toLowerCase());
   });
-  if(view==='recent')filtered.sort((a,b)=>Date.parse(preferences.get(b.uuid)?.last_visited_at||'')-Date.parse(preferences.get(a.uuid)?.last_visited_at||''));
-  const filters=[{id:'all',label:'All servers',count:q.servers.length},{id:'running',label:'Running',count:running},{id:'stopped',label:'Stopped',count:stopped},{id:'attention',label:'Other states',count:other}];
+  filtered.sort(compareServers);
   return <div className="page workspace-page overview-page">
-    <h1 className="overview-accessible-title">Server overview</h1>
-    <div className="overview-totals" aria-label="Server totals">
-      {[{label:"Total servers",count:q.servers.length,icon:"server",kind:"total"},{label:"Running",count:running,icon:"play",kind:"running"},{label:"Stopped",count:stopped,icon:"stop",kind:"stopped"}].map(x=><Card className={`overview-total shadcn-card total-${x.kind}`} key={x.kind}><CardHeader><CardTitle>{x.label}</CardTitle><CardAction><span className="overview-total-icon" aria-hidden="true"><Icon name={x.icon as "server"|"play"|"stop"}/></span></CardAction></CardHeader><CardContent><strong>{q.loading?"—":x.count}</strong></CardContent></Card>)}
-    </div>
+    <h1 className="overview-accessible-title">Servers</h1>
+    <ResourceSummary>{(['cpu','memory','disk'] as const).map(key=>{
+      const available=q.servers.filter(s=>s.resources&&!s.resourceError);
+      const complete=!q.loading&&!q.error&&available.length===q.servers.length;
+      const used=available.reduce((total,s)=>total+Number(s.resources?.[key==='cpu'?'cpu_absolute':key==='memory'?'memory_bytes':'disk_bytes']||0),0)/(key==='cpu'?100:1024**2);
+      const limit=q.servers.reduce((total,s)=>total+Number(s.limits?.[key]||0),0)/(key==='cpu'?100:1);
+      const unlimited=q.servers.some(s=>!s.limits?.[key]);
+      const format=(amount:number)=>key==='cpu'?`${amount.toFixed(2)} vCPUs`:formatMiBGB(amount);
+      return <ResourceMetric key={key} label={key==='cpu'?'CPU':key==='memory'?'Memory':'Storage'}
+        value={complete?format(used):q.loading?'Loading':'Unavailable'}
+        percent={complete&&!unlimited&&limit>0?used/limit*100:undefined}
+        title="Live usage across your accessible servers. Limits are server allocations, not node capacity."
+        note={!complete?`Readings from ${available.length}/${q.servers.length} servers`:<>{unlimited?'Unlimited server limits':`${format(limit)} allocated`} {"\u00b7"} {running} online / {q.servers.length} servers</>}/>;
+    })}</ResourceSummary>
     <PageError error={q.error}/>
     {(view==='favorites'||view==='recent')&&<div className="overview-view-heading"><h2>{view==='favorites'?'Favorites':'Recent servers'}</h2><Button variant="secondary" onClick={()=>setParams({})}>Show all servers</Button></div>}
-    <div className="overview-list-heading"><div><h2>Your servers <span className="overview-count">{q.servers.length}</span></h2><p className="muted">{other>0?`${other} ${other===1?"server is":"servers are"} changing state or awaiting status.`:'Select a server to open its workspace.'}</p></div><div className="toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" className="overview-search-input" aria-label="Search servers" placeholder="Find a server or node…" value={search} onChange={e=>setSearch(e.target.value)}/></div></div></div>
-    <div className="overview-filters" role="group" aria-label="Filter servers by status">{filters.map(f=><button key={f.id} type="button" aria-pressed={filter===f.id} onClick={()=>setFilter(f.id)}>{f.label}<span>{q.loading?'—':f.count}</span></button>)}</div>
+    <div className="overview-search-toolbar"><div className="overview-search"><Icon name="search"/><Input type="search" className="overview-search-input" aria-label="Search servers" placeholder="Find a server or node" value={search} onChange={e=>setSearch(e.target.value)}/></div>{search.trim()&&<Button variant="secondary" onClick={()=>setSearch('')}>Clear search</Button>}</div>
     {q.loading?<div className="overview-server-grid overview-skeletons" role="status" aria-label="Loading servers">{[0,1].map(i=><div className="overview-skeleton" key={i} aria-hidden="true"><span/><span/><span/></div>)}</div>:<div className="overview-server-grid">{filtered.map((s,index)=><ServerCard key={s.uuid} server={s} priority={index<2}/>)}</div>}
-    {!q.loading&&!q.error&&!filtered.length&&<Card className="workspace-empty shadcn-card"><CardHeader><span className="workspace-empty-icon"><Icon name={emptySavedView?(view==='favorites'?'star':'clock'):q.servers.length?'search':'server'}/></span><CardTitle><h2>{emptySavedView?(view==='favorites'?'No favorites yet':'No recent servers yet'):q.servers.length?"No servers in this view":"Your first server starts here"}</h2></CardTitle><CardDescription>{emptySavedView?(view==='favorites'?'Star a server to keep it in your favorites.':'Servers you open appear here.'):q.servers.length?'Try a different search or status filter.':'Choose a game from the library to create your first server.'}</CardDescription></CardHeader><CardContent>{emptySavedView?<Button variant="secondary" onClick={()=>{setParams({});setSearch('');setFilter('all')}}>Browse servers</Button>:q.servers.length?<Button variant="secondary" onClick={()=>{setSearch('');setFilter('all')}}>Clear filters</Button>:<Link className="button" to="/game-library">Explore Game Library<Icon name="chevron"/></Link>}</CardContent></Card>}
+    {!q.loading&&!q.error&&!filtered.length&&<Card className="workspace-empty shadcn-card"><CardHeader><span className="workspace-empty-icon"><Icon name={emptySavedView?(view==='favorites'?'star':'clock'):q.servers.length?'search':'server'}/></span><CardTitle><h2>{emptySavedView?(view==='favorites'?'No favorites yet':'No recent servers yet'):q.servers.length?"No servers in this view":"Your first server starts here"}</h2></CardTitle><CardDescription>{emptySavedView?(view==='favorites'?'Star a server to keep it in your favorites.':'Servers you open appear here.'):q.servers.length?'Try a different search.':'Choose a game from the library to create your first server.'}</CardDescription></CardHeader><CardContent>{emptySavedView?<Button variant="secondary" onClick={()=>{setParams({});setSearch('')}}>Browse servers</Button>:q.servers.length?<Button variant="secondary" onClick={()=>{setSearch('')}}>Clear search</Button>:<Link className="button" to="/game-library">Explore Game Library<Icon name="chevron"/></Link>}</CardContent></Card>}
   </div>;
 }

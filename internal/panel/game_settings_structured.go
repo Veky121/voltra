@@ -56,6 +56,7 @@ func expandGameSettingsStructs(parsed gameSettingsParsed) (gameSettingsParsed, e
 				f.value, f.kind = decoded, "text"
 			} else if strings.HasPrefix(value, "(") {
 				f.kind = "readonly"
+				f.secret = true
 			}
 			fields = append(fields, f)
 			r.members[key] = member{start, start + len(value), quoted}
@@ -63,6 +64,7 @@ func expandGameSettingsStructs(parsed gameSettingsParsed) (gameSettingsParsed, e
 		}
 		if len(fields) == 0 {
 			field.kind = "readonly"
+			field.secret = true
 			out.fields = append(out.fields, field)
 			continue
 		}

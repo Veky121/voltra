@@ -77,6 +77,61 @@ def patch_json(path,values):
     if updated!=data or original is None:private_bytes(path,(json.dumps(updated,ensure_ascii=False,indent=2,allow_nan=False)+'\n').encode(),path.stat() if path.exists() else None)
 
 
+def jc3_plan(root,env):
+    """Read-only preflight. Native editable values win; allocations stay managed."""
+    if env.get('WINDOWS_INSTALL','0') not in ('0','1'):raise ValueError('Invalid platform selection')
+    boolean(env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','1')))
+    if env.get('SRCDS_APPID',str(PINS['jc3']['appid']))!=str(PINS['jc3']['appid']):raise ValueError('Dedicated application identity is fixed')
+    arguments(root,PINS['jc3']['appid'],env,True,platform='windows' if env.get('WINDOWS_INSTALL','0')=='1' else 'linux')
+    primary,ports=allocated(env);roles=[]
+    for key in ('QUERY_PORT','STEAM_PORT','HTTP_PORT'):
+        value=env.get(key,'');chosen=integer(value) if value else next((p for p in ports if p not in [primary,*roles]),None)
+        if chosen is None or chosen not in ports or chosen in [primary,*roles]:raise ValueError('JC3MP needs four distinct allocated game/query/Steam/HTTP ports')
+        roles.append(chosen)
+    seeds={'name':text(env.get('SERVER_NAME','JC3MP server')),'description':text(env.get('SERVER_DESCRIPTION','')),'password':text(env.get('SERVER_PASSWORD',''),30),'maxPlayers':integer(env.get('MAX_PLAYER','32'),1,1000),'maxTickRate':integer(env.get('TICK_RATE','60'),1,1000),'announce':boolean(env.get('PUBLIC_SERVER','true'))}
+    managed=dict(zip(('host','bind','port','queryPort','steamPort','httpPort'),('0.0.0.0','0.0.0.0',primary,*roles)))
+    path=confined(root,'config.json')
+    if path.exists() and (not path.is_file() or path.stat().st_size>8*1024**2):raise ValueError('Invalid native config file')
+    raw=path.read_bytes() if path.exists() else b'{}'
+    body=raw.decode('utf-8-sig');data=json_object(body)
+    keys={k.casefold():k for k in (*seeds,*managed,'requiredDLC')}
+    for key in data:
+        if key.casefold() in keys and key!=keys[key.casefold()]:raise ValueError('Ambiguous native setting alias')
+    effective={**seeds,**data}
+    for key in ('name','description','password'):text(effective[key],30 if key=='password' else 4096)
+    for key in ('maxPlayers','maxTickRate'):
+        if type(effective[key]) is not int:raise ValueError('Native integer required')
+        integer(effective[key],1,1000)
+    if type(effective['announce']) is not bool:raise ValueError('Native boolean required')
+    if 'requiredDLC' in data and (not isinstance(data['requiredDLC'],list) or any(type(v)is not int or not 1<=v<=4294967295 for v in data['requiredDLC'])):raise ValueError('Invalid native DLC list')
+    # Use the shared strict JSON reader above and stdlib decoder offsets to
+    # replace only managed scalar tokens. All unrelated bytes survive exactly.
+    changes={k:v for k,v in {**{k:v for k,v in seeds.items() if k not in data},**managed}.items() if k not in data or data[k]!=v}
+    decoder=json.JSONDecoder();i=body.index('{')+1;edits=[];missing=dict(changes)
+    while True:
+        while body[i].isspace():i+=1
+        if body[i]=='}':break
+        key,end=decoder.raw_decode(body,i);i=end
+        while body[i].isspace():i+=1
+        i+=1
+        while body[i].isspace():i+=1
+        start=i;_,i=decoder.raw_decode(body,i)
+        if key in changes:edits.append((start,i,json.dumps(changes[key],ensure_ascii=False)));missing.pop(key,None)
+        while body[i].isspace():i+=1
+        if body[i]==',':i+=1
+    if missing:edits.append((i,i,(',' if data else '')+','.join(json.dumps(k)+':'+json.dumps(v,ensure_ascii=False) for k,v in missing.items())))
+    for start,end,value in reversed(edits):body=body[:start]+value+body[end:]
+    updated=(b'\xef\xbb\xbf' if raw.startswith(b'\xef\xbb\xbf') else b'')+body.encode()
+    # Validate every preservation and managed launch path before any mkdir.
+    preserved_paths(root,'jc3');confined(root,'.voltra/open-world-jc3');confined(root,'Server');confined(root,'Server.exe')
+    return path,updated,raw,path.exists()
+
+
+def configure_jc3(root,env):
+    path,updated,raw,exists=jc3_plan(root,env)
+    if updated!=raw or not exists:private_bytes(path,updated,path.stat() if exists else None)
+
+
 def lac_version(env):
     value=env.get('VER',PINS['lac']['version'])
     if not re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,3}',value):raise ValueError('LAC version must contain numeric components only')
@@ -97,12 +152,7 @@ def configure(root,game,env):
         if primary<3 or not {primary-2,primary-1,primary}.issubset(ports):raise ValueError('Onset requires allocated game port and game-1 query/game-2 file ports')
         patch_json(confined(root,'server_config.json'),{'ipaddress':'0.0.0.0','port':primary,'servername':text(env.get('SERVER_NAME','Onset server'),260),'password':text(env.get('SERVER_PASSWORD',''),128),'masterlist':boolean(env.get('PUBLIC_SERVER','true'))})
     elif game=='jc3':
-        roles=[]
-        for key in ('QUERY_PORT','STEAM_PORT','HTTP_PORT'):
-            value=env.get(key,'');chosen=integer(value) if value else next((p for p in ports if p not in [primary,*roles]),None)
-            if chosen is None or chosen not in ports or chosen in [primary,*roles]:raise ValueError('JC3MP needs four distinct allocated game/query/Steam/HTTP ports')
-            roles.append(chosen)
-        patch_json(confined(root,'config.json'),{'host':'0.0.0.0','bind':'0.0.0.0','port':primary,'queryPort':roles[0],'steamPort':roles[1],'httpPort':roles[2],'name':text(env.get('SERVER_NAME','JC3MP server')),'description':text(env.get('SERVER_DESCRIPTION','')),'password':text(env.get('SERVER_PASSWORD',''),30),'maxPlayers':integer(env.get('MAX_PLAYER','32'),1,1000),'maxTickRate':integer(env.get('TICK_RATE','60'),1,1000),'announce':boolean(env.get('PUBLIC_SERVER','true'))})
+        configure_jc3(root,env)
     elif game=='lac':
         path=confined(root,'.config/unity3d/MA/LAC/ServerConfig.txt');path.parent.mkdir(parents=True,exist_ok=True)
         if path.exists() and path.stat().st_size>8*1024**2:raise ValueError('LAC configuration exceeds bounds')
@@ -141,6 +191,7 @@ def preserved_paths(root,game):
 
 def install(root,game,env):
     root=Path(root).resolve()
+    if game=='jc3':jc3_plan(root,env)
     if game not in ('onset','jc3','lac'):raise ValueError('Unknown reviewed open-world game')
     if game!='lac':
         if env.get('SRCDS_APPID',str(PINS[game]['appid']))!=str(PINS[game]['appid']):raise ValueError('Dedicated application identity is fixed')
@@ -183,6 +234,9 @@ def install(root,game,env):
 
 def launch(root,game,env):
     root=Path(root).resolve();env=dict(env)
+    if game=='jc3':
+        jc3_plan(root,env)
+        if env.get('WINDOWS_INSTALL','0')=='1':raise ValueError('Windows runtime is not verified')
     if game!='lac' and boolean(env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','1'))):install(root,game,env)
     if env.get('WINDOWS_INSTALL','0')=='1':raise ValueError('Windows payload acquisition is retained; runtime needs a separately verified Windows/Wine stack')
     configure(root,game,env)

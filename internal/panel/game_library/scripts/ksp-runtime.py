@@ -40,6 +40,21 @@ def properties(content,values):
     if lines and not lines[-1].endswith('\n'):lines[-1]+='\n'
     lines.extend(key+'='+str(value)+'\n' for key,value in values.items() if key not in seen)
     return ''.join(lines)
+def dmp_settings(content,values):
+    # Native file owns operator settings after first seed. Only allocation-owned
+    # listeners remain enforced on subsequent launches. Refuse ambiguous aliases.
+    present=set();known={key.casefold():key for key in values}
+    for line in content.lstrip('\ufeff').splitlines():
+        if line.lstrip().startswith(('#',';')) or '=' not in line:continue
+        key=line.split('=',1)[0].strip();canonical=known.get(key.casefold())
+        if canonical:
+            if canonical!=key or key in present:raise ValueError('Ambiguous DMP setting')
+            present.add(key)
+    managed={key:value for key,value in values.items() if key not in present or key in ('address','supportIpv6','port','httpPort')}
+    # Preserve BOM and newline convention, including opaque secrets/arrays.
+    bom='\ufeff' if content.startswith('\ufeff') else ''
+    newline='\r\n' if '\r\n' in content else '\n'
+    return bom+properties(content.removeprefix(bom),managed).replace('\r\n','\n').replace('\n',newline)
 def xml(root,path,name,values):
     confined(root,path)
     raw=path.read_bytes() if path.exists() else b''
@@ -71,28 +86,46 @@ def configure(root,game,env):
     for name in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD','LD_LIBRARY_PATH'):environment.pop(name,None)
     environment.update({'HOME':str(root),'DOTNET_CLI_TELEMETRY_OPTOUT':'1','DOTNET_NOLOGO':'1','DOTNET_EnableDiagnostics':'0'})
     if game=='dmp':
+        binary=confined(root,root/'DMPServer.dll')
+        if not binary.is_file():raise ValueError('Install the selected KSP server first')
+        runtime=root/'.voltra/ksp/dmp.runtimeconfig.json';confined(root,runtime)
         values={'address':'0.0.0.0','supportIpv6':'False','port':port,'httpPort':status,'serverName':text(env.get('SERVERNAME','DMP Server'),48),'maxPlayers':integer(env.get('MAX_PLAYERS','20'),1,1000),'modpackMode':choice(env,'MODPACKMODE',['NONE','CKAN','GAMEDATA'],'NONE'),'warpMode':choice(env,'WARPMODE',['MCW_FORCE','MCW_VOTE','MCW_LOWEST','SUBSPACE_SIMPLE','SUBSPACE','NONE'],'SUBSPACE'),'gameMode':choice(env,'GAMEMODE',['SANDBOX','CAREER','SCIENCE'],'SANDBOX'),'gameDifficulty':choice(env,'DIFFICULTY',['EASY','NORMAL','MODERATE','HARD','CUSTOM'],'NORMAL'),'whitelisted':boolean(env.get('WHITELIST','False')).title()}
-        target=root/'Config/Settings.txt';confined(root,target);write(root,target,properties(target.read_text(encoding='utf-8-sig') if target.exists() else '',values))
+        target=root/'Config/Settings.txt';confined(root,target);write(root,target,dmp_settings(target.read_bytes().decode('utf-8') if target.exists() else '',values))
         binary=confined(root,root/'DMPServer.dll')
         runtime=root/'.voltra/ksp/dmp.runtimeconfig.json';confined(root,runtime);private_write(runtime,json.dumps({'runtimeOptions':{'tfm':'net10.0','framework':{'name':'Microsoft.NETCore.App','version':'10.0.0'}}}))
         argv=['dotnet','exec','--runtimeconfig',str(runtime),str(binary)];cwd=root;stop='/exit';ready='Ready!';credentials=[]
     elif game=='lmp':
         cwd=root/'LMPServer'
         if not cwd.resolve().is_relative_to(root):raise ValueError('LMP root escapes volume')
-        config=cwd/'Config';difficulty=choice(env,'GameDifficulty',['Easy','Normal','Moderate','Hard','Custom'],'Easy')
-        xml(root,config/'ConnectionSettings.xml','ConnectionSettingsDefinition',{'ListenAddress':'0.0.0.0','Port':port,'Upnp':'false'})
-        xml(root,config/'GeneralSettings.xml','GeneralSettingsDefinition',{'ServerName':text(env.get('SERVER_NAME','Luna Server'),30),'Password':text(env.get('PASSWORD',''),30),'AdminPassword':text(env.get('ADMIN_PASSWORD',''),30),'MaxPlayers':integer(env.get('MaxPlayers','20'),1,1000),'GameDifficulty':difficulty,'GameMode':choice(env,'GameMode',['Sandbox','Career','Science'],'Sandbox')})
-        xml(root,config/'MasterServerSettings.xml','MasterServerSettingsDefinition',{'RegisterWithMasterServer':boolean(env.get('PUBLIC_LISTING','0'))})
-        xml(root,config/'WebsiteSettings.xml','WebsiteSettingsDefinition',{'EnableWebsite':'true','ListenAddress':'0.0.0.0','Port':status})
-        marker=root/'.voltra/ksp/lmp-preset.json';confined(root,marker);previous=json.loads(marker.read_text()) if marker.exists() else {}
-        if difficulty!='Custom' and previous.get('preset')!=difficulty:
-            gameplay=config/'GameplaySettings.xml';confined(root,gameplay)
-            if gameplay.exists():
-                backup=root/'.voltra/ksp/config-backups'/(str(time.time_ns())+'-GameplaySettings.xml');confined(root,backup);backup.parent.mkdir(parents=True,exist_ok=True)
-                with os.fdopen(os.open(backup,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'wb') as output:output.write(gameplay.read_bytes())
-                gameplay.unlink()
-        private_write(marker,json.dumps({'preset':difficulty}))
-        binary=confined(root,cwd/'Server.dll');argv=['dotnet',str(binary)];stop='\x03';ready='All systems up and running';credentials=[env.get('PASSWORD',''),env.get('ADMIN_PASSWORD','')]
+        binary=confined(root,cwd/'Server.dll')
+        if not binary.is_file():raise ValueError('Install the selected KSP server first')
+        config=cwd/'Config'
+        # Validate every environment value and target before the first config write.
+        plans=[('ConnectionSettings','ConnectionSettingsDefinition',{'ListenAddress':'0.0.0.0','Port':port,'Upnp':'false'}, {'ListenAddress','Port','Upnp'}),
+            ('GeneralSettings','GeneralSettingsDefinition',{'ServerName':text(env.get('SERVER_NAME','Luna Server'),30),'Password':text(env.get('PASSWORD',''),30),'AdminPassword':text(env.get('ADMIN_PASSWORD',''),30),'MaxPlayers':integer(env.get('MaxPlayers','20'),1,1000),'GameDifficulty':choice(env,'GameDifficulty',['Easy','Normal','Moderate','Hard','Custom'],'Easy'),'GameMode':choice(env,'GameMode',['Sandbox','Career','Science'],'Sandbox')},set()),
+            ('MasterServerSettings','MasterServerSettingsDefinition',{'RegisterWithMasterServer':boolean(env.get('PUBLIC_LISTING','0'))},set()),
+            ('WebsiteSettings','WebsiteSettingsDefinition',{'EnableWebsite':'true','ListenAddress':'0.0.0.0','Port':status},{'ListenAddress','Port'})]
+        rendered=[];credentials=[]
+        for filename,name,values,always in plans:
+            path=confined(root,config/(filename+'.xml'))
+            raw=path.read_bytes() if path.exists() else b''
+            decoded=raw.decode('utf-16' if raw.startswith((b'\xff\xfe',b'\xfe\xff')) else 'utf-8-sig')
+            if '<!DOCTYPE' in decoded.upper() or '<!ENTITY' in decoded.upper():raise ValueError('XML entities/DTDs are unsupported')
+            tree=ET.fromstring(decoded,parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))) if decoded else ET.Element(name)
+            if tree.tag!=name:raise ValueError('Unexpected native XML root')
+            changed=False
+            for key,value in values.items():
+                matches=[node for node in tree if isinstance(node.tag,str) and node.tag.casefold()==key.casefold()]
+                if len(matches)>1 or (matches and matches[0].tag!=key):raise ValueError('Ambiguous managed native XML field')
+                if not matches or key in always:
+                    element=matches[0] if matches else ET.SubElement(tree,key)
+                    if element.text!=str(value):element.text=str(value);changed=True
+            if filename=='GeneralSettings':credentials=[tree.findtext('Password',''),tree.findtext('AdminPassword','')]
+            if changed:rendered.append((path,ET.tostring(tree,encoding='unicode')+'\n'))
+        # GameplaySettings and the historical preset marker remain operator-owned.
+        confined(root,root/'.voltra/ksp/config-backups')
+        for path,value in rendered:write(root,path,value)
+        argv=['dotnet',str(binary)];stop='\x03';ready='All systems up and running'
     else:raise ValueError('Unknown KSP server family')
     if not binary.is_file():raise ValueError('Install the selected KSP server first')
     return cwd,argv,environment,stop,credentials,ready

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 const catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),existing=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),base='internal/panel/game_library/scripts/',profiles={};
 const games={sonic:'sonic_robo_blast_2/egg-sonic-robo-blast2.json',openworld:'rimworld/open_world/egg-rimworld-open-world.json',together:'rimworld/together/egg-rimworld-together.json'};
 const add=(egg,name,key,value,rules,description)=>{if(!egg.variables.some(v=>v.env_variable===key))egg.variables.push({name,env_variable:key,default_value:value,rules,description,user_viewable:true,user_editable:true,field_type:'text'});};
@@ -44,4 +45,6 @@ for(const[game,path]of Object.entries(games)){
   game==='together'?'Stop sends native quit. Back up Configs/, Assets/, Saves/, Users/, Maps/, Settlements/ and Backups/ before changing versions. Reinstall stages only the server engine and retains user data.':'Stop sends native shutdown. Back up the complete Data/ folder and native generated save/mod folders before changing versions. Reinstall stages only the server engine and retains user data.'
  ]};
 }
-fs.mkdirSync('.local/sonic-rimworld',{recursive:true});fs.writeFileSync('.local/sonic-rimworld/profiles.json',JSON.stringify(profiles,null,2)+'\n');console.log('Three exact dedicated profiles staged; native acceptance remains separate.');
+const output=process.env.VOLTRA_SONIC_PROFILE_OUTPUT||'.local/sonic-rimworld/profiles.json';
+fs.mkdirSync(path.dirname(output),{recursive:true});
+fs.writeFileSync(output,JSON.stringify(profiles,null,2)+'\n');console.log('Three exact dedicated profiles staged; native acceptance remains separate.');

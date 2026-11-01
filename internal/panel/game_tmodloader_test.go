@@ -60,8 +60,10 @@ func TestTModLoaderReviewedProfile(t *testing.T) {
 	if err := json.Unmarshal([]byte(str(asMap(entry.Egg["config"])["files"])), &files); err != nil {
 		t.Fatal(err)
 	}
+	// The wrapper owns ordinary settings after seeding. Wings retains only
+	// its allocation-owned port mapping, never password or world overrides.
 	settings := asMap(asMap(files["serverconfig.txt"])["find"])
-	if settings["password"] != "{{server.build.env.SERVER_PASSWORD}}" || settings["world"] != "/home/container/saves/Worlds/{{server.build.env.WORLD_NAME}}.wld" {
-		t.Fatal("native configuration mapping missing")
+	if len(files) != 1 || len(settings) != 1 || settings["port"] != "{{server.build.default.port}}" || !strings.Contains(installer, "'-config', 'serverconfig.txt'") {
+		t.Fatal("native configuration must retain only the allocation-owned port mapping")
 	}
 }

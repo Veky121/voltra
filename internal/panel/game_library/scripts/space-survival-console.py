@@ -10,16 +10,32 @@ import threading
 import time
 
 
+def raw_commands(fd, limit=8192):
+    """Bounded whole-line input without buffered stdin locks at interpreter exit."""
+    pending=bytearray();overflow=False;previous_cr=False
+    for block in iter(lambda:os.read(fd,65536),b''):
+        for byte in block:
+            if byte==10 and previous_cr:
+                previous_cr=False;continue
+            if byte in (10,13):
+                if not overflow and 0 not in pending:yield bytes(pending)+b'\r\n'
+                pending.clear();overflow=False;previous_cr=byte==13
+            else:
+                previous_cr=False
+                if not overflow:
+                    pending.append(byte)
+                    if len(pending)>limit:pending.clear();overflow=True
+    if pending and not overflow and 0 not in pending:yield bytes(pending)+b'\r\n'
+
+
 def run(port, argv, environment):
     password=environment.pop('VOLTRA_EMPYRION_PASSWORD','')
     process=subprocess.Popen(argv,env=environment,start_new_session=True)
     commands=queue.Queue(maxsize=64);finished=threading.Event();connection=None
     def stdin():
-        while not finished.is_set():
-            data=sys.stdin.buffer.readline(8193)
-            if not data:break
-            if len(data)>8192 or b'\0'in data:continue
-            try:commands.put(data.rstrip(b'\r\n')+b'\r\n',timeout=.2)
+        for data in raw_commands(sys.stdin.fileno()):
+            if finished.is_set():break
+            try:commands.put(data,timeout=.2)
             except queue.Full:print('Admin command queue full; command rejected.',file=sys.stderr)
     reader=threading.Thread(target=stdin,daemon=True);reader.start()
     def interrupted(signum,frame):raise SystemExit(128+signum)

@@ -49,7 +49,12 @@ func TestUnturnedReviewedSettings(t *testing.T) {
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 	for _, source := range []string{"steam-template.py", "bundle-debian-python.py", "native-console.py", "unturned-runtime.py"} {
 		content, err := os.ReadFile("game_library/scripts/" + source)
-		if err != nil || !strings.Contains(script, string(content)) {
+		if source == "native-console.py" {
+			content = reviewedConsoleV1(t)
+			err = nil
+		}
+		// Compare the entire helper after normalizing only checkout line endings.
+		if err != nil || !strings.Contains(strings.ReplaceAll(script, "\r\n", "\n"), strings.ReplaceAll(string(content), "\r\n", "\n")) {
 			t.Fatal("embedded installer source mismatch", source, err)
 		}
 	}

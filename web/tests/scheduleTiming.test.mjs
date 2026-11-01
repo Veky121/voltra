@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clampInterval, simpleTimingCron, readSimpleTiming } from '../src/client/scheduleTimingModel.ts';
+import { clampInterval, simpleTimingCron, readSimpleTiming, describeSchedule } from '../src/client/scheduleTimingModel.ts';
+
+test('timing labels describe exact daily times and preserve custom cron semantics',()=>{
+ const cron={minute:'0',hour:'3',day_of_month:'*',month:'*',day_of_week:'*'};
+ assert.equal(describeSchedule(cron),'Every day at 03:00');
+ assert.equal(describeSchedule({...cron,day_of_week:'1-5'}),'Mon, Tue, Wed, Thu, Fri at 03:00');
+ assert.equal(describeSchedule({...cron,hour:'*',minute:'*/15'}),'Every 15 minutes');
+ assert.equal(describeSchedule({...cron,hour:'*',minute:'*/7'}),'Every 7 minutes within each hour');
+ assert.equal(describeSchedule({...cron,hour:'*/7'}),'Custom daily times');
+ assert.equal(describeSchedule({...cron,month:'6'}),'Custom schedule');
+ assert.equal(cron.hour,'3');
+});
 
 test('interval bounds clamp immediately, including a minute to hour unit change', () => {
   for (const unit of ['minute', 'hour']) {

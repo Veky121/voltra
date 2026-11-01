@@ -74,15 +74,15 @@ class OpenWorldTests(unittest.TestCase):
                 return {'fixture_only':True}
             with patch.object(game,'update',side_effect=publisher):
                 if failure:
-                    with self.assertRaises(RuntimeError):game.install(root,'jc3',{})
-                else:game.install(root,'jc3',{})
+                    with self.assertRaises(RuntimeError):game.install(root,'jc3',{'SERVER_PORT':'28010','VOLTRA_ALLOCATED_PORTS':'28010,28011,28012,28013'})
+                else:game.install(root,'jc3',{'SERVER_PORT':'28010','VOLTRA_ALLOCATED_PORTS':'28010,28011,28012,28013'})
             for path,expected in before.items():self.assertEqual((path.read_bytes(),path.stat().st_mode&0o777,path.stat().st_uid,path.stat().st_gid),expected)
     def test_successful_update_preserves_operator_packages_and_metadata(self):self.preservation(False)
     def test_failed_update_preserves_operator_packages_and_metadata(self):self.preservation(True)
     def test_symlink_configuration_rejects_before_publisher(self):
         with tempfile.TemporaryDirectory() as d,patch.object(game,'update') as update:
             root=Path(d);outside=root/'outside';outside.write_text('untouched');(root/'config.json').symlink_to(outside)
-            with self.assertRaises(ValueError):game.install(root,'jc3',{})
+            with self.assertRaises(ValueError):game.install(root,'jc3',{'SERVER_PORT':'28010','VOLTRA_ALLOCATED_PORTS':'28010,28011,28012,28013'})
             update.assert_not_called();self.assertEqual(outside.read_text(),'untouched')
     def test_lac_native_text_and_editor_data_are_confined(self):
         with tempfile.TemporaryDirectory() as d:

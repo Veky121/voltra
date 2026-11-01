@@ -34,5 +34,8 @@ try {
     if ($UpdateManifestURL) { $linker += " -X main.updateManifestURL=$UpdateManifestURL -X main.updatePublicKey=$UpdatePublicKey" }
     go build -trimpath -ldflags $linker -o bin/Voltra.exe .
     if ($LASTEXITCODE -ne 0) { throw 'Desktop executable build failed.' }
+    go build -trimpath -ldflags "$linker -X main.setupMode=true" -o bin/Voltra-Setup.exe .
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop setup build failed.' }
     Write-Host "Built $PSScriptRoot\bin\Voltra.exe"
+    Write-Host "Built $PSScriptRoot\bin\Voltra-Setup.exe"
 } finally { Pop-Location }

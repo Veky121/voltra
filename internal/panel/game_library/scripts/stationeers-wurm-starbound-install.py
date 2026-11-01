@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """MIT. Typed Steam acquisition with recoverable Wurm world preservation."""
+from contextlib import nullcontext
 import hashlib
 import json
 import os
@@ -126,8 +127,62 @@ def workshop_links(root,enabled):
     private_write(receipt,json.dumps(planned,indent=2)+'\n')
 
 
+def preserve_stationeers_update(root, operation):
+    """Restore operator files after either update outcome; not crash atomic."""
+    def copy_file(source, target):
+        metadata=Path(source).lstat()
+        if not stat.S_ISREG(metadata.st_mode):raise ValueError('Invalid preserved Stationeers file')
+        shutil.copy2(source,target,follow_symlinks=False)
+        if not stat.S_ISREG(Path(target).lstat().st_mode):raise ValueError('Unsafe preserved Stationeers copy')
+        os.chown(target,metadata.st_uid,metadata.st_gid,follow_symlinks=False)
+        os.chmod(target,stat.S_IMODE(metadata.st_mode),follow_symlinks=False)
+        return target
+    def copy_tree(source, target):
+        validate_tree(root,source)
+        directories=[source]+[entry for entry in source.rglob('*')if entry.is_dir()]
+        metadata=[(entry.relative_to(source),entry.lstat())for entry in directories]
+        shutil.copytree(source,target,copy_function=copy_file)
+        for relative,info in metadata:
+            destination=target/relative
+            if destination.is_symlink()or not destination.is_dir():raise ValueError('Unsafe preserved Stationeers directory')
+            os.chown(destination,info.st_uid,info.st_gid,follow_symlinks=False)
+            os.chmod(destination,stat.S_IMODE(info.st_mode),follow_symlinks=False)
+    names=('setting.xml','modconfig.xml','saves','mods')
+    paths=[confined(root,name) for name in names]
+    for path in paths:
+        if path.exists():
+            if path.is_dir():validate_tree(root,path)
+            elif not path.is_file():raise ValueError('Invalid Stationeers preserved path')
+    state=confined(root,'.voltra/stationeers')
+    # Keep recovery copies if restoration itself refuses an unsafe publisher path.
+    with nullcontext(tempfile.mkdtemp(prefix='preserve-',dir=state)) as temporary:
+        folder=Path(temporary);saved=[]
+        for path in paths:
+            if path.exists():
+                backup=folder/path.name
+                if path.is_dir():copy_tree(path,backup)
+                else:copy_file(path,backup)
+                saved.append((path,backup))
+        try:return operation()
+        finally:
+            for path,backup in saved:
+                confined(root,path.name)
+                if path.exists():
+                    if path.is_dir():validate_tree(root,path);shutil.rmtree(path)
+                    elif path.is_file():path.unlink()
+                    else:raise ValueError('Unsafe publisher replacement')
+                if backup.is_dir():copy_tree(backup,path)
+                else:copy_file(backup,path)
+            shutil.rmtree(folder)
+
+
 def install(root,kind,env=None):
-    root=Path(root).resolve();env=dict(os.environ if env is None else env);state=confined(root,'.voltra/'+kind);state.mkdir(parents=True,exist_ok=True)
+    root=Path(root).resolve();env=dict(os.environ if env is None else env);state=confined(root,'.voltra/'+kind)
+    vanilla=kind=='stationeers' and env.get('VOLTRA_STATIONEERS_VARIANT','vanilla')=='vanilla'
+    if vanilla:
+        from stationeers_wurm_starbound_runtime import configure
+        configure(root,kind,env,preflight=True)
+    state.mkdir(parents=True,exist_ok=True)
     if kind=='starbound':
         if env.get('STEAM_USER','').lower()in('','anonymous'):raise ValueError('Starbound requires an entitled Steam account configured through the secure Steam integration; anonymous acquisition is unavailable')
         release=update(root,211820,env=env,required=('linux/starbound_server',),validate=env.get('VALIDATE','false')=='true')
@@ -145,7 +200,8 @@ def install(root,kind,env=None):
     elif kind=='stationeers':
         modded=env.get('VOLTRA_STATIONEERS_VARIANT','vanilla')=='bepinex'
         if modded:selection,framework=stationeers_framework(root,env)
-        release=update(root,600760,env=env,required=('rocketstation_DedicatedServer.x86_64',),validate=env.get('VALIDATE','false')=='true')
+        operation=lambda:update(root,600760,env=env,required=('rocketstation_DedicatedServer.x86_64',),validate=env.get('VALIDATE','false')=='true')
+        release=preserve_stationeers_update(root,operation) if vanilla else operation()
         from stationeers_console_compat import provision
         release={**release,'console_compatibility':provision(root)}
         if modded:

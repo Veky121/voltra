@@ -179,6 +179,7 @@ def plugins(root,selection):
     native.private_write(receipt,json.dumps(records))
 
 def install(root,game,env):
+    if game=='rising':rising_plan(root,env)
     root=Path(root).resolve();app,binary=GAMES[game]
     if env.get('SRCDS_APPID',str(app))!=str(app):raise ValueError('Wrong native Steam application')
     target=confined(root,root/'holdfastnaw-dedicated') if game=='holdfast' else root;target.mkdir(parents=True,exist_ok=True);options=dict(env)
@@ -202,8 +203,7 @@ def install(root,game,env):
                 with tempfile.TemporaryDirectory(dir=root/'.voltra') as temp:
                     downloaded=Path(temp)/'config.json';release.download(COLONY_CONFIG,downloaded);shutil.copyfile(downloaded,config);config.chmod(0o600)
         elif game=='rising':
-            config=confined(root,root/'server.properties')
-            if not config.exists():shutil.copyfile(confined(root,root/'server.example.properties'),config);config.chmod(0o600)
+            pass  # Seed reviewed missing scalars only after retention restores.
         elif game=='hurtworld':
             for bits,arch in (('32','x86'),('64','x86_64')):
                 source=confined(root,root/'.steam'/('sdk'+bits)/'steamclient.so');destination=confined(root,root/'Hurtworld_Data/Plugins'/arch/'steamclient.so')
@@ -212,8 +212,19 @@ def install(root,game,env):
                 with tempfile.TemporaryDirectory(dir=root/'.voltra') as temp:
                     archive=Path(temp)/'oxide.zip';release.download(OXIDE,archive);unzip(root,archive)
                 plugins(root,text(env,'INSTALL_PLUGINS','',12000))
+    if game=='rising':configure(root,game,env)
 
 def configure(root,game,env):
+    if game=='rising':
+        target,updated,secrets,port=rising_plan(root,env)
+        # Keep untouched bytes (including BOM and CRLF) out of write_config's
+        # universal-newline reader. Publication uses the shared private writer.
+        old=target.read_bytes().decode('utf-8') if target.exists() else None
+        if old!=updated:
+            if old is not None:native.private_write(confined(Path(root).resolve(),Path(root).resolve()/'.voltra/steam-native-next-config'/str(time.time_ns())),old)
+            native.private_write(target,updated)
+        target.chmod(0o600)
+        return [str(Path(root).resolve()/'RisingWorldServer.x64'),'+Server_Port='+str(port)],secrets
     root=Path(root).resolve();secret=[]
     if game=='colony':
         ports=roles(env,['SERVER_STEAMPORT']);target=confined(root,root/'server.config.json');config=json_unique(target.read_text(encoding='utf-8-sig'))
@@ -241,19 +252,60 @@ def configure(root,game,env):
         for flag,name in [('workshopDataPath','workshop'),('micSpammersPlayersFilePath','micspammers.txt'),('mutedVoipPlayersFilePath','mutedplayersvoip.txt'),('mutedChatPlayersFilePath','mutedplayerschat.txt'),('bannedPlayersFilePath','bannedplayers.txt')]:argv.extend(('-'+flag,str(confined(root,folder/name))))
         (folder/'logs_output'/('output_'+config_path)).parent.mkdir(parents=True,exist_ok=True);(folder/archive).mkdir(parents=True,exist_ok=True)
         return argv,secret
-    if game=='rising':
-        rcon=text(env,'RCON','false',5)
-        if rcon not in ('true','false'):raise ValueError('Invalid RCON switch')
-        ports=roles(env,['RCON_PORT'] if rcon=='true' else [],offsets=(-1,));password=text(env,'SRV_PW','',255);admin=text(env,'RCON_PASS','',255)
-        if rcon=='true' and len(admin)<6:raise ValueError('RCON password requires six characters')
-        mode=text(env,'GAME_MODE','Survival',20)
-        if mode not in ('','Survival','Creative'):raise ValueError('Invalid world mode')
-        rcon_port=ports['RCON_PORT'] if rcon=='true' else integer({**env,'RCON_PORT':env.get('RCON_PORT') or '4253'},'RCON_PORT',4253)
-        values={'Server_Name':text(env,'SRV_NAME','Rising World',40),'Server_Password':password,'World_GameMode':mode,'World_Name':world_name(env,'myworld',20),'RCON_Enabled':rcon,'RCON_Password':admin,'RCON_Port':rcon_port,'Server_Port':ports['primary']}
-        target=confined(root,root/'server.properties');old=target.read_text(encoding='utf-8-sig')
-        if re.search(r'(?m)^Password=',old):values['Password']=password
-        write_config(root,target,patch_properties(old,values));secret.extend((password,admin));return [str(root/'RisingWorldServer.x64'),'+Server_Port='+str(ports['primary'])],secret
     raise ValueError('Unknown Steam/native recipe')
+
+def rising_plan(root,env):
+    """Read-only preflight. Native scalars own subsequent boots; ports stay managed.
+
+    Refuse ambiguous spelling/duplicates instead of guessing publisher aliases.
+    This is the existing scalar properties contract, not a plugin evaluator.
+    """
+    root=Path(root)
+    if root.is_symlink() or any(p.is_symlink() for p in root.parents):raise ValueError('Native root uses symbolic links')
+    root=root.resolve();target=confined(root,root/'server.properties')
+    steam.arguments(root,339010,env)
+    if target.exists() and not target.is_file():raise ValueError('Native properties must be a file')
+    if env.get('SRCDS_APPID','339010')!='339010':raise ValueError('Wrong native Steam application')
+    if env.get('VOLTRA_STEAM_AUTO_UPDATE','0') not in ('0','1'):raise ValueError('Invalid update switch')
+    text(env,'VOLTRA_NATIVE_LD_LIBRARY_PATH','/linux64',4096)
+    # Validate path inputs even when a native document already owns the value.
+    world_name(env,'myworld',20)
+    for path in (root/'.voltra',root/'.voltra/steam-native-next-config',root/'.voltra/steam-native-next-preserve',root/'server.example.properties',root/'RisingWorldServer.x64',root/'linux64'):
+        confined(root,path)
+    old=target.read_bytes().decode('utf-8') if target.exists() else ''
+    defaults={'Server_Name':text(env,'SRV_NAME','Rising World',40),'Server_Password':text(env,'SRV_PW','',255),'World_GameMode':text(env,'GAME_MODE','Survival',20),'World_Name':world_name(env,'myworld',20),'RCON_Enabled':text(env,'RCON','false',5),'RCON_Password':text(env,'RCON_PASS','',255),'RCON_Port':env.get('RCON_PORT') or '4253','Server_Port':env.get('SERVER_PORT','27015')}
+    names={k.casefold():k for k in defaults};names['password']='Password';found={}
+    for line in old.lstrip('\ufeff').splitlines():
+        if not line.strip() or line.lstrip().startswith(('#','!')):continue
+        key=line.split('=',1)[0].strip();canonical=names.get(key.casefold())
+        if canonical:
+            if key!=canonical or canonical in found or '=' not in line:raise ValueError('Ambiguous native property')
+            found[canonical]=line.split('=',1)[1]
+    if 'Password' in found:
+        if 'Server_Password' in found and found['Password']!=found['Server_Password']:raise ValueError('Ambiguous native password aliases')
+        defaults['Server_Password']=found['Password']
+    effective={**defaults,**found}
+    for key in defaults:text(effective,key,'',4096)
+    world_name({'WORLD_NAME':effective['World_Name']},'myworld',20)
+    if effective['World_GameMode'] not in ('','Survival','Creative'):raise ValueError('Invalid native world mode')
+    if effective['RCON_Enabled'] not in ('true','false'):raise ValueError('Invalid native RCON switch')
+    enabled=effective['RCON_Enabled']=='true'
+    if enabled and len(effective['RCON_Password'])<6:raise ValueError('RCON password requires six characters')
+    integer(effective,'RCON_Port',4253)
+    # Allocation changes remain authoritative. Retain a native RCON port when
+    # it is still a valid distinct allocation and no explicit role was supplied.
+    role_env=dict(env)
+    if enabled and not env.get('RCON_PORT') and 'RCON_Port' in found:
+        candidate=integer(effective,'RCON_Port',4253)
+        primary=integer(env,'SERVER_PORT',27015)
+        if str(candidate) in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') and candidate not in (primary,primary-1):role_env['RCON_PORT']=str(candidate)
+    ports=roles(role_env,['RCON_PORT'] if enabled else [],offsets=(-1,))
+    values={k:v for k,v in defaults.items() if k not in found}
+    values['Server_Port']=ports['primary']
+    if enabled:values['RCON_Port']=ports['RCON_PORT']
+    updated=patch_properties(old.lstrip('\ufeff'),values)
+    if old.startswith('\ufeff'):updated='\ufeff'+updated
+    return target,updated,[effective['Server_Password'],effective['RCON_Password']],ports['primary']
 
 def holdfast_redaction_values(values):
     """Mask full credentials and publisher-clipped character/UTF-8 prefixes."""
@@ -329,6 +381,7 @@ class HoldfastLog:
 
 
 def run(root,game,env):
+    if game=='rising':rising_plan(root,env)
     if env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1':install(root,game,env)
     argv,secrets=configure(root,game,env);environment=dict(os.environ)
     for key in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD','LD_LIBRARY_PATH'):environment.pop(key,None)

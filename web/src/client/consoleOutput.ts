@@ -6,7 +6,7 @@ export function stripConsoleControls(text: string, preserveColor = false): strin
 
 export function consoleOutput(text: string, event: string, preserveColor = false): string {
   const clean = stripConsoleControls(text, preserveColor);
-  return clean.split(/\r?\n/).filter(line => {
+  return clean.split(/\r\n|[\r\n]/).filter(line => {
     // Only hide our demo process signal. Wings already consumes it before the UI.
     return event !== 'console output' || !/^(?:VOLTRA|PTEROCLONE)_READY$/.test(stripConsoleControls(line).trim());
   }).map(line => {

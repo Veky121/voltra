@@ -74,8 +74,8 @@ def configure_cs2d(root,env):
     mailbox.unlink(missing_ok=True)
     return [str(game/'cs2d_dedicated'),'-port',str(port),'-maxplayers',str(maximum)],game
 
-def configure_openrct2(root,env):
-    data=confined(root,'ServerData');data.mkdir(parents=True,exist_ok=True)
+def configure_openrct2(root,env,preflight=False,installing=False):
+    data=confined(root,'ServerData')
     general={'autosave':str(integer(env,'AUTOSAVE_INTERVAL',1,0,5)),'autosave_amount':str(integer(env,'AUTOSAVE_AMOUNT',10,0,10000))}
     network={'default_port':str(integer(env,'SERVER_PORT',11753,1,65535)),'maxplayers':str(integer(env,'MAX_PLAYERS',16,1,255))}
     for key,variable in [('player_name','SERVER_PLAYER_NAME'),('default_password','SERVER_PASSWORD'),('server_name','SERVER_NAME'),('server_description','SERVER_DESCRIPTION'),('server_greeting','SERVER_GREETING'),('provider_name','PROVIDER_NAME'),('provider_email','PROVIDER_EMAIL'),('provider_website','PROVIDER_WEBSITE')]:network[key]=quoted(env.get(variable,'Server' if variable=='SERVER_PLAYER_NAME' else ''),1024)
@@ -85,27 +85,65 @@ def configure_openrct2(root,env):
         network[key]=value
     asset=env.get('RCT2_DATA_PATH','')
     if asset:general['game_path']=quoted(str(confined(root,asset)))
-    ini.configure_ini(root,data/'config.ini',{'general':general,'network':network},root/'.voltra/openrct2/config-backups')
+    config=confined(root,'ServerData/config.ini')
+    backups=confined(root,'.voltra/openrct2/config-backups')
+    previous=''
+    if config.exists():
+        with config.open(encoding='utf-8',newline='') as source:previous=source.read()
+    # Let the shared parser detect identities and ambiguity, and record which
+    # requested values it replaces. Ordinary native keys are seeded only once.
+    class Existing(dict):
+        def __getitem__(self,key):
+            seen.add((id(self),key))
+            return super().__getitem__(key)
+    seen=set()
+    sections={name:Existing(values) for name,values in ini.resolve_ini_identities(previous,{'general':general,'network':network}).items()}
+    ini.patch_ini(previous,sections)
+    missing={name:{key:value for key,value in values.items() if (id(values),key) not in seen or key.casefold()=='default_port'} for name,values in sections.items()}
+    updated=ini.patch_ini(previous,missing)
     autosave=env.get('LOAD_AUTOSAVE','true')
     if autosave not in ('true','false'):raise ValueError('Invalid autosave selection')
     saves=sorted((data/'save/autosave').glob('*'),key=lambda p:p.stat().st_mtime_ns,reverse=True) if (data/'save/autosave').is_dir() else []
     saves=[p for p in saves if p.is_file() and p.suffix.lower() in ('.park','.sv6','.sv4')]
     uri=env.get('SAVE_URI','ServerData/save/save.park')
-    if autosave=='true' and saves:selected=saves[0]
-    elif uri.startswith('https://'):
-        # Keep private URI out of argv and reports; bounded fetch to owned file.
-        selected=data/'save/remote.park';selected.parent.mkdir(parents=True,exist_ok=True)
+    if not uri or any(ord(c)<32 for c in uri):raise ValueError('Invalid save path')
+    remote=uri.startswith('https://')
+    if '://' in uri and not remote:raise ValueError('Remote saves require HTTPS')
+    if remote:
+        from urllib.parse import urlsplit
+        parts=urlsplit(uri)
+        if not parts.hostname or parts.username or parts.password:raise ValueError('Invalid HTTPS save URL')
+        selected=confined(root,'ServerData/save/remote.park')
+    else:selected=confined(root,uri)
+    if selected.suffix.lower() not in ('.park','.sv6','.sv4'):raise ValueError('Unsupported save format')
+    for candidate in saves:confined(root,str(candidate))
+    if autosave=='true' and saves:selected=saves[0];remote=False
+    if not remote and not selected.is_file() and not (installing and selected==confined(root,'ServerData/save/save.park')):raise ValueError('Upload a compatible saved park through Files')
+    game=confined(root,'OpenRCT2');libraries=env.get('LD_LIBRARY_PATH','./OpenRCT2/lib')
+    paths=libraries.split(':')
+    if not all(paths):raise ValueError('Empty library search path')
+    library_path=':'.join(str(confined(root,path)) for path in paths)+':'+str(confined(root,'OpenRCT2/lib'))
+    # All pure validation completes before acquisition or operator writes.
+    if preflight:return
+    content=None
+    if remote:
         with urllib.request.urlopen(uri,timeout=60) as source:
             if not source.url.startswith('https://'):raise ValueError('Save download redirected outside HTTPS')
             content=source.read(128*1024**2+1)
-        if len(content)>128*1024**2:raise ValueError('Remote park exceeds128MiB')
-        temporary=selected.with_suffix('.tmp');temporary.write_bytes(content);os.replace(temporary,selected)
-    elif '://' in uri:raise ValueError('Remote saves require HTTPS')
-    else:selected=confined(root,uri)
-    if not selected.is_file():raise ValueError('Upload a compatible saved park through Files and set Save File; the server cannot create a new park automatically')
-    game=root/'OpenRCT2';libraries=env.get('LD_LIBRARY_PATH','./OpenRCT2/lib')
-    # Retain original advanced library path, resolving it within this volume.
-    os.environ['LD_LIBRARY_PATH']=str(confined(root,libraries))+':'+str(game/'lib')
+        if not content or len(content)>128*1024**2:raise ValueError('Remote park empty or exceeds 128MiB')
+    if content is not None:
+        import tempfile
+        selected.parent.mkdir(parents=True,exist_ok=True)
+        fd,temporary=tempfile.mkstemp(prefix='.remote-',dir=selected.parent)
+        try:
+            with os.fdopen(fd,'wb') as output:output.write(content)
+            os.replace(temporary,selected)
+        finally:
+            if os.path.exists(temporary):os.unlink(temporary)
+    if updated!=previous:
+        if config.exists():ini.private_write(backups/(str(time.time_ns())+'-config.ini'),previous)
+        ini.private_write(config,updated)
+    os.environ['LD_LIBRARY_PATH']=library_path
     return [str(game/'bin/openrct2-cli'),'host',str(selected),'--port',network['default_port'],'--user-data-path',str(data)],root
 
 def run_native(argv,cwd,credentials,mailbox=None):

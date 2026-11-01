@@ -11,7 +11,7 @@ function load(file, mocks={}) {
   const source=readFileSync(new URL(file,import.meta.url),'utf8');
   const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
   const module={exports:{}};
-  const modules={react:React,'react-router-dom':{Link:'a',useNavigate:()=>()=>{}},'../resourceUnits':units,'../lib':{Select:'select'},'../ui/Settings':{Switch:'input'},'./management-ui.css':{},...mocks};
+  const modules={'../notifications/useErrorState':{useErrorState:()=> (mocks.react||React).useState('')},'../ui/ConfirmAction':{confirmAction:async()=>true},'../client/PendingSettings':{usePendingSetting(){},useDiscardSettings:()=>async()=>true},'../ui/sectionTabs.css':{},'../ui/PageHeading':{PageHeading:({children})=>React.createElement(React.Fragment,null,children)},'../components/ui/tabs':{Tabs:'div',TabsList:'div',TabsTrigger:'button',TabsContent:'div'},'../components/ui/field':{Field:'label',FieldGroup:'div',FieldSet:'fieldset',FieldLegend:'legend'},'../components/ui/checkbox':{Checkbox:'input'},'../components/ui/badge':{Badge:'span'},'../ui/Disclosure':{Disclosure:'details',DisclosureTrigger:'summary'},'../components/ui/alert':{Alert:'div',AlertDescription:'div'},'../components/ui/card':{Card:'section'},'../components/ui/input':{Input:'input'},'../components/ui/textarea':{Textarea:'textarea'},'../components/ui/table':{Table:'table',TableHeader:'thead',TableBody:'tbody',TableRow:'tr',TableHead:'th',TableCell:'td'},'../ui/ActionButton':{ActionButton:'button'},react:React,'react-router-dom':{Link:'a',useNavigate:()=>()=>{}},'../resourceUnits':units,'../lib':{Select:'select'},'../ui/Settings':{Switch:'input',SettingsField:({label,description,children})=>React.createElement('label',null,label,children,description),SettingsSection:({title,children})=>React.createElement('section',null,title,children)},'./management-ui.css':{},...mocks};
   new Function('require','module','exports',compiled)(name=>Object.hasOwn(modules,name)?modules[name]:require(name),module,module.exports);
   return module.exports;
 }
@@ -52,10 +52,10 @@ test('Fields renders decimal GB controls and change handler produces the correct
   assert.doesNotMatch(html,/MiB|GiB|\bMB\b/);
 });
 test('runtime rules load and save GB, rounding decimals and rejecting blank input',async()=>{
-  let states=[],cursor=0,effects=[],calls=[];
+  let states=[],cursor=0,effects=[],calls=[],pendingChange;
   const react={...React,useState(initial){const index=cursor++;if(!(index in states))states[index]=initial;return [states[index],next=>{states[index]=typeof next==='function'?next(states[index]):next}]},useEffect(fn){effects.push(fn)}};
   const lib={api:async(path,options)=>{calls.push(JSON.parse(options.body));return {attributes:{rules:JSON.parse(options.body).rules}}},unwrap:value=>value.attributes,useAPI:()=>({data:{attributes:{rules:[{id:'rule',min_memory_mib:8192}]}},loading:false,error:''}),Button:'button',Card:'section',Field:'label',Input:'input',Select:'select'};
-  const {MinecraftRuntimeRules}=load('../src/admin/MinecraftRuntimeRules.tsx',{react,'../lib':lib});
+  const {MinecraftRuntimeRules}=load('../src/admin/MinecraftRuntimeRules.tsx',{react,'../lib':lib,'../client/PendingSettings':{usePendingSetting:(_key,_dirty,change)=>{pendingChange=change}}});
   const render=()=>{cursor=0;effects=[];return MinecraftRuntimeRules()};
   render();effects[0]();
   let tree=render();
@@ -63,11 +63,11 @@ test('runtime rules load and save GB, rounding decimals and rejecting blank inpu
   assert.equal(memory.props.value,8);
   memory.props.onChange({target:{value:'1.2345'}});
   tree=render();
-  const save=()=>allNodes(tree).find(node=>node.type==='button'&&node.props.onClick&&node.props.children==='Save runtime rules').props.onClick();
+  const save=()=>pendingChange.save();
   await save();assert.equal(calls[0].rules[0].min_memory_mib,1264);
   tree=render();assert.equal(allNodes(tree).find(node=>node.type==='input'&&node.props.max===1024).props.value,1264/1024);
   memory=allNodes(tree).find(node=>node.type==='input'&&node.props.max===1024);
-  memory.props.onChange({target:{value:''}});tree=render();await save();
+  memory.props.onChange({target:{value:''}});tree=render();await assert.rejects(save(),/GB/);
   assert.equal(calls.length,1);assert.match(states[3],/GB/);
 });
 test('capacity formatting uses GB even below one GB',()=>{

@@ -5,8 +5,58 @@ import (
 	"strconv"
 )
 
+// Only reviewed declarations bind a startup variable to the game listener.
+// Unrelated variables named PORT keep their previous behavior.
+func templatePrimaryListenerPort(entry gameTemplate, environment M) (int64, bool, error) {
+	name := entry.PrimaryPortEnv
+	if name == "" {
+		return 0, false, nil
+	}
+	if len(name) > 100 || !templatePortEnvironmentName.MatchString(name) {
+		return 0, false, bad("This recipe has invalid primary listener metadata.")
+	}
+	matches := 0
+	for _, raw := range asSlice(entry.Egg["variables"]) {
+		if str(asMap(raw)["env_variable"]) == name {
+			matches++
+		}
+	}
+	if matches != 1 {
+		return 0, false, bad("This recipe needs one unambiguous primary listener control.")
+	}
+	raw := str(environment[name])
+	if raw == "" {
+		return 0, false, nil
+	}
+	port, err := templateExplicitPort(raw)
+	if err != nil {
+		return 0, false, bad("The primary listener must be empty or a canonical integer between 1 and 65535.")
+	}
+	return port, true, nil
+}
+
 func validateTemplatePortRules(entry gameTemplate, environment M, primary M, additional []M) error {
-	var err error
+	if err := validateL4D2OutgoingClientPort(entry, environment, primary); err != nil {
+		return err
+	}
+	listener, explicitListener, err := templatePrimaryListenerPort(entry, environment)
+	if err != nil {
+		return err
+	}
+	if entry.PrimaryPortEnv != "" {
+		if err := validateTemplateAllocationPorts(primary, additional, false); err != nil {
+			return err
+		}
+		if explicitListener {
+			allocated := num(primary["port"]) == listener
+			for _, allocation := range additional {
+				allocated = allocated || num(allocation["port"]) == listener
+			}
+			if !allocated {
+				return bad("The configured primary listener must be among the server's allocated ports.")
+			}
+		}
+	}
 	environment, err = normalizeTemplatePortEnvironment(entry, environment, primary, additional)
 	if err != nil {
 		return err
@@ -196,6 +246,18 @@ func templateRuntimeEnvironment(egg, environment M) error {
 	if arkWine {
 		environment["VOLTRA_ARK_WINETRICKS_RUN"] = wineRuntime
 		environment["WINETRICKS_RUN"] = ""
+	}
+	return nil
+}
+
+// Exact L4D2 outgoing client port contract; it is not an allocated listener.
+func validateL4D2OutgoingClientPort(entry gameTemplate, environment M, primary M) error {
+	if entry.Path != "left4dead_2/egg-left4dead_2.json" {
+		return nil
+	}
+	port, err := strconv.Atoi(str(environment["SRCDS_CPORT"]))
+	if err != nil || port != 0 && (port < 1025 || port > 65535 || primary != nil && int64(port) == num(primary["port"])) {
+		return bad("Choose 0 or a distinct optional outgoing client port between 1025 and 65535.")
 	}
 	return nil
 }

@@ -62,6 +62,18 @@ class Foundry(unittest.TestCase):
         self.assertNotIn('private-secret',str(ctx.exception))
     def test_legacy_entrypoint(self):
         self.install(self.archive(('resources/app/main.js',)));self.assertEqual(f.entrypoint(self.root/'app').relative_to(self.root/'app').as_posix(),'resources/app/main.js')
+    def test_preflight_refuses_without_mutation_or_acquisition(self):
+        for delta in [{'SERVER_PORT':'0'}, {'FOUNDRY_SHA256':'bad'}, {'TIMED_URL':'http://invalid.test'}]:
+            with self.subTest(delta=delta):
+                downloader=mock.Mock()
+                with self.assertRaises(ValueError):f.install(self.root,dict(self.env,**delta),downloader)
+                downloader.assert_not_called()
+                self.assertEqual(list(self.root.iterdir()),[])
+    def test_existing_options_still_validate_environment_before_download(self):
+        p=self.root/'data/Config/options.json';p.parent.mkdir(parents=True);p.write_text('{"port":30000}')
+        downloader=mock.Mock();before=p.read_bytes()
+        with self.assertRaises(ValueError):f.install(self.root,dict(self.env,SERVER_PORT='65536'),downloader)
+        downloader.assert_not_called();self.assertEqual(before,p.read_bytes())
     def test_swap_failure_restores_original(self):
         app=self.root/'app';app.mkdir();(app/'main.js').write_text('original');archive=self.archive();replace=f.os.replace
         def fail_candidate(src,dst):

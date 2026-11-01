@@ -33,7 +33,7 @@ def extract(archive,target):
     with zipfile.ZipFile(archive) as source:
         for member in source.infolist():
             parts=PurePosixPath(member.filename).parts;mode=member.external_attr>>16
-            if not parts or member.filename.startswith('/') or '..' in parts or '\\' in member.filename or member.filename in seen or (mode&0o170000)==0o120000:raise ValueError('Unsafe RAGECOOP archive member')
+            if '\\' in member.orig_filename or not parts or member.filename.startswith('/') or '..' in parts or '\\' in member.filename or member.filename in seen or (mode&0o170000)==0o120000:raise ValueError('Unsafe RAGECOOP archive member')
             seen.add(member.filename);total+=member.file_size
             if len(seen)>10000 or total>1024**3:raise ValueError('RAGECOOP archive exceeds limits')
             destination=target.joinpath(*parts)
@@ -42,19 +42,65 @@ def extract(archive,target):
             with source.open(member) as inp,destination.open('xb') as out:shutil.copyfileobj(inp,out)
             destination.chmod(0o755 if member.filename=='RageCoop.Server' else 0o644)
 
+LEGACY=['Settings.xml','Resources','resources','Plugins','plugins']
+
+def preflight(root,env):
+    # No acquisition or writes here, including publisher metadata lookup.
+    version=env.get('VERSION',RELEASE['version'])
+    if not re.fullmatch(r'[A-Za-z0-9._-]{1,40}',version):raise ValueError('Invalid VERSION')
+    checksum=env.get('RELEASE_SHA256','')
+    if checksum and not re.fullmatch(r'[A-Fa-f0-9]{64}',checksum):raise ValueError('Invalid RELEASE_SHA256')
+    for base in [root/'.voltra',root/'.voltra/ragecoop',root/'ragecoop']:
+        paths=[base]+(list(base.rglob('*')) if base.is_dir() else [])
+        for path in paths:
+            if path.is_symlink() or not path.resolve().is_relative_to(root):raise ValueError('Unsafe RAGECOOP destination')
+    for name in LEGACY:
+        source=root/name
+        for path in [source]+(list(source.rglob('*')) if source.is_dir() else []):
+            if path.is_symlink():raise ValueError('Legacy symlinks require explicit operator migration')
+    runtime=module('ragecoop-runtime')
+    runtime.configure(root,env,validate_only=True)
+    # Validate the legacy configuration too, before importing it.
+    if not (root/'ragecoop/Settings.xml').exists() and (root/'Settings.xml').exists():
+        raw=(root/'Settings.xml').read_text()
+        if '<!DOCTYPE' in raw.upper() or '<!ENTITY' in raw.upper():raise ValueError('XML entity declarations unsupported')
+        config=runtime.ET.fromstring(raw)
+        if config.tag!='Settings':raise ValueError('Invalid RAGECOOP settings root')
+        for key in ['Port','Name','MaxPlayers','AnnounceSelf']:
+            if len(config.findall(key))>1:raise ValueError('Duplicate managed RAGECOOP element '+key)
+
+def migrate_missing(root):
+    # Unlike the shared legacy copier, an active native file has authority.
+    marker=root/'.voltra/ragecoop/legacy-layout-imported.json'
+    if marker.exists():return
+    copied=[]
+    for name in LEGACY:
+        source=root/name
+        for old in list(source.rglob('*')) if source.is_dir() else [source]:
+            if not old.is_file():continue
+            destination=root/'ragecoop'/old.relative_to(root)
+            if destination.exists():continue
+            destination.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(old,destination);copied.append(old.relative_to(root).as_posix())
+    marker.write_text(json.dumps({'copied':copied,'originals_retained':True},indent=2)+'\n')
+
 def install(root,env):
     root=root.resolve();state=root/'.voltra/ragecoop';target=root/'ragecoop'
     for path in [state,target]:
         if not path.resolve().is_relative_to(root):raise ValueError('RAGECOOP destination escapes volume')
-    state.mkdir(parents=True,exist_ok=True);selected=identity(env);receipt=state/'release.json'
+    preflight(root,env)
+    selected=identity(env)
+    state.mkdir(parents=True,exist_ok=True);receipt=state/'release.json'
     release=module('native-release');old=json.loads(receipt.read_text()) if receipt.is_file() else {}
     if not (target/'LICENSE').exists():
         target.mkdir(parents=True,exist_ok=True);release.download(LICENSE,target/'LICENSE')
-    if old.get('sha256')==selected['sha256'] and (target/'RageCoop.Server').is_file() and release.sha256(target/'RageCoop.Server')==old.get('binary_sha256'):return
+    if old.get('sha256')==selected['sha256'] and (target/'RageCoop.Server').is_file() and release.sha256(target/'RageCoop.Server')==old.get('binary_sha256'):
+        migrate_missing(root);return
     with tempfile.TemporaryDirectory(dir=state) as temporary:
         stage=Path(temporary);release.download(selected,stage/'archive');ready=stage/'ready';ready.mkdir();extract(stage/'archive',ready)
         if not (ready/'RageCoop.Server').is_file():raise ValueError('Dedicated executable missing')
         target.mkdir(parents=True,exist_ok=True)
+        migrate_missing(root)
         for path in ready.rglob('*'):
             if not path.is_file():continue
             relative=path.relative_to(ready);destination=target/relative
@@ -62,6 +108,6 @@ def install(root,env):
             if destination.exists() and str(relative)!='RageCoop.Server':continue
             destination.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,destination)
         receipt.write_text(json.dumps({**selected,'binary_sha256':release.sha256(target/'RageCoop.Server')},indent=2)+'\n')
-    module('gta-install').migrate(root,'ragecoop',['Settings.xml','Resources','resources','Plugins','plugins'])
+    migrate_missing(root)
 
 if __name__=='__main__':install(Path(os.environ.get('VOLTRA_SERVER_ROOT','/mnt/server')),os.environ)

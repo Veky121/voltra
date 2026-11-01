@@ -347,6 +347,9 @@ def install(root, game, env, validate=True):
         raise ValueError('Choose Steam or legally uploaded Portal payload')
     validation = {key: value for key, value in env.items() if key not in ('STEAM_USER', 'STEAM_PASS', 'STEAM_AUTH', 'SRCDS_BETAPASS')} if uploaded else env
     steam_template.arguments(root, APPS[game], validation, validate, platform=platform)
+    if game == 'solace':
+        from fantasy_worlds_runtime import solace_plan
+        solace_plan(root, env)
     # Credential and branch validation precedes preservation copies and processes.
     with tempfile.TemporaryDirectory(prefix='voltra-fantasy-preserve-', dir=confined(root, '.')) as backup:
         state = Retention(root, game, backup)

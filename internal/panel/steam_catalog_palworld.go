@@ -210,14 +210,26 @@ chmod 600 %s .voltra/palworld-console.json .voltra/console-client.manifest.json 
 %s%s -publiclobby -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS "-port=${SERVER_PORT}" &
 game_pid=$!
 stop_game() { .voltra/console-client -t rcon -c .voltra/palworld-console.json Save || true; .voltra/console-client -t rcon -c .voltra/palworld-console.json 'Shutdown %d' || true; wait "$game_pid" || true; }
-trap stop_game TERM INT
+trap 'stop_game; exit 143' TERM
+trap 'stop_game; exit 130' INT
+palworld_info_ready() {
+ local response
+ # CLI authenticates using private JSON. Exit zero alone accepts arbitrary
+ # command bodies, so require the single-line publisher Info response too.
+ response=$(timeout --kill-after=1 3 .voltra/console-client -t rcon -c .voltra/palworld-console.json Info 2>/dev/null) || return 1
+ [[ "$response" != *$'\n'* && "$response" =~ ^Welcome\ to\ Pal\ Server\[v[0-9]+(\.[0-9]+)+\]\ [^[:cntrl:]]+$ ]]
+}
+ready=0
 for ((attempt=0;attempt<300;attempt++)); do
- if ! kill -0 "$game_pid" 2>/dev/null; then wait "$game_pid"; exit 1; fi
- if %s; then break; fi
+ if ! kill -0 "$game_pid" 2>/dev/null; then status=0; wait "$game_pid" || status=$?; exit "$status"; fi
+ if %s; then
+  if kill -0 "$game_pid" 2>/dev/null; then ready=1; fi
+  break
+ fi
  sleep 1
 done
-%s
-printf 'VOLTRA_PALWORLD_CONSOLE_READY\n'
+if ! kill -0 "$game_pid" 2>/dev/null; then status=0; wait "$game_pid" || status=$?; exit "$status"; fi
+if [ "$ready" = 1 ]; then printf 'VOLTRA_PALWORLD_CONSOLE_READY\n'; fi
 # Palworld can close idle RCON sessions. Each input command gets a new
 # authenticated connection, matching the original recipe. Never replay a failed
 # command: show its error and continue only when another command arrives.
@@ -236,15 +248,12 @@ exit "$status"
 			return preflight + "\n"
 		}
 		return ""
-	}(), command, shutdownSeconds, steamPalworldReadiness(game, port), steamPalworldReadiness(game, port))
+	}(), command, shutdownSeconds, steamPalworldReadiness(game, port))
 	return []byte(launcher), nil
 }
 
-func steamPalworldReadiness(game string, port int64) string {
-	if game == "palworld-proton" {
-		return fmt.Sprintf("timeout 1 bash -c 'exec 3<>/dev/tcp/127.0.0.1/%d' >/dev/null 2>&1", port)
-	}
-	return fmt.Sprintf("nc -z 127.0.0.1 %d", port)
+func steamPalworldReadiness(_ string, _ int64) string {
+	return "palworld_info_ready"
 }
 
 // Quick setup shares the managed control transaction so native files, encrypted

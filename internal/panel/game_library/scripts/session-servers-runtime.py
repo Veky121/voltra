@@ -3,7 +3,7 @@
 import os,re,shlex,stat,sys
 from pathlib import Path
 import steam_template,native_console
-from native_config import patch_ini
+from native_config import patch_ini,resolve_ini_identities
 
 APPS={'scp':'996560','exiled':'996560','kf2':'232130'}
 
@@ -68,23 +68,61 @@ def kf2_ports(env):
  if web=='true':webport=port(env,'WEB_ADMIN_PORT',8089,used)
  return primary,query,web,webport
 
-def configuration(root,relative,sections):
- target=confined(root,relative)
- if target.exists() and target.stat().st_size>4*1024*1024:raise ValueError('Configuration exceeds four MiB')
- previous=target.read_text(encoding='utf-8-sig') if target.exists() else ''
- # Unreal section/key names are case insensitive. Preserve unrelated duplicate keys
- # (Workshop subscription arrays, map cycles, MultiAdmin and mutator configuration).
- canonical={s.casefold():s for s in sections};rows=[];section=None
- for row in previous.splitlines(keepends=True):
-  header=re.fullmatch(r'\s*\[([^\]]+)\]\s*',row.strip())
-  if header:
-   section=canonical.get(header[1].casefold());row='['+section+']\n' if section else row
-  elif section and '=' in row and not row.lstrip().startswith((';','#')):
-   left,right=row.split('=',1);key=next((k for k in sections[section] if k.casefold()==left.strip().casefold()),None)
-   if key:row=key+'='+right
-  rows.append(row)
- updated=patch_ini(''.join(rows),sections).encode()
- if updated!=previous.encode():steam_template._publish(root,relative,lambda out:out.write(updated),0o600)
+def kf2_document(root,relative,sections,managed):
+ # Pure preflight: anchored no-follow reads, complete identity resolution, no mkdir.
+ confined(root,relative)
+ with steam_template._publication_parent(root,relative) as (parent,leaf,_):
+  metadata=steam_template._publication_leaf(parent,leaf) if parent is not None else None
+  raw=b''
+  if metadata:
+   if metadata.st_size>4*1024*1024:raise ValueError('Configuration exceeds four MiB')
+   fd=os.open(leaf,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=parent)
+   with os.fdopen(fd,'rb') as source:raw=source.read(4*1024*1024+1)
+   if len(raw)>4*1024*1024:raise ValueError('Configuration exceeds four MiB')
+ text=raw.decode('utf-8');identities=resolve_ini_identities(text.lstrip('\ufeff'),sections)
+ # Resolve only the declared scalar identities; unrelated arrays remain opaque.
+ effective={};changes={}
+ for section,values in identities.items():
+  for key,default in values.items():
+   match=re.search(r'^\s*\['+re.escape(section)+r'\]\s*(?:[;#].*)?$([\s\S]*?)(?=^\s*\[|\Z)',text.lstrip('\ufeff'),re.M)
+   found=re.search(r'^[ \t]*'+re.escape(key)+r'[ \t]*=([^\r\n]*)',match[1],re.M) if match else None
+   # Unreal array operators on a declared scalar have ambiguous effective semantics.
+   if match and re.search(r'^[ \t]*[+.!-]'+re.escape(key)+r'[ \t]*=',match[1],re.M|re.I):raise ValueError('Ambiguous KF2 scalar array alias')
+   effective[(section.casefold(),key.casefold())]=found[1].strip() if found else default
+   if not found or (section.casefold(),key.casefold()) in managed:
+    if not found or found[1].strip()!=default:changes.setdefault(section,{})[key]=default
+ updated=patch_ini(text,changes).encode('utf-8') if changes else raw
+ return (relative,raw,updated),effective
+
+def kf2_plan(root,env):
+ root=Path(root).resolve()
+ if env.get('SRCDS_APPID','232130')!='232130':raise ValueError('Original dedicated-server app ID is required')
+ steam_template.arguments(root,232130,env)
+ primary,query,web,webport=kf2_ports(env)
+ password=line(env.get('ADMIN_PASS',''),'ADMIN_PASS');name=line(env.get('SERVER_NAME','A Pterodactyl Hosted Server'),'SERVER_NAME')
+ mapname=env.get('MAP_NAME','kf-bioticslab')
+ if not re.fullmatch(r'[A-Za-z0-9_./-]+',mapname) or '..' in mapname:raise ValueError('MAP_NAME must be a map package, not an injected travel URL')
+ difficulty=integer(env,'DIFFICULTY',0,0,3)
+ extra=shlex.split(line(env.get('EXTRA_FLAGS',''),'EXTRA_FLAGS'))
+ for token in extra:
+  if not token.startswith('-') or any(c in token for c in '?\x00') or token.split('=',1)[0].casefold() in ['-port','-steamport','-queryport','-webadminport','-adminpassword','-configsubdir','-homedir','-userdir','-ini','-gameini','-engineini']:raise ValueError('EXTRA_FLAGS requires literal optional switches without managed port/path/admin overrides')
+ game,values=kf2_document(root,'KFGame/Config/LinuxServer-KFGame.ini',{'Engine.AccessControl':{'AdminPassword':password},'Engine.GameReplicationInfo':{'ServerName':name}},set())
+ webdoc,webvalues=kf2_document(root,'KFGame/Config/KFWeb.ini',{'IpDrv.WebServer':{'bEnabled':web,'ListenPort':str(webport)}},{('ipdrv.webserver','listenport')})
+ enabled=webvalues[('ipdrv.webserver','benabled')].casefold()
+ if enabled not in ['true','false']:raise ValueError('Invalid native WebAdmin enabled value')
+ if enabled=='true':
+  checked=dict(env,WEB_ADMIN='true');kf2_ports(checked)
+  if not values[('engine.accesscontrol','adminpassword')]:raise ValueError('WebAdmin requires ADMIN_PASS')
+ argv=[str(confined(root,'Binaries/Win64/KFGameSteamServer.bin.x86_64')),mapname+'?Port='+str(primary)+'?QueryPort='+str(query)+'?Difficulty='+str(difficulty),'-Port='+str(primary),'-QueryPort='+str(query),*extra]
+ return argv,[game,webdoc],values[('engine.accesscontrol','adminpassword')]
+
+def kf2_publish(root,plans):
+ # Complete refusal before either write. This is not a crash-atomic transaction.
+ for relative,raw,updated in plans:
+  target=confined(root,relative)
+  if (target.read_bytes() if target.exists() else b'')!=raw:raise ValueError('KF2 configuration changed after preflight')
+ for relative,raw,updated in plans:
+  if raw!=updated:steam_template._publish(root,relative,lambda out,value=updated:out.write(value),0o600)
 
 def launch(root,game,env):
  root=Path(root).resolve();app=APPS[game]
@@ -108,30 +146,24 @@ def launch(root,game,env):
   argv=[str(confined(root,'LocalAdmin')),str(primary)]
   if game in ('scp','exiled') and scp_first_run(root,primary):argv.append('--useDefault')
   return argv,environment,'EXIT',b'Waiting for players'
- primary,query,web,webport=kf2_ports(env)
- password=line(env.get('ADMIN_PASS',''),'ADMIN_PASS');name=line(env.get('SERVER_NAME','A Pterodactyl Hosted Server'),'SERVER_NAME')
- if web=='true' and not password:raise ValueError('WebAdmin requires ADMIN_PASS')
- mapname=env.get('MAP_NAME','kf-bioticslab')
- if not re.fullmatch(r'[A-Za-z0-9_./-]+',mapname) or '..' in mapname:raise ValueError('MAP_NAME must be a map package, not an injected travel URL')
- difficulty=integer(env,'DIFFICULTY',0,0,3)
- extra=shlex.split(line(env.get('EXTRA_FLAGS',''),'EXTRA_FLAGS'))
- for token in extra:
-  if not token.startswith('-') or any(c in token for c in '?\x00') or token.split('=',1)[0].casefold() in ['-port','-steamport','-queryport','-webadminport','-adminpassword','-configsubdir','-homedir','-userdir']:raise ValueError('EXTRA_FLAGS requires literal optional switches without managed port/path/admin overrides')
- configuration(root,'KFGame/Config/KFWeb.ini',{'IpDrv.WebServer':{'bEnabled':web,'ListenPort':str(webport)}})
- configuration(root,'KFGame/Config/LinuxServer-KFGame.ini',{'Engine.AccessControl':{'AdminPassword':password},'Engine.GameReplicationInfo':{'ServerName':name}})
- return [str(confined(root,'Binaries/Win64/KFGameSteamServer.bin.x86_64')),mapname+'?Port='+str(primary)+'?QueryPort='+str(query)+'?Difficulty='+str(difficulty),'-Port='+str(primary),'-QueryPort='+str(query),*extra],environment,'\x03',b'DevOnline: Playfab server registered with lobby ID '
+ argv,plans,_=kf2_plan(root,env)
+ kf2_publish(root,plans)
+ return argv,environment,'\x03',b'DevOnline: Playfab server registered with lobby ID '
 
 def main():
  game=sys.argv[1];root=Path.cwd();env=dict(os.environ)
  auto=env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','0' if game=='exiled' else '1'))
  if auto not in ['0','1']:raise ValueError('AUTO_UPDATE must be 0 or 1')
  # Validate all typed controls before update.
- argv,environment,stop,ready=launch(root,game,env)
+ if game=='kf2':kf2_plan(root,env)
+ else:argv,environment,stop,ready=launch(root,game,env)
  if auto=='1':
   from session_servers_install import install
   install(root,game,env)
-  argv,environment,stop,ready=launch(root,game,env)
- return native_console.run(root,argv,environment,stop,credentials=tuple(env.get(k,'') for k in ['ADMIN_PASS','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS'] if env.get(k)),ready_marker=ready,terminal_input=True)
+  if game!='kf2':argv,environment,stop,ready=launch(root,game,env)
+ if game=='kf2':argv,environment,stop,ready=launch(root,game,env)
+ native_password=kf2_plan(root,env)[2] if game=='kf2' else ''
+ return native_console.run(root,argv,environment,stop,credentials=tuple([native_password] if native_password else [])+tuple(env.get(k,'') for k in ['ADMIN_PASS','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS'] if env.get(k)),ready_marker=ready,terminal_input=True)
 
 if __name__=='__main__':
  try:sys.exit(main())

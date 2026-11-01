@@ -191,6 +191,11 @@ def install(root,game,env):
     root=Path(root).resolve();require_terms(game,env)
     if game not in GAMES:raise ValueError('Unknown Bedrock engine')
     if game=='bds_arm' and platform.machine() not in ('aarch64','arm64'):raise ValueError('Original ARM64 recipe requires an ARM64 host and box64; x64 testing does not validate ARM emulation')
+    config_plan=None
+    if game in ('bds','bds_arm'):
+        config_path=inside(root,'server.properties')
+        config_before=config_path.read_bytes() if config_path.exists() else None
+        config_plan=bds_configuration(root,game,env,config_before if config_before is not None else b'')
     cache=inside(root,'.voltra/public-cache');identity=selected(game,env,cache);state=inside(root,'.voltra/'+game);state.mkdir(parents=True,exist_ok=True)
     if game in ('nukkit','pnx','gomint'):
         # Reuse the reviewed Java21 installer unchanged. Its private download
@@ -222,6 +227,10 @@ def install(root,game,env):
             else:
                 if not (ready/binary).is_file():raise ValueError('BDS executable missing')
                 (ready/binary).chmod(0o755)
+                if config_before is None and (ready/'server.properties').exists():
+                    config_plan=bds_configuration(root,game,env,(ready/'server.properties').read_bytes())
+                current=config_plan[0].read_bytes() if config_plan[0].exists() else None
+                if current!=config_before:raise ValueError('BDS configuration changed during acquisition')
                 # BDS worlds/config/plugins are always retained, even on first adoption.
                 for name in ('server.properties','permissions.json','allowlist.json','whitelist.json','worlds','config','plugins'):
                     path=ready/name
@@ -248,10 +257,41 @@ def install(root,game,env):
             (ready/'bin/php7/bin/php').chmod(0o755)
             shutil.copyfile(archive,ready/'PocketMine-MP.phar')
             publisher.publish(root,ready,root,dict(identity,game=game,php=php),'PocketMine-MP.phar')
-    configure(root,game,env)
+    if config_plan is not None:
+        write(config_plan[0],config_plan[1])
+    else:configure(root,game,env)
+
+
+def bds_configuration(root,game,env,previous=None):
+    port=number(env.get('SERVER_PORT','19132'),1,65535)
+    values={'server-port':str(port),'server-ip':'0.0.0.0'}
+    transport=env.get('BEDROCK_TRANSPORT','nethernet')
+    if transport not in ('raknet','nethernet'):raise ValueError('Invalid BDS transport')
+    allocated=[number(value.strip(),1,65535) for value in env.get('VOLTRA_ALLOCATED_PORTS',str(port)).split(',')]
+    if port not in allocated:raise ValueError('BDS primary port is not allocated')
+    ipv6=port
+    if transport=='raknet':
+        secondary=env.get('SERVER_PORT_V6','0')
+        if secondary=='0':secondary=next((str(p) for p in allocated if p!=port),None)
+        if secondary is None:raise ValueError('RakNet needs a second distinct allocated IPv6 port')
+        ipv6=number(secondary,1,65535)
+        if ipv6==port or ipv6 not in allocated:raise ValueError('BDS IPv6 port must be a distinct allocation')
+    values.update({'server-name':single(env.get('SERVERNAME','Bedrock Dedicated Server'),100),'gamemode':env.get('GAMEMODE','survival'),'difficulty':env.get('DIFFICULTY','easy'),'allow-cheats':env.get('CHEATS','false'),'enable-lan-visibility':'false','server-portv6':str(ipv6),'emit-server-telemetry':'false','online-mode':env.get('ONLINE_MODE','true')})
+    advertised=env.get('BEDROCK_ADVERTISED_ADDRESS','')
+    if advertised:
+        address=ipaddress.ip_address(advertised)
+        advertised=('['+str(address)+']') if address.version==6 else str(address)
+    values.update({'transport':transport,'server-udp-ports':(advertised+':' if advertised else '')+str(port)+':'+str(port)})
+    if values['gamemode'] not in ('survival','creative','adventure') or values['difficulty'] not in ('peaceful','easy','normal','hard') or values['allow-cheats'] not in ('true','false') or values['online-mode'] not in ('true','false'):raise ValueError('Invalid BDS game control')
+    if game=='bds_arm':values['max-threads']='2'
+    path=inside(root,'server.properties')
+    if previous is None:previous=path.read_bytes() if path.exists() else b''
+    return path,properties(previous.decode('utf-8'),values).encode(),port
 
 
 def configure(root,game,env):
+    if game in ('bds','bds_arm'):
+        path,content,port=bds_configuration(root,game,env);write(path,content);return port
     port=number(env.get('SERVER_PORT','19132'),1,65535)
     if game=='pnx':
         path=inside(root,'pnx.yml')
@@ -261,27 +301,7 @@ def configure(root,game,env):
         if not path.exists():write(path,(json.dumps({'settings':{'ip':'0.0.0.0','port':port,'motd':single(env.get('SERVERNAME','PowerNukkitX Server'),100)},'network-settings':{'enableQuery':True}},indent=2)+'\n').encode())
         return port
     values={'server-port':str(port),'server-ip':'0.0.0.0'}
-    if game in ('bds','bds_arm'):
-        transport=env.get('BEDROCK_TRANSPORT','nethernet')
-        if transport not in ('raknet','nethernet'):raise ValueError('Invalid BDS transport')
-        allocated=[number(value.strip(),1,65535) for value in env.get('VOLTRA_ALLOCATED_PORTS',str(port)).split(',')]
-        if port not in allocated:raise ValueError('BDS primary port is not allocated')
-        ipv6=port
-        if transport=='raknet':
-            secondary=env.get('SERVER_PORT_V6','0')
-            if secondary=='0':secondary=next((str(p) for p in allocated if p!=port),None)
-            if secondary is None:raise ValueError('RakNet needs a second distinct allocated IPv6 port')
-            ipv6=number(secondary,1,65535)
-            if ipv6==port or ipv6 not in allocated:raise ValueError('BDS IPv6 port must be a distinct allocation')
-        values.update({'server-name':single(env.get('SERVERNAME','Bedrock Dedicated Server'),100),'gamemode':env.get('GAMEMODE','survival'),'difficulty':env.get('DIFFICULTY','easy'),'allow-cheats':env.get('CHEATS','false'),'enable-lan-visibility':'false','server-portv6':str(ipv6),'emit-server-telemetry':'false','online-mode':env.get('ONLINE_MODE','true')})
-        advertised=env.get('BEDROCK_ADVERTISED_ADDRESS','')
-        if advertised:
-            address=ipaddress.ip_address(advertised)
-            advertised=('['+str(address)+']') if address.version==6 else str(address)
-        values.update({'transport':transport,'server-udp-ports':(advertised+':' if advertised else '')+str(port)+':'+str(port)})
-        if values['gamemode'] not in ('survival','creative','adventure') or values['difficulty'] not in ('peaceful','easy','normal','hard') or values['allow-cheats'] not in ('true','false') or values['online-mode'] not in ('true','false'):raise ValueError('Invalid BDS game control')
-        if game=='bds_arm':values['max-threads']='2'
-    else:values.update({'query.port':str(port),'enable-query':'on' if game in ('nukkit','pnx','pocketmine') else 'true','motd':single(env.get('SERVERNAME','Voltra Bedrock Server'),100)})
+    values.update({'query.port':str(port),'enable-query':'on' if game in ('nukkit','pnx','pocketmine') else 'true','motd':single(env.get('SERVERNAME','Voltra Bedrock Server'),100)})
     if game=='pocketmine':
         ipv6=number(env.get('SERVER_PORT_V6','0'),0,65535)
         values['enable-ipv6']='on' if ipv6 else 'off'

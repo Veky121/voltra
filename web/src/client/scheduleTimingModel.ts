@@ -10,6 +10,22 @@ export const weekDays = [
   { value: 6, label: "Sat", name: "Saturday" },
   { value: 0, label: "Sun", name: "Sunday" },
 ];
+export function describeSchedule(cron:ScheduleCron):string {
+  // Expand weekday ranges only for display; never rewrite the stored cron.
+  const range=/^([0-6])-([0-6])$/.exec(cron.day_of_week);
+  const days=range&&Number(range[1])<=Number(range[2])?Array.from({length:Number(range[2])-Number(range[1])+1},(_,i)=>String(Number(range[1])+i)).join(','):cron.day_of_week;
+  const timing=readSimpleTiming({...cron,day_of_week:days});
+  if(!timing||!timing.days.length)return 'Custom schedule';
+  const selected=weekDays.filter(day=>timing.days.includes(day.value));
+  const when=selected.length===7?'Every day':selected.map(day=>day.label).join(', ');
+  if(timing.unit==='hour'&&timing.every===24)return `${when} at ${timing.startTime||'00:00'}`;
+  const suffix=selected.length===7?'':` · ${when}`;
+  if(timing.unit==='minute')return `${timing.every===1?'Every minute':`Every ${timing.every} minutes`}${60%timing.every?' within each hour':''}${suffix}`;
+  if(24%timing.every)return `Custom daily times${suffix}`;
+  const minute=timing.startTime?.slice(3)||'00';
+  if(timing.every===1)return `Every hour${minute==='00'?'':` at :${minute}`}${suffix}`;
+  return `Every ${timing.every} hours from ${timing.startTime||'00:00'}${suffix}`;
+}
 export function clampInterval(value: number, unit: IntervalUnit): number {
   return Math.min(unit === "minute" ? 60 : 24, Math.max(1, Number.isFinite(value) ? Math.trunc(value) : 1));
 }

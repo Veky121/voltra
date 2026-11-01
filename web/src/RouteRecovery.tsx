@@ -1,3 +1,5 @@
+import {captureErrorContext,reportPanelError} from './notifications/store';
+import {ActionButton as MiraAction} from './ui/ActionButton';
 import {Component, type ReactNode} from 'react';
 
 // React.lazy caches rejected imports. A document reload creates a fresh module
@@ -5,6 +7,7 @@ import {Component, type ReactNode} from 'react';
 export default class RouteRecovery extends Component<{children:ReactNode; resetKey?:string}, {failed:boolean}> {
   state = {failed:false};
   static getDerivedStateFromError() { return {failed:true}; }
+  componentDidCatch(error:Error){reportPanelError(error,captureErrorContext('Page rendering',this.props.resetKey?{page:this.props.resetKey}:{}));}
   componentDidUpdate(previous:Readonly<{children:ReactNode; resetKey?:string}>) {
     if (this.state.failed && previous.resetKey !== this.props.resetKey) this.setState({failed:false});
   }
@@ -13,7 +16,7 @@ export default class RouteRecovery extends Component<{children:ReactNode; resetK
     return <section className="page" role="alert" aria-labelledby="route-recovery-title">
       <h1 id="route-recovery-title">This page could not open</h1>
       <p>Use navigation to open another page, or reload to try this page again. Reloading discards unsaved changes.</p>
-      <button type="button" className="button" onClick={()=>window.location.reload()}>Reload page</button>
+      <MiraAction type="button" className="button" onClick={()=>window.location.reload()}>Reload page</MiraAction>
     </section>;
   }
 }

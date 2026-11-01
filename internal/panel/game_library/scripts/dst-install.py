@@ -38,16 +38,24 @@ def update_game(root, validate=True):
                 if os.path.exists(temporary):os.unlink(temporary)
 
 
-def worldgen(root, env):
+def worldgen(root, env, dry_run=False):
     root = Path(root).resolve()
     identity = env.get('CLUSTER_ID', 'server')
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', identity):raise ValueError('Invalid persistent cluster ID')
+    pending = []
     for shard, key, bundled in [('Master','MASTER_WORLDGEN','dst-worldgen-master.lua'),('Caves','CAVES_WORLDGEN','dst-worldgen-caves.lua')]:
         target = root / 'DoNotStarveTogether/config' / identity / shard / 'worldgenoverride.lua'
         if not target.resolve().is_relative_to(root):raise ValueError('World generation file leaves the volume')
         if target.exists():continue
         url = env.get(key, '')
         if not url:continue
+        pending.append((target, url, bundled, shard))
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError('Worldgen downloads require an HTTPS URL without embedded credentials')
+    if dry_run:return
+    prepared = []
+    for target, url, bundled, shard in pending:
         if url == 'https://raw.githubusercontent.com/ptero-eggs/game-eggs/main/dont_starve/worldgenoverride.' + shard.lower() + '.lua':
             content = (root / '.voltra' / bundled).read_text(encoding='utf-8')
         else:
@@ -59,10 +67,14 @@ def worldgen(root, env):
                 content = response.read(4 * 1024 * 1024 + 1)
             if len(content) > 4 * 1024 * 1024:raise ValueError('Worldgen file exceeds 4 MiB')
             content = content.decode('utf-8')
-        private_write(target, content)
+        prepared.append((target, content))
+    for target, content in prepared:private_write(target, content)
 
 
 if __name__ == '__main__':
     root = Path.cwd()
+    from dst_config import configure
+    configure(root, os.environ, dry_run=True)
+    worldgen(root, os.environ, dry_run=True)
     update_game(root)
     worldgen(root, os.environ)

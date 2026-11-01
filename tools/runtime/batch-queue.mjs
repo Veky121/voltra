@@ -75,7 +75,7 @@ function allocateLease(state,request,limits,utility,retryOf) {
   const active = state.claims.filter(c => c.status === 'active');
   const reserve = limits.reserved_disk_mib ?? 20480;
   if (!Number.isSafeInteger(reserve) || reserve < 0) throw Error('reserved_disk_mib must be a nonnegative integer');
-  if (active.length >= limits.max_active || active.reduce((s,c)=>s+c.memory_mib,0)+request.memory_mib > limits.memory_mib || active.reduce((s,c)=>s+c.disk_mib,0)+request.disk_mib+reserve > limits.disk_mib) throw Error('resource budget exhausted');
+  if (active.length >= limits.max_active || active.reduce((s,c)=>s+c.memory_mib,0)+(state.installer_slot?.supplement_mib||0)+request.memory_mib > limits.memory_mib || active.reduce((s,c)=>s+c.disk_mib,0)+request.disk_mib+reserve > limits.disk_mib) throw Error('resource budget exhausted');
   const used = new Set(active.flatMap(c => c.ports));
   let ports=utility && request.ports===0 ? [] : undefined;
   for (let first=limits.port_min; !ports && first+request.ports-1<=limits.port_max; first++) {
@@ -90,6 +90,7 @@ function allocateLease(state,request,limits,utility,retryOf) {
 export function release(state, id, owner, outcome, resourcesRemoved) {
   const row = state.claims.find(c=>c.lease_id===id && c.owner===owner && c.status==='active');
   if (!row) throw Error('no matching active owner lease');
+  if(state.installer_slot?.lease_id===id)throw Error('Release installer slot first');
   if (!resourcesRemoved) throw Error('release requires explicit confirmation that owned servers and allocations are removed');
   if (!['released','blocked','tested'].includes(outcome)) throw Error('outcome must be released, blocked or tested');
   row.status=outcome; row.finished_at=new Date().toISOString();
@@ -103,9 +104,10 @@ export function resize(state, request, limits) {
   if(diskChange){positive(request.disk_mib,'disk_mib');positive(limits.disk_mib,'disk budget');}
   const row=state.claims.find(c=>c.lease_id===request.lease_id && c.owner===request.owner && c.status==='active');
   if(!row)throw Error('No owned active lease to resize');
+  if(state.installer_slot?.lease_id===row.lease_id)throw Error('Release installer slot before resize');
   if(request.stopped_confirmed!==true)throw Error('Resource resize requires confirmed stopped native server and installer');
   const active=state.claims.filter(c=>c.status==='active' && c!==row);
-  if(memoryChange&&active.reduce((sum,c)=>sum+c.memory_mib,0)+request.memory_mib>limits.memory_mib)throw Error('Memory budget exhausted');
+  if(memoryChange&&active.reduce((sum,c)=>sum+c.memory_mib,0)+(state.installer_slot?.supplement_mib||0)+request.memory_mib>limits.memory_mib)throw Error('Memory budget exhausted');
   if(diskChange){
     const reserve=limits.reserved_disk_mib??20480;
     if(!Number.isSafeInteger(reserve)||reserve<0)throw Error('reserved_disk_mib must be a nonnegative integer');

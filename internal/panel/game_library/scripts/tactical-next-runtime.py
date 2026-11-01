@@ -98,20 +98,37 @@ def configure(root,env):
         prefix=confined(root,'.wine');library=env.get('WINEPATH',str(root))
         if library!=str(root):raise ValueError('Original Ground Branch WINEPATH must match the server volume')
         maximum=integer(env,'MAX_PLAYERS',16,1,2147483647)
+        target=confined(root,'GroundBranch/ServerConfig/Server.ini')
+        modding=confined(root,'GroundBranch/Config/DefaultModding.ini')
+        if not target.exists():
+            updated=patch_ini('',{'/Script/RBZooKeeper.ZKServer':{'ServerName':name,'MaxPlayers':str(maximum)}}).encode()
+            _publish(root,'GroundBranch/ServerConfig/Server.ini',lambda output:output.write(updated),0o600)
         default_ground_maplist(root)
-        target=confined(root,'GroundBranch/ServerConfig/Server.ini');previous=target.read_bytes()if target.exists()else b''
-        if len(previous)>8*1024**2:raise ValueError('Ground Branch Server.ini exceeds limit')
-        updated=patch_ini(previous.decode('utf-8-sig'),{'/Script/RBZooKeeper.ZKServer':{'ServerName':name,'MaxPlayers':str(maximum)}}).encode()
-        if updated!=previous:
-            if previous:_publish(root,'.voltra/tactical-next/server-ini-backup-'+str(__import__('time').time_ns()),lambda output:output.write(previous),0o600)
-            metadata=target.stat()if target.exists()else None
-            _publish(root,'GroundBranch/ServerConfig/Server.ini',lambda output:output.write(updated),metadata.st_mode&0o777 if metadata else 0o600)
-            if metadata and os.geteuid()==0:os.chown(target,metadata.st_uid,metadata.st_gid)
-        flat_config(root,'GroundBranch/Config/DefaultModding.ini',{'ModPath':'../steamapps/workshop/content/16900/'})
+        if not modding.exists():
+            flat_config(root,'GroundBranch/Config/DefaultModding.ini',{'ModPath':'../steamapps/workshop/content/16900/'})
         child.update(WINEARCH='win64',WINEDEBUG=debug,WINEPATH=library,WINEPREFIX=str(prefix))
         argv=[wine,str(binary),'MultiHome=0.0.0.0','Port='+str(selected['SERVER_PORT']),'QueryPort='+str(selected['QUERY_PORT']),'-log']
         ready=b'Bringing up level for play took'
     return argv,child,secrets,ready
+
+
+
+def preflight_groundbranch(root, env):
+    """Refuse invalid launch controls before an automatic publisher update."""
+    ports(env,['QUERY_PORT'])
+    text(env.get('SERVER_NAME','Dedicated server'),255)
+    integer(env,'MAX_PLAYERS',16,1,2147483647)
+    if env.get('WINEARCH','win64')!='win64':raise ValueError('Original Ground Branch requires a win64 Wine prefix')
+    debug=text(env.get('WINEDEBUG','-all'),256)
+    if not re.fullmatch(r'[A-Za-z0-9_+,-]*',debug):raise ValueError('Invalid Wine debug channels')
+    wine=shutil.which('wine')
+    if not wine:raise ValueError('Ground Branch requires the selected Wine runtime image; wine is missing')
+    if not os.environ.get('DISPLAY'):raise ValueError('Ground Branch Wine image must provide its headless display before launch')
+    prefix=confined(root,'.wine');library=env.get('WINEPATH',str(root))
+    if library!=str(root):raise ValueError('Original Ground Branch WINEPATH must match the server volume')
+    confined(root,'GroundBranch/ServerConfig/Server.ini')
+    confined(root,'GroundBranch/Config/DefaultModding.ini')
+    confined(root,'GroundBranch/ServerConfig/MapList.ini')
 
 
 def main(root,env):
@@ -119,6 +136,7 @@ def main(root,env):
     if automatic not in('0','1'):raise ValueError('Auto update must be0or1')
     validate=env.get('VALIDATE','')
     if validate not in('','true','1'):raise ValueError('Repair validation must be empty,trueor1')
+    if kind=='groundbranch':preflight_groundbranch(Path(root).resolve(),env)
     if automatic=='1':install(root,env,validate=validate in('true','1'))
     argv,child,secrets,ready=configure(root,env)
     if kind=='groundbranch':

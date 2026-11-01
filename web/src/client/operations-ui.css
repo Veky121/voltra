@@ -1,5 +1,7 @@
 /* Account and server operations opt in; the shell and game/file screens keep their own styles. */
 .operations-page{min-width:0;font-size:calc(13px * var(--ui-font-scale,1))}
+.operations-page .operations-table .table :is(th,td):first-child{padding-left:16px}
+.operations-page .operations-table .table :is(th,td):last-child{padding-right:16px}
 .operations-heading{margin-bottom:24px}
 .operations-heading>h2{font-size:calc(16px * var(--ui-font-scale,1));font-weight:550;letter-spacing:-.015em;margin:0 0 8px}
 .operations-heading>p{margin:0;color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;max-width:72ch}
@@ -24,10 +26,10 @@
 .operations-page .operations-filters{padding:12px;border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-surface);gap:8px;margin-bottom:16px}
 .operations-filters>input{flex:1;min-width:160px;max-width:360px}
 .operations-page .operations-table{border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-surface);margin-bottom:16px}
-.operations-table>.table{font-size:calc(12px * var(--ui-font-scale,1))}
-.operations-table>.table th{font-size:calc(11px * var(--ui-font-scale,1));font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);background:var(--ui-hover)}
-.operations-table>.table :is(th,td){padding:11px 12px;border-color:var(--ui-divider);vertical-align:top}
-.operations-table>.table tbody tr:hover{background:var(--ui-hover)}
+.operations-table .table{font-size:calc(12px * var(--ui-font-scale,1))}
+.operations-table .table th{font-size:calc(11px * var(--ui-font-scale,1));font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);background:var(--ui-hover)}
+.operations-table .table :is(th,td){padding:11px 12px;border-color:var(--ui-divider);vertical-align:top}
+.operations-table .table tbody tr:hover{background:var(--ui-hover)}
 .operations-table .table td code{font-size:calc(11px * var(--ui-font-scale,1));color:var(--muted)}
 .operations-table .table td>small{display:block;margin-top:4px}
 .operations-table .table td>pre{margin:0;min-width:140px;font-size:calc(11px * var(--ui-font-scale,1));line-height:1.6}

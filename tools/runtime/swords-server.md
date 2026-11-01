@@ -90,3 +90,14 @@ child; these source checks remain distinct from a publisher server boot. No
 protocol/client join/mod/admin/save/reinstall acceptance is claimed. Verification
 stays not_verified pending actual native acceptance; the source-schema blocker
 has been resolved using real primary evidence.
+
+2026-10-30 scoped follow-up: direct install now validates the six native inputs,
+allocation roles and confined config/template paths before Steam acquisition or
+preservation writes. Eleven source fixtures pass under local WSL Python, and
+the same eleven pass against extracted emitted installer helpers. The staged
+profile preserves the complete original ordered variable prefix and Wine image.
+Unmeasured resource defaults were removed; no publisher recommendation is claimed.
+The installer shell still bootstraps Python/packages and writes helper payloads
+before invoking adapter preflight; complete panel-creation no-write refusal needs
+root integration validation. Native readiness, actual Wine image compatibility,
+stop/save behavior and browser consumption remain unverified.

@@ -1,5 +1,5 @@
 /* Shadcn Base UI controls share the current user's theme tokens. */
-.ui-switch[data-slot=switch]{display:inline-flex;position:relative;flex:0 0 28px;align-items:center;justify-content:flex-start;gap:0;width:28px;height:17px;min-height:17px;margin:0;padding:0;border:1px solid transparent;border-radius:999px;background:var(--line-strong);color:var(--text);cursor:pointer;box-shadow:none;filter:none;vertical-align:middle;touch-action:manipulation;transition:background 150ms}
+.ui-switch[data-slot=switch]{display:inline-flex;position:relative;flex:0 0 auto;align-items:center;justify-content:flex-start;gap:0;width:28px;height:17px;min-height:17px;margin:0;padding:0;border:1px solid transparent;border-radius:999px;background:var(--line-strong);color:var(--text);cursor:pointer;box-shadow:none;filter:none;vertical-align:middle;touch-action:manipulation;transition:background 150ms}
 .ui-switch[data-slot=switch][data-checked]{background:var(--primary)}
 .ui-switch[data-slot=switch] [data-slot=switch-thumb]{display:block;flex:none;width:14px;height:14px;border-radius:999px;background:var(--text);translate:none;transform:translateX(0);transition:transform 150ms;pointer-events:none}
 .ui-switch[data-slot=switch][data-checked] [data-slot=switch-thumb]{transform:translateX(12px);background:var(--theme-button-ink,var(--accent-ink,#fff))}
@@ -32,3 +32,41 @@ label:not(.field)>.ui-switch[data-slot=switch]{align-self:center;flex-shrink:0}
 .desktop-updates .ui-select{min-height:26px;padding:3px 6px;font-size:11px}
 @media(max-width:600px){.mc-content-search>.ui-select-field{order:3;flex-basis:100%}}
 @media(prefers-reduced-motion:reduce){.ui-switch[data-slot=switch],.ui-switch[data-slot=switch] [data-slot=switch-thumb]{transition:none}}
+
+/* Voltra compositions retain layout while Mira owns control behavior. */
+.settings-group[data-slot=card]{padding:0;gap:0}
+.settings-plain[data-slot=card]{padding:0;gap:0;box-shadow:none;background:transparent;border:0;--tw-ring-shadow:0 0 #0000}
+[data-voltra-disclosure-trigger]{justify-content:flex-start;white-space:normal;text-align:left;max-width:100%;height:auto;min-height:28px;padding:4px 6px}
+[data-voltra-disclosure-trigger]>svg:first-child{transition:transform .15s;flex-shrink:0}
+[data-voltra-disclosure-trigger][aria-expanded=false]>svg:first-child{transform:rotate(-90deg)}
+[data-slot=disclosure]{min-width:0}
+[data-slot=disclosure]>[data-slot=collapsible-content]{padding-top:8px}
+
+[data-voltra-disclosure-trigger]{background:transparent;border-color:transparent;color:var(--muted);box-shadow:none;font-size:12px;line-height:20px}
+[data-voltra-disclosure-trigger]:hover{background:var(--ui-hover);color:var(--text)}
+.voltra-sidebar-advanced>[data-voltra-disclosure-trigger]::after{content:none}
+
+.loading-skeleton{width:60px;height:8px}
+.field[data-slot=field]{display:flex;flex-direction:column}
+.overview-meter[data-slot=progress]{display:block;gap:0}
+.overview-meter [data-slot=progress-track]{height:100%;background:transparent}
+.overview-meter [data-slot=progress-indicator]{background:var(--meter-color,var(--accent));border-radius:inherit;transition:width 300ms}
+.fleet-progress [data-slot=progress-track]{height:5px;background:var(--ui-divider)}
+.fleet-capacity:last-child .fleet-progress [data-slot=progress-indicator]{background:var(--theme-accent-b)}
+.mc-loaders[data-slot=radio-group]{display:flex;flex-wrap:wrap}
+.mc-loader [data-slot=radio-group-item]{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.mc-loader:has([data-slot=radio-group-item]:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+:is(.explorer-check,.fm-entry-check)[data-slot=checkbox]{display:inline-flex;width:14px;height:14px;min-height:0;padding:0;border-radius:2px;vertical-align:middle}
+.panel-switcher[data-slot=toggle-group]{width:100%;gap:0}
+.panel-switcher [data-slot=toggle-group-item]{min-width:0;height:auto;font-size:inherit;text-decoration:none}
+
+.console-dropdown{width:280px;max-width:calc(100vw - 24px);font-size:12px}
+.console-dropdown .console-history-budget{padding:6px 8px;margin:0;font-size:11px;color:var(--muted)}
+.console-dropdown-history{max-height:280px;width:360px}
+.console-dropdown-history code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mira-language-menu{width:min(380px,calc(100vw - 24px));max-height:min(420px,var(--available-height));overflow:auto}
+.mira-language-menu [data-slot=combobox-item]{justify-content:space-between;gap:12px}
+.mira-language-menu small{font-size:10px;color:var(--muted);text-align:right}
+.mira-language-menu .editor-language-help{padding:8px;font-size:11px;color:var(--muted)}
+.console-terminal .console-icon-button[data-slot=button]{width:28px;height:28px;min-height:0;padding:5px;background:transparent;border:0;color:var(--muted);box-shadow:none}
+.console-terminal .console-icon-button[data-slot=button]:hover{color:var(--text);background:var(--ui-hover)}

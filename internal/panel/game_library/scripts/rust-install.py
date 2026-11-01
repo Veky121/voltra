@@ -105,7 +105,11 @@ def wipe_matches(root, parts, mounts):
 
 def validate_wipe(root, env):
     if env.get('REGEN_SERVER', '0') != '1':return []
-    root = root.resolve();mounts = mount_points();patterns = env.get('REMOVE_FILES', '').split()
+    # Check the raw operator value before split() can erase tabs/newlines.
+    raw_patterns = env.get('REMOVE_FILES', '')
+    if any(ord(c)<32 or ord(c)==127 for c in raw_patterns):
+        raise ValueError('Wipe patterns cannot contain control characters')
+    root = root.resolve();mounts = mount_points();patterns = raw_patterns.split()
     parsed = []
     for pattern in patterns:
         if any(ord(c)<32 or ord(c)==127 for c in pattern):raise ValueError('Wipe patterns cannot contain control characters')

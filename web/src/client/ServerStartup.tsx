@@ -1,9 +1,13 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {Checkbox} from '../components/ui/checkbox';
+import {SettingsSection as PreferenceSection} from '../ui/Settings';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {settingDescription} from './settingDescription';
 import {PendingSettings, usePendingSetting} from './PendingSettings';
 import {GameSwitch} from './GameSwitch';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { api, Button, Card, Input, Select, useAPI } from '../lib';
+import { api, Button, Input, Select, useAPI } from '../lib';
 import { can, items, json, PageError, useServer, value } from './common';
 import { JavaSettings } from './JavaSettings';
 import { commandPreview, secretVariable, variableControl, variableEditable, variableProblem, variableValue, variableWrite, startupVariableSection } from './startupSettingsModel';
@@ -23,7 +27,7 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
   const [draft, setDraft] = useState(baseline);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useErrorState('client/ServerStartup.tsx');
   const [success, setSuccess] = useState('');
   const [clear, setClear] = useState(false);
   const secret = secretVariable(variable);
@@ -90,11 +94,11 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
         aria-describedby={problem ? `${id}-help` : undefined} aria-invalid={!!problem}
         onChange={event => { setDraft(event.target.value); setSuccess(''); setError(''); }} />}
     </div>
-    {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><input type="checkbox" checked={clear} disabled={busy} onChange={event => {setClear(event.target.checked); setDraft('');}}/> Clear saved value</label>}
+    {secret && editable && !control.required && configured !== false && <label className="startup-field-help"><Checkbox checked={clear} disabled={busy} onCheckedChange={checked => {setClear(checked); setDraft('');}}/> Clear saved value</label>}
     {problem && <p id={`${id}-help`} className="startup-validation" role="alert">{problem}</p>}
     {error && <p role="alert" className="error">{error}</p>}
     {success && <p role="status" className="success">{success}</p>}
-    <details className="startup-field-details"><summary>Details</summary><p>Rules: {variable.rules || 'None'}</p><p>Default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p></details>
+    <Disclosure className="startup-field-details"><DisclosureTrigger>Details</DisclosureTrigger><p>Rules: {variable.rules || 'None'}</p><p>Default: {secret ? 'Hidden' : String(variable.default_value ?? '') || '(empty)'}</p></Disclosure>
   </div>;
 
 }
@@ -106,33 +110,33 @@ function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyCh
   const previous = useRef(image);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useErrorState('client/ServerStartup.tsx');
   const [success, setSuccess] = useState('');
   useEffect(() => { const oldImage = previous.current; setDraft(current => current === oldImage ? image : current); previous.current = image; }, [image]);
   const choices = Object.entries(images);
-  const dirty = draft !== image;
+  const [savedImage,setSavedImage]=useState(image);
+  const dirty = draft !== savedImage;
   useEffect(() => {onDirtyChange(dirty); return () => onDirtyChange(false);}, [dirty, onDirtyChange]);
-  return <section className="startup-advanced">
-    <h3>Runtime image{dirty ? ' · Unsaved' : ''}</h3>
-    <p className="muted">The container image applies next start. Saving does not reinstall the server.</p>
-    <form aria-busy={busy} onSubmit={event => {
-      event.preventDefault();
-      if (!permitted || !dirty || !draft.trim() || locked.current) return;
-      locked.current = true; setBusy(true); setError(''); setSuccess('');
-      void api(`${base}/settings/docker-image`, json('PUT', { docker_image: draft })).then(() => {
-        onSaved(draft); setSuccess('Runtime image saved. Applies next start.');
-      }).catch(cause => setError(cause instanceof Error ? cause.message : 'Could not save the image.')).finally(() => { locked.current = false; setBusy(false); });
-    }}>
+  async function saveImage(){
+    if(!permitted||!dirty||!draft.trim()||locked.current)return;
+    locked.current=true;setBusy(true);setError('');setSuccess('');
+    try{await api(`${base}/settings/docker-image`,json('PUT',{docker_image:draft}));setSavedImage(draft);setSuccess('Saved. Applies on the next start.')}
+    catch(error){setError(error instanceof Error?error.message:String(error));throw error}finally{locked.current=false;setBusy(false)}
+  }
+  usePendingSetting(`image:${base}`,dirty,{blocked:busy||!permitted||!draft.trim(),save:saveImage,afterSave:()=>onSaved(draft),discard:()=>{setDraft(savedImage);setError('')}});
+  return <PreferenceSection title="Runtime image" className="startup-advanced">
+    <p className="settings-section-note">Applies on the next start. Saving does not reinstall.</p>
+    <form aria-busy={busy} onSubmit={event=>{event.preventDefault();void saveImage().catch(()=>{})}}>
       <label className="field"><span>Runtime image{!permitted ? ' · Read-only' : ''}</span>
         {customAllowed ? <Input value={draft} disabled={!permitted || busy} onChange={event => {setDraft(event.target.value); setSuccess('');}}/> : choices.length ? <Select value={draft} disabled={!permitted || busy} onChange={event => { setDraft(event.target.value); setSuccess(''); }}>
           {!choices.some(([, value]) => value === draft) && <option value={draft}>{draft || 'Choose an image'}</option>}
           {choices.map(([name, image]) => <option key={name} value={image}>{name} · {image}</option>)}
         </Select> : <Input value={draft} disabled={!permitted || busy} onChange={event => { setDraft(event.target.value); setSuccess(''); }} />}
       </label>
-      {permitted && <div className="startup-field-actions"><Button type="submit" disabled={busy || !dirty || !draft.trim()}>{busy ? 'Saving...' : 'Save image'}</Button>{dirty && <Button variant="secondary" disabled={busy} onClick={() => setDraft(image)}>Discard draft</Button>}</div>}
+
     </form>
     <PageError error={error} />{success && <p className="success" role="status">{success}</p>}
-  </section>;
+  </PreferenceSection>;
 }
 
 type SettingsSection = 'game' | 'runtime';
@@ -168,22 +172,21 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
     if (response.meta) setSavedMeta(response.meta);
     return updated;
   }}/>;
-  const OptionsGroup = section === 'runtime' ? 'section' : Card;
   const options = <>
-    <OptionsGroup className="startup-variables"><h3>{section === 'game' ? 'Game options' : 'Installation & startup options'}</h3>
+    <PreferenceSection className="startup-variables" title={section === 'game' ? 'Game options' : 'Installation & startup options'}>
       {!variables.length && <p className="muted">No additional {section === 'game' ? 'game' : 'runtime'} options for this template.</p>}
       <div className="startup-variable-grid">{variables.filter(variable=>!licenceFields.has(variable.env_variable)).map(renderVariable)}</div>
-    </OptionsGroup>
+    </PreferenceSection>
   </>;
   return <section className="startup-settings games-ui">
     <PageError error={query.error} />
-    {section === 'runtime' ? <Card className="startup-runtime-card">
+    {section === 'runtime' ? <div className="startup-runtime-sections">
       {runtimeCommand}
-      {showCommandPreview && <section className="startup-preview"><h3>Startup command</h3><p className="muted">Preview of saved settings. Secret values are hidden. Unsaved drafts are excluded.</p><pre>{commandPreview(meta, (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable))}</pre></section>}
+      {showCommandPreview && <PreferenceSection title="Startup command" className="startup-preview"><p className="settings-section-note">Saved settings only. Secret values are hidden.</p><pre>{commandPreview(meta, (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable))}</pre></PreferenceSection>}
       {!meta.java_managed && <RuntimeImage base={base} image={savedImage ?? server.docker_image ?? server.image ?? ''} images={meta.docker_images || {}} permitted={imageAllowed} customAllowed={administrator} onDirtyChange={imageDirty} onSaved={image => { setSavedImage(image); reload(); }} />}
       <JavaSettings key={base} base={base} memoryMiB={server.limits?.memory ?? server.memory} canChangeRuntime={imageAllowed} onSaved={() => { query.reload(); reload(); }} />
       {options}
-    </Card> : options}
+    </div> : options}
   </section>;
 }
 

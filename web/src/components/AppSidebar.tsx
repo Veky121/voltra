@@ -1,3 +1,6 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {NotificationBell} from '../notifications/NotificationLayer';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {useContext,useEffect,useState} from 'react';
 import {Link,useLocation} from 'react-router-dom';
 import {ChevronsUpDown,ArrowLeft,Check} from 'lucide-react';
@@ -41,8 +44,8 @@ function Shortcuts({label,servers,view}:{label:string;servers:NavigationServer[]
 function AccountMenu({account}:{account:Record<string,any>}){
  const nickname=accountNickname(account),administrator=!!(account.root_admin||account.admin);
  const session=useContext(AccountSessionContext),{isMobile,state}=useSidebar();
- const [busy,setBusy]=useState(false),[error,setError]=useState('');
- return <><SidebarMenu><SidebarMenuItem><DropdownMenu>
+ const [busy,setBusy]=useState(false),[error,setError]=useErrorState('components/AppSidebar.tsx');
+ return <><SidebarMenu><SidebarMenuItem className="voltra-account-row"><DropdownMenu>
   <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="voltra-account-trigger" tooltip={nickname}/>} aria-label={`Account menu for ${nickname}`}>
    <span className="voltra-account-avatar" aria-hidden="true">{(nickname||'A').charAt(0).toUpperCase()}</span><span className="voltra-account-copy"><strong>{nickname}</strong><small>{administrator?'Administrator':'Member'}</small></span><ChevronsUpDown className="voltra-picker-chevron"/>
   </DropdownMenuTrigger>
@@ -50,7 +53,7 @@ function AccountMenu({account}:{account:Record<string,any>}){
    <DropdownMenuGroup><DropdownMenuLabel>Your account</DropdownMenuLabel><DropdownMenuItem render={<Link to="/account"/>}><Icon name="settings"/>Settings</DropdownMenuItem></DropdownMenuGroup><DropdownMenuSeparator/>
    <DropdownMenuItem variant="destructive" disabled={busy||!session.canSignOut} onClick={async()=>{if(busy||!session.canSignOut)return;setBusy(true);setError('');try{await session.signOut()}catch(failure){setError(failure instanceof Error?failure.message:String(failure))}finally{setBusy(false)}}}><Icon name="logout"/>{busy?'Logging out…':'Logout'}</DropdownMenuItem>
   </DropdownMenuContent>
- </DropdownMenu></SidebarMenuItem></SidebarMenu>{error&&<p className="voltra-account-error" role="alert">{error}</p>}</>;
+ </DropdownMenu><NotificationBell/></SidebarMenuItem></SidebarMenu>{error&&<p className="voltra-account-error" role="alert">{error}</p>}</>;
 }
 
 export function SidebarRouteEffects(){
@@ -65,13 +68,13 @@ export default function AppSidebar({account,name,setTarget}:{account:Record<stri
  const administrator=!!(account.root_admin||account.admin),collapsed=state==='collapsed';
  const favorites=nav.servers.filter(server=>server.favorite);
  const recents=nav.servers.filter(server=>server.last_visited_at).sort((a,b)=>Date.parse(b.last_visited_at!)-Date.parse(a.last_visited_at!));
- return <Sidebar variant="inset" collapsible="icon" className="voltra-sidebar" aria-label="Main navigation">
-  <SidebarHeader className="voltra-sidebar-header"><div className="voltra-sidebar-brand-row"><Link className="voltra-sidebar-brand" to={admin?'/admin':'/'} title={name}><BrandMark/><span>{name}</span></Link>{isMobile?<button type="button" className="voltra-sidebar-close" aria-label="Close navigation" onClick={()=>setOpenMobile(false)}><Icon name="close"/></button>:<SidebarTrigger className="voltra-sidebar-collapse" title={collapsed?'Expand sidebar':'Collapse sidebar'} aria-label={collapsed?'Expand sidebar':'Collapse sidebar'} aria-expanded={!collapsed}/>}</div><PanelSwitcher admin={admin} administrator={administrator}/>{serverPage&&!admin&&<ServerPicker servers={nav.servers}/>}</SidebarHeader>
+ return <Sidebar variant="sidebar" collapsible="icon" className="voltra-sidebar" aria-label="Main navigation">
+  <SidebarHeader className="voltra-sidebar-header"><div className="voltra-sidebar-brand-row"><Link className="voltra-sidebar-brand" to={admin?'/admin':'/'} title={name}><BrandMark/><span>{name}</span></Link>{isMobile?<MiraAction type="button" className="voltra-sidebar-close" aria-label="Close navigation" onClick={()=>setOpenMobile(false)}><Icon name="close"/></MiraAction>:<SidebarTrigger className="voltra-sidebar-collapse" title={collapsed?'Expand sidebar':'Collapse sidebar'} aria-label={collapsed?'Expand sidebar':'Collapse sidebar'} aria-expanded={!collapsed}/>}</div><PanelSwitcher admin={admin} administrator={administrator}/>{serverPage&&!admin&&<ServerPicker servers={nav.servers}/>}</SidebarHeader>
   <SidebarContent className="voltra-sidebar-scroll" id="sidebar-scroll">
    {admin?administrator&&<AdminNavigation/>:serverPage?<SidebarMenu className="voltra-sidebar-back"><SidebarMenuItem><SidebarMenuButton render={<Link to="/"/>} tooltip="All servers"><ArrowLeft/><span>All servers</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>:<NavigationGroup label="Workspace"><Link to="/" title="Overview"><NavIcon name="dashboard"/><span>Overview</span><span className="voltra-sidebar-count">{nav.servers.length}</span></Link><Link to="/game-library" title="Game Library"><NavIcon name="eggs"/><span>Game Library</span></Link></NavigationGroup>}
    <div className="voltra-sidebar-sections" ref={setTarget}/>
    {!admin&&!serverPage&&<><Shortcuts label="Favorites" servers={favorites} view="favorites"/><Shortcuts label="Recents" servers={recents} view="recent"/></>}
-   {nav.error&&<div className="voltra-navigation-error" role="alert"><span>{nav.error}</span><button type="button" onClick={nav.reload}><Icon name="restart"/>Retry</button></div>}
+   {nav.error&&<div className="voltra-navigation-error" role="alert"><span>{nav.error}</span><MiraAction type="button" onClick={nav.reload}><Icon name="restart"/>Retry</MiraAction></div>}
   </SidebarContent>
   <SidebarFooter className="voltra-sidebar-footer"><AccountMenu account={account}/></SidebarFooter>
  </Sidebar>;

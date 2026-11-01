@@ -75,8 +75,12 @@ def selected(version, mod):
 def install(root, env, mod):
     if os.uname().machine not in ('x86_64', 'amd64'):
         raise ValueError('Publisher AppImage requires Linux x64')
-    migrate_support(root)
-    asset = selected(env.get('VERSION', 'release-20250330'), mod)
+    if mod in ('d2k', 'cnc'):
+        arguments(root, env, mod, preflight=True)
+        asset = selected(env.get('VERSION', 'release-20250330'), mod)
+    else:
+        migrate_support(root)
+        asset = selected(env.get('VERSION', 'release-20250330'), mod)
     state = root/'.voltra/openra'
     state.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.install-', dir=state) as temporary:
@@ -107,6 +111,8 @@ def install(root, env, mod):
                 raise ValueError('Publisher AppImage link escapes staged tree')
         ready = stage/'ready'
         shutil.copytree(source, ready, symlinks=False)
+        if mod in ('d2k', 'cnc'):
+            migrate_support(root)
         publisher.publish(root, ready, root/'openra', {'game': 'openra', 'version': asset['version'], 'mod': mod, 'archive': asset}, 'OpenRA.Server')
 
 
@@ -141,14 +147,69 @@ def text(value, maximum=255):
     return value
 
 
-def arguments(root, env, mod):
+# Publisher ServerSettings defaults, release-20250330. Startup-owned identity,
+# listener, password, public/auth and replay settings intentionally remain out.
+DEFAULT_SETTINGS = b'''# Optional native server settings for release-20250330.
+# Startup controls own identity, listeners, password, public/auth and replays.
+Server:
+\tQueryMapRepository: True
+\tEnableSyncReports: False
+\tEnableLintChecks: True
+\tEnableVoteKick: True
+\tFloodLimitJoinCooldown: 5000
+\tFloodLimitInterval: 5000
+\tFloodLimitMessageCount: 5
+\tFloodLimitCooldown: 15000
+\tVoteKickTimer: 30000
+\tVoteKickerCooldown: 120000
+'''
+
+
+def seed_settings(root, release_version):
+    """Exclusive first creation only; existing bytes/mode/owner stay authoritative."""
+    root = Path(root).resolve()
+    if not root.is_dir():
+        raise ValueError('Existing native OpenRA root required')
+    support = root / 'OpenRAData'
+    target = support / 'settings.yaml'
+    if support.is_symlink() or (support.exists() and not support.is_dir()) or target.is_symlink():
+        raise ValueError('Unsafe native OpenRA settings path')
+    if target.exists():
+        if not target.is_file():
+            raise ValueError('Native OpenRA settings must be a regular file')
+        return False
+    if release_version != 'release-20250330':
+        return False
+    support.mkdir(exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix='.voltra-openra-seed-', dir=support)
+    try:
+        with os.fdopen(fd, 'wb') as output:
+            output.write(DEFAULT_SETTINGS)
+            output.flush()
+            os.fsync(output.fileno())
+        os.chmod(temporary, 0o600)
+        try:
+            # Same-directory hard link publishes complete bytes without ever
+            # replacing an existing/concurrently-created operator document.
+            os.link(temporary, target)
+        except FileExistsError:
+            if target.is_symlink() or not target.is_file():
+                raise ValueError('Native OpenRA settings changed concurrently')
+            return False
+        return True
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def arguments(root, env, mod, preflight=False):
     if mod not in MODS:
         raise ValueError('Unsupported bundled OpenRA mod')
     port = int(env['SERVER_PORT'])
     if not 1 <= port <= 65535:
         raise ValueError('Invalid allocated port')
     support = root/'OpenRAData'
-    support.mkdir(parents=True, exist_ok=True)
+    if mod == 'ra':
+        support.mkdir(parents=True, exist_ok=True)
     if support.is_symlink() or not support.resolve().is_relative_to(root.resolve()):
         raise ValueError('Support directory escapes server volume')
     argv = [str(root/'openra/OpenRA.Server'), 'Game.Mod='+mod, 'Engine.SupportDir='+str(support),
@@ -167,6 +228,8 @@ def arguments(root, env, mod):
         if not re.fullmatch(r'[0-9a-f]{40}', value):
             raise ValueError('Map must be the native SHA1 map UID')
         argv.append('Server.Map='+value)
+    if mod in ('d2k', 'cnc') and not preflight:
+        support.mkdir(parents=True, exist_ok=True)
     return argv
 
 
@@ -177,5 +240,10 @@ if __name__ == '__main__':
         install(root, os.environ, mod)
     else:
         argv = arguments(root, os.environ, mod)
+        if mod in ('d2k', 'cnc'):
+            receipt = json.loads((root/'.voltra/openra/release.json').read_text())
+            if receipt.get('game') != 'openra' or receipt.get('mod') != mod:
+                raise ValueError('Matching installed OpenRA release required')
+            seed_settings(root, receipt.get('version'))
         os.chdir(root/'openra')
         os.execv(argv[0], argv)

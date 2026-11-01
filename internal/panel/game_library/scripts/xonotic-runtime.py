@@ -32,7 +32,72 @@ def map_exists(root, name):
     return False
 
 
+def planned_paths(root, paths, maximum=8 * 1024 * 1024):
+    root = Path(root)
+    if root.is_symlink() or root.resolve() != root:
+        raise ValueError('Xonotic volume must be canonical')
+    for target in paths:
+        relative = target.relative_to(root)
+        current = root
+        for index, part in enumerate(relative.parts):
+            current = current / part
+            if current.is_symlink():
+                raise ValueError('Xonotic configuration paths must not be symlinks')
+            if current.exists() and index < len(relative.parts) - 1 and not current.is_dir():
+                raise ValueError('Xonotic configuration parent must be a directory')
+        if target.exists():
+            if not target.is_file() or maximum is not None and target.stat().st_size > maximum:
+                raise ValueError('Invalid or oversized Xonotic native file')
+
+
+def preflight(env, root):
+    credential = root / '.voltra/xonotic/rcon-password'
+    files = [credential, root / '.xonotic/data/server.cfg', root / '.xonotic/data/voltra-managed.cfg', root / 'xonotic/server/server.cfg']
+    planned_paths(root, files)
+    for file in files:
+        if file.is_file():
+            file.read_bytes().decode('utf-8')
+    selected_map = env.get('GAME_MAP', 'stormkeep')
+    if not re.fullmatch(r'[A-Za-z0-9_-]{1,63}', selected_map):
+        raise ValueError('Invalid native map basename')
+    for folder in [root / '.xonotic/data', root / 'xonotic/data']:
+        planned_paths(root, [folder / 'maps' / (selected_map + '.bsp')], maximum=None)
+        if folder.is_symlink() or folder.exists() and (not folder.is_dir() or not folder.resolve().is_relative_to(root)):
+            raise ValueError('Xonotic data must stay inside the volume')
+        for package in folder.glob('*.pk3'):
+            if package.is_symlink() or not package.is_file():
+                raise ValueError('Xonotic packages must be regular files')
+    # Complete predictable validation before credential or configuration writes.
+    name = env.get('SERVER_NAME', 'Xonotic server')
+    quoted(name)
+    if '\\' in name:
+        raise ValueError('Native server-info names cannot contain backslashes')
+    if env.get('SERVER_PASSWORD', ''):
+        raise ValueError('This Xonotic adapter cannot enforce a join password; leave SERVER_PASSWORD empty. Public listing off is not join access control.')
+    password = env.get('RCON_PASSWORD', '')
+    if not password and credential.is_file():
+        password = credential.read_text()
+    if password:
+        quoted(password, 127)
+        if ' ' in password:
+            raise ValueError('Use a single native RCON password')
+    allocated = {int(value) for value in env.get('VOLTRA_ALLOCATED_PORTS', '').split(',') if value}
+    if allocated and int(env['SERVER_PORT']) not in allocated:
+        raise ValueError('Xonotic primary port must be allocated')
+
+
+NATIVE_DEFAULTS = (('sv_taunt', '1'), ('sv_autotaunt', '1'), ('sv_autopause', '1'),
+                   ('g_footsteps', '1'), ('g_friendlyfire', '0.5'),
+                   ('g_warmup_limit', '180'), ('g_maplist_shuffle', '1'), ('sv_maxidle', '0'))
+
+
+def native_seed():
+    return '\n// Additional native gameplay tuning; existing files remain authoritative.\n' + ''.join(key + ' "' + value + '"\n' for key, value in NATIVE_DEFAULTS)
+
+
 def configure(env, root):
+    root = Path(root)
+    preflight(env, root)
     port, maximum = int(env['SERVER_PORT']), int(env.get('MAX_PLAYERS', '16'))
     minimum, skill = int(env.get('MIN_PLAYERS', '0')), int(env.get('BOT_SKILL', '5'))
     per_team, empty_bots = int(env.get('MIN_PLAYERS_PER_TEAM', '0')), env.get('BOT_JOIN_EMPTY', '0')
@@ -61,7 +126,6 @@ def configure(env, root):
              'maxplayers ' + str(maximum), 'minplayers ' + str(minimum), 'skill ' + str(skill),
              'minplayers_per_team ' + str(per_team), 'bot_join_empty ' + empty_bots,
              'sv_public ' + public, 'gametype ' + kind,
-             'password ' + quoted(env.get('SERVER_PASSWORD', ''), 127),
              'rcon_password ' + quoted(password, 127), 'rcon_secure 2',
              'net_address 0.0.0.0', 'port ' + str(port), 'log_file latest.log']
     folder = root / '.xonotic/data'
@@ -71,7 +135,10 @@ def configure(env, root):
     config = folder / 'server.cfg'
     if not config.exists() and original.is_file():
         with config.open('x', encoding='utf-8') as output:
-            output.write(original.read_text(encoding='utf-8'))
+            output.write(original.read_text(encoding='utf-8') + native_seed())
+    if not config.exists():
+        with config.open('x', encoding='utf-8') as output:
+            output.write(native_seed())
     managed, content = folder / 'voltra-managed.cfg', '\n'.join(lines) + '\n'
     if not managed.is_file() or managed.read_text(encoding='utf-8') != content:
         fd, temporary = tempfile.mkstemp(prefix='.voltra-', dir=folder)
@@ -91,42 +158,50 @@ def configure(env, root):
             '+startmap_dm', '+exec', 'voltra-managed.cfg', '+map', game_map]
 
 
+def ready_response(packet, address, port, token, selected_map):
+    prefix = b'\xff\xff\xff\xffinfoResponse\n'
+    if address != ('127.0.0.1', port) or not packet.startswith(prefix):
+        return False
+    fields = packet[len(prefix):].split(b'\n', 1)[0].split(b'\\')
+    if not fields or fields[0] != b'' or len(fields) % 2 != 1:
+        return False
+    values = {}
+    for index in range(1, len(fields) - 1, 2):
+        if fields[index] in values:
+            return False
+        values[fields[index]] = fields[index + 1]
+    return values.get(b'challenge') == token and values.get(b'gamename') == b'Xonotic' and values.get(b'mapname') == selected_map.encode('ascii')
+
+
 def run(root, argv):
-    child = subprocess.Popen(argv, cwd=root / 'xonotic', stdin=sys.stdin,
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
-    def stop(*_):
-        if child.poll() is None:
-            child.send_signal(signal.SIGTERM)
-    signal.signal(signal.SIGTERM, stop)
-    signal.signal(signal.SIGINT, stop)
-    def output():
-        for line in iter(child.stdout.readline, b''):
-            sys.stdout.buffer.write(line)
-            sys.stdout.buffer.flush()
-    reader = threading.Thread(target=output, daemon=True)
-    reader.start()
-    token, ready = secrets.token_hex(8).encode(), False
-    port = int(os.environ['SERVER_PORT'])
-    try:
+    from native_console import run as supervise
+    environment = dict(os.environ)
+    credentials = [environment.get('SERVER_PASSWORD', ''), environment.get('RCON_PASSWORD', '')]
+    if not credentials[1]:
+        credentials[1] = (root / '.voltra/xonotic/rcon-password').read_text()
+    finished = threading.Event()
+    def readiness():
+        token = secrets.token_hex(8).encode()
+        port = int(environment['SERVER_PORT'])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             probe.settimeout(0.2)
-            while child.poll() is None:
-                if not ready:
-                    probe.sendto(b'\xff\xff\xff\xffgetinfo ' + token + b'\n', ('127.0.0.1', port))
-                    try:
-                        packet, address = probe.recvfrom(8192)
-                        if address == ('127.0.0.1', port) and packet.startswith(b'\xff\xff\xff\xffinfoResponse\n') and b'\\challenge\\' + token in packet:
-                            ready = True
-                            print('Xonotic native UDP server ready', flush=True)
-                    except socket.timeout:
-                        pass
-                time.sleep(0.1)
-        return child.returncode
+            while not finished.is_set():
+                probe.sendto(b'\xff\xff\xff\xffgetinfo ' + token + b'\n', ('127.0.0.1', port))
+                try:
+                    packet, address = probe.recvfrom(8192)
+                    if ready_response(packet, address, port, token, environment.get('GAME_MAP', 'stormkeep')):
+                        print('Xonotic native UDP server ready', flush=True)
+                        return
+                except socket.timeout:
+                    pass
+                finished.wait(0.1)
+    worker = threading.Thread(target=readiness, daemon=True)
+    worker.start()
+    try:
+        return supervise(root / 'xonotic', argv, environment, 'quit', credentials=credentials)
     finally:
-        if child.poll() is None:
-            child.send_signal(signal.SIGTERM)
-            child.wait(timeout=15)
-        reader.join(timeout=5)
+        finished.set()
+        worker.join(timeout=1)
 
 
 if __name__ == '__main__':

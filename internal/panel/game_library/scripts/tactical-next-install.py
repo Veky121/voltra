@@ -37,6 +37,19 @@ def default_server(root, content):
 
 def install(root, env, validate=True, groundbranch_default=None):
     root=Path(root).resolve(); kind,info=selection(env)
+    if kind=='groundbranch' and groundbranch_default is None:
+        # The emitted installer uses underscores; checkout source uses hyphens.
+        template=Path(__file__).with_name('groundbranch_original_Server.ini')
+        if not template.is_file():template=Path(__file__).with_name('groundbranch-original-server.ini')
+        groundbranch_default=template.read_bytes()
+    if kind=='groundbranch':
+        from tactical_runtime import text, integer
+        from native_config import patch_ini
+        name=text(env.get('SERVER_NAME','Unnamed Ground Branch Server'),255)
+        maximum=integer(env,'MAX_PLAYERS',16,1,2147483647)
+        # Seed creation controls once; existing native files remain authoritative.
+        content=groundbranch_default.decode('utf-8-sig') if isinstance(groundbranch_default,bytes) else groundbranch_default
+        groundbranch_default=patch_ini(content,{'/Script/RBZooKeeper.ZKServer':{'ServerName':name,'MaxPlayers':str(maximum)}}).encode()
     arguments(root,info['app'],env,validate,platform=info['platform'])
     retained={}
     with tempfile.TemporaryDirectory(prefix='.tactical-next-retention-',dir=root) as temporary:

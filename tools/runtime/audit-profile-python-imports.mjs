@@ -1,27 +1,42 @@
-// Check local Python dependencies inside embedded installer heredocs.
-// This covers ordinary imports, not dynamic importlib paths or external packages.
+// Static local-helper import candidates, without importing or running game code.
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {embeddedPython} from './embedded-python.mjs';
-const known=new Set(fs.readdirSync('internal/panel/game_library/scripts').filter(name=>name.endsWith('.py')).map(name=>name.slice(0,-3).replaceAll('-','_')));
-const profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
-const findings=[],conditional=[];let checked=0,modules=0;
-for(const [recipe,profile]of Object.entries(profiles)){
- const script=profile.egg.scripts.installation.script;
- const embedded=[];
- for(const match of embeddedPython(script))embedded.push({name:path.posix.basename(match.file).slice(0,-3).replaceAll('-','_'),source:match.source});
- if(!embedded.length)continue;
- checked++;modules+=embedded.length;
- const available=new Set(embedded.map(module=>module.name));
- for(const module of embedded){
-  const imports=/^([ \t]*)(?:from\s+([A-Za-z_]\w*)\s+import|import\s+([A-Za-z_]\w*))/gm;
-  for(const match of module.source.matchAll(imports)){
-   const dependency=match[2]||match[3];
-   if(known.has(dependency)&&!available.has(dependency))(match[1]?conditional:findings).push({recipe,module:module.name,missing_local_dependency:dependency});
-  }
- }
-}
-const report={scope:'Unconditional local Python imports in embedded installer heredocs. Indented imports are listed separately for recipe-level review.',profiles_checked:checked,embedded_modules:modules,findings,conditional_dependencies_to_review:conditional};
-fs.writeFileSync('artifacts/game-profile-python-import-audit.json',JSON.stringify(report,null,2)+'\n');
-console.log(JSON.stringify(report,null,2));
-if(findings.length)process.exitCode=1;
+
+const output=process.argv[2];
+if(!output||fs.existsSync(output))throw Error('Provide a new output receipt path');
+const file='internal/panel/game_library/overrides.json', raw=fs.readFileSync(file);
+const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+const known=fs.readdirSync('internal/panel/game_library/scripts').filter(n=>n.endsWith('.py')).map(n=>n.slice(0,-3).replaceAll('-','_'));
+const profiles=Object.entries(JSON.parse(raw)).map(([recipe,p])=>({recipe,modules:embeddedPython(p.egg.scripts.installation.script).map(m=>({...m,source:m.source+'\n'}))}));
+const inspected=spawnSync('docker',['image','inspect','python:3.13-slim','--format','{{.Id}}'],{encoding:'utf8',windowsHide:true});
+if(inspected.error||inspected.status||!/^sha256:[a-f0-9]{64}\s*$/.test(inspected.stdout))throw Error('Cached Python image required; no pull attempted');
+const code=String.raw`import ast,json,posixpath,sys
+def imports(source):
+ tree=ast.parse(source.encode('utf-8'))
+ result=set()
+ for node in tree.body:
+  if isinstance(node,ast.Import): result.update(alias.name.split('.')[0] for alias in node.names)
+  elif isinstance(node,ast.ImportFrom) and node.level==0 and node.module: result.add(node.module.split('.')[0])
+ return result
+assert imports('import alpha as a\nfrom beta.child import x\ndef f():\n import deferred\n')=={'alpha','beta'}
+data=json.load(sys.stdin)
+known=set(data['known']); candidates=[]; errors=[]; count=0
+for profile in data['profiles']:
+ available={posixpath.basename(m['file'])[:-3] for m in profile['modules']}
+ for module in profile['modules']:
+  count+=1
+  try: missing=sorted((imports(module['source']) & known)-available)
+  except SyntaxError as e:
+   errors.append(dict(recipe=profile['recipe'],file=module['file'],line=e.lineno,error=e.msg)); continue
+  if missing: candidates.append(dict(recipe=profile['recipe'],file=module['file'],missing_local_modules=missing))
+print(json.dumps(dict(modules=count,candidates=candidates,syntax_errors=errors)))`;
+const run=spawnSync('docker',['run','--rm','--pull','never','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--memory','256m','--cpus','1','-i',inspected.stdout.trim(),'python3','-B','-c',code],{encoding:'utf8',windowsHide:true,input:JSON.stringify({known,profiles}),timeout:60000,maxBuffer:8*1024*1024});
+if(run.error||run.status)throw Error([run.error?.message,run.stderr].filter(Boolean).join('\n'));
+const result=JSON.parse(run.stdout);
+const report={scope:'Top-level absolute imports referring to known repository Python helpers, compared with literal Python heredoc basenames in each exact profile. Static candidates only: no import execution, conditional/dynamic imports, shell copy/download analysis, sys.path resolution, package/ABI checks or native acceptance.',catalog_sha256:hash(raw),catalog_unchanged:hash(fs.readFileSync(file))===hash(raw),image:inspected.stdout.trim(),profiles:profiles.length,...result};
+fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2)+'\n');
+console.log(JSON.stringify({profiles:report.profiles,modules:report.modules,candidates:report.candidates.length,syntax_errors:report.syntax_errors.length,catalog_unchanged:report.catalog_unchanged,output}));
+if(!report.catalog_unchanged||report.syntax_errors.length)process.exitCode=1;

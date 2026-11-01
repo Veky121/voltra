@@ -98,6 +98,13 @@ func validateTemplateAgreements(entry gameTemplate) error {
 }
 
 func requireTemplateAgreements(entry gameTemplate, supplied any) error {
+	switch entry.Path {
+	case "minecraft/java/magma/egg-magma.json", "minecraft/java/mohist/egg-mohist.json", "minecraft/java/spongeforge/egg-sponge-forge.json":
+		provided := asMap(supplied)
+		if value, ok := provided["EULA_ACCEPTED"].(string); !ok || value != "true" {
+			return APIError{422, "MinecraftEULARequired", "Explicitly accept the Minecraft EULA before creating this imported server."}
+		}
+	}
 	if err := validateTemplateAgreements(entry); err != nil {
 		return err
 	}
@@ -111,41 +118,47 @@ func requireTemplateAgreements(entry gameTemplate, supplied any) error {
 }
 
 type gameTemplateOverride struct {
-	SetupUnavailableReason   string              `json:"setup_unavailable_reason,omitempty"`
-	Agreements               []templateAgreement `json:"agreements,omitempty"`
-	UpstreamSHA256           string              `json:"upstream_sha256"`
-	Revision                 string              `json:"revision"`
-	Defaults                 M                   `json:"defaults"`
-	Egg                      M                   `json:"egg"`
-	Verification             string              `json:"verification,omitempty"`
-	Detail                   string              `json:"detail,omitempty"`
-	SetupSteps               []string            `json:"setup_steps,omitempty"`
-	Platforms                []string            `json:"platforms,omitempty"`
-	RequiredPorts            int                 `json:"required_ports,omitempty"`
-	ConsecutivePorts         bool                `json:"consecutive_ports,omitempty"`
-	ConsecutivePortsCount    int                 `json:"consecutive_ports_count,omitempty"`
-	ConsecutivePrimaryOffset int                 `json:"consecutive_primary_offset,omitempty"`
-	PortRules                []templatePortRule  `json:"port_rules,omitempty"`
+	SettingsDocuments        settingsDocumentPaths     `json:"settings_documents,omitempty"`
+	SetupUnavailableReason   string                    `json:"setup_unavailable_reason,omitempty"`
+	Agreements               []templateAgreement       `json:"agreements,omitempty"`
+	SetupValidation          []templateSetupValidation `json:"setup_validation,omitempty"`
+	UpstreamSHA256           string                    `json:"upstream_sha256"`
+	Revision                 string                    `json:"revision"`
+	Defaults                 M                         `json:"defaults"`
+	Egg                      M                         `json:"egg"`
+	Verification             string                    `json:"verification,omitempty"`
+	Detail                   string                    `json:"detail,omitempty"`
+	SetupSteps               []string                  `json:"setup_steps,omitempty"`
+	Platforms                []string                  `json:"platforms,omitempty"`
+	RequiredPorts            int                       `json:"required_ports,omitempty"`
+	ConsecutivePorts         bool                      `json:"consecutive_ports,omitempty"`
+	ConsecutivePortsCount    int                       `json:"consecutive_ports_count,omitempty"`
+	ConsecutivePrimaryOffset int                       `json:"consecutive_primary_offset,omitempty"`
+	PrimaryPortEnv           string                    `json:"primary_port_env,omitempty"`
+	PortRules                []templatePortRule        `json:"port_rules,omitempty"`
 }
 
 type gameTemplate struct {
-	SetupUnavailableReason   string              `json:"setup_unavailable_reason,omitempty"`
-	Agreements               []templateAgreement `json:"agreements,omitempty"`
-	Path                     string              `json:"path"`
-	SHA256                   string              `json:"sha256"`
-	Egg                      M                   `json:"egg"`
-	ID                       string              `json:"id"`
-	Profile                  string              `json:"profile,omitempty"`
-	Defaults                 M                   `json:"defaults,omitempty"`
-	Verification             string              `json:"verification,omitempty"`
-	Detail                   string              `json:"detail,omitempty"`
-	SetupSteps               []string            `json:"setup_steps,omitempty"`
-	Platforms                []string            `json:"platforms,omitempty"`
-	RequiredPorts            int                 `json:"required_ports,omitempty"`
-	ConsecutivePorts         bool                `json:"consecutive_ports,omitempty"`
-	ConsecutivePortsCount    int                 `json:"consecutive_ports_count,omitempty"`
-	ConsecutivePrimaryOffset int                 `json:"consecutive_primary_offset,omitempty"`
-	PortRules                []templatePortRule  `json:"port_rules,omitempty"`
+	SettingsDocuments        settingsDocumentPaths     `json:"settings_documents,omitempty"`
+	SetupUnavailableReason   string                    `json:"setup_unavailable_reason,omitempty"`
+	Agreements               []templateAgreement       `json:"agreements,omitempty"`
+	SetupValidation          []templateSetupValidation `json:"setup_validation,omitempty"`
+	Path                     string                    `json:"path"`
+	SHA256                   string                    `json:"sha256"`
+	Egg                      M                         `json:"egg"`
+	ID                       string                    `json:"id"`
+	Profile                  string                    `json:"profile,omitempty"`
+	Defaults                 M                         `json:"defaults,omitempty"`
+	Verification             string                    `json:"verification,omitempty"`
+	Detail                   string                    `json:"detail,omitempty"`
+	SetupSteps               []string                  `json:"setup_steps,omitempty"`
+	Platforms                []string                  `json:"platforms,omitempty"`
+	RequiredPorts            int                       `json:"required_ports,omitempty"`
+	ConsecutivePorts         bool                      `json:"consecutive_ports,omitempty"`
+	ConsecutivePortsCount    int                       `json:"consecutive_ports_count,omitempty"`
+	ConsecutivePrimaryOffset int                       `json:"consecutive_primary_offset,omitempty"`
+	PrimaryPortEnv           string                    `json:"primary_port_env,omitempty"`
+	PortRules                []templatePortRule        `json:"port_rules,omitempty"`
 }
 type templateCatalog struct {
 	Repository string         `json:"repository"`
@@ -187,8 +200,11 @@ func gameTemplates() templateCatalog {
 				entry.ConsecutivePorts = override.ConsecutivePorts
 				entry.ConsecutivePortsCount = override.ConsecutivePortsCount
 				entry.ConsecutivePrimaryOffset = override.ConsecutivePrimaryOffset
+				entry.PrimaryPortEnv = override.PrimaryPortEnv
 				entry.PortRules = override.PortRules
+				entry.SettingsDocuments = override.SettingsDocuments
 				entry.Agreements = override.Agreements
+				entry.SetupValidation = override.SetupValidation
 				entry.SetupUnavailableReason = override.SetupUnavailableReason
 				entry.SHA256 = gameTemplateOverrideDigest(override)
 			}
@@ -206,6 +222,8 @@ func gameTemplates() templateCatalog {
 // Review notes and instructions do not change an installed egg's behavior.
 // Keep its identity stable when only that presentation metadata changes.
 func gameTemplateOverrideDigest(override gameTemplateOverride) string {
+	override.SettingsDocuments = nil
+	override.SetupValidation = nil
 	override.Verification = ""
 	override.Detail = ""
 	override.SetupSteps = nil
@@ -230,6 +248,9 @@ func templateSummary(entry gameTemplate) M {
 		err = agreementErr
 		available = false
 	}
+	if setupErr := validateTemplateSetupMetadata(entry.SetupValidation, entry.Egg); setupErr != nil {
+		err, available = setupErr, false
+	}
 	detail := entry.Detail
 	if err != nil {
 		detail = "This upstream recipe needs a compatibility fix before setup."
@@ -242,6 +263,12 @@ func templateSummary(entry gameTemplate) M {
 		verification = "not_verified"
 	}
 	out := M{"id": entry.ID, "name": entry.Egg["name"], "description": entry.Egg["description"], "category": strings.Split(entry.Path, "/")[0], "source": gameTemplates().Repository + "/blob/" + gameTemplates().Revision + "/" + entry.Path, "available": available, "detail": detail, "verification": verification, "profile": entry.Profile, "setup_steps": entry.SetupSteps, "platforms": entry.Platforms, "required_ports": max(1, entry.RequiredPorts), "consecutive_ports": entry.ConsecutivePorts, "consecutive_ports_count": entry.ConsecutivePortsCount, "consecutive_primary_offset": entry.ConsecutivePrimaryOffset, "port_rules": entry.PortRules}
+	if len(entry.SetupValidation) > 0 {
+		out["setup_validation"] = entry.SetupValidation
+	}
+	if entry.PrimaryPortEnv != "" {
+		out["primary_port_env"] = entry.PrimaryPortEnv
+	}
 	if entry.Path == fs25Path {
 		out["source"] = fs25Source
 	}
@@ -407,7 +434,15 @@ func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {
 	for label, image := range asMap(egg["docker_images"]) {
 		images = append(images, M{"label": label, "value": image})
 	}
-	sort.Slice(images, func(i, j int) bool { return str(images[i]["label"]) < str(images[j]["label"]) })
+	sort.Slice(images, func(i, j int) bool {
+		left, right := str(images[i]["label"]), str(images[j]["label"])
+		preferredLeft := strings.Contains(strings.ToLower(left), "(reviewed default)")
+		preferredRight := strings.Contains(strings.ToLower(right), "(reviewed default)")
+		if preferredLeft != preferredRight {
+			return preferredLeft
+		}
+		return left < right
+	})
 	out := templateSummary(entry)
 	out["nodes"] = nodes
 	out["automatic_ports"] = true
@@ -512,6 +547,15 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	// Sunkenland requires explicit runtime consent before any provisioning.
+	// Environment values use strings; neither defaults nor JSON booleans consent.
+	if entry.Path == "sunkenland/egg-sunkenland.json" {
+		consent, valid := asMap(input["environment"])["ACCEPT_WINDOWS_RUNTIME_LICENSES"].(string)
+		if !valid || consent != "true" {
+			fail(w, bad("Explicitly accept the Windows runtime licences: ACCEPT_WINDOWS_RUNTIME_LICENSES must be the string true."))
+			return
+		}
+	}
 	if err := requireTemplateAgreements(entry, input["environment"]); err != nil {
 		fail(w, err)
 		return
@@ -573,6 +617,29 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 	}
 	env, err := templateEnvironment(variables, input["environment"])
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	// Match the emitted TF2 installer before allocation planning or egg import.
+	if entry.Path == "team_fortress_2/egg-team-fortress-2.json" {
+		for _, variable := range variables {
+			if str(variable["env_variable"]) == "SRCDS_BETAID" {
+				if err := validateEggValue(env["SRCDS_BETAID"], true, str(variable["rules"]), env); err != nil {
+					fail(w, bad("Variable SRCDS_BETAID "+err.Error()))
+					return
+				}
+			}
+		}
+	}
+	if err = validateL4D2OutgoingClientPort(entry, env, nil); err != nil {
+		fail(w, err)
+		return
+	}
+	if err = validateCfxRecipeEnvironment(entry.Path, env); err != nil {
+		fail(w, err)
+		return
+	}
+	if err = validateTemplateSetupEnvironment(entry.SetupValidation, entry.Egg, env); err != nil {
 		fail(w, err)
 		return
 	}

@@ -1,3 +1,5 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {Alert,AlertDescription} from '../components/ui/alert';
 import {formatBytesGB,formatMiBGB} from '../resourceUnits';
 import './gameSwitch.css';
 import { createContext, useContext, useState } from "react";
@@ -34,7 +36,7 @@ export const json = (method: string, body?: any): RequestInit => ({
       }),
 });
 export function useAction() {
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('client/common.tsx');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
   async function run<T>(
@@ -61,9 +63,7 @@ export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
   return (
     <>
       {action.error && (
-        <div role="alert" className="error">
-          {action.error}
-        </div>
+        <Alert variant="destructive" className="error"><AlertDescription>{action.error}</AlertDescription></Alert>
       )}
       {action.success && (
         <div role="status" className="success">
@@ -75,9 +75,7 @@ export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
 }
 export function PageError({ error }: { error: string }) {
   return error ? (
-    <div role="alert" className="error">
-      {error}
-    </div>
+    <Alert variant="destructive" className="error"><AlertDescription>{error}</AlertDescription></Alert>
   ) : null;
 }
 export function Pager({

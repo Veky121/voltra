@@ -43,7 +43,9 @@ def publish(root,game,state,ready,binary,old,identity):
   raise
 
 def install(root):
- root=root.resolve();mode=os.environ.get('NZP_ENGINE','vril')
+ from id_family_runtime import configure
+ root=root.resolve();configure(os.environ,root,'nzportable')
+ mode=os.environ.get('NZP_ENGINE','vril')
  if mode not in RELEASES:raise ValueError('NZP_ENGINE must be vril or fte_legacy')
  game=confined(root,root/'nzportable'/mode);state=confined(root,root/'.voltra'/('nzportable-'+mode));state.mkdir(parents=True,exist_ok=True)
  receipt=confined(root,state/'release.json');old=json.loads(receipt.read_text()) if receipt.is_file() else {}

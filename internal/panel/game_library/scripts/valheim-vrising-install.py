@@ -148,12 +148,43 @@ def install(root,kind,env):
     if variant not in(('vanilla','bepinex','plus')if kind=='valheim'else('vanilla','bepinex')):raise ValueError('Invalid game variant')
     pack=env.get('V_MODPACK','')if kind=='valheim'and variant=='bepinex'else''
     if pack:package_id(pack)
+    # Vanilla preflight must finish before Steam can modify an installation.
+    # Keep the existing Plus/BepInEx callers unchanged.
+    vanilla_previous=None
+    if kind=='valheim' and variant=='vanilla':
+        from valheim_runtime import launch_arguments
+        launch_arguments(root,env)
+        previous_path=confined(root,'.voltra/valheim/installation.json')
+        vanilla_previous=json.loads(previous_path.read_text())if previous_path.is_file()else{}
+        if not isinstance(vanilla_previous,dict) or not isinstance(vanilla_previous.get('overlays',[]),list):raise ValueError('Invalid Valheim installation receipt')
+        for release in vanilla_previous.get('overlays',[]):
+            if not isinstance(release,dict) or not isinstance(release.get('files',{}),dict):raise ValueError('Invalid Valheim overlay receipt')
+            for name,digest in release.get('files',{}).items():
+                confined(root,name)
+                if not isinstance(digest,str) or not re.fullmatch(r'[0-9a-f]{64}',digest):raise ValueError('Invalid Valheim overlay digest')
+    if kind=='valheim' and variant!='vanilla':
+        from valheim_runtime import launch_arguments
+        launch_arguments(root,env)
+        if variant=='plus':
+            repo=env.get('GITHUB_PACKAGE','Grantapher/ValheimPlus');version=env.get('VERSION','latest')or'latest';match=env.get('MATCH','UnixServer.zip')
+            if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',repo) or not re.fullmatch(r'[A-Za-z0-9_.-]+',version) or not match or any(c in match for c in '/\\\r\n'):raise ValueError('Invalid ValheimPlus release selection')
+        previous_path=confined(root,'.voltra/valheim/installation.json')
+        vanilla_previous=json.loads(previous_path.read_text())if previous_path.is_file()else{}
+        if not isinstance(vanilla_previous,dict) or not isinstance(vanilla_previous.get('overlays',[]),list):raise ValueError('Invalid Valheim installation receipt')
+        for release in vanilla_previous.get('overlays',[]):
+            if not isinstance(release,dict) or not isinstance(release.get('files',{}),dict):raise ValueError('Invalid Valheim overlay receipt')
+            for name,digest in release.get('files',{}).items():
+                confined(root,name)
+                if not isinstance(digest,str) or not re.fullmatch(r'[0-9a-f]{64}',digest):raise ValueError('Invalid Valheim overlay digest')
+    if kind=='vrising' and variant=='vanilla':
+        from vrising_runtime import configure
+        configure(root,env,preflight=True)
     environment=dict(env)
     if kind=='vrising':environment['WINDOWS_INSTALL']='1'
     update(root,896660 if kind=='valheim' else 1829350,env=environment,required=('valheim_server.x86_64',)if kind=='valheim'else('VRisingServer.exe',),validate=env.get('VALIDATE','')=='true',platform='linux' if kind=='valheim' else 'windows')
     state=confined(root,'.voltra/'+kind);state.mkdir(parents=True,exist_ok=True);receipt={'variant':variant,'overlays':[]}
     previous_path=confined(root,'.voltra/'+kind+'/installation.json')
-    previous=json.loads(previous_path.read_text())if previous_path.is_file()else{}
+    previous=vanilla_previous if vanilla_previous is not None else (json.loads(previous_path.read_text())if previous_path.is_file()else{})
     managed={name:digest for release in previous.get('overlays',[])for name,digest in release.get('files',{}).items()}
     def pinned(release):
         if not release.get('sha256'):
@@ -165,6 +196,14 @@ def install(root,kind,env):
         if variant!='vanilla':
             release=pinned(plus_release(env)if variant=='plus'else RELEASES[kind])
             archive=temporary/'base.zip';identity=acquire(root,release,archive)
+            if kind=='valheim':
+                with zipfile.ZipFile(archive) as source:
+                    names={item.filename for item in source.infolist() if not item.is_dir() and item.file_size>0}
+                prefix=release.get('prefix','')
+                prefix=prefix+'/' if prefix else ''
+                required={'doorstop_libs/libdoorstop_x64.so','BepInEx/core/BepInEx.Preloader.dll'}
+                if variant=='plus':required.add('BepInEx/plugins/ValheimPlus.dll')
+                if not all(prefix+name in names for name in required):raise ValueError('Valheim loader archive is incomplete')
             files=overlay(root,archive,release.get('prefix'),managed=managed)
             receipt['overlays'].append({**identity,'files':files})
         if pack:

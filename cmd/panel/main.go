@@ -59,6 +59,7 @@ func main() {
 		slog.Warn("Local development identity is enabled; loopback browser requests act as the selected development user.")
 	}
 	go app.RunScheduler(ctx)
+	go app.RunSubdomainReconciler(ctx)
 	consoleLogsDone := make(chan struct{})
 	go func() { defer close(consoleLogsDone); app.RunConsoleLogs(ctx) }()
 	defer func() { stop(); <-consoleLogsDone }()

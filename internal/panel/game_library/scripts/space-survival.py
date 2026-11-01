@@ -88,8 +88,11 @@ def patch_yaml(root,content,values):
             serialized=json.dumps(value,ensure_ascii=False)if isinstance(value,str)else str(value).lower()if isinstance(value,bool)else str(value)
             edits.append((old.start_mark.index,old.end_mark.index,serialized))
         if missing:
-            addition=''.join('  '+line+'\n'for line in yaml.safe_dump(missing,sort_keys=False,allow_unicode=True).splitlines())
-            edits.append((node.end_mark.index,node.end_mark.index,addition))
+            indent=' ' * node.value[0][0].start_mark.column
+            addition=''.join(indent+line+'\n'for line in yaml.safe_dump(missing,sort_keys=False,allow_unicode=True).splitlines())
+            at=node.end_mark.index
+            if at==len(content) and at and content[at-1] not in '\r\n':addition='\n'+addition
+            edits.append((at,at,addition))
     for start,end,value in sorted(edits,key=lambda e:e[0],reverse=True):content=content[:start]+value+content[end:]
     checked=yaml.safe_load(content)
     for section,fields in values.items():
@@ -126,7 +129,7 @@ def configure(root,game,env):
     root=Path(root).resolve();pin=PINS[game]
     if game=='astroneer':
         ports=shared.roles(env,[]);public=shared.text(env,'PUBLIC_IP','',64);ipaddress.ip_address(public)
-        owner=shared.text(env,'OWNER_NAME','',100);guid=shared.text(env,'OWNER_GUID','',20)
+        owner=shared.text(env,'OWNER_NAME','',100);guid=owner_guid_preflight(root,game,env)
         if not owner or not re.fullmatch(r'[0-9]{1,20}',guid):raise ValueError('Original owner name/GUID required')
         password=shared.text(env,'SERVER_PWD','',100);name=shared.text(env,'SERVER_NAME','Pterodactyl hosted Server',60)
         settings=shared.confined(root,root/'Astro/Saved/Config/WindowsServer/AstroServerSettings.ini')
@@ -195,8 +198,16 @@ def operator_files(root,game):
     native.private_write(shared.confined(root,root/'.voltra/space-survival/operator-files.json'),json.dumps({'game':game,'files':hashes,'runtime_verified':False,'publisher_authenticity_verified':False})+'\n')
 
 
+def owner_guid_preflight(root, game, env):
+    if game != 'astroneer': return None
+    settings = shared.confined(Path(root).resolve(), Path(root).resolve()/'Astro/Saved/Config/WindowsServer/AstroServerSettings.ini')
+    content = settings.read_text(encoding='utf-8-sig') if settings.exists() else ''
+    return helper('astroneer-rcon').owner_guid(content, env.get('OWNER_GUID', ''))
+
+
 def install(root,game,env):
     root=Path(root).resolve();identity(game,env)
+    owner_guid_preflight(root,game,env)
     mode=engineering.choice(env,'INSTALL_MODE','steam',('steam','operator_files'))
     # Parse private credentials before any game/framework acquisition.
     if mode=='steam':steam.arguments(root,PINS[game]['appid'],env,platform='windows')
@@ -232,6 +243,7 @@ def follow_log(path,finished,credentials):
 
 def run(root,game,env):
     root=Path(root).resolve();identity(game,env)
+    owner_guid_preflight(root,game,env)
     auto=engineering.choice(env,'VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','1'),('0','1'))
     mode=engineering.choice(env,'INSTALL_MODE','steam',('steam','operator_files'))
     if auto=='1':install(root,game,env)

@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import stat
 import sys
 import tempfile
@@ -178,12 +179,35 @@ def configure(root, environment):
     if discovery != 2757:
         print('STK uses custom discovery UDP port %d. Stock LAN discovery expects 2757; configure a matching client discovery port or use an explicit direct server address. Native/client discovery compatibility is not verified.' % discovery, flush=True)
     cwd, argv, child_environment, stop, credentials, ready = family_configure(root, 'stk', environment)
+    child_environment['LD_LIBRARY_PATH'] = str(cwd / 'lib')
+    child_environment['SUPERTUXKART_DATADIR'] = str(cwd)
+    # STK compares this string with DATADIR + '/data/' before normalization.
+    # Match its publisher launcher exactly, or the same asset root is loaded
+    # twice, sharing borrowed wheel meshes and crashing native shutdown.
+    child_environment['SUPERTUXKART_ASSETS_DIR'] = str(cwd) + '/data/'
+    # This dedicated server has no graphics. The image's Xvfb shares tini's
+    # signal group and can exit before native cleanup on a Wings stop.
+    child_environment['SDL_VIDEODRIVER'] = 'dummy'
     prepare_config(root, primary, discovery)
     argv.append('--stk-config=' + GENERATED)
     return cwd, argv, child_environment, stop, credentials, ready
 
 
+def launch(root, environment):
+    cwd, argv, environment, stop, credentials, ready = configure(root, environment)
+    result = run(cwd, argv, environment, stop, credentials, ready_marker=ready.encode(),
+                 terminal_input=True, terminal_query_reply=True)
+    # subprocess uses negative signal numbers on POSIX. sys.exit(-11) becomes
+    # 245 at the container boundary; retain both facts without masking failure.
+    detail = ''
+    if result < 0:
+        try:
+            detail = ' signal=' + signal.Signals(-result).name
+        except ValueError:
+            detail = ' signal=' + str(-result)
+    print('STK native child returncode=%d%s' % (result, detail), flush=True)
+    return result
+
+
 if __name__ == '__main__':
-    cwd, argv, environment, stop, credentials, ready = configure(Path.cwd(), dict(os.environ))
-    sys.exit(run(cwd, argv, environment, stop, credentials, ready_marker=ready.encode(),
-                 terminal_input=True, terminal_query_reply=True))
+    sys.exit(launch(Path.cwd(), dict(os.environ)))

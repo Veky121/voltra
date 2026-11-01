@@ -79,7 +79,77 @@ def preserve(root):
             for record in records:
                 confined(root,root/record['target']);restore(root,record)
 
+def mordhau_plan(root, env):
+    """Read-only Linux preflight. No acquisition or publication in this plan."""
+    root=Path(root)
+    if root.is_symlink():raise ValueError('Melee root is symbolic')
+    root=root.resolve();selection('mordhau',env)
+    # preserve() visits operator files and its receipt after creating state.
+    # Refuse unsafe entries before even that first mkdir.
+    for path in root.rglob('*'):
+        confined(root,path)
+    for relative in (GAMES['mordhau'][2], '.voltra/melee-preserve/publisher.json',
+                     '.voltra/melee-config-backups', '.steam/sdk64'):
+        path=confined(root,root/relative)
+        if path.exists() and relative.endswith('publisher.json'):
+            if not path.is_file():raise ValueError('Invalid publisher receipt')
+            receipt=json.loads(path.read_text())
+            if not isinstance(receipt,dict):raise ValueError('Invalid publisher receipt')
+    for relative in (GAMES['mordhau'][2], '.voltra/melee-preserve/publisher.json',
+                     '.voltra/melee-config-backups/seed.ini', 'Mordhau/Saved/Config/LinuxServer/Game.ini'):
+        target=confined(root,root/relative)
+        if target.exists() and not target.is_file():raise ValueError('Invalid native file path')
+        for parent in target.parents:
+            if parent==root:break
+            if parent.exists() and not parent.is_dir():raise ValueError('Invalid native directory path')
+    ports=service_ports(env)
+    mapname=text(env,'DEFAULT_MAP','Grad/FL_Grad',256)
+    if not mapname or not re.fullmatch('[A-Za-z0-9_/-]+',mapname) or '..' in mapname.split('/'):
+        raise ValueError('Default map must be a literal native package path')
+    if not mapname.startswith('/Game/'):mapname='/Game/Mordhau/Maps/'+mapname
+    text(env,'VOLTRA_NATIVE_LD_LIBRARY_PATH','',4096)
+    mapping={'ServerName':text(env,'SERVER_NAME','Pterodactyl Server'),
+             'ServerPassword':text(env,'GAME_PASSWORD'),'AdminPassword':text(env,'ADMIN_PASSWORD'),
+             'MaxSlots':str(integer(env,'MAX_PLAYERS',48,1,60))}
+    relative='Mordhau/Saved/Config/LinuxServer/Game.ini';path=confined(root,root/relative)
+    if path.exists() and not path.is_file():raise ValueError('Native configuration is not regular')
+    previous=path.read_bytes().decode('utf-8') if path.exists() else ''
+    section='/Script/Mordhau.MordhauGameSession'
+    resolved=native.resolve_ini_identities(previous.lstrip('\ufeff'),{section:mapping})
+    actual,keys=next(iter(resolved.items()));effective={};current=None
+    for line in previous.lstrip('\ufeff').splitlines():
+        header=re.fullmatch(r'\s*\[([^\]]+)\]\s*(?:[;#].*)?',line.strip())
+        if header:current=header[1]
+        elif current==actual and not line.lstrip().startswith((';','#')) and '=' in line:
+            key,value=line.split('=',1);key=key.strip()
+            if key in keys:effective[key]=value.strip()
+    missing={key:value for key,value in keys.items() if key not in effective}
+    for canonical in mapping:
+        key=next(k for k in keys if k.casefold()==canonical.casefold())
+        value=effective.get(key,keys[key])
+        if canonical=='MaxSlots':integer({'MaxSlots':value},'MaxSlots',48,1,60)
+        else:text({'native value':value},'native value')
+        mapping[canonical]=value
+    updated=native.patch_ini(previous,{actual:missing}) if missing else previous
+    argv=[str(root/GAMES['mordhau'][2]),mapname,'-MaxSlots='+mapping['MaxSlots'],
+          '-USEALLAVAILABLECORES','-Port='+str(ports['primary']),
+          '-QueryPort='+str(ports['QUERY_PORT']),'-Beaconport='+str(ports['BEACON_PORT'])]
+    secrets=[mapping['ServerPassword'],mapping['AdminPassword']]
+    for line in updated.splitlines():
+        match=re.match(r'^\s*(?:RconPassword|ServerModAuthToken)\s*=\s*(.*?)\s*$',line,re.IGNORECASE)
+        if match and match[1]:secrets.append(match[1].strip('"'))
+    return root,path,relative,previous,updated,argv,tuple(secrets)
+
+
+def configure_mordhau(root,env):
+    root,path,relative,previous,updated,argv,secrets=mordhau_plan(root,env)
+    if previous!=updated:
+        if previous:steam._publish(root,'.voltra/melee-config-backups/'+str(time.time_ns())+'-Game.ini',lambda output:output.write(previous.encode()),0o600)
+        steam._publish(root,relative,lambda output:output.write(updated.encode()),path.stat().st_mode&0o777 if path.exists() else 0o600)
+    return root,argv,secrets
+
 def install(root,game,env,validate=True):
+    if game=='mordhau':mordhau_plan(root,env)
     root=Path(root).resolve();app,platform,binary=selection(game,env)
     with preserve(root):
         result=steam.update(root,app,env,validate=validate,required=(binary,),platform=platform,force_platform=True)
@@ -108,6 +178,7 @@ def service_ports(env):
     return ports
 
 def configure(root,game,env):
+    if game=='mordhau':return configure_mordhau(root,env)
     root=Path(root).resolve();selection(game,env);binary=confined(root,root/GAMES[game][2])
     if game=='bannerlord':
         token=text(env,'AUTH_TOKEN','',16384)

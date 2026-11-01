@@ -1,15 +1,18 @@
 package panel
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math"
 	"net/http"
 	"path"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -24,13 +27,14 @@ type gameSetting struct {
 	key, value, kind, on, off string
 	node                      *yaml.Node
 	structured                bool
+	secret                    bool
 }
 type gameSettingsParsed struct {
 	fields []gameSetting
 	patch  func(map[string]string) ([]byte, error)
 }
 
-var gameSettingSecret = regexp.MustCompile(`(?i)password|passwd|passphrase|secret|token|api.?key|auth.?key|license.?key|private.?key|credential`)
+var gameSettingSecret = regexp.MustCompile(`(?i)password|passwd|passphrase|secret|token|api.?key|auth.?key|license.?key|private.?key|credential|gslt`)
 var gameSettingBoolean = regexp.MustCompile(`(?i)(^|[./])(enabled?|disabled?|allow|require|use|show|hide|force|enforce|prevent|broadcast|log|is|has)([._/-]|$)|^(pvp|hardcore|online-mode|white-list|allowlist|public)$|(?:Enabled|Disabled)$`)
 
 type gameSettingsContentsKey struct{}
@@ -65,15 +69,51 @@ func gameSettingsFormat(file string) string {
 }
 
 func (a *App) gameSettingsDocuments(ctx context.Context, s, egg M, includeWorlds, includePlatform bool) ([]gameSettingsDocument, []M, error) {
+	// No publisher schema or active-file authority has been established for Battalion.
+	// Keep raw Files and startup controls available through their existing routes.
+	if nativeSettingsIsRecipe(egg, "battalion_legacy/egg-b-a-t-t-a-l-i-o-n--legacy.json") {
+		return nil, nil, notFound()
+	}
+	if soldatSettingsRecipe(egg) && !soldatSettingsAuthority(s, egg) {
+		return nil, nil, notFound()
+	}
+	if err := a.prepareCampaignSettingsAuthority(ctx, s, egg); err != nil {
+		return nil, nil, err
+	}
 	entries, err := a.quickSetupListExisting(ctx, s, "/")
 	if err != nil {
 		return nil, nil, err
 	}
 	docs := []gameSettingsDocument{}
+	declaredDocuments := nativeSettingsDocuments(egg)
+	preferredDocuments := gameSettingsDeclaredDocuments(egg)
+	preferredOrder := map[string]int{}
+	for i, file := range preferredDocuments {
+		if _, exists := preferredOrder[file]; !exists {
+			preferredOrder[file] = i
+		}
+	}
+	craftopia := nativeSettingsIsRecipe(egg, "craftopia/egg-craftopia.json")
 	seen := map[string]bool{}
 	add := func(file string) {
 		file = "/" + strings.TrimPrefix(file, "/")
-		if _, e := quickPathParts(file); e != nil || seen[file] || gameSettingsFormat(file) == "" {
+		if nativeSettingsIsRecipe(egg, "brickadia/egg-brickadia.json") && file != brickadiaPath {
+			return
+		}
+		if p, _ := integratedScalarSettings(egg); p != "" && !integratedScalarDocument(egg, file) {
+			return
+		}
+		if nativeSettingsIsRecipe(egg, "ddnet/egg-d-d-net.json") && file != ddnetSettingsPath {
+			return
+		}
+		if hytaleLayoutSettings(egg) && file != "/Server/config.json" {
+			return
+		}
+		// The publisher seed is not the configuration used by a running world.
+		if craftopia && file == "/DefaultServerSetting.ini" {
+			return
+		}
+		if _, e := quickPathParts(file); e != nil || seen[file] || (gameSettingsDiscoveryFormat(egg, file) == "" && declaredDocuments[file] == "") {
 			return
 		}
 		seen[file] = true
@@ -87,7 +127,10 @@ func (a *App) gameSettingsDocuments(ctx context.Context, s, egg M, includeWorlds
 			add(name)
 		}
 	}
-	candidates := []string{}
+	candidates := preferredDocuments
+	for file := range declaredDocuments {
+		candidates = append(candidates, file)
+	}
 	for name := range asMap(egg["config_files"]) {
 		name = strings.TrimPrefix(name, "/")
 		if _, err := quickPathParts("/" + name); err == nil && !strings.Contains(name, "{{") && !strings.HasPrefix(name, "plugins/") && !strings.HasPrefix(name, "mods/") && gameSettingsFormat(name) != "" {
@@ -131,8 +174,32 @@ func (a *App) gameSettingsDocuments(ctx context.Context, s, egg M, includeWorlds
 	if file := quickConfigPath(game); file != "" {
 		candidates = append(candidates, file)
 	}
+	if nativeSettingsGameID(egg) == "arma3" {
+		candidates = append(candidates, "/server.cfg", "/basic.cfg")
+	}
 	if game == "satisfactory" {
 		candidates = append(candidates, "/FactoryGame/Saved/Config/LinuxServer/Game.ini", "/FactoryGame/Saved/Config/LinuxServer/Engine.ini")
+	}
+	if nativeSettingsIsRecipe(egg, "ddracenetwork/egg-d-d-race-network.json") {
+		// Match the wrapper's canonical-file precedence, never merge executable
+		// exec documents or edit an inactive shadow configuration.
+		for _, file := range []string{ddnetSettingsPath, ddnetDataSettingsPath} {
+			es, exists, e := a.quickSetupList(ctx, s, path.Dir(file))
+			if e != nil {
+				return nil, nil, e
+			}
+			if !exists {
+				continue
+			}
+			entry, found, e := quickFindEntry(es, path.Base(file))
+			if e != nil {
+				return nil, nil, e
+			}
+			if found && quickFileEntry(entry) {
+				add(file)
+				break
+			}
+		}
 	}
 	for _, file := range candidates {
 		es, exists, e := a.quickSetupList(ctx, s, path.Dir(file))
@@ -156,6 +223,14 @@ func (a *App) gameSettingsDocuments(ctx context.Context, s, egg M, includeWorlds
 		if docs[j].Path == "/server.properties" {
 			return false
 		}
+		left, leftDeclared := preferredOrder[docs[i].Path]
+		right, rightDeclared := preferredOrder[docs[j].Path]
+		if leftDeclared != rightDeclared {
+			return leftDeclared
+		}
+		if leftDeclared && left != right {
+			return left < right
+		}
 		return docs[i].Path < docs[j].Path
 	})
 	folders := []M{}
@@ -163,6 +238,32 @@ func (a *App) gameSettingsDocuments(ctx context.Context, s, egg M, includeWorlds
 		name := str(e["name"])
 		if quickDirectoryEntry(e) && quickSafeDirectory(name) && (worldFolders[name] || map[string]bool{"config": true, "mods": true, "plugins": true, "resourcepacks": true, "saves": true, "worlds": true, "world": true}[strings.ToLower(name)]) {
 			folders = append(folders, M{"label": name, "path": "/" + name})
+		}
+	}
+	if nativeSettingsIsRecipe(egg, "minetest/egg-minetest.json") {
+		children, exists, err := a.quickSetupList(ctx, s, "/.minetest")
+		if err != nil {
+			return nil, nil, err
+		}
+		if exists {
+			for _, name := range []string{"mods", "games", "worlds"} {
+				entry, found, err := quickFindEntry(children, name)
+				if err != nil {
+					return nil, nil, err
+				}
+				if found && quickDirectoryEntry(entry) {
+					folders = append(folders, M{"label": name, "path": "/.minetest/" + name})
+				}
+			}
+		}
+	}
+	if nativeSettingsIsRecipe(egg, "openra/openra_red_alert/egg-open-r-a.json") {
+		entry, found, err := quickFindEntry(entries, "OpenRAData")
+		if err != nil {
+			return nil, nil, err
+		}
+		if found && quickDirectoryEntry(entry) {
+			folders = append(folders, M{"label": "OpenRAData", "path": "/OpenRAData"})
 		}
 	}
 	return docs, folders, nil
@@ -178,6 +279,24 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 	ctx = context.WithValue(ctx, gameSettingsContentsKey{}, map[string][]byte{})
 	egg, err := a.serverEffectiveEgg(ctx, s)
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	// ET's native document requires the reviewed launcher on the actual server.
+	if nativeSettingsIsRecipe(egg, etlegacySettingsRecipe) &&
+		(!etlegacySettingsDocument(egg, etlegacySettingsPath) || str(s["startup"]) != str(egg["startup"])) {
+		fail(w, notFound())
+		return
+	}
+	if err = a.prepareSTKSettingsEgg(ctx, s, egg); err != nil {
+		fail(w, err)
+		return
+	}
+	if err = a.prepareBananaSettingsEgg(ctx, s, egg); err != nil {
+		fail(w, err)
+		return
+	}
+	if err = a.prepareOpenArenaSettingsEgg(ctx, s, egg); err != nil {
 		fail(w, err)
 		return
 	}
@@ -259,6 +378,11 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			fail(w, bad("Choose at least one setting to save."))
 			return
 		}
+		playersAuthority, e := a.satisfactoryPlayersAuthority(ctx, s, egg, file)
+		if e != nil {
+			fail(w, e)
+			return
+		}
 		tx, e := a.DB.Begin(ctx)
 		if e != nil {
 			fail(w, e)
@@ -269,8 +393,97 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		// Discovery's cache is never used to validate a write.
+		var publicationServer, publicationEgg M
+		// Startup can change while this request waits for the mutation lock.
+		// Recheck ET authority from the database before touching native bytes.
+		{
+			s, e = a.server(r, "file.read-content")
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			egg, e = a.serverEffectiveEgg(r.Context(), s)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			u, e = a.user(r)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if !a.can(ctx, u, s, "file.read-content") || !a.can(ctx, u, s, "file.update") {
+				fail(w, forbidden())
+				return
+			}
+			if boolean(s["is_node_under_maintenance"]) || str(s["status"]) != "" {
+				fail(w, bad("This server is not available for configuration updates."))
+				return
+			}
+			publicationServer = M{}
+			for _, key := range []string{"id", "uuid", "node_id", "egg_id", "allocation_id", "startup", "image"} {
+				publicationServer[key] = s[key]
+			}
+			publicationEgg = M{}
+			for key, value := range egg {
+				publicationEgg[key] = value
+			}
+			if e = a.prepareCampaignSettingsAuthority(r.Context(), s, egg); e != nil {
+				fail(w, e)
+				return
+			}
+			if campaignSettingsRequiresAuthority(egg) && str(s["startup"]) != str(egg["startup"]) || soldatSettingsRecipe(egg) && !soldatSettingsAuthority(s, egg) {
+				fail(w, notFound())
+				return
+			}
+		}
+		if e = a.checkSatisfactoryPlayersAuthority(ctx, s, egg, file, playersAuthority); e != nil {
+			fail(w, e)
+			return
+		}
+		// Refresh dynamic paths on the newly loaded effective egg before
+		// rediscovery. Admission-time selections belong to the previous egg map.
 		fresh := r.Context()
+		if e = a.prepareSTKSettingsEgg(fresh, s, egg); e != nil {
+			fail(w, e)
+			return
+		}
+		if e = a.prepareBananaSettingsEgg(fresh, s, egg); e != nil {
+			fail(w, e)
+			return
+		}
+		if e = a.prepareOpenArenaSettingsEgg(fresh, s, egg); e != nil {
+			fail(w, e)
+			return
+		}
+		// Re-discover with no request cache after acquiring the mutation lock.
+		// A deleted file or changed active-document selection cannot retain
+		// authority from the inventory that admitted this request.
+		currentDocs, _, discoveryErr := a.gameSettingsDocuments(r.Context(), s, egg, includeWorlds, includePlatform)
+		if discoveryErr != nil {
+			fail(w, discoveryErr)
+			return
+		}
+		selected := false
+		for _, document := range currentDocs {
+			if document.Path == file {
+				selected = true
+				break
+			}
+		}
+		if !selected {
+			fail(w, APIError{409, "GameSettingsSelectionChanged", "The active configuration changed. Reload settings before saving."})
+			return
+		}
+		// Discovery's cache is never used to validate a write.
+		if nativeSettingsIsRecipe(egg, quakeLiveSettingsRecipe) && file != str(egg["_quakelive_settings_path"]) {
+			fail(w, APIError{409, "GameSettingsSelectionChanged", "The active configuration changed. Reload settings before saving."})
+			return
+		}
+		if nativeSettingsIsSTK(egg) && file != str(egg["_stk_settings_path"]) || nativeSettingsIsRecipe(egg, "banana_shooter/egg-banana-shooter.json") && file != bananaSelectedSettingsDocument(egg) || nativeSettingsIsRecipe(egg, openArenaSettingsRecipe) && file != openArenaSelectedSettingsDocument(egg) {
+			fail(w, APIError{409, "GameSettingsSelectionChanged", "The active configuration changed. Reload settings before saving."})
+			return
+		}
 		if e = a.quickSetupStopped(fresh, s); e != nil {
 			fail(w, e)
 			return
@@ -280,11 +493,11 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if str(in["revision"]) != quickRevision("native", file, data, true) {
+		if str(in["revision"]) != campaignParserRevision(egg, file, data) {
 			fail(w, APIError{409, "QuickSetupRevisionConflict", "These settings changed. Reload before saving."})
 			return
 		}
-		parsed, e := parseGameSettings(file, data)
+		parsed, e := parseDiscoveredGameSettings(egg, file, data)
 		if e != nil {
 			fail(w, e)
 			return
@@ -299,8 +512,18 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
+		if nativeSettingsIsRecipe(egg, kf2SettingsRecipe) {
+			if e = a.wave43ValidateKF2Update(fresh, s, file, updated); e != nil {
+				fail(w, e)
+				return
+			}
+		}
+		if e = validateFactorioNativeSettings(egg, file, updated); e != nil {
+			fail(w, e)
+			return
+		}
 		// Validate the resulting document before writing anything.
-		if _, e = parseGameSettings(file, updated); e != nil {
+		if _, e = parseDiscoveredGameSettings(egg, file, updated); e != nil {
 			fail(w, e)
 			return
 		}
@@ -308,11 +531,180 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
+		factorioAuthority := factorioNativeSettings(egg)
+		{
+			before := str(egg["_campaign_parser_binding"])
+			// Daemon reads above can outlive a permission or startup change.
+			// Reload database authority immediately before publication as well.
+			s, e = a.server(r, "file.read-content")
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			u, e = a.user(r)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if !a.can(fresh, u, s, "file.update") {
+				fail(w, forbidden())
+				return
+			}
+			if boolean(s["is_node_under_maintenance"]) || str(s["status"]) != "" {
+				fail(w, bad("This server is not available for configuration updates."))
+				return
+			}
+			egg, e = a.serverEffectiveEgg(fresh, s)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if !reflect.DeepEqual(publicationEgg, egg) {
+				fail(w, APIError{409, "GameSettingsAuthorityChanged", "Configuration authority changed. Reload settings."})
+				return
+			}
+			if campaignParserRecipe(publicationEgg) != "" && campaignParserRecipe(egg) == "" {
+				fail(w, notFound())
+				return
+			}
+			if e = a.prepareCampaignSettingsAuthority(fresh, s, egg); e != nil {
+				fail(w, e)
+				return
+			}
+			if factorioAuthority && (!factorioNativeSettings(egg) || str(s["startup"]) != factorioNativeStartup || str(egg["startup"]) != factorioNativeStartup) {
+				fail(w, notFound())
+				return
+			}
+			// Compare the authority used to parse, allowing unchanged custom startup.
+			for key, value := range publicationServer {
+				if !reflect.DeepEqual(value, s[key]) {
+					fail(w, APIError{409, "GameSettingsAuthorityChanged", "Configuration authority changed. Reload settings."})
+					return
+				}
+			}
+			if e = a.prepareSTKSettingsEgg(fresh, s, egg); e != nil {
+				fail(w, e)
+				return
+			}
+			if e = a.prepareBananaSettingsEgg(fresh, s, egg); e != nil {
+				fail(w, e)
+				return
+			}
+			if e = a.prepareOpenArenaSettingsEgg(fresh, s, egg); e != nil {
+				fail(w, e)
+				return
+			}
+			finalDocs, _, finalErr := a.gameSettingsDocuments(fresh, s, egg, includeWorlds, includePlatform)
+			if finalErr != nil {
+				fail(w, finalErr)
+				return
+			}
+			selected = false
+			for _, document := range finalDocs {
+				if document.Path == file {
+					selected = true
+				}
+			}
+			if !selected || nativeSettingsIsSTK(egg) && file != str(egg["_stk_settings_path"]) || nativeSettingsIsRecipe(egg, "banana_shooter/egg-banana-shooter.json") && file != bananaSelectedSettingsDocument(egg) || nativeSettingsIsRecipe(egg, openArenaSettingsRecipe) && file != openArenaSelectedSettingsDocument(egg) || nativeSettingsIsRecipe(egg, quakeLiveSettingsRecipe) && file != str(egg["_quakelive_settings_path"]) {
+				fail(w, APIError{409, "GameSettingsSelectionChanged", "The active configuration changed. Reload settings before saving."})
+				return
+			}
+			latest, readErr := read(fresh)
+			if readErr != nil {
+				fail(w, readErr)
+				return
+			}
+			if before != str(egg["_campaign_parser_binding"]) || !bytes.Equal(latest, data) {
+				fail(w, APIError{409, "QuickSetupRevisionConflict", "These settings changed. Reload before saving."})
+				return
+			}
+		}
+		if e = a.checkSatisfactoryPlayersAuthority(fresh, s, egg, file, playersAuthority); e != nil {
+			fail(w, e)
+			return
+		}
+		if playersAuthority != "" {
+			latestServer, err := a.server(r, "file.read-content")
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			latestUser, err := a.user(r)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			if !a.can(fresh, latestUser, latestServer, "file.update") {
+				fail(w, forbidden())
+				return
+			}
+			latest, err := read(fresh)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			if !bytes.Equal(latest, data) {
+				fail(w, APIError{409, "QuickSetupRevisionConflict", "These settings changed. Reload before saving."})
+				return
+			}
+		}
+		if nativeSettingsIsRecipe(egg, "brickadia/egg-brickadia.json") || among165Recipe(egg) != "" || assettoSettingsRecipe(egg) || beamngSettingsRecipe(egg) != "" || nativeSettingsIsRecipe(egg, archeanRepairRecipe) || nativeSettingsIsRecipe(egg, urbanTerrorSettingsRecipe) || nativeSettingsIsRecipe(egg, srb2SettingsRecipe) {
+			// Reads can outlive a launcher or permission change. Bind again at
+			// the final publication boundary, outside the inventory cache.
+			latestServer, err := a.server(r, "file.read-content")
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			latestUser, err := a.user(r)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			if !a.can(fresh, latestUser, latestServer, "file.update") {
+				fail(w, forbidden())
+				return
+			}
+			latestEgg, err := a.serverEffectiveEgg(fresh, latestServer)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			if (!nativeSettingsIsRecipe(latestEgg, "brickadia/egg-brickadia.json") && among165Recipe(latestEgg) == "" && !assettoSettingsRecipe(latestEgg) && beamngSettingsRecipe(latestEgg) == "" && !nativeSettingsIsRecipe(latestEgg, archeanRepairRecipe) && !nativeSettingsIsRecipe(latestEgg, urbanTerrorSettingsRecipe) && !nativeSettingsIsRecipe(latestEgg, srb2SettingsRecipe)) || !reflect.DeepEqual(publicationEgg, latestEgg) {
+				fail(w, notFound())
+				return
+			}
+			if err = a.prepareCampaignSettingsAuthority(fresh, latestServer, latestEgg); err != nil {
+				fail(w, err)
+				return
+			}
+			if str(latestEgg["_campaign_parser_binding"]) != str(egg["_campaign_parser_binding"]) {
+				fail(w, APIError{409, "GameSettingsAuthorityChanged", "Configuration authority changed. Reload settings."})
+				return
+			}
+		}
+
+		if e = a.persistSatisfactoryPlayers(fresh, tx, s, egg, file, patch); e != nil {
+			fail(w, e)
+			return
+		}
 		if e = a.quickSetupWrite(fresh, s, file, updated); e != nil {
+			if playersAuthority != "" {
+				if restoreErr := a.quickSetupWrite(fresh, s, file, data); restoreErr != nil {
+					fail(w, APIError{500, "GameSettingsRestoreFailed", "Native settings could not be restored after a failed write. Durable controls were not saved. Inspect the native file before starting."})
+					return
+				}
+			}
 			fail(w, e)
 			return
 		}
 		if e = tx.Commit(ctx); e != nil {
+			if playersAuthority != "" {
+				if restoreErr := a.quickSetupWrite(fresh, s, file, data); restoreErr != nil {
+					fail(w, APIError{500, "GameSettingsRestoreFailed", "Native settings could not be restored after a failed commit. Inspect the native file before starting."})
+					return
+				}
+			}
 			fail(w, e)
 			return
 		}
@@ -335,7 +727,7 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	parsed, err := parseGameSettings(file, data)
+	parsed, err := parseDiscoveredGameSettings(egg, file, data)
 	if err != nil {
 		fail(w, err)
 		return
@@ -347,8 +739,100 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 		if kind == "boolean" {
 			value = f.value == f.on
 		}
-		secret := gameSettingSecret.MatchString(f.key)
+		secret := f.secret || gameSettingSecret.MatchString(f.key) && !(nativeSettingsIsRecipe(egg, "windrose/egg-windrose.json") && f.key == windroseSettingsPrefix+"IsPasswordProtected" && f.kind == "boolean" || f.kind == "boolean" && craftopiaSettingsBit(egg, file, f.key) || tshockNativeBoolean(egg, file, f.key, f.kind) || openttdPublicNumericField(egg, file, f) || nativeSettingsIsRecipe(egg, portalKnightsRecipe) && f.kind == "boolean")
 		field := M{"key": f.key, "label": f.key, "type": kind, "value": value, "secret": secret, "readonly": f.kind == "readonly" || gameSettingManaged(egg, file, f.key)}
+		if wave85ASEManaged(egg, file, f.key) {
+			field["description"] = "Managed by shared game setup controls for player capacity and mods, or the private console boundary."
+		}
+		switch campaignParserRecipe(egg) {
+		case starmadeSettingsRecipe:
+			starmadeSettingPresentation(field)
+		case coreKeeperSettingsRecipe:
+			coreKeeperSettingPresentation(field)
+		case necesseSettingsRecipe:
+			necesseSettingPresentation(field)
+		case valheimPlusSettingsRecipe:
+			metadata := valheimPlusLabels[f.key]
+			field["label"], field["description"] = metadata[0], metadata[1]
+			field["group"], _, _ = strings.Cut(f.key, "/")
+			field["restart_required"] = true
+			if f.key == "Server/maxPlayers" {
+				field["min"], field["max"] = 1, 32
+			}
+		case bepinexLoggingRecipe:
+			field["label"], field["description"] = "Disk logging", "Write BepInEx logs to disk."
+			field["group"], field["restart_required"] = "Logging", true
+		case nuclearRecipe, solaceSettingsRecipe, nzPortableSettingsRecipe, vrisingSettingsRecipe, gtacSettingsRecipe, clusterioSettingsRecipe, kspDMPRecipe, dstSettingsRecipe, "openrct2/egg-openrct2.json", ragecoopRecipe, romesteadSettingsRecipe:
+			field["group"], field["restart_required"] = "General", true
+		case enshroudedSettingsRecipe:
+			enshroudedSettingPresentation(field)
+		case projectZomboidSettingsRecipe:
+			for k, v := range projectZomboidSettingMetadata(f.key) {
+				field[k] = v
+			}
+		case groundBranchSettingsRecipe:
+			groundBranchSettingPresentation(field)
+		}
+
+		if recipe := campaignParserRecipe(egg); recipe == mordhauLinuxSettingsRecipe || recipe == kf2SettingsRecipe || recipe == veinSettingsRecipe {
+			field["group"], field["restart_required"] = "General", true
+		}
+		if recipe := campaignParserRecipe(egg); recipe == jc3SettingsRecipe || recipe == plainsSettingsRecipe {
+			field["group"], field["restart_required"] = "General", true
+		}
+		if recipe := campaignParserRecipe(egg); recipe == ss14SettingsRecipe || recipe == stationeersBepinexRecipe || recipe == stationeersVanillaRecipe || recipe == "the_isle/evrima/egg-the-isle.json" {
+			field["group"], field["restart_required"] = "General", true
+			if recipe == ss14SettingsRecipe {
+				for k, v := range ss14ReviewedMetadata(f.key) {
+					field[k] = v
+				}
+			}
+			if recipe == "the_isle/evrima/egg-the-isle.json" && f.kind == "boolean" {
+				field["secret"] = false
+				secret = false
+			}
+		}
+		if recipe := campaignParserRecipe(egg); recipe == aapgSettingsRecipe || recipe == sandstormSettingsRecipe || recipe == "humanitz/egg-humanit-z.json" {
+			field["group"], field["restart_required"] = "General", true
+			if recipe == sandstormSettingsRecipe {
+				sandstormSettingPresentation(field)
+			}
+		}
+		if nativeSettingsIsRecipe(egg, resoniteSettingsRecipe) {
+			field["group"] = "General"
+			labels := map[string]string{"/comment": "Description", "/usernameOverride": "Display username", "/loginCredential": "Resonite account", "/loginPassword": "Resonite password"}
+			field["label"] = labels[f.key]
+		}
+		if nativeSettingsIsRecipe(egg, portalKnightsRecipe) {
+			parts := strings.Split(strings.TrimPrefix(f.key, "/"), "/")
+			field["group"] = "General"
+			if len(parts) == 2 && (parts[0] == "admins" || parts[0] == "users" || parts[0] == "guests") {
+				field["group"] = parts[0]
+			}
+			labels := map[string]string{"name": "Server name", "universeSize": "Universe size", "canLogin": "Allow login", "canKickPlayers": "Allow kicking players", "canModifyWorld": "Allow world changes"}
+			field["label"] = labels[parts[len(parts)-1]]
+			if f.key == "/universeSize" {
+				field["type"] = "select"
+				field["options"] = []M{{"value": "Small", "label": "Small"}, {"value": "Normal", "label": "Normal"}, {"value": "Large", "label": "Large"}}
+			}
+		}
+		if nativeSettingsIsRecipe(egg, redMSettingsRecipe) {
+			field["group"] = "General"
+			if f.key == "sv_hostname" {
+				field["label"] = "Server name"
+			} else {
+				field["label"] = "LAN only"
+			}
+		}
+		if cube := cubeGameSettingsKind(egg, file); cube != "" {
+			if label := cubeGameSettingLabel(cube, f.key); label != "" {
+				field["label"] = label
+			}
+			if cube == "sauerbraten" && f.key == "public-server-mode" {
+				field["type"] = "select"
+				field["options"] = []M{{"value": "0", "label": "Private privileges"}, {"value": "1", "label": "Public privileges"}, {"value": "2", "label": "Cooperative privileges"}}
+			}
+		}
 		game := steamGameID(egg)
 		if javaMinecraftEgg(egg) {
 			game = "minecraft"
@@ -375,13 +859,86 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 			field["value"] = nil
 			field["configured"] = f.value != ""
 		}
+		if nativeSettingsIsRecipe(egg, "ddnet/egg-d-d-net.json") && file == ddnetSettingsPath {
+			labels := map[string]string{"sv_name": "Server name", "sv_map": "Map", "sv_register": "Public listing", "sv_max_clients": "Maximum clients", "sv_sixup": "0.7 protocol support", "sv_test_cmds": "Test commands"}
+			if label := labels[f.key]; label != "" {
+				field["label"], field["group"], field["restart_required"] = label, "General", true
+			}
+		}
+		if p, _ := integratedScalarSettings(egg); p != "" {
+			field["group"], field["restart_required"] = "General", true
+			if p == towerSettingsPath {
+				towerSettingPresentation(field)
+			}
+			if p == terraTechSettingsPath {
+				if f.key == "SlotCount" {
+					field["label"], field["min"], field["max"], field["type"] = "Player slots", 1, 6, "number"
+				}
+			}
+			if p == windroseSettingsPath {
+				labels := map[string]string{"ServerName": "Server name", "UseDirectConnection": "Use direct connection", "Password": "Password", "MaxPlayerCount": "Maximum players", "InviteCode": "Invite code", "IsPasswordProtected": "Password protection"}
+				field["label"] = labels[strings.TrimPrefix(f.key, windroseSettingsPrefix)]
+			}
+		}
+		if nativeSettingsIsRecipe(egg, gmodSettingsRecipe) && file == gmodSettingsPath {
+			gmodSettingPresentation(field)
+			field["description"] = "Native config value applied on restart. Plugins and gamemode scripts may change runtime behavior."
+		}
+		if (nativeSettingsIsRecipe(egg, tf2SettingsRecipe) && file == tf2SettingsPath || nativeSettingsIsRecipe(egg, nmrihSettingsRecipe) && file == nmrihSettingsPath) && f.key == "mp_timelimit" {
+			field["label"], field["group"], field["min"] = "Time limit (minutes)", "General", 0
+			field["description"] = "Native config value applied on restart. Map scripts and plugins may change runtime behavior."
+		}
+		if nativeSettingsIsRecipe(egg, astrocolonySettingsRecipe) {
+			astrocolonySettingPresentation(field)
+		}
+		if file == "/server.properties" && nativeSettingsIsRecipe(egg, canvasSettingsRecipe) {
+			canvasDifficultyPresentation(field)
+		}
+		if file == "/server.properties" && nativeSettingsIsRecipe(egg, paperDifficultyRecipe) {
+			paperDifficultyPresentation(field)
+		}
+		carrierSettingPresentation(egg, file, field)
+		hl2dmSettingPresentation(egg, file, field)
+		sonsSettingPresentation(egg, file, field)
+		sonsGameplaySettingPresentation(egg, file, field)
+		resoniteSessionSettingPresentation(egg, file, field)
+		goldSrcCS16SettingPresentation(egg, file, field)
 		fields = append(fields, field)
 	}
-	result["fields"], result["revision"] = fields, quickRevision("native", file, data, true)
+	if file == "/server.properties" && nativeSettingsIsRecipe(egg, canvasSettingsRecipe) {
+		result["help"] = append(asSlice(result["help"]), canvasDifficultyHelp())
+	}
+	if file == "/server.properties" && nativeSettingsIsRecipe(egg, paperDifficultyRecipe) {
+		result["help"] = append(asSlice(result["help"]), paperDifficultyHelp())
+	}
+	result["fields"], result["revision"] = fields, campaignParserRevision(egg, file, data)
 	writeJSON(w, 200, item("game_settings", result))
 }
 
 func gameSettingManaged(egg M, file, key string) bool {
+	if nativeSettingsIsRecipe(egg, necesseSettingsRecipe) && file == necesseSettingsPath {
+		return !necesseEditable(key)
+	}
+	if nativeSettingsIsRecipe(egg, nmrihSettingsRecipe) && file == nmrihSettingsPath {
+		switch strings.ToLower(key) {
+		case "hostname", "sv_password", "rcon_password", "sv_lan", "tv_enable", "tv_port":
+			return true
+		}
+	}
+
+	if among165Recipe(egg) != "" && campaignParserPathAllowed(egg, file) && file == "/impostor/config.json" && (key == "/Server/PublicIp" || key == "/Server/PublicPort") {
+		return false
+	}
+
+	if nativeSettingsIsRecipe(egg, soldatClassicRecipe) && soldatSettingsDocument(egg, file) && soldatNativeManaged(file, key) {
+		return true
+	}
+	if gameSettingsRecipeManaged(egg, file, key) {
+		return true
+	}
+	fullKey := strings.TrimPrefix(key, "/")
+	caseInsensitive := gameSettingsCaseInsensitiveINI(file, nil) || strings.EqualFold(path.Base(file), "PalWorldSettings.ini")
+	equal := func(a, b string) bool { return a == b || caseInsensitive && strings.EqualFold(a, b) }
 	if i := strings.LastIndex(key, "/"); i >= 0 {
 		key = key[i+1:]
 	}
@@ -390,14 +947,16 @@ func gameSettingManaged(egg M, file, key string) bool {
 		return true
 	}
 	if steamPalworldVariant(steamGameID(egg)) {
-		if map[string]bool{"ServerName": true, "ServerDescription": true, "ServerPassword": true, "AdminPassword": true, "ServerPlayerMaxNum": true, "PublicIP": true, "PublicPort": true, "RCONEnabled": true, "RCONPort": true, "RESTAPIEnabled": true, "RESTAPIPort": true, "CrossplayPlatforms": true, "AllowConnectPlatform": true}[key] {
-			return true
+		for _, managed := range []string{"ServerName", "ServerDescription", "ServerPassword", "AdminPassword", "ServerPlayerMaxNum", "PublicIP", "PublicPort", "RCONEnabled", "RCONPort", "RESTAPIEnabled", "RESTAPIPort", "CrossplayPlatforms", "AllowConnectPlatform"} {
+			if strings.EqualFold(managed, key) {
+				return true
+			}
 		}
 	}
 	rule := asMap(asMap(egg["config_files"])[strings.TrimPrefix(file, "/")])
 	find := asMap(rule["find"])
 	for name, value := range find {
-		if (name == key || strings.ReplaceAll(strings.TrimPrefix(key, "/"), "/", ".") == name) && strings.Contains(str(value), "{{") {
+		if (equal(name, key) || equal(strings.ReplaceAll(fullKey, "/", "."), name)) && strings.Contains(str(value), "{{") {
 			return true
 		}
 	}
@@ -407,6 +966,9 @@ func gameSettingManaged(egg M, file, key string) bool {
 func gameSettingsChanges(fields []gameSetting, changes M, egg M, file string) (map[string]string, error) {
 	if file == valheimSettingsPath {
 		return quickValidateSettings("valheim", changes)
+	}
+	if err := wave85NativeChanges(egg, file, changes); err != nil {
+		return nil, err
 	}
 	allowed := map[string]gameSetting{}
 	for _, f := range fields {
@@ -456,6 +1018,9 @@ func gameSettingsChanges(fields []gameSetting, changes M, egg M, file string) (m
 		v, ok := value.(string)
 		if !ok || len(v) > 65536 || strings.ContainsRune(v, 0) {
 			return nil, bad("Enter a valid setting value.")
+		}
+		if file == "/webadmin.ini" && strings.EqualFold(key, "User:admin/Password") && nativeSettingsIsRecipe(egg, "minecraft/java/cuberite/egg-cuberite.json") && (utf8.RuneCountInString(v) < 12 || !quickSingleLine(v)) {
+			return nil, bad("Choose a WebAdmin password of at least 12 characters on one line.")
 		}
 		if f.kind == "number" {
 			if n, e := strconv.ParseFloat(v, 64); e != nil || math.IsNaN(n) || math.IsInf(n, 0) {
@@ -510,18 +1075,23 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 		return out, nil
 	}
 	if gameSettingsFormat(file) == "ini" && (strings.EqualFold(path.Base(file), "PalWorldSettings.ini") || strings.Contains(string(data), "[/Script/Pal.PalGameWorldSettings]")) {
+		if err := validatePalworldSettingsIdentity(data); err != nil {
+			return out, err
+		}
 		tuple, values, err := quickPalworldOptions(data)
 		if err != nil {
 			return out, err
 		}
 		quoted := map[string]bool{}
 		complex := map[string]bool{}
+		folded := map[string]bool{}
 		for _, segment := range tuple.Segments {
 			key, raw, _ := strings.Cut(strings.TrimSpace(segment), "=")
 			key = strings.TrimSpace(key)
-			if _, duplicate := quoted[key]; duplicate {
+			if folded[gameSettingsINIFold(key)] {
 				return out, bad("Duplicate structured settings cannot be edited here.")
 			}
+			folded[gameSettingsINIFold(key)] = true
 			raw = strings.TrimSpace(raw)
 			quoted[key] = strings.HasPrefix(raw, "\"")
 			complex[key] = strings.HasPrefix(raw, "(")
@@ -533,6 +1103,7 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 			}
 			if complex[key] {
 				f.kind = "readonly"
+				f.secret = true
 			}
 			out.fields = append(out.fields, f)
 		}
@@ -579,6 +1150,14 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 		if gameSettingsFormat(file) == "json" && !json.Valid(data) {
 			return out, bad("This JSON configuration is invalid.")
 		}
+		var originalJSON any
+		if gameSettingsFormat(file) == "json" {
+			decoder := json.NewDecoder(bytes.NewReader(data))
+			decoder.UseNumber()
+			if e := decoder.Decode(&originalJSON); e != nil {
+				return out, e
+			}
+		}
 		var root yaml.Node
 		if e := yaml.Unmarshal(data, &root); e != nil {
 			return out, bad("The game configuration could not be parsed.")
@@ -605,14 +1184,27 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 				}
 			case yaml.SequenceNode:
 				var value any
-				if err := n.Decode(&value); err != nil {
+				if gameSettingsFormat(file) == "json" {
+					value = originalJSON
+					if prefix != "" {
+						for _, part := range strings.Split(strings.TrimPrefix(prefix, "/"), "/") {
+							key := strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
+							value = value.(map[string]any)[key]
+						}
+					}
+				} else if err := n.Decode(&value); err != nil {
 					return bad("This list cannot be edited here.")
 				}
 				encoded, err := json.Marshal(value)
 				if err != nil {
 					return bad("This list cannot be edited here.")
 				}
-				out.fields = append(out.fields, gameSetting{key: prefix, value: string(encoded), kind: "list", node: n})
+				field := gameSetting{key: prefix, value: string(encoded), kind: "list", node: n}
+				if gameSettingsContainsSecret(value) {
+					field.secret = true
+					field.kind = "readonly"
+				}
+				out.fields = append(out.fields, field)
 				nodes[prefix] = n
 			case yaml.ScalarNode:
 				f := gameSettingType(prefix, n.Value)
@@ -667,8 +1259,29 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 			}
 			if gameSettingsFormat(file) == "json" {
 				var value any
-				if e := root.Decode(&value); e != nil {
+				decoder := json.NewDecoder(bytes.NewReader(data))
+				decoder.UseNumber()
+				if e := decoder.Decode(&value); e != nil {
 					return nil, e
+				}
+				for key, changed := range changes {
+					n := nodes[key]
+					var next any
+					switch n.Tag {
+					case "!!int", "!!float":
+						next = json.Number(n.Value)
+					case "!!seq":
+						decoder := json.NewDecoder(strings.NewReader(changed))
+						decoder.UseNumber()
+						if e := decoder.Decode(&next); e != nil {
+							return nil, e
+						}
+					default:
+						if e := n.Decode(&next); e != nil {
+							return nil, e
+						}
+					}
+					value = replaceGameSettingsJSON(value, key, next)
 				}
 				return json.MarshalIndent(value, "", "  ")
 			}
@@ -690,7 +1303,12 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 		if err != nil {
 			return out, err
 		}
-		return expandGameSettingsStructs(parsed)
+		parsed = gameSettingsINICaseSafety(file, data, parsed)
+		expanded, err := expandGameSettingsStructs(parsed)
+		if err != nil {
+			return out, err
+		}
+		return gameSettingsINICaseSafety(file, data, expanded), nil
 	default:
 		return out, bad("This configuration format does not have a settings editor yet.")
 	}
@@ -699,6 +1317,26 @@ func parseGameSettings(file string, data []byte) (gameSettingsParsed, error) {
 		return out, bad("This configuration has too many settings to edit here.")
 	}
 	return out, nil
+}
+
+// Keep untouched JSON numbers exact, including IDs beyond uint64 and decimals.
+// Paths come from the validated mapping walk; sequences are edited whole.
+func replaceGameSettingsJSON(root any, pointer string, value any) any {
+	if pointer == "" {
+		return value
+	}
+	parts := strings.Split(strings.TrimPrefix(pointer, "/"), "/")
+	current := root
+	for i, part := range parts {
+		key := strings.ReplaceAll(strings.ReplaceAll(part, "~1", "/"), "~0", "~")
+		object := current.(map[string]any)
+		if i == len(parts)-1 {
+			object[key] = value
+		} else {
+			current = object[key]
+		}
+	}
+	return root
 }
 
 // INI/TOML scalar edits replace only the value span, keeping sections, comments,
@@ -714,7 +1352,7 @@ func parseGameSettingsLines(file string, data []byte) (gameSettingsParsed, error
 	spans := map[string]span{}
 	duplicates := map[string]bool{}
 	section := ""
-	toml := strings.HasSuffix(file, ".toml")
+	toml := strings.EqualFold(path.Ext(file), ".toml")
 	inArray := false
 	for index, line := range lines {
 		trim := strings.TrimSpace(line)
@@ -913,7 +1551,17 @@ func (a *App) gameSettingsFolders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	for _, folder := range []string{"config", "saves", "worlds", "logs", "mods", "plugins"} {
+	commonFolders := []string{"config", "saves", "worlds", "logs", "mods", "plugins"}
+	if nativeSettingsIsRecipe(egg, soldatClassicRecipe) {
+		commonFolders = append(commonFolders, "maps", "scripts", "textures", "scenery-gfx", "bots")
+	}
+	if nativeSettingsIsRecipe(egg, soldat2Recipe) {
+		commonFolders = append(commonFolders, "Levels", "Rules", "Modifiers", "Cycles", "Scripts")
+	}
+	if nativeSettingsIsRecipe(egg, "beamng/kissmp/egg-kissmp.json") {
+		commonFolders = append(commonFolders, "addons")
+	}
+	for _, folder := range commonFolders {
 		exists, e := a.quickSetupFolderExists(ctx, s, "/"+folder)
 		if e != nil {
 			fail(w, e)

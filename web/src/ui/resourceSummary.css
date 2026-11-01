@@ -1,0 +1,12 @@
+.resource-summary[data-slot=card]{padding:0;gap:0;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface);box-shadow:none;overflow:hidden}
+.resource-summary-grid[data-slot=card-content]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:32px;padding:18px 20px}
+.resource-metric{display:grid;gap:7px;min-width:0;color:var(--muted);font-size:13px;line-height:1.45}
+.resource-metric-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:14px}
+.resource-metric-heading strong{color:var(--text);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.resource-metric-heading small{font-size:13px;font-weight:400;color:var(--muted)}
+.resource-meter{height:5px;overflow:hidden;border-radius:4px;background:var(--ui-divider)}
+.resource-meter [data-slot=progress-track]{height:5px;background:var(--ui-divider)}
+.resource-meter [data-slot=progress-indicator]{background:var(--theme-accent-a,var(--accent))}
+.resource-metric:last-child .resource-meter [data-slot=progress-indicator]{background:var(--theme-accent-b,var(--accent))}
+.resource-metric-note{overflow-wrap:anywhere}
+@media(max-width:700px){.resource-summary-grid[data-slot=card-content]{grid-template-columns:1fr;gap:18px;padding:16px}}

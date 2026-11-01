@@ -1,0 +1,44 @@
+.voltra-account-row{display:flex;align-items:center;gap:4px}
+.voltra-account-row .voltra-account-trigger{flex:1;min-width:0;width:auto}
+.notification-bell[data-slot=button]{position:relative;flex:0 0 30px;width:30px;height:30px;min-height:30px;justify-content:center;padding:6px;color:var(--muted);background:transparent;border:0;border-radius:6px}
+.notification-bell[data-slot=button]:hover{background:var(--ui-hover);color:var(--text)}
+.notification-bell[data-slot=button]>svg{width:16px;height:16px}
+.notification-unread{position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface-raised,#22252c);pointer-events:none}
+@media(min-width:768px){.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-row{flex-direction:column}.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-trigger{flex:none}}
+.notification-history[data-slot=sheet-content]{z-index:410;width:min(460px,100vw);max-width:100vw;background:var(--surface-raised,#22252c);color:var(--text);border-color:var(--ui-border);font-size:13px}
+body:has(.notification-history) [data-slot=sheet-overlay]{z-index:400}
+.notification-history [data-slot=sheet-header]{padding:24px 48px 16px 20px}
+.notification-history [data-slot=sheet-title]{font-size:17px}
+.notification-history [data-slot=sheet-description]{color:var(--muted);font-size:12px;line-height:1.5}
+.notification-toolbar{display:flex;align-items:center;gap:8px;padding:0 20px 16px;border-bottom:1px solid var(--ui-divider)}
+.notification-toolbar>span{margin-right:auto;color:var(--muted)}
+.notification-list{overflow:auto;flex:1;min-height:0;padding:0 20px 20px}
+.notification-entry{padding:18px 0;border-bottom:1px solid var(--ui-divider)}
+.notification-entry-title{display:flex;align-items:center;gap:8px}
+.notification-entry-title>svg{width:16px;height:16px;flex-shrink:0}
+.notification-entry-title>button{margin-left:auto}
+.notification-error{color:var(--red)}
+.notification-resolved{color:var(--green,#62d9a0)}
+.notification-message{margin:8px 0;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.notification-meta{display:flex;flex-wrap:wrap;gap:4px 10px;color:var(--muted);font-size:11px;margin-bottom:8px}
+.notification-entry>a{color:var(--accent);font-size:12px;overflow-wrap:anywhere}
+.notification-entry details{margin-top:10px;color:var(--muted);font-size:11px}
+.notification-entry summary{cursor:pointer}
+.notification-entry code{display:block;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.notification-empty{color:var(--muted);padding-top:24px;text-align:center}
+[data-slot=toast-viewport]{z-index:600;bottom:56px;width:min(400px,calc(100vw - 24px));max-width:400px;left:auto;right:12px;margin:0}
+[data-slot=toast]{--scale:1;--shrink:0;--peek:8px;--gap:8px;background:var(--surface-raised,#22252c);color:var(--text);border-color:var(--ui-border);border-radius:9px;will-change:auto}
+[data-slot=toast-content]{padding:12px;gap:10px;align-items:center}
+[data-slot=toast-content]>div{gap:2px}
+[data-slot=toast-title]{margin:0;font-size:14px;line-height:20px;font-weight:600;letter-spacing:0}
+[data-slot=toast-description]{margin:0;color:color-mix(in srgb,var(--text) 82%,var(--muted));overflow-wrap:anywhere;font-size:14px;line-height:20px;font-weight:400}
+[data-slot=toast-icon]{display:flex;align-items:center;width:18px;height:18px}
+[data-slot=toast-icon]>svg{width:18px;height:18px}
+.notification-history button,[data-slot=toast] button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;min-height:30px;padding:4px 8px;background:var(--ui-hover);color:var(--text);border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);font-size:12px;font-weight:500}
+.notification-history button:hover,[data-slot=toast] button:hover{background:color-mix(in srgb,var(--text) 10%,transparent)}
+.notification-history button>svg,[data-slot=toast] button>svg{width:14px;height:14px}
+.notification-history [data-slot=sheet-close],.notification-entry-title [data-slot=button],[data-slot=toast-close]{width:28px;padding:0}
+[data-slot=toast] button{height:26px;min-height:26px;padding:2px 6px;font-size:12px;line-height:18px;border-radius:5px}
+[data-slot=toast] [data-slot=toast-action]{background:transparent;border-color:transparent}
+[data-slot=toast] [data-slot=toast-close]{width:24px;height:24px;min-height:24px;padding:0;background:transparent;border-color:transparent}
+@media(prefers-reduced-motion:reduce){[data-slot=toast],[data-slot=toast-content],.notification-history{transition:none;animation:none}}

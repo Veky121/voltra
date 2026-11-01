@@ -1,31 +1,47 @@
+import {captureErrorContext,reportPanelError,resolvePanelErrors,setNotificationScope} from './notifications/store';
+import {Field as MiraField} from './components/ui/field';
+import {Skeleton} from './components/ui/skeleton';
+import {Empty as MiraEmpty,EmptyDescription} from './components/ui/empty';
 import {useCallback} from 'react';
 import {invalidateQueryCache,purgeQueryCache,normalizedQueryPath,setQueryCacheScope} from './hooks/queryCache';
 export {invalidateQueryCache,purgeQueryCache,setQueryCacheScope} from './hooks/queryCache';
 import {useAPIRequest} from './hooks/useAPIRequest';
 import type {ButtonHTMLAttributes,InputHTMLAttributes,SelectHTMLAttributes,TextareaHTMLAttributes,HTMLAttributes,ReactNode} from 'react';
+import {Button as ShadcnButton} from './components/ui/button';
+import {Input as ShadcnInput} from './components/ui/input';
+import {Textarea as ShadcnTextarea} from './components/ui/textarea';
+import {Alert,AlertDescription} from './components/ui/alert';
 import {Card as ShadcnCard} from './components/ui/card';
 export function queryCacheSessionIdentity(session:any):string{return JSON.stringify([!!session?.authenticated,session?.user?.id??null,!!session?.user?.root_admin]);}
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
+  const context=captureErrorContext('HTTP',{endpoint:path,method:options.method||'GET'});
+  let status:number|undefined;
+  try{
   const headers=new Headers(options.headers);
   headers.set('Accept','application/json');
   if(options.body&&!(options.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
   const response=await fetch(path,{...options,headers});
+  status=response.status;
   const mutationPath=normalizedQueryPath(path).split('?')[0];
   if(response.status===401)purgeQueryCache();
   if(response.ok&&mutationPath.startsWith('/api/auth/')&&mutationPath!=='/api/auth/session')purgeQueryCache();
   if(response.ok&&!['GET','HEAD','OPTIONS'].includes((options.method||'GET').toUpperCase())&&!mutationPath.startsWith('/api/auth/'))invalidateQueryCache(path);
   if(response.status===401)window.dispatchEvent(new Event('desktop-session-rejected'));
   if(response.ok&&path==='/api/auth/logout')window.dispatchEvent(new Event('panel-auth-changed'));
-  if(response.status===204)return undefined as T;
+  if(response.status===204){resolvePanelErrors(path,options.method||'GET',context.epoch);return undefined as T;}
   const contentType=response.headers.get('content-type')||'';
-  const data=contentType.includes('json')?await response.json():await response.text();
+  let data:any;
+  try{data=contentType.includes('json')?await response.json():await response.text()}
+  catch(error){if(error instanceof SyntaxError)throw Object.assign(new Error('The panel returned an invalid JSON response.'),{status:response.status});throw error}
   if(!response.ok){
     const message=typeof data==='object'?(data.errors?.map((e:any)=>e.detail||e.message).join('\n')||data.message||(typeof data.error==='string'?data.error:undefined)):data;
     throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status});
   }
   if(path==='/api/admin/settings'&&options.method&&options.method.toUpperCase()!=='GET')window.dispatchEvent(new Event('panel-settings-changed'));
-  if(mutationPath==='/api/auth/session')setQueryCacheScope(queryCacheSessionIdentity(data));
+  if(mutationPath==='/api/auth/session'){setQueryCacheScope(queryCacheSessionIdentity(data));setNotificationScope(queryCacheSessionIdentity(data));}
+  resolvePanelErrors(path,options.method||'GET',context.epoch);
   return data as T;
+  }catch(error){if(!options.signal?.aborted)reportPanelError(error,{...context,status});throw error}
 }
 export function unwrap(response:any):any{return response?.attributes??response}
 export function rows(response:any):any[]{return (response?.data??[]).map((x:any)=>({...unwrap(x),...(x.meta?{_meta:x.meta}:{})}))}
@@ -33,13 +49,13 @@ export function useAPI<T=any>(path:string|null){return useAPIRequest<T>(path,api
 export function translate(dictionary:any,key:string,values:Record<string,any>={},fallback=key,locale='en'):string{const lookup=(path:string)=>path.split('.').reduce((value:any,part)=>value?.[part],dictionary);let found=lookup(key);if(values.count!==undefined&&Number.isFinite(Number(values.count))){let category='other';try{category=new Intl.PluralRules(locale).select(Number(values.count))}catch{}found=(Number(values.count)===0?lookup(`${key}_zero`):undefined)??lookup(`${key}_${category}`)??found}if(typeof found!=='string')return fallback;return found.replace(/{{([^}]+)}}/g,(_whole,path:string)=>{const value=path.split('.').reduce((v:any,p)=>v?.[p],values);return value===undefined?`{{${path}}}`:String(value)})}
 export function useTranslation(namespace:string){const account=useAPI('/api/client/account');const locale=unwrap(account.data)?.language||'en';const local=useAPI(`/locales/locale.json?locale=${encodeURIComponent(locale)}&namespace=${encodeURIComponent(namespace)}`);const english=useAPI(locale==='en'?null:`/locales/locale.json?locale=en&namespace=${encodeURIComponent(namespace)}`);return useCallback((key:string,values:Record<string,any>={},fallback=key)=>translate(local.data?.[locale]?.[namespace],key,values,translate(english.data?.en?.[namespace],key,values,fallback),locale),[local.data,english.data,locale,namespace])}
 type ButtonProps=ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'default'|'secondary'|'danger'};
-export function Button({variant='default',className='',children,...props}:ButtonProps){return <button type="button" className={`button ${variant==='default'?'':variant} ${className}`} {...props}>{children}</button>}
-export function Input(props:InputHTMLAttributes<HTMLInputElement>){return <input {...props}/>}
+export function Button({variant='default',className='',children,...props}:ButtonProps){return <ShadcnButton type="button" variant={variant==='danger'?'destructive':variant} className={`button ${variant==='default'?'':variant} ${className}`} {...props}>{children}</ShadcnButton>}
+export function Input(props:InputHTMLAttributes<HTMLInputElement>){return <ShadcnInput {...props}/>}
 export {Select} from './ui/Select';
-export function Textarea(props:TextareaHTMLAttributes<HTMLTextAreaElement>){return <textarea {...props}/>}
-export function Field({label,hint,children}: {label:string,hint?:string,children:ReactNode}){return <label className="field"><span>{label}</span>{children}{hint&&<small className="muted">{hint}</small>}</label>}
+export function Textarea(props:TextareaHTMLAttributes<HTMLTextAreaElement>){return <ShadcnTextarea {...props}/>}
+export function Field({label,hint,children}: {label:string,hint?:string,children:ReactNode}){return <MiraField as="label" className="field"><span>{label}</span>{children}{hint&&<small className="muted">{hint}</small>}</MiraField>}
 export function Card({children,className='',...props}:HTMLAttributes<HTMLElement>){return <ShadcnCard as="section" data-ui="card" className={`card legacy-card scn:gap-0 scn:[--card-spacing:var(--ui-card-padding)] ${className}`} {...props}>{children}</ShadcnCard>}
-export function ErrorBox({children}: {children?:ReactNode}){return children?<div className="error" role="alert">{children}</div>:null}
-export function Loading(){return <div className="loading" role="status"><span className="spinner"/>Loading…</div>}
-export function Empty({children}: {children?:ReactNode}){return <div className="empty">{children||'Nothing here yet.'}</div>}
+export function ErrorBox({children}: {children?:ReactNode}){return children?<Alert variant="destructive" className="error"><AlertDescription>{children}</AlertDescription></Alert>:null}
+export function Loading(){return <div className="loading" role="status"><Skeleton className="loading-skeleton"/>Loading…</div>}
+export function Empty({children}: {children?:ReactNode}){return <MiraEmpty className="empty"><EmptyDescription>{children||'Nothing here yet.'}</EmptyDescription></MiraEmpty>}
 export {Modal} from './ui/Modal';

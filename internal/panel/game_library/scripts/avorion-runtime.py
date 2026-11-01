@@ -79,13 +79,19 @@ def arguments(root,env):
     return argv,environment
 
 
-if __name__=='__main__':
-    root=Path.cwd();env=dict(os.environ)
+def main(root=None, env=None):
+    root=Path.cwd() if root is None else Path(root)
+    env=dict(os.environ if env is None else env)
     automatic=env.get('VOLTRA_STEAM_AUTO_UPDATE','0')
     if automatic not in ('0','1'):
         raise ValueError('Invalid automatic update flag')
+    # Reject invalid setup before publisher acquisition or managed file writes.
+    argv,environment=arguments(root,env)
     if automatic=='1':
         install(root,'avorion',env,validate=False)
-    argv,environment=arguments(root,env)
     environment=native_environment(root,environment,argv[0],'bin/AvorionServer')
-    raise SystemExit(run(root,argv,environment,'/stop',credentials=[env.get(k,'') for k in ('STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')],ready_marker=b'Server startup complete'))
+    return run(root,argv,environment,'/stop',credentials=[env.get(k,'') for k in ('STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')],ready_marker=b'Server startup complete')
+
+
+if __name__=='__main__':
+    raise SystemExit(main())

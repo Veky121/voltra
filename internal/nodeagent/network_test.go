@@ -119,17 +119,28 @@ func TestNetworkConnectorAuthenticatedStream(t *testing.T) {
 }
 
 func TestNetworkProbeOccupiedAndReleased(t *testing.T) {
-	tcp, err := net.Listen("tcp4", "127.0.0.1:0")
+	// Windows can reserve a TCP-selected ephemeral port for UDP. Select UDP
+	// first and retain only a port that both protocols can actually bind.
+	var tcp net.Listener
+	var udp net.PacketConn
+	var err error
+	for attempt := 0; attempt < 64; attempt++ {
+		udp, err = net.ListenPacket("udp4", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tcp, err = net.Listen("tcp4", udp.LocalAddr().String())
+		if err == nil {
+			break
+		}
+		udp.Close()
+	}
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("could not reserve a loopback TCP/UDP fixture pair: %v", err)
 	}
 	defer tcp.Close()
-	port := int64(tcp.Addr().(*net.TCPAddr).Port)
-	udp, err := net.ListenPacket("udp4", tcp.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer udp.Close()
+	port := int64(tcp.Addr().(*net.TCPAddr).Port)
 	q := NetworkProbeRequest{IP: "127.0.0.1", Ports: []int64{port}}
 	got, err := ProbeNetworkPorts(context.Background(), q)
 	if err != nil {

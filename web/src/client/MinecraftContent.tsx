@@ -1,3 +1,4 @@
+import {useErrorState} from '../notifications/useErrorState';
 import {SectionTabs} from "../ui/SectionTabs";
 import './games-ui.css';
 import { useState } from "react";
@@ -36,7 +37,7 @@ function MinecraftContentView({ server }: { server: string }) {
   const [selected, setSelected] = useState<Project | null>(null);
   const [removing, setRemoving] = useState<Installed | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('client/MinecraftContent.tsx');
   const [notice, setNotice] = useState("");
   const catalog = useAPI(`${base}?${new URLSearchParams({ provider, query, compatibility, include_unverified:String(includeUnverified) })}`);
   const data = unwrap(catalog.data) as Catalog | null;
@@ -97,7 +98,7 @@ function ContentVersions({ base, provider, compatibility, includeUnverified, pro
   const [version, setVersion] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('client/MinecraftContent.tsx');
   const chosen = data?.versions.find(v => v.id === version);
   async function install() {
     if (!chosen || busy) return;

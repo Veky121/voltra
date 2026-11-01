@@ -253,7 +253,10 @@ class NativeLogRelay:
                 names = names[shift:] + names[:shift]
                 self.turn += 1
             budget = self.POLL_READ
+            pending = False
             for name, scanned in names:
+                if self.finish_deadline is not None and time.monotonic() >= self.finish_deadline:
+                    raise TimeoutError('final log drain deadline')
                 if name not in self.names:
                     if len(self.names) >= self.MAX_NAMES:
                         raise ValueError('name limit')
@@ -286,7 +289,10 @@ class NativeLogRelay:
                     # Compare only the previously observed prefix, never emit it.
                     state.prefix = prefix
                     state.mtime = info.st_mtime_ns
-                    if baseline or budget <= 0:
+                    if baseline:
+                        continue
+                    if budget <= 0:
+                        pending = pending or state.position < info.st_size
                         continue
                     if state.position >= info.st_size:
                         continue
@@ -296,11 +302,13 @@ class NativeLogRelay:
                     data = os.read(fd, min(self.FILE_READ, budget))
                     budget -= len(data)
                     state.position += len(data)
+                    pending = pending or state.position < info.st_size
                     self._emit(state.feed(data))
                     if state.position >= info.st_size:
                         self._emit(state.quiesce())
                 finally:
                     os.close(fd)
+            return pending
         finally:
             os.close(directory)
 
@@ -328,7 +336,11 @@ class NativeLogRelay:
         try:
             while not self.done.wait(self.INTERVAL):
                 self._poll()
-            self._poll()
+            # Keep each poll bounded, but drain further batches before claiming
+            # a successful finish. The existing deadline bounds total work.
+            while self._poll():
+                if self.finish_deadline is not None and time.monotonic() >= self.finish_deadline:
+                    raise TimeoutError('final log drain deadline')
             if not self.failed:
                 for state in self.identities.values():
                     if state.has_input:

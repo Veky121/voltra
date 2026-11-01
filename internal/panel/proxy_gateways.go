@@ -49,6 +49,7 @@ func proxySafeGateway(m M) M {
 	return m
 }
 func (a *App) registerProxyGateways(mux *http.ServeMux) {
+ a.registerSubdomains(mux)
 	mux.HandleFunc("GET /api/client/servers/{server}/proxy-routes", a.proxyClientRoutes)
 	mux.HandleFunc("GET /api/admin/proxy-gateways/{gateway}/config/frps", a.proxyDownload)
 	mux.HandleFunc("GET /api/admin/proxy-gateways/{gateway}/clients/{client}/config", a.proxyDownload)

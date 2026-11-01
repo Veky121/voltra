@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import re
 import sys
-from unreal_survival_install import metadata, confined, install
+from unreal_survival_install import metadata, confined, install, front_preflight, abiotic_preflight
 from native_config import patch_ini
 from steam_template import _publish
 from native_console import run
@@ -29,7 +29,8 @@ def front_argument(key,value):
 
 def configure(root, game, environment):
     root=Path(root).resolve();info=metadata()[game]
-    env={**info['defaults'], **environment}
+    env=front_preflight(root, environment, info) if game=='front' else {**info['defaults'], **environment}
+    if game=='abiotic':env=abiotic_preflight(root, environment, info)
     ports=[int(env['SERVER_PORT'])]+[int(env[name]) for name in info['ports']]
     allocated={int(p) for p in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') if p}
     if len(set(ports))!=len(ports) or any(not 1<=p<=65535 or p not in allocated for p in ports):
@@ -158,6 +159,8 @@ class AbioticLog:
 
 def main():
     game=sys.argv[1];root=Path.cwd();env=dict(os.environ)
+    if game=='front':front_preflight(root,env)
+    if game=='abiotic':abiotic_preflight(root,env)
     if env.get('VOLTRA_STEAM_AUTO_UPDATE',env.get('AUTO_UPDATE','0'))=='1':install(root,game,env)
     argv,child,secrets,ready=configure(root,game,env)
     if game=='abiotic':

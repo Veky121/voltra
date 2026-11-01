@@ -34,6 +34,32 @@ def map_exists(game, mod, name):
     return False
 
 
+NATIVE_DEFAULTS = ('// OpenArena 0.8.8 extra native tuning. Original form controls load afterward.\n'
+                   'set fraglimit "20"\nset timelimit "0"\nset capturelimit "8"\n'
+                   'set g_friendlyFire "0"\nset g_allowVote "1"\nset g_doWarmup "0"\n'
+                   'set g_warmup "20"\nset g_inactivity "0"\n')
+
+
+def planned_paths(root, paths):
+    root = root.resolve()
+    for path in paths:
+        relative = path.relative_to(root)
+        current = root
+        for index, part in enumerate(relative.parts):
+            current = current / part
+            if current.is_symlink():
+                raise ValueError('OpenArena configuration paths must not use symlinks')
+            if current.exists() and (not current.is_file() if index == len(relative.parts)-1 else not current.is_dir()):
+                raise ValueError('OpenArena configuration path has an invalid file kind')
+
+
+def seed_native(folder):
+    target = folder / 'server.cfg'
+    if not target.exists():
+        with open(target, 'x', opener=lambda p, f: os.open(p, f | os.O_NOFOLLOW, 0o600)) as out:
+            out.write(NATIVE_DEFAULTS)
+
+
 def configure(env, root):
     port, maximum = int(env['SERVER_PORT']), int(env.get('MAX_PLAYERS', '16'))
     kind, minimum = int(env.get('GAME_TYPE', '0')), int(env.get('MIN_PLAYERS', '0'))
@@ -54,6 +80,13 @@ def configure(env, root):
              'set g_password ' + quoted(env.get('SERVER_PASSWORD', ''), 127, True)]
     password = env.get('RCON_PASSWORD', '')
     credential = root / '.voltra/openarena/rcon-password'
+    if password:
+        quoted(password, 127)
+    allocated = {int(value) for value in env.get('VOLTRA_ALLOCATED_PORTS', '').split(',') if value}
+    if allocated and port not in allocated:
+        raise ValueError('OpenArena needs an allocated primary port')
+    folder = game / 'userdata' / mod
+    planned_paths(root, [credential, folder / 'server.cfg', folder / 'voltra-managed.cfg'])
     if not password:
         credential.parent.mkdir(parents=True, exist_ok=True)
         if not credential.exists():
@@ -63,6 +96,7 @@ def configure(env, root):
     lines.append('set rconPassword ' + quoted(password, 127))
     folder = game / 'userdata' / mod
     folder.mkdir(parents=True, exist_ok=True)
+    seed_native(folder)
     config = folder / 'voltra-managed.cfg'
     content = '\n'.join(lines) + '\n'
     if not config.is_file() or config.read_text() != content:
@@ -84,42 +118,35 @@ def configure(env, root):
 
 
 def run(root, argv):
-    child = subprocess.Popen(argv, cwd=root / 'openarena', stdin=sys.stdin,
-                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
-    def stop(*_):
-        if child.poll() is None:
-            child.send_signal(signal.SIGTERM)
-    signal.signal(signal.SIGTERM, stop)
-    signal.signal(signal.SIGINT, stop)
-    def output():
-        for line in iter(child.stdout.readline, b''):
-            sys.stdout.buffer.write(line)
-            sys.stdout.buffer.flush()
-    reader = threading.Thread(target=output, daemon=True)
-    reader.start()
-    token = secrets.token_hex(8).encode()
-    port = int(os.environ['SERVER_PORT'])
-    ready = False
-    try:
+    from native_console import run as supervise
+    environment = dict(os.environ)
+    credentials = [environment.get('SERVER_PASSWORD', ''), environment.get('RCON_PASSWORD', '')]
+    if not credentials[1]:
+        credentials[1] = (root / '.voltra/openarena/rcon-password').read_text()
+    finished = threading.Event()
+    def readiness():
+        token = secrets.token_hex(8).encode()
+        port = int(environment['SERVER_PORT'])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
             probe.settimeout(0.2)
-            while child.poll() is None:
-                if not ready:
-                    probe.sendto(b'\xff\xff\xff\xffgetinfo ' + token + b'\n', ('127.0.0.1', port))
-                    try:
-                        packet, address = probe.recvfrom(8192)
-                        if address == ('127.0.0.1', port) and packet.startswith(b'\xff\xff\xff\xffinfoResponse\n') and b'\\challenge\\' + token in packet:
-                            ready = True
-                            print('OpenArena native UDP server ready', flush=True)
-                    except socket.timeout:
-                        pass
-                time.sleep(0.1)
-        return child.returncode
+            while not finished.is_set():
+                probe.sendto(b'\xff\xff\xff\xffgetinfo ' + token + b'\n', ('127.0.0.1', port))
+                try:
+                    packet, address = probe.recvfrom(8192)
+                    if address == ('127.0.0.1', port) and packet.startswith(b'\xff\xff\xff\xffinfoResponse\n') and b'\\challenge\\' + token in packet:
+                        print('OpenArena native UDP server ready', flush=True)
+                        return
+                except socket.timeout:
+                    pass
+                finished.wait(0.1)
+    worker = threading.Thread(target=readiness, daemon=True)
+    worker.start()
+    try:
+        result = supervise(root / 'openarena', argv, environment, 'quit', credentials=credentials)
+        return result if result >= 0 else 128 - result
     finally:
-        if child.poll() is None:
-            child.send_signal(signal.SIGTERM)
-            child.wait(timeout=15)
-        reader.join(timeout=5)
+        finished.set()
+        worker.join(timeout=1)
 
 
 if __name__ == '__main__':

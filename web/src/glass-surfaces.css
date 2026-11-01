@@ -1,7 +1,7 @@
 /* User-selected surfaces shared by client, admin, and lazy-loaded pages.
    Keep blur on outer panels, not rows or nested card content. */
 :root[data-voltra-theme]{--ui-surface:var(--theme-card-surface,#181c25);--surface:var(--ui-surface);--card:var(--ui-surface);--ui-input:#1b1e26;--ui-border:#dce4ff1a;--ui-divider:#dce4ff0a}
-[data-voltra-theme] .voltra-shadcn-content{background:radial-gradient(ellipse at 5% 0,color-mix(in srgb,var(--theme-accent-a) 9%,transparent),transparent 55%),radial-gradient(ellipse at 95% 30%,color-mix(in srgb,var(--theme-accent-b) 7%,transparent),transparent 60%),var(--scn-background)}
+[data-voltra-theme] .voltra-shadcn-content{background:var(--theme-background,var(--shell-canvas,var(--scn-background)))}
 :root[data-voltra-theme] :is(.card,[data-slot=card],.metric-card,.settings-group,.server-topbar,.console-terminal,.fm-browser,.file-explorer,.file-transfers,.appearance-preview-metric,.files-ui-state,.files-path,.files-table-wrap,.file-selection-bar,.library-card,.game-family-option,.mc-choice,.mc-pack-card,.mc-catalog-filters,.operations-record,.operations-filters,.operations-table,.overview-skeleton){
  background:var(--theme-card-sheen),var(--ui-surface);
  border-color:var(--ui-border);

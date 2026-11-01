@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
-from goldsrc_runtime import selection
+from goldsrc_runtime import selection, preflight
 from steam_template import update
 
 
@@ -29,6 +29,8 @@ def operator_files(root, game):
 def install(root, env, validate=True):
     root = root.resolve()
     flavor, game = selection(env)
+    if flavor in ('generic', 'rehlds'):
+        preflight(root, env)
     if flavor == 'rehlds' and env.get('SRCDS_BETAID', '') != 'steam_legacy':
         raise ValueError('ReHLDS requires the publisher steam_legacy branch')
     (root / '.voltra').mkdir(parents=True, exist_ok=True)

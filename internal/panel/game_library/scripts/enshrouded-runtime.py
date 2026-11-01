@@ -24,51 +24,71 @@ def boolean(env,key,default='0'):
     return env.get(key,default)=='1'
 
 
-def configure(root, env):
+def configure(root, env, preflight=False):
     root=Path(root).resolve();target=root/'enshrouded_server.json'
     if not target.resolve().is_relative_to(root) or not (root/'.voltra/enshrouded/config-backups').resolve().is_relative_to(root):raise ValueError('Enshrouded configuration leaves the volume')
     previous=target.read_text(encoding='utf-8-sig') if target.exists() and target.stat().st_size<=8*1024*1024 else ''
     if target.exists() and not previous:raise ValueError('Invalid or oversized Enshrouded configuration')
     data=json.loads(previous) if previous else {}
     if not isinstance(data,dict):raise ValueError('Expected native JSON object')
-    maximum=int(env.get('MAX_PLAYERS','16'));port=int(env['SERVER_PORT'])
-    allocated={int(p) for p in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') if p}
-    if not 1<=maximum<=16 or not 1<=port<=65535 or port not in allocated:raise ValueError('Choose 1..16 slots and an allocated query port')
-    data.update({'name':text(env.get('SRV_NAME','Enshrouded server')),'slotCount':maximum,'queryPort':port,'ip':'0.0.0.0'})
-    for key,default in [('saveDirectory','./savegame'),('logDirectory','./logs')]:
-        relative=data.get(key,default)
-        if not isinstance(relative,str) or not relative or '\\' in relative or Path(relative).is_absolute() or not (root/relative).resolve().is_relative_to(root):raise ValueError('Native save and log directories must remain in this server volume')
-        data[key]=relative;(root/relative).mkdir(parents=True,exist_ok=True)
-    preset=env.get('GAME_PRESET','Default')
-    if preset not in ('Default','Relaxed','Hard','Survival','Custom'):raise ValueError('Unsupported native difficulty preset')
-    data['gameSettingsPreset']=preset
-    data['enableVoiceChat']=boolean(env,'VOICE_CHAT');data['enableTextChat']=boolean(env,'TEXT_CHAT')
-    data.setdefault('voiceChatMode','Proximity')
-    groups=data.setdefault('userGroups',[])
-    if not isinstance(groups,list) or any(not isinstance(g,dict) for g in groups):raise ValueError('Native userGroups must be an array of objects')
     passwords=[]
-    for index,(name,key) in enumerate([('Admin','SRV_PW'),('Friend','SRV_PW2'),('Guest','SRV_PW3'),('Visitor','SRV_PW4')]):
-        password=text(env.get(key,'ChangeMe'+str(index+1)),128)
-        if not password or password.isdigit():raise ValueError('Each role needs a nonempty password containing nonnumeric characters')
-        passwords.append(password)
-        matches=[g for g in groups if g.get('name')==name]
-        if len(matches)>1:raise ValueError('Duplicate managed native user group')
-        if matches:group=matches[0]
-        elif index==0 and groups:group=groups[0]
-        else:
-            group={'name':name,'canKickBan':index==0,'canAccessInventories':index<2,'canEditBase':index<2,'canExtendBase':index<2,'canEditWorld':index<3}
-            groups.append(group)
-        group['password']=password
-    if len(set(passwords))!=4:raise ValueError('Use distinct passwords for all four native roles')
-    updated=json.dumps(data,ensure_ascii=False,indent=2)+'\n'
-    if updated!=previous:
-        if previous:private_write(root/'.voltra/enshrouded/config-backups'/(str(time.time_ns())+'-enshrouded_server.json'),previous)
-        private_write(target,updated)
-    else:target.chmod(0o600)
+    if not previous:
+        maximum=int(env.get('MAX_PLAYERS','16'));port=int(env['SERVER_PORT'])
+        allocated={int(p) for p in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') if p}
+        if not 1<=maximum<=16 or not 1<=port<=65535 or port not in allocated:raise ValueError('Choose 1..16 slots and an allocated query port')
+        data.update({'name':text(env.get('SRV_NAME','Enshrouded server')),'slotCount':maximum,'queryPort':port,'ip':'0.0.0.0'})
+        for key,default in [('saveDirectory','./savegame'),('logDirectory','./logs')]:
+            relative=data.get(key,default)
+            if not isinstance(relative,str) or not relative or '\\' in relative or Path(relative).is_absolute() or not (root/relative).resolve().is_relative_to(root):raise ValueError('Native save and log directories must remain in this server volume')
+            data[key]=relative
+        preset=env.get('GAME_PRESET','Default')
+        if preset not in ('Default','Relaxed','Hard','Survival','Custom'):raise ValueError('Unsupported native difficulty preset')
+        data['gameSettingsPreset']=preset
+        data['enableVoiceChat']=boolean(env,'VOICE_CHAT');data['enableTextChat']=boolean(env,'TEXT_CHAT')
+        data.setdefault('voiceChatMode','Proximity')
+        groups=data.setdefault('userGroups',[])
+        if not isinstance(groups,list) or any(not isinstance(g,dict) for g in groups):raise ValueError('Native userGroups must be an array of objects')
+        passwords=[]
+        for index,(name,key) in enumerate([('Admin','SRV_PW'),('Friend','SRV_PW2'),('Guest','SRV_PW3'),('Visitor','SRV_PW4')]):
+            password=text(env.get(key,'ChangeMe'+str(index+1)),128)
+            if not password or password.isdigit():raise ValueError('Each role needs a nonempty password containing nonnumeric characters')
+            passwords.append(password)
+            matches=[g for g in groups if g.get('name')==name]
+            if len(matches)>1:raise ValueError('Duplicate managed native user group')
+            if matches:group=matches[0]
+            elif index==0 and groups:group=groups[0]
+            else:
+                group={'name':name,'canKickBan':index==0,'canAccessInventories':index<2,'canEditBase':index<2,'canExtendBase':index<2,'canEditWorld':index<3}
+                groups.append(group)
+            group['password']=password
+        if len(set(passwords))!=4:raise ValueError('Use distinct passwords for all four native roles')
+    # Native files become authoritative after the first seed. Never serialize an
+    # operator file merely to start it, including unknown numeric values/bytes.
+    port=data.get('queryPort')
+    allocated={int(p) for p in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') if p}
+    if type(port) is not int or port != int(env['SERVER_PORT']) or port not in allocated:
+        raise ValueError('Native queryPort must match the primary allocation; edit the stopped native file')
+    directories=[]
+    for key in ('saveDirectory','logDirectory'):
+        relative=data.get(key)
+        if not isinstance(relative,str) or not relative or '\\' in relative or Path(relative).is_absolute() or not (root/relative).resolve().is_relative_to(root):
+            raise ValueError('Native save and log directories must remain in this server volume')
+        directories.append(root/relative)
+    groups=data.get('userGroups',[])
+    if not isinstance(groups,list) or any(not isinstance(g,dict) for g in groups):raise ValueError('Native userGroups must be an array of objects')
+    passwords.extend(g.get('password','') for g in groups if isinstance(g.get('password',''),str))
+    log=root/data['logDirectory']/'enshrouded_server.log'
+    if not log.resolve().is_relative_to(root):raise ValueError('Native log leaves the server volume')
+    prefixes=[root/'.steam/steam',root/'.steam/steam/steamapps/compatdata/2278520']
+    if any(not p.resolve().is_relative_to(root) for p in prefixes):raise ValueError('Proton prefix leaves the server volume')
+    if preflight:return
     binary=root/'enshrouded_server.exe'
     if not binary.is_file() or not binary.resolve().is_relative_to(root):raise ValueError('Steam installation is missing a confined enshrouded_server.exe')
+    launcher=location(root)
+    for directory in directories+prefixes:directory.mkdir(parents=True,exist_ok=True)
+    if not previous:private_write(target,json.dumps(data,ensure_ascii=False,indent=2)+'\n')
     environment=dict(os.environ)
-    for key in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD'):environment.pop(key,None)
+    for key in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD','STEAM_USER','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS'):environment.pop(key,None)
     environment['HOME']=str(root)
     environment['DISPLAY']=':99'
     environment['VOLTRA_MANAGED_DISPLAY']='1'
@@ -79,10 +99,10 @@ def configure(root, env):
         if not Path(environment[key]).resolve().is_relative_to(root):raise ValueError('Proton prefix leaves the server volume')
         Path(environment[key]).mkdir(parents=True,exist_ok=True)
     passwords.extend(g.get('password','') for g in groups if isinstance(g.get('password',''),str))
-    credentials=passwords+[env.get(k,'') for k in ('STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')]
+    credentials=passwords+[env.get(k,'') for k in ('STEAM_USER','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')]
     log=root/data['logDirectory']/'enshrouded_server.log'
     if not log.resolve().is_relative_to(root):raise ValueError('Native log leaves the server volume')
-    return [str(location(root)),'run',str(binary)],environment,credentials,log
+    return [str(launcher),'run',str(binary)],environment,credentials,log
 
 
 def native_pids(root,proc=Path('/proc')):
@@ -163,7 +183,9 @@ def run(root,argv,environment,credentials,log):
 
 def main():
     root=Path.cwd();env=dict(os.environ)
-    if boolean(env,'VOLTRA_STEAM_AUTO_UPDATE'):install(root,'enshrouded',env,validate=boolean(env,'VALIDATE'))
+    auto=boolean(env,'VOLTRA_STEAM_AUTO_UPDATE');validate=boolean(env,'VALIDATE')
+    configure(root,env,preflight=True)
+    if auto:install(root,'enshrouded',env,validate=validate)
     return run(root,*configure(root,env))
 
 

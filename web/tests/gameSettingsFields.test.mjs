@@ -11,8 +11,8 @@ const require = createRequire(import.meta.url);
 const source = readFileSync(new URL('../src/client/GameSettingsFields.tsx', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
 const module = {exports:{}};
-const mocks = {'./settingDescription':{settingDescription:text=>text},
-  '../lib':{Input:'input', Select:'select', Textarea:'textarea'},
+const mocks = {'../ui/Settings':{SettingsSection:({title,children})=>React.createElement('section',null,title,children),SettingsRow:({label,description,control})=>React.createElement('div',null,label,description,control)},'./settingDescription':{settingDescription:text=>text},
+  '../ui/ActionButton':{ActionButton:'button'}, '../lib':{Input:'input', Select:'select', Textarea:'textarea'},
   './GameSwitch':{GameSwitch:({checked,onCheckedChange,...props})=>React.createElement('button',{...props,role:'switch','aria-checked':checked})},
   './gameSettingsLayout':layout,
 };

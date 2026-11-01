@@ -135,7 +135,7 @@ def configure(root, env):
     argv = [str(binary), '-batchmode', '-nographics', '-logfile', '-', '+server.identity', identity,
             '+server.port', str(game), '+server.queryport', str(query_port),
             '+rcon.ip', '0.0.0.0', '+rcon.port', str(rcon), '+rcon.web', '1', '+rcon.password', password,
-            '+app.port', '1-' if app == -1 else str(app), *extras]
+            '+app.port', str(app), *extras]
     return argv, child_env, rcon, password
 
 
@@ -280,6 +280,9 @@ def run(root, argv, environment, port, password, credentials=()):
     try:
         code = child.wait()
         threads[0].join(timeout=2)
+        if code < 0:
+            emit(('Rust native child exited with raw status '+str(code)+'\n').encode())
+            code = 128 - code
         return code if announced else (code or 1)
     finally:
         finished.set();threads[0].join(timeout=2);child.stdout.close()

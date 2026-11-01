@@ -149,6 +149,7 @@ func (a *App) infraCRUD(resource string) http.HandlerFunc {
 				fail(w, e)
 				return
 			}
+			nodeConfigRequested := resource == "nodes" && infraNodeConfigurationSyncRequested(data)
 			if r.Method == http.MethodPost || resource == "nodes" && r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/api/application/") {
 				if e = infraCreateRequest(resource, data); e != nil {
 					fail(w, e)
@@ -179,7 +180,7 @@ func (a *App) infraCRUD(resource string) http.HandlerFunc {
 				fail(w, e)
 				return
 			}
-			if resource == "nodes" && id > 0 {
+			if resource == "nodes" && id > 0 && (nodeConfigRequested || infraNodeConfigurationNeedsSync(old, row)) {
 				connection := M{}
 				for k, v := range old {
 					connection[k] = v

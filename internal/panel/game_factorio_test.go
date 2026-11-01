@@ -26,7 +26,7 @@ func TestFactorioUpdaterEmbeddedSource(t *testing.T) {
 
 func TestFactorioReviewedSettings(t *testing.T) {
 	for _, spec := range []struct{ path, profile string }{
-		{"factorio/factorio/egg-factorio.json", "factorio-version-choice-v2"},
+		{"factorio/factorio/egg-factorio.json", "factorio-version-choice-v2-native-authority-v2"},
 		{"factorio/factorio-modupdate/egg-factorio-modupdate.json", "factorio-modupdate-version-choice-v2"},
 		{"factorio/factorio/egg-factorio-a-r-m64.json", "factorio-arm64-version-choice-v2"},
 	} {

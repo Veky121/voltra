@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import {usePendingSetting} from './PendingSettings';
+import {confirmAction} from '../ui/ConfirmAction';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import { useEffect, useState, type ReactNode } from "react";
 import { JavaSettings } from "./JavaSettings";
 import { ProxyEndpoints } from "./ProxyEndpoints";
 import {SettingsRow,SettingsSection} from '../ui/Settings';
@@ -93,10 +96,10 @@ export function Backups() {
               <code>{b.uuid}</code>
             </small>
             {b.checksum && (
-              <details>
-                <summary>Checksum</summary>
+              <Disclosure>
+                <DisclosureTrigger>Checksum</DisclosureTrigger>
                 <code>{b.checksum}</code>
-              </details>
+              </Disclosure>
             )}
             <div className="actions operations-record-actions">
               {can(permissions, "backup.download") && b.is_successful && (
@@ -134,8 +137,8 @@ export function Backups() {
                   <Button
                     variant="danger"
                     disabled={a.busy || b.is_locked}
-                    onClick={() => {
-                      if (confirm(`Permanently delete backup ${b.name}?`))
+                    onClick={async () => {
+                      if (await confirmAction({title:"Delete?",description:`Permanently delete backup ${b.name}?`,confirmLabel:"Delete",danger:true}))
                         perform(b.uuid, "", undefined, "DELETE");
                     }}
                   >
@@ -233,11 +236,19 @@ export function Network() {
       () => api(`${base}/network/allocations${path}`, json(method, body)),
       r.reload
     );
+  const [savingNotes,setSavingNotes]=useState(false);
+  const changedNotes=Object.entries(notes).filter(([id,text])=>text!==(items(r.data).find(n=>String(n.id)===id)?.notes??''));
+  async function saveNotes(){
+    setSavingNotes(true);a.setError('');
+    try{for(const [id,text] of changedNotes){await api(`${base}/network/allocations/${id}`,json('POST',{notes:text}));setNotes(current=>{const next={...current};if(next[id]===text)delete next[id];return next})}}
+    catch(error){a.setError(error instanceof Error?error.message:String(error));throw error}finally{setSavingNotes(false)}
+  }
+  usePendingSetting(`network-notes:${base}`,changedNotes.length>0,{blocked:savingNotes||!can(permissions,'allocation.update'),save:saveNotes,afterSave:r.reload,discard:()=>{setNotes({});a.setError('')}});
   return (
-    <section className="operations-page network-page">
+    <section className="operations-page network-page" aria-label="Network allocations">
       <ProxyEndpoints base={base} />
       <div className="toolbar server-page-toolbar">
-        <ServerPageTitle title="Network allocations" limit={server.feature_limits?.allocations}/>
+        <span className="server-limit-badge">Limit: {server.feature_limits?.allocations ?? 'Unlimited'}</span>
         {can(permissions, "allocation.create") && (
           <Button disabled={a.busy} onClick={() => perform("")}>
             Assign allocation
@@ -263,10 +274,7 @@ export function Network() {
               </p>
             )}
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                perform(`/${n.id}`, { notes: notes[n.id] ?? n.notes ?? "" });
-              }}
+              onSubmit={e=>{e.preventDefault();void saveNotes().catch(()=>{})}}
             >
               <Field label="Notes">
                 <Input
@@ -281,9 +289,6 @@ export function Network() {
               <div className="actions operations-record-actions">
                 {can(permissions, "allocation.update") && (
                   <>
-                    <Button type="submit" disabled={a.busy}>
-                      Save notes
-                    </Button>
                     {!n.is_default && (
                       <Button
                         type="button"
@@ -301,8 +306,8 @@ export function Network() {
                     type="button"
                     variant="danger"
                     disabled={a.busy}
-                    onClick={() => {
-                      if (confirm(`Unassign ${n.ip}:${n.port}?`))
+                    onClick={async () => {
+                      if (await confirmAction({title:"Unassign?",description:`Unassign ${n.ip}:${n.port}?`,confirmLabel:"Unassign",danger:true}))
                         perform(`/${n.id}`, undefined, "DELETE");
                     }}
                   >
@@ -479,7 +484,7 @@ export function Startup() {
   );
 }
 
-export function Settings() {
+export function Settings({details,showReinstall=true}:{details?:ReactNode;showReinstall?:boolean}={}) {
   const { base, server, permissions, reload } = useServer();
   const account = useAPI("/api/client/account");
   const a = useAction();
@@ -487,26 +492,20 @@ export function Settings() {
     [description, setDescription] = useState(server.description || "");
   const user = value(account.data) || {};
   const sftp = server.sftp_details || {};
+  const [saving,setSaving]=useState(false),[baseline,setBaseline]=useState({name:server.name||'',description:server.description||''});
+  async function saveDetails(){
+    setSaving(true);a.setError('');
+    try{await api(`${base}/settings/rename`,json('POST',{name,description}));setBaseline({name,description})}
+    catch(error){a.setError(error instanceof Error?error.message:String(error));throw error}finally{setSaving(false)}
+  }
+  usePendingSetting(`details:${base}`,!details&&(name!==baseline.name||description!==baseline.description),{blocked:saving||!name.trim()||!can(permissions,'settings.rename'),save:saveDetails,afterSave:reload,discard:()=>{setName(baseline.name);setDescription(baseline.description);a.setError('')}});
   return (
     <section className="operations-page settings-page server-general-settings">
       <Notice action={a} />
       <div className="server-general-grid">
-        <SettingsSection title="Panel details">
+        {details ?? <SettingsSection title="Panel details">
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              a.run(
-                () =>
-                  api(
-                    `${base}/settings/rename`,
-                    json("POST", { name, description })
-                  ),
-                () => {
-                  reload();
-                  a.setSuccess("Server details saved.");
-                }
-              );
-            }}
+            onSubmit={e=>{e.preventDefault();void saveDetails().catch(()=>{})}}
           >
             <SettingsRow label="Panel name" description="Shown only in Voltra." control={
               <Input
@@ -525,15 +524,8 @@ export function Settings() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             }/>
-            {can(permissions, "settings.rename") && (
-              <div className="settings-actions">
-              <Button type="submit" disabled={a.busy}>
-                Save
-              </Button>
-              </div>
-            )}
           </form>
-        </SettingsSection>
+        </SettingsSection>}
         <SettingsSection title="SFTP">
           <SettingsRow label="Address" control={
             <Input
@@ -566,17 +558,15 @@ export function Settings() {
           <SettingsRow label="Node" control={<span className="settings-value">{server.node}</span>}/>
           <SettingsRow label="UUID" control={<Input aria-label="Server UUID" readOnly value={server.uuid || ""} />}/>
         </SettingsSection>
-        {can(permissions, "settings.reinstall") && (
+        {showReinstall && can(permissions, "settings.reinstall") && (
           <SettingsSection title="Reinstall">
             <SettingsRow label="Reinstall server" description="Stops the server and may overwrite files. Back up first." control={
             <Button
               variant="danger"
               disabled={a.busy}
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  confirm(
-                    `Reinstall ${server.name}? Installation scripts can overwrite existing files.`
-                  )
+                  await confirmAction({title:`Reinstall ${server.name}?`,description:"Installation scripts can overwrite existing files. Back up first.",confirmLabel:"Reinstall server",danger:true})
                 )
                   a.run(
                     () => api(`${base}/settings/reinstall`, json("POST")),

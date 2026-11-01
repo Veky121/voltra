@@ -42,6 +42,9 @@ type Config struct {
 	ConsoleHistoryLines                                                                    int
 }
 type App struct {
+	liveSnapshots      liveSnapshotHub
+	resourceReads      sharedResourceReads
+	liveEvents         liveEventHub
 	cloudflare         cloudflareAccessState
 	DB                 *pgxpool.Pool
 	Config             Config
@@ -246,7 +249,7 @@ func (a *App) unseal(value string) (string, error) {
 	return string(plaintext), err
 }
 
-func (a *App) query(ctx context.Context, sql string, args ...any) ([]M, error) {
+func (a *App) queryUncached(ctx context.Context, sql string, args ...any) ([]M, error) {
 	rs, err := a.DB.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
@@ -450,6 +453,9 @@ func (a *App) migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 func (a *App) Close() {
+	a.liveSnapshots.close()
+	a.resourceReads.close()
+	a.liveEvents.close()
 	a.closePrivateSteam()
 	a.closeHTTPS()
 	a.connectors().close()
@@ -476,6 +482,7 @@ func (a *App) Handler() http.Handler {
 	a.registerArtworkLibrary(mux)
 	a.registerAccounts(mux)
 	a.registerServerNavigation(mux)
+	mux.HandleFunc("GET /api/client/events", a.clientLiveEvents)
 	a.registerServerConfiguration(mux)
 	a.registerDesktop(mux)
 	a.registerSetup(mux)
@@ -498,6 +505,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, notFound()) })
 	mux.HandleFunc("/", a.serveWeb)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = withRequestReads(r)
 		defer func() {
 			if p := recover(); p != nil {
 				slog.Error("handler panic", "panic", p)
@@ -605,7 +613,13 @@ func (a *App) Handler() http.Handler {
 			a.lifecycleExternal(w, r)
 			return
 		}
-		mux.ServeHTTP(w, r)
+		if r.Method!="GET" && r.Method!="HEAD" && r.Method!="OPTIONS" && (UserID(r)>0||strings.HasPrefix(r.URL.Path,"/api/remote/")) && strings.HasPrefix(r.URL.Path,"/api/") {
+			tracked:=&liveMutationResponse{ResponseWriter:w};mux.ServeHTTP(tracked,r)
+			if tracked.status>=200&&tracked.status<300 {
+				a.liveSnapshots.invalidate(UserID(r))
+				if !strings.HasSuffix(r.URL.Path,"/navigation")&&(strings.HasPrefix(r.URL.Path,"/api/client/servers/")||strings.HasPrefix(r.URL.Path,"/api/admin/servers")||strings.HasPrefix(r.URL.Path,"/api/application/servers")) {a.liveEvents.navigationChanged(UserID(r))}
+			}
+		} else {mux.ServeHTTP(w, r)}
 	})
 }
 func (a *App) serveWeb(w http.ResponseWriter, r *http.Request) {

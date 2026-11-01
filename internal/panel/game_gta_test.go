@@ -33,7 +33,12 @@ func TestGTAReviewedDefaults(t *testing.T) {
 			}
 			for _, name := range []string{"gta-install.py", "gta-runtime.py", "native-release.py", "native-config.py", "native-console.py", "steam-template.py"} {
 				source, err := os.ReadFile("game_library/scripts/" + name)
-				if err != nil || !strings.Contains(str(egg["script_install"]), string(source)) {
+				if name == "native-console.py" {
+					source = reviewedConsoleV1(t)
+					err = nil
+				}
+				// Linux heredocs use LF even when canonical sources have Windows CRLF.
+				if err != nil || !strings.Contains(strings.ReplaceAll(str(egg["script_install"]), "\r\n", "\n"), strings.ReplaceAll(string(source), "\r\n", "\n")) {
 					t.Fatal("missing or stale source", name, err)
 				}
 			}

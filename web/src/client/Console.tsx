@@ -1,3 +1,4 @@
+import {useErrorState} from '../notifications/useErrorState';
 import { useEffect, useRef, useState } from "react";
 import { api, Button, Input, Select, Field, Modal } from "../lib";
 import {useServerTelemetry} from "./ServerDashboard";
@@ -50,8 +51,8 @@ export default function Console() {
   const [history, setHistory] = useState(emptyConsoleHistory),
     [status, setStatus] = useState("unknown"),
     [connection, setConnection] = useState("Connecting"),
-    [socketError, setSocketError] = useState(""),
-    [historyError, setHistoryError] = useState(""),
+    [socketError, setSocketError] = useErrorState('client/Console.tsx'),
+    [historyError, setHistoryError] = useErrorState('client/Console.tsx'),
     [feature, setFeature] = useState(""),
     [oauth, setOAuth] = useState(""),
     [token, setToken] = useState(""),

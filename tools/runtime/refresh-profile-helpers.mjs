@@ -8,9 +8,9 @@ export function refreshHelpers(profiles, sources) {
   for (const [recipe, profile] of Object.entries(result)) {
     const installation = profile.egg.scripts.installation;
     installation.script = installation.script.replace(
-      /(cat\s+>\s*([^\s]+\.py)\s+<<'([^']+)'\r?\n)([\s\S]*?)(\r?\n\3(?:\r?\n|$))/g,
+      /(cat\s+>\s*((?:"[^"\r\n]+\.py"|'[^'\r\n]+\.py'|[^\s]+\.py))\s+<<'([^']+)'\r?\n)([\s\S]*?)(\r?\n\3(?:\r?\n|$))/g,
       (whole, start, target, delimiter, embedded, end) => {
-        const name = path.posix.basename(target).slice(0, -3).replaceAll('-', '_');
+        const name = path.posix.basename(target.replace(/^['"]|['"]$/g, '')).slice(0, -3).replaceAll('-', '_');
         if (!sources.has(name)) return whole;
         // The delimiter contributes one newline. Retain any additional source
         // newlines so exact-source checks and installed provenance agree.

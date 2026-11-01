@@ -395,9 +395,16 @@ def publish(root, content, release, archive_sha256, state, before_replace=lambda
 
 
 def initialize(root, kind, env):
+    if kind == 'tmodloader' and not confined(root, 'serverconfig.txt').exists():
+        from tmodloader_runtime import configuration
+        configuration(root, env, write=True)
     for name in ('saves/Worlds', 'mods') if kind == 'tmodloader' else ('saves/Worlds', 'tshock', 'logs') if kind in ('tshock', 'legacy') else ('saves/Worlds',):
         confined(root, name).mkdir(parents=True, exist_ok=True)
     config = confined(root, 'serverconfig.txt')
+    if kind == 'legacy' and not config.exists():
+        world = env.get('WORLD_NAME', 'world')
+        with config.open('x') as out:
+            out.write('worldpath=/home/container/saves/Worlds\nworldname=' + world + '\nworld=/home/container/saves/Worlds/' + world + '.wld\nautocreate=' + env.get('WORLD_SIZE', '1') + '\ndifficulty=' + env.get('WORLD_DIFFICULTY', '0') + '\nport=7777\nmaxplayers=' + env.get('MAX_PLAYERS', '8') + '\nupnp=0\n')
     if not config.exists():
         with config.open('x') as out:
             out.write('worldpath=/home/container/saves/Worlds\nworldname=world\nworld=/home/container/saves/Worlds/world.wld\nautocreate=1\ndifficulty=0\nport=7777\nmaxplayers=8\nupnp=0\n')
@@ -434,8 +441,30 @@ def preflight_operator_paths(root, kind, env):
         if alias.is_symlink() and os.readlink(alias) != 'libSDL2-2.0.so.0': raise ValueError('Operator SDL alias conflicts with the loader')
 
 
+def legacy_preflight(root, env, machine):
+    if machine not in ('x86_64', 'amd64'): raise ValueError('Legacy TShock requires Linux x64')
+    version = env.get('TSHOCK_VERSION', '').removeprefix('v')
+    if version != 'latest' and not re.fullmatch(r'4\.\d+\.\d+', version): raise ValueError('Select an exact legacy TShock 4.x release')
+    expected = checksum(env.get('RELEASE_SHA256', ''))
+    pin = PINS.get(('legacy', version, 'x64'))
+    if pin and expected and pin[1] != expected: raise ValueError('Operator checksum conflicts with reviewed publisher pin')
+    saves = confined(root, 'saves')
+    if saves.exists() and not saves.is_dir(): raise ValueError('Operator data directory conflicts: saves')
+    preflight_operator_paths(root, 'legacy', env)
+    # Only new native configuration consumes creation controls.
+    if not confined(root, 'serverconfig.txt').exists():
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,40}', env.get('WORLD_NAME', 'world')): raise ValueError('Invalid legacy world name')
+        if env.get('WORLD_SIZE', '1') not in ('1', '2', '3'): raise ValueError('Invalid legacy world size')
+        if env.get('WORLD_DIFFICULTY', '0') not in ('0', '1', '2', '3'): raise ValueError('Invalid legacy world difficulty')
+
+
 def install(root, env, read_metadata=metadata, download=acquire, machine=platform.machine()):
     root = Path(root).resolve()
+    if env.get('VOLTRA_TERRARIA_KIND') == 'tmodloader':
+        from tmodloader_runtime import environment_preflight
+        environment_preflight(root, env, machine)
+    if env.get('VOLTRA_TERRARIA_KIND') == 'legacy':
+        legacy_preflight(root, env, machine)
     state = confined(root, '.voltra/terraria-release'); state.mkdir(parents=True, exist_ok=True)
     lock_path = confined(root, '.voltra/terraria-release/install.lock')
     with lock_path.open('a+b') as lock:
@@ -450,6 +479,12 @@ def _install(root, env, read_metadata, download, machine):
     kind = env['VOLTRA_TERRARIA_KIND']
     key = 'TERRARIA_VERSION' if kind == 'vanilla' else 'VERSION' if kind == 'tmodloader' else 'TSHOCK_VERSION'
     arch = {'x86_64': 'x64', 'amd64': 'x64', 'aarch64': 'arm64'}.get(machine, '')
+    # Vanilla operator paths are knowable without publisher metadata or payload.
+    # Refuse conflicts before acquisition and before recovery mutates game files.
+    if kind == 'vanilla':
+        saves = confined(root, 'saves')
+        if saves.exists() and not saves.is_dir(): raise ValueError('Operator data directory conflicts: saves')
+        preflight_operator_paths(root, kind, env)
     release = resolve(kind, env[key], arch, env.get('RELEASE_SHA256', ''), read_metadata)
     state = confined(root, '.voltra/terraria-release'); state.mkdir(parents=True, exist_ok=True)
     recover(root, state)

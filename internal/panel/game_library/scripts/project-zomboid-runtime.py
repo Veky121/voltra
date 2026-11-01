@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """MIT. Native Zomboid setup without overwriting publisher launchers or worlds."""
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -21,7 +22,7 @@ def single_line(value, limit):
     return value
 
 
-def patch_ini(content, values):
+def patch_ini(content, values, seed_only=False):
     newline = '\r\n' if '\r\n' in content else '\n'
     result, seen = [], set()
     for line in content.splitlines(keepends=True):
@@ -31,7 +32,7 @@ def patch_ini(content, values):
                 if key in seen:
                     raise ValueError('Duplicate managed Zomboid setting: ' + key)
                 seen.add(key)
-                result.append(line.split('=', 1)[0] + '=' + values[key] + newline)
+                result.append(line if seed_only and key not in ('DefaultPort', 'UDPPort') else line.split('=', 1)[0] + '=' + values[key] + newline)
                 continue
         result.append(line)
     if result and not result[-1].endswith(('\r', '\n')):
@@ -60,7 +61,7 @@ def administrator_exists(path, username):
     # Native account state is authoritative. Never delete or rewrite it to make
     # administrator bootstrap appear successful.
     try:
-        with sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True) as database:
+        with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as database:
             return database.execute('SELECT 1 FROM whitelist WHERE username=? LIMIT 1', (username,)).fetchone() is not None
     except sqlite3.Error:
         raise ValueError('Existing Zomboid authentication database needs native recovery; it was not changed') from None
@@ -81,7 +82,7 @@ def available_memory(env):
     return min(limits) if limits else 6144
 
 
-def configure(root, env):
+def configure(root, env, preflight=False):
     root = root.resolve()
     prefix = env.get('SERVER_NAME', 'Pterodactyl')
     if not re.fullmatch(r'[A-Za-z0-9]{1,64}', prefix):
@@ -134,23 +135,30 @@ def configure(root, env):
     argv = [str(java), *vmargs, '-cp', ':'.join(classpath), main.replace('/', '.'),
             '-port', str(port), '-udpport', str(secondary), '-cachedir=' + str(cache),
             '-servername', prefix, '-adminusername', user]
-    if not administrator_exists(database, user):
-        password = single_line(env.get('ADMIN_PASSWORD', ''), 128)
-        if not password:
-            credential = state / 'admin-password'
-            if not credential.resolve().is_relative_to(root):
-                raise ValueError('Administrator credential escapes the server volume')
-            if not credential.exists():
-                atomic_private(credential, secrets.token_hex(24))
-            credential.chmod(0o600)
-            password = credential.read_text()
-        argv += ['-adminpassword', password]
     if ini.exists():
         with ini.open(encoding='utf-8', newline='') as stream:
             original = stream.read()
     else:
         original = ''
-    content = patch_ini(original, values)
+    content = patch_ini(original, values, seed_only=True)
+    account_exists = administrator_exists(database, user)
+    password = single_line(env.get("ADMIN_PASSWORD", ""), 128)
+    credential = state / "admin-password"
+    if not credential.resolve().is_relative_to(root):
+        raise ValueError("Administrator credential escapes the server volume")
+    if not account_exists and not password and credential.exists():
+        password = single_line(credential.read_text(), 128)
+        if not password:
+            raise ValueError("Existing bootstrap credential is empty; recover it explicitly")
+    if preflight:
+        return None
+    if not account_exists:
+        if not password:
+            password = secrets.token_hex(24)
+            atomic_private(credential, password)
+        if credential.exists():
+            credential.chmod(0o600)
+        argv += ["-adminpassword", password]
     if original != content:
         if ini.exists():
             backup = state / 'config-backups' / (str(time.time_ns()) + '-' + prefix + '.ini')
@@ -174,6 +182,7 @@ def run(root, env):
     automatic = env.get('VOLTRA_STEAM_AUTO_UPDATE', env.get('AUTO_UPDATE', '0'))
     if automatic not in ('0', '1'):
         raise ValueError('AUTO_UPDATE must be 0 or 1')
+    configure(root, env, preflight=True)
     if automatic == '1':
         update(root, 380870, env, validate=False, required=('ProjectZomboid64.json', 'jre64/bin/java'))
     argv, child_env = configure(root, env)

@@ -1,3 +1,4 @@
+import {confirmAction} from '../ui/ConfirmAction';
 import {useState} from 'react';
 import {api,Button,Input,useAPI,unwrap} from '../lib';
 import {SettingsRow,SettingsSection} from '../ui/Settings';
@@ -29,7 +30,7 @@ export default function DesktopApps(){
         {!devices.loading&&!items(devices.data).length&&<p className="operations-empty">No desktop apps linked yet.</p>}
         {items(devices.data).map(device=><SettingsRow key={device.id} label={device.name}
           description={`Linked ${date(device.created_at)}. Last used ${date(device.last_used_at)}.`}
-          control={device.revoked_at?<span className="badge">Access revoked</span>:<Button variant="danger" disabled={action.busy} onClick={()=>{if(confirm(`Revoke desktop access for ${device.name}?`))action.run(()=>api(`/api/client/account/desktop/devices/${device.id}`,json('DELETE')),devices.reload)}}>Revoke access</Button>}>
+          control={device.revoked_at?<span className="badge">Access revoked</span>:<Button variant="danger" disabled={action.busy} onClick={async ()=>{if(await confirmAction({title:"Revoke access?",description:`Revoke desktop access for ${device.name}?`,confirmLabel:"Revoke access",danger:true}))action.run(()=>api(`/api/client/account/desktop/devices/${device.id}`,json('DELETE')),devices.reload)}}>Revoke access</Button>}>
           {!device.revoked_at&&<p className="settings-note">Access expires {date(device.expires_at)}</p>}
         </SettingsRow>)}
       </SettingsSection>

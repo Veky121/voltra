@@ -82,8 +82,9 @@ export function settingsGroups(fields: QuickField[], game: string, file: string)
   if (palworld) for (const group of palworldGroups) groups.set(group.id, {...group, fields: []});
   for (const field of fields) {
     const section = field.key.startsWith('/') ? field.key.slice(1).split('/')[0] : field.key.includes('/') ? field.key.split('/')[0] : 'general';
-    const id = minecraft ? minecraftGroup(field.key) : palworld ? palworldGroup(field.key) : section;
-    if (!groups.has(id)) groups.set(id, {id, label: id === 'general' ? 'General' : readableSettingName({key: id, label: id}), fields: []});
+    const explicitGroup = field.group?.trim();
+    const id = minecraft ? minecraftGroup(field.key) : palworld ? palworldGroup(field.key) : explicitGroup ? `explicit:${explicitGroup}` : section;
+    if (!groups.has(id)) groups.set(id, {id, label: explicitGroup && !minecraft && !palworld ? explicitGroup : id === 'general' ? 'General' : readableSettingName({key: id, label: id}), fields: []});
     groups.get(id)!.fields.push(field);
   }
   if (minecraft) {

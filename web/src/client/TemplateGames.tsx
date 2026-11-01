@@ -1,3 +1,8 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {PageHeading} from '../ui/PageHeading';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {cfxSetupProblem, fiveMTemplateID} from './cfxAdmission';
+import {type TemplateSetupValidation} from './templateSetupRules';
 import {miBToGB} from "../resourceUnits.ts";
 import {startupVariableSection} from './startupSettingsModel';
 import {GameSwitch} from './GameSwitch';
@@ -10,7 +15,7 @@ import {memoryMiB, gameInitialNode, gameMemoryBudget, gameResourceBudget, type S
 import {SteamSetupForm} from './SteamGames';
 import {useGameRequest} from './useGameRequest';
 import {type GameAgreement, templateMemoryWarning, templateStorageWarning, templateVariableControl, templateVariableProblem, type TemplatePortRule} from './gameTemplateModel';
-import {templateSetupProblems} from './templateSetupValidation';
+import {templateSetupProblems,templateSetupDependencyVariables} from './templateSetupValidation';
 import {GamePorts, useGamePortPlan, rememberInstallationPorts} from './GamePorts';
 import {GameLibraryCard,gameArtwork} from './GameLibraryCard';
 import {compareGamePopularity} from './gameLibraryOrder';
@@ -22,7 +27,7 @@ import {clearTemplateSteamSecrets, templateSteamDefault, templateSteamEnvironmen
 type Template = {profile?: string; id: string; name: string; description: string; category: string; source: string; available: boolean; detail: string; verification: string; managed_game?: SteamGame; setup_steps?: string[]; platforms?: string[] | null; required_ports?: number; consecutive_ports?: boolean; consecutive_ports_count?: number; consecutive_primary_offset?: number; port_rules?: TemplatePortRule[] | null};
 type Variable = {name: string; description: string; env_variable: string; default_value: string; rules: string; user_viewable: boolean};
 type Allocation = {id: number; ip: string; port: number};
-type TemplateOptions = Template & {egg_id?: number; saved_license?: boolean; steam_installation?: TemplateSteamInstallation; agreements?: GameAgreement[]; private_content_supported?: boolean; nodes: (SetupNode & {allocations: Allocation[]; private_content_ready?: boolean})[]; images: {label: string; value: string}[]; variables: Variable[]; defaults: {memory: number; disk: number}};
+type TemplateOptions = Template & {setup_validation?:TemplateSetupValidation[]|null; egg_id?: number; saved_license?: boolean; steam_installation?: TemplateSteamInstallation; agreements?: GameAgreement[]; private_content_supported?: boolean; nodes: (SetupNode & {allocations: Allocation[]; private_content_ready?: boolean})[]; images: {label: string; value: string}[]; variables: Variable[]; defaults: {memory: number; disk: number}};
 
 function TemplateVerification({template}: {template: Template}) {
   const label = template.verification === 'runtime_verified' ? 'Native hosting tested'
@@ -46,14 +51,14 @@ export function GameTemplateCatalog({minecraftOnly = false}: {minecraftOnly?: bo
     {request.loading && !request.data && <p role="status">Loading game catalog...</p>}
     {request.data && <p role="status" className="muted">{matches.length} of {games.length} recipes</p>}
     <div className="game-template-list">{matches.map(game=><GameLibraryCard key={game.id} name={game.name} subtitle={minecraftOnly ? 'Minecraft community' : game.category.replaceAll('_',' ')} artwork={(minecraftOnly ? (communityArtwork as Record<string, GameArtwork>)[minecraftProjectKey(game.source) ?? ''] : undefined)||gameArtwork('templates',game.id)||gameArtwork('categories',game.category)} to={`/game-library/template/${game.id}`} note={game.verification==='runtime_verified'?'Hosting tested':game.verification==='runtime_partial'?'Partially tested':game.verification==='runtime_failed'?'Runtime test failed':'Runtime not verified'} noteTitle={game.detail} source={game.source} disabledReason={!game.available?'Compatibility review needed':!request.data?.can_install?'Administrator access required':undefined}/>)}</div>
-    {minecraftOnly && <details className="library-artwork-credits"><summary>Project artwork credits</summary><p>Project logos belong to their respective owners and are displayed unchanged. Inclusion does not imply endorsement. <a href="https://docs.papermc.io/misc/assets/" target="_blank" rel="noreferrer">PaperMC artwork guidelines</a>.</p><ul>{Object.entries(communityArtwork).filter(([key]) => key !== 'spongevanilla').map(([key, art]) => <li key={key}><a href={art.sourcePage} target="_blank" rel="noreferrer">{art.title}</a><span>{art.credit}</span></li>)}</ul></details>}
+    {minecraftOnly && <Disclosure className="library-artwork-credits"><DisclosureTrigger>Project artwork credits</DisclosureTrigger><p>Project logos belong to their respective owners and are displayed unchanged. Inclusion does not imply endorsement. <a href="https://docs.papermc.io/misc/assets/" target="_blank" rel="noreferrer">PaperMC artwork guidelines</a>.</p><ul>{Object.entries(communityArtwork).filter(([key]) => key !== 'spongevanilla').map(([key, art]) => <li key={key}><a href={art.sourcePage} target="_blank" rel="noreferrer">{art.title}</a><span>{art.credit}</span></li>)}</ul></Disclosure>}
   </section>;
 }
 
 export default function GameTemplateSetup() {
   const {template} = useParams();
   const request = useGameRequest<TemplateOptions>(template ? `/api/client/game-library/templates/${encodeURIComponent(template)}` : null);
-  return <div className="page steam-setup-page games-ui"><header className="page-header"><div><Link to="/game-library">Game Library</Link><h1>{request.data?.name || 'Game'} setup</h1></div></header><ErrorBox>{request.error}</ErrorBox>{request.error && <Button onClick={request.reload} variant="secondary">Retry setup</Button>}{request.loading && !request.data && <p role="status">Loading game requirements...</p>}{request.data && (request.data.managed_game ? <ManagedTemplateSetup key={template} template={request.data} game={request.data.managed_game}/> : <TemplateSetupForm key={template} options={request.data}/>)}</div>;
+  return <div className="page steam-setup-page games-ui"><header className="page-header"><div><Link to="/game-library">Game Library</Link><PageHeading title={<>{request.data?.name || 'Game'} setup</>}/></div></header><ErrorBox>{request.error}</ErrorBox>{request.error && <Button onClick={request.reload} variant="secondary">Retry setup</Button>}{request.loading && !request.data && <p role="status">Loading game requirements...</p>}{request.data && (request.data.managed_game ? <ManagedTemplateSetup key={template} template={request.data} game={request.data.managed_game}/> : <TemplateSetupForm key={template} options={request.data}/>)}</div>;
 }
 
 function ManagedTemplateSetup({template, game}: {template: Template; game: SteamGame}) {
@@ -64,15 +69,15 @@ function ManagedTemplateSetup({template, game}: {template: Template; game: Steam
 export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const fs25 = options.profile?.startsWith('fs25-') ?? options.name === 'Farming Simulator 25';
   const navigate = useNavigate();
-  const initialNode = gameInitialNode(fs25 ? options.nodes.filter(node => (node.available_disk ?? 0) >= options.defaults.disk && (node.available_memory ?? 0) >= options.defaults.memory) : options.nodes) ?? gameInitialNode(options.nodes);
+  const initialNode = (fs25 ? gameInitialNode(options.nodes.filter(node => (node.available_disk ?? 0) >= options.defaults.disk && (node.available_memory ?? 0) >= options.defaults.memory)) : gameInitialNode(options.nodes, options.defaults)) ?? gameInitialNode(options.nodes);
   const [environment, setEnvironment] = useState<Record<string, string>>(() => clearTemplateSteamSecrets(Object.fromEntries(options.variables.map(variable => [variable.env_variable, variable.default_value])), options.steam_installation));
   const [privateContent, setPrivateContent] = useState(templateSteamDefault(options.steam_installation, !!options.private_content_supported));
   const [name, setName] = useState(`${options.name} server`);
   const [node, setNode] = useState(String(initialNode?.id ?? ''));
-  const [memory, setMemory] = useState(String(miBToGB(Math.min(options.defaults.memory, Math.max(128, gameMemoryBudget(1048576, initialNode))))));
-  const [disk, setDisk] = useState(String(miBToGB(Math.min(options.defaults.disk, Math.max(128, gameResourceBudget(16777216, initialNode?.available_disk))))));
+  const [memory, setMemory] = useState(String(miBToGB(fs25 ? Math.min(options.defaults.memory, Math.max(128, gameMemoryBudget(1048576, initialNode))) : options.defaults.memory)));
+  const [disk, setDisk] = useState(String(miBToGB(fs25 ? Math.min(options.defaults.disk, Math.max(128, gameResourceBudget(16777216, initialNode?.available_disk))) : options.defaults.disk)));
   const [image, setImage] = useState(options.images[0]?.value ?? '');
-  const [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [error, setError] = useErrorState('client/TemplateGames.tsx'), [busy, setBusy] = useState(false);
   const submitting = useRef(false), submission = useRef<{payload: string; id: string} | null>(null);
   const setupForm=useRef<HTMLFormElement>(null);
   let safeEnvironment: Record<string, string> = {}, steamEnvironmentError = '';
@@ -85,12 +90,17 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const memoryMaximum = gameMemoryBudget(1048576, selectedNode), diskMaximum = gameResourceBudget(16777216, selectedNode?.available_disk);
   // Decide from original defaults so correcting a required field never removes it.
   const defaultEnvironment = Object.fromEntries(options.variables.map(variable => [variable.env_variable, variable.default_value]));
+  const prerequisiteSelectors=templateSetupDependencyVariables(options.variables);
   const setupVariables = options.variables.filter(variable => startupVariableSection(variable) === 'runtime'
+    || options.id === fiveMTemplateID && ['TXHOST_GAME_NAME', 'MAX_PLAYERS'].includes(variable.env_variable)
+    || prerequisiteSelectors.has(variable.env_variable)
     || !!templateVariableProblem(variable, defaultEnvironment)
     || /(?:^|\|)required_(?:if|unless|with|without)/.test(variable.rules)
     || fs25 && ['SERVER_NAME', 'WEB_PASSWORD', 'AUTO_DOWNLOAD'].includes(variable.env_variable));
   const checkedVariables=options.variables.filter(variable=>!(fs25&&['WEB_PORT'].includes(variable.env_variable))&&!options.agreements?.some(agreement=>agreement.environment===variable.env_variable)&&(!templateSteamRole(variable.env_variable)||templateSteamRole(variable.env_variable)==='branch')&&!(privateContent&&['SRCDS_APPID','AUTO_UPDATE'].includes(variable.env_variable))&&!options.port_rules?.some(rule=>rule.auto_allocate&&rule.environment===variable.env_variable));
-  const setupProblems=templateSetupProblems({name,node:selectedNode,memory:memoryValue,memoryMaximum,disk:diskValue,diskMaximum,imageValid:options.images.some(item=>item.value===image),portsReady:!!ports.data,portsLoading:ports.loading,portsError:!!ports.error,steamError:!!steamEnvironmentError,privateContent,privateSupported:options.private_content_supported===true,fs25,savedLicence:!!options.saved_license,variables:checkedVariables,environment,agreements:options.agreements});
+  const setupProblems=templateSetupProblems({name,node:selectedNode,memory:memoryValue,memoryMaximum,disk:diskValue,diskMaximum,imageValid:options.images.some(item=>item.value===image),portsReady:!!ports.data,portsLoading:ports.loading,portsError:!!ports.error,steamError:!!steamEnvironmentError,privateContent,privateSupported:options.private_content_supported===true,fs25,savedLicence:!!options.saved_license,variables:checkedVariables,environment,agreements:options.agreements,setupValidation:options.setup_validation});
+  const cfxProblem=cfxSetupProblem(options.id,environment);
+  if(cfxProblem)setupProblems.push({field:'game-template-MAX_PLAYERS',message:cfxProblem});
   const valid=setupProblems.length===0;
   function focusProblem(id:string){
     const field=setupForm.current?.querySelector<HTMLElement>(`[id="${id}"]`);
@@ -136,12 +146,12 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
     {fs25 && <p className="muted">{options.saved_license ? 'The administrator supplies the game licence and assigned DLC keys automatically.' : 'Ask an administrator to configure a GIANTS server licence before using automatic download.'}</p>}
     <p className="muted">Game options use the template defaults. Edit them in Settings after creation.</p>
     {!!setupVariables.length && <><h2>Installation requirements</h2><div className="steam-form-grid">{setupVariables.map(renderVariable)}</div></>}
-    <details className="steam-advanced"><summary>Runtime image</summary><div className="steam-form-grid"><Field label="Runtime image"><Select id="game-runtime-image" value={image} onChange={event => setImage(event.target.value)}>{options.images.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field></div></details>
+    <Disclosure className="steam-advanced"><DisclosureTrigger>Runtime image</DisclosureTrigger><div className="steam-form-grid"><Field label="Runtime image"><Select id="game-runtime-image" value={image} onChange={event => setImage(event.target.value)}>{options.images.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></Field></div></Disclosure>
     {!options.nodes.length && <p className="game-stop-note">No compatible online node is available. Connect a node, then reload this setup.</p>}
     <ErrorBox>{error}</ErrorBox>
     {!busy&&setupProblems.length>0&&<section id="game-template-readiness" className="template-readiness" aria-label="Setup requirements"><p role="status">{setupProblems.length===1?'Complete this requirement to create your server.':`Complete these ${setupProblems.length} requirements to create your server.`}</p><ul>{setupProblems.map((problem,index)=><li key={`${problem.field}:${index}`}>{problem.field?<a href={`#${problem.field}`} onClick={event=>{event.preventDefault();focusProblem(problem.field!);}}>{problem.message}</a>:problem.message}</li>)}</ul></section>}
     <Button type="submit" disabled={!valid || busy} aria-busy={busy} aria-describedby={!valid?'game-template-readiness':undefined}>{busy ? 'Creating server...' : 'Create server'}</Button>
-  </fieldset></form>{fs25 && <details className="steam-advanced"><summary>Installation and DLC help</summary><ol>{options.setup_steps?.map((step,index)=><li key={index}>{step}</li>)}</ol><p className="muted">{options.detail}</p><a href={options.source} target="_blank" rel="noreferrer">Reviewed upstream recipe</a></details>}</Card>{!fs25 && <aside><h2>Runtime verification</h2><TemplateVerification template={options}/><h2>Recipe requirements</h2><p className="template-description">{options.description}</p><p className="muted">Resource defaults are starting values, not a verified recommendation for this game. Adjust them to the publisher's requirements. {privateContent ? 'Preparation runs first. Steam maintenance opens next for account authorization and content installation. Download completion does not establish native startup readiness.' : 'Installation runs first; start the server from Console when it finishes.'}</p>{!!options.setup_steps?.length && <><h2>After installation</h2><ol>{options.setup_steps.map((step, index) => <li key={index}>{step}</li>)}</ol></>}<a href={options.source} target="_blank" rel="noreferrer">Read the upstream recipe</a></aside>}</div>;
+  </fieldset></form>{fs25 && <Disclosure className="steam-advanced"><DisclosureTrigger>Installation and DLC help</DisclosureTrigger><ol>{options.setup_steps?.map((step,index)=><li key={index}>{step}</li>)}</ol><p className="muted">{options.detail}</p><a href={options.source} target="_blank" rel="noreferrer">Reviewed upstream recipe</a></Disclosure>}</Card>{!fs25 && <aside><h2>Runtime verification</h2><TemplateVerification template={options}/><h2>Recipe requirements</h2><p className="template-description">{options.description}</p><p className="muted">Resource defaults are starting values, not a verified recommendation for this game. Adjust them to the publisher's requirements. {privateContent ? 'Preparation runs first. Steam maintenance opens next for account authorization and content installation. Download completion does not establish native startup readiness.' : 'Installation runs first; start the server from Console when it finishes.'}</p>{!!options.setup_steps?.length && <><h2>After installation</h2><ol>{options.setup_steps.map((step, index) => <li key={index}>{step}</li>)}</ol></>}<a href={options.source} target="_blank" rel="noreferrer">Read the upstream recipe</a></aside>}</div>;
 }
 
 function TemplateVariable({variable, environment, value, automatic, privateCarrier, onChange}: {privateCarrier?: boolean; variable: Variable; environment: Record<string, string>; value: string; automatic?: {active: boolean; port?: number}; onChange: (value: string) => void}) {

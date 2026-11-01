@@ -8,10 +8,10 @@
     "source_commit": "ffa3279d66d82b2583363b3a6f2937196f9ca04b"
   },
   "mcgalaxy": {
-    "version": "publisher-release-2026-10-23",
+    "version": "publisher-release-2026-10-24",
     "url": "https://cdn.classicube.net/client/mcg/release/MCGalaxy.zip",
-    "sha256": "d03cbe656d8fc49af03dc74281d33c02d3ef6938605eb6a75429ee67d885ed53",
-    "bytes": 2065072,
+    "sha256": "d65f48af9875fabce15568d836860239e2ee3b041f829759e24b78491b2dfb9d",
+    "bytes": 2079118,
     "license": "GPL-3.0-or-later OR ECL-2.0"
   },
   "purpur": {

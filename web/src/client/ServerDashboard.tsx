@@ -1,3 +1,9 @@
+import {confirmAction} from '../ui/ConfirmAction';
+import {useErrorState} from '../notifications/useErrorState';
+import {ButtonFeedback} from '../ui/ButtonFeedback';
+import {Progress} from '../components/ui/progress';
+import {useTransientMessage} from '../hooks/useTransientMessage';
+import {formatUptime} from './uptime';
 import {formatBytesGB} from '../resourceUnits';
 import {requestServerPower} from './serverPower';
 import type {PowerSignal} from './consoleLifecycle';
@@ -11,55 +17,66 @@ import {Item,ItemMedia,ItemContent,ItemDescription,ItemActions} from '../compone
 import {Icon,type IconName} from '../Icons';
 import {bytes,resourceUsageGB,resourceLimitGB,can,items,PageError,useServer,value} from './common';
 import './serverHeader.css';
+import {ServerConnection} from './ServerConnection';
 import './shadcn-cards.css';
 import './dashboard-ui.css';
 import {fallbackArtwork,getServerArtwork,type ServerArtwork} from './serverArtwork';
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {FavoriteButton} from '../ServerNavigation';
 import {InstallationPortsNotice} from './GamePorts';
+import {visiblePoll} from '../hooks/visiblePoll';
+import {observeLivePath,isLivePathFresh} from '../hooks/liveEvents';
 
 type Sample={at:number;cpu:number;memory:number;rx:number;tx:number;uptime:number};
 type Telemetry={state:string;resources:Record<string,any>;samples:Sample[];updated:number;error:string;refresh:()=>void};
 const TelemetryContext=createContext<Telemetry>({state:'unknown',resources:{},samples:[],updated:0,error:'',refresh:()=>{}});
 export const useServerTelemetry=()=>useContext(TelemetryContext);
 const number=(v:unknown)=>Math.max(0,Number.isFinite(Number(v))?Number(v):0);
+const emptyTelemetry=():Omit<Telemetry,'refresh'>=>({state:'unknown',resources:{},samples:[],updated:0,error:''});
 
 function useTelemetry(base:string,enabled:boolean):Telemetry{
-  const [data,setData]=useState<Omit<Telemetry,'refresh'>>({state:'unknown',resources:{},samples:[],updated:0,error:''});
+  const [data,setData]=useState<{base:string;value:Omit<Telemetry,'refresh'>}>(()=>({base,value:emptyTelemetry()}));
   const [version,setVersion]=useState(0);
   useEffect(()=>{
-    if(!enabled)return;
+    if(!enabled){setData({base,value:emptyTelemetry()});return;}
     let active=true;
-    let timer:ReturnType<typeof setTimeout>;
-    const abort=new AbortController();
-    async function poll(){
+    let liveVersion=0;
+    const path=`${base}/resources`;
+    const consume=(payload:any)=>{
+      const response=value(payload);
+      const r=response.resources||{},at=Date.now();
+      const sample={at,cpu:number(r.cpu_absolute),memory:number(r.memory_bytes),rx:number(r.network_rx_bytes),tx:number(r.network_tx_bytes),uptime:number(r.uptime)};
+      setData(old=>({base,value:{state:response.is_suspended?'suspended':response.current_state||'unknown',resources:r,samples:[...(old.base===base?old.value.samples:[]),sample].slice(-60),updated:at,error:''}}));
+    };
+    const unsubscribe=observeLivePath(path,sample=>{
+      if(!active||document.hidden)return;
+      liveVersion++;
+      if(sample.status===200)consume(sample.data);
+      else setData({base,value:{...emptyTelemetry(),error:sample.data?.errors?.[0]?.detail||'Live resources unavailable.'}});
+    });
+    const stop=visiblePoll(async signal=>{
+      if(isLivePathFresh(path))return;
+      const generation=liveVersion;
       try{
-        const response=value(await api(`${base}/resources`,{signal:abort.signal}));
-        if(!active)return;
-        const r=response.resources||{},at=Date.now();
-        const sample={at,cpu:number(r.cpu_absolute),memory:number(r.memory_bytes),rx:number(r.network_rx_bytes),tx:number(r.network_tx_bytes),uptime:number(r.uptime)};
-        setData(old=>({state:response.is_suspended?'suspended':response.current_state||'unknown',resources:r,samples:[...old.samples,sample].slice(-60),updated:at,error:''}));
+        const response=await api(path,{signal});
+        if(!active||signal.aborted||generation!==liveVersion)return;
+        consume(response);
       }catch(error){
-        if(active)setData(old=>({...old,error:error instanceof Error?error.message:String(error)}));
-      }finally{
-        if(active)timer=setTimeout(poll,document.hidden?10000:1000);
+        if(active&&!signal.aborted&&generation===liveVersion)setData(old=>({base,value:{...(old.base===base?old.value:emptyTelemetry()),error:error instanceof Error?error.message:String(error)}}));
+        throw error;
       }
-    }
-    void poll();
-    return()=>{active=false;clearTimeout(timer);abort.abort()};
+    });
+    return()=>{active=false;stop();unsubscribe?.()};
   },[base,enabled,version]);
-  return {...data,refresh:()=>setVersion(v=>v+1)};
+  return {...(enabled&&data.base===base?data.value:emptyTelemetry()),refresh:()=>setVersion(v=>v+1)};
 }
 
-function uptime(ms:number){
-  const seconds=Math.floor(ms/1000),days=Math.floor(seconds/86400),hours=Math.floor(seconds/3600)%24,minutes=Math.floor(seconds/60)%60;
-  return `${days?`${days}d `:''}${hours}h ${minutes}m ${seconds%60}s`;
-}
-
-const PowerContext=createContext<{pending:PowerOperation|null;busy:boolean;error:string;success:string;power:(signal:PowerSignal)=>Promise<void>}>({pending:null,busy:false,error:'',success:'',power:async()=>{}});
+const PowerContext=createContext<{pending:PowerOperation|null;busy:boolean;error:string;success:string;completedSignal:PowerSignal|null;power:(signal:PowerSignal)=>Promise<void>}>({pending:null,busy:false,error:'',success:'',completedSignal:null,power:async()=>{}});
 
 function usePowerOperation(base:string,telemetry:Telemetry){
-  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useState(''),[success,setSuccess]=useState('');
+  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useErrorState('client/ServerDashboard.tsx');
+  const [success,setSuccess]=useTransientMessage(2000);
+  const [completedSignal,setCompletedSignal]=useState<PowerSignal|null>(null);
   const requestInFlight=useRef<PowerOperation|null>(null),operationRef=useRef<PowerOperation|null>(null),active=useRef(true);
   useEffect(()=>{active.current=true;return()=>{active.current=false}},[]);
   function update(operation:PowerOperation|null){operationRef.current=operation;setPending(operation)}
@@ -69,12 +86,12 @@ function usePowerOperation(base:string,telemetry:Telemetry){
     if(!operation||telemetry.error)return;
     const result=advancePowerOperation(operation,telemetry.state,number(telemetry.resources.uptime),telemetry.updated);
     if(result.operation!==operation)update(result.operation);
-    if(result.outcome==='success')setSuccess(result.message!);
+    if(result.outcome==='success'){setCompletedSignal(operation.signal);setSuccess(result.message!)}
     if(result.outcome==='error')setError(result.message!);
   },[telemetry.state,telemetry.updated,telemetry.error,pending?.accepted]);
   async function power(signal:PowerSignal){
     if(requestInFlight.current||(operationRef.current&&signal!=='kill'))return;
-    if(signal==='kill'&&!window.confirm('Force stop this server immediately? Unsaved progress may be lost.'))return;
+    if(signal==='kill'&&!await confirmAction({title:"Force stop?",description:'Force stop this server immediately? Unsaved progress may be lost.',confirmLabel:"Force stop",danger:true}))return;
     setError('');setSuccess('');
     const operation=beginPowerOperation(signal,telemetry.updated,number(telemetry.resources.uptime));
     requestInFlight.current=operation;
@@ -85,7 +102,7 @@ function usePowerOperation(base:string,telemetry:Telemetry){
     }catch(error){if(active.current&&operationRef.current===operation){update(null);setError(error instanceof Error?error.message:String(error))}}
     finally{if(requestInFlight.current===operation)requestInFlight.current=null}
   }
-  return {pending,busy:!!pending&&!pending.accepted,error,success,power};
+  return {pending,busy:!!pending&&!pending.accepted,error,success,completedSignal,power};
 }
 
 function PowerControls({compact=false}:{compact?:boolean}){
@@ -100,20 +117,25 @@ function PowerControls({compact=false}:{compact?:boolean}){
     ['kill','Force stop','close','control.stop',!running&&!starting&&telemetry.state!=='stopping'&&!pending],
   ];
   return <div className="server-power">
-    <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=><Button key={signal} className="server-power-button" data-power={signal} variant="secondary" aria-label={compact?`${label} server`:undefined} title={signal==='kill'?'Immediately terminate the server process':compact?`${label} server`:undefined} aria-busy={pending?.signal===signal} disabled={blocked||disabled||action.busy||!!pending&&(signal!=='kill'||pending.signal==='kill')} onClick={()=>void action.power(signal)}><Icon name={icon}/>{!compact&&(pending?.signal===signal?powerOperationLabel(pending):label)}</Button>)}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
-    {(pending||starting||telemetry.state==='stopping')&&<div className="server-power-progress" role="status"><span>{telemetry.error?'Connection interrupted. Waiting for server status.':pending?powerOperationLabel(pending):starting?'Starting…':'Stopping…'}</span><div className="server-power-progress-track" role="progressbar" aria-label="Server power operation"><span/></div></div>}
+    <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=>{
+      const working=pending?pending.signal===signal:!telemetry.error&&(signal==='start'&&starting||signal==='stop'&&telemetry.state==='stopping');
+      const feedback=working?'pending':action.success&&action.completedSignal===signal?'success':'idle';
+      return <Button key={signal} className="server-power-button" data-power={signal} data-feedback={feedback} variant="secondary" aria-label={compact?`${label} server`:undefined} title={working&&pending?powerOperationLabel(pending):signal==='kill'?'Immediately terminate the server process':compact?`${label} server`:undefined} aria-busy={working} disabled={blocked||disabled||action.busy||!!pending&&(signal!=='kill'||pending.signal==='kill')} onClick={()=>void action.power(signal)}><ButtonFeedback state={feedback}><Icon name={icon}/></ButtonFeedback>{!compact&&label}</Button>;
+    })}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
+    <span className="button-feedback-sr" role="status">{pending?(telemetry.error?'Connection interrupted. Waiting for server status.':powerOperationLabel(pending)):action.success}</span>
     {action.error&&<div className="error" role="alert">{action.error}</div>}
-    {action.success&&<div className="success" role="status">{action.success}</div>}
   </div>;
 }
 
 export function ServerStateLine(){
   const {server}=useServer(),telemetry=useServerTelemetry();
   const state=server.status||telemetry.state;
+  const online=state==='running'&&!telemetry.error;
+  const elapsed=online?number(telemetry.resources.uptime):0;
   const label:Record<string,string>={running:'Online',offline:'Offline',stopped:'Offline',starting:'Starting',stopping:'Stopping',unknown:'Connecting',installing:'Installing',install_failed:'Installation failed',reinstall_failed:'Reinstallation failed',suspended:'Suspended',restoring_backup:'Restoring backup'};
   return <div className="server-state-line">
-          <span className={`server-state state-${telemetry.error&&!server.status?'unknown':state}`}><span className="status-dot"/>{telemetry.error&&!server.status?'Connection unavailable':label[state]||state.replaceAll('_',' ')}</span>
-          {telemetry.updated&&!server.status&&<span className="server-uptime">Uptime <strong>{uptime(number(telemetry.resources.uptime))}</strong></span>}
+          <span className={`server-state state-${telemetry.error&&!server.status?'unknown':state}`}><span className="server-meta-label">Status:</span><span className="status-dot"/>{telemetry.error&&!server.status?'Connection unavailable':label[state]||state.replaceAll('_',' ')}</span>
+          <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}>Uptime: <strong>{telemetry.error?'—':formatUptime(elapsed)}</strong></span>
   </div>;
 }
 
@@ -136,7 +158,7 @@ export function ServerWorkspace({children}:{children:ReactNode}){
       <CardHeader className="server-hero-info">
         <div className="server-hero-title"><CardTitle><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div></CardTitle></div>
         {server.description&&<CardDescription className="server-description">{server.description}</CardDescription>}
-        <ServerStateLine/>
+        <div className="server-hero-meta"><ServerStateLine/><ServerConnection key={base}/></div>
       </CardHeader>
       <CardAction className="server-hero-controls"><PowerControls/></CardAction>
     </Card></header>}
@@ -214,7 +236,7 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
     {cards.map(card=><Card className="metric-card shadcn-card" data-metric={card.icon} key={card.label}>
       <CardHeader className="metric-header"><CardTitle><h2>{card.label}</h2></CardTitle><CardAction><span className="metric-icon"><Icon name={card.icon}/></span></CardAction></CardHeader>
       <CardContent className="metric-content"><p className={card.label==='Address'?'metric-address':''} title={`${card.value}${card.limit?` / ${card.limit}`:''}`}><span className="metric-reading">{card.value}</span>{card.limit&&<span className="metric-limit"> / {card.limit}</span>}</p>
-        {card.label==='Disk'?<div className="metric-disk-usage">{updated&&number(server.limits?.disk)>0?<div className="overview-meter" aria-label={`Disk usage ${card.value} of ${card.limit}`}><span style={{width:`${Math.min(100,number(r.disk_bytes)/(number(server.limits.disk)*1024**2)*100)}%`}}/></div>:<span>{updated?'Current usage':'Waiting for live samples'}</span>}</div>:null}
+        {card.label==='Disk'?<div className="metric-disk-usage">{updated&&number(server.limits?.disk)>0?<Progress className="overview-meter" aria-label={`Disk usage ${card.value} of ${card.limit}`} value={Math.min(100,number(r.disk_bytes)/(number(server.limits.disk)*1024**2)*100)}/>:<span>{updated?'Current usage':'Waiting for live samples'}</span>}</div>:null}
       </CardContent>
       <CardFooter className="metric-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name={card.icon}/></ItemMedia><ItemContent><ItemDescription>{card.limit?'Limit':'Server allocation'}</ItemDescription></ItemContent>{card.limit&&<ItemActions>{card.limit}</ItemActions>}</Item></CardFooter>
     </Card>)}</div>

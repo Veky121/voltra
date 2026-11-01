@@ -1,3 +1,5 @@
+import {IconButton} from '../ui/IconButton';
+import {Checkbox} from '../components/ui/checkbox';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {useAPI} from '../lib';
 import {Icon} from '../Icons';
@@ -8,8 +10,8 @@ import './fileMetadata.css';
 
 type Controls={selected:string[];onSelect:(path:string)=>void;onMenu:(path:string,anchor:HTMLButtonElement)=>void};
 type Shared={base:string;activeFile:string;activeDirectory?:string;refreshToken:string;dirty:boolean;filter:string;permissions:string[];onOpen:(path:string)=>void;onDirectory?:(path:string)=>void;onEntries?:(path:string,files:FileEntry[])=>void;controls?:Controls&{membership:ReadonlySet<string>}};
-function EntryCheck({path,controls}:{path:string;controls?:Controls&{membership:ReadonlySet<string>}}){return controls&&<label className="explorer-check-target" title={`Select ${path}`}><input type="checkbox" className="explorer-check" aria-label={`Select ${path}`} checked={controls.membership.has(path)} onChange={()=>controls.onSelect(path)}/></label>}
-function EntryMenu({path,controls}:{path:string;controls?:Controls}){return controls&&<button type="button" className="explorer-menu" aria-label={`Options for ${path}`} aria-haspopup="menu" onClick={event=>controls.onMenu(path,event.currentTarget)}><Icon name="more"/></button>}
+function EntryCheck({path,controls}:{path:string;controls?:Controls&{membership:ReadonlySet<string>}}){return controls&&<label className="explorer-check-target" title={`Select ${path}`}><Checkbox className="explorer-check" aria-label={`Select ${path}`} checked={controls.membership.has(path)} onCheckedChange={()=>controls.onSelect(path)}/></label>}
+function EntryMenu({path,controls}:{path:string;controls?:Controls}){return controls&&<IconButton type="button" className="explorer-menu" aria-label={`Options for ${path}`} aria-haspopup="menu" onClick={event=>controls.onMenu(path,event.currentTarget)}><Icon name="more"/></IconButton>}
 function EntryMetadata({entry}:{entry:FileEntry}){
   const modified=fileModifiedDate(entry.modified_at),size=fileEntrySize(entry),type=fileEntryType(entry);
   return <span className="explorer-metadata"><span className="explorer-modified" title={modified?.toLocaleString()||'Date modified unavailable'}>{modified?<time dateTime={modified.toISOString()}>{modified.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</time>:'—'}</span><span className="explorer-type" title={type}>{type}</span><span className="explorer-size" title={size===null?entry.is_file?'Size unavailable':'Folder contents are not included in directory listing sizes':`${size.toLocaleString()} bytes`}>{size===null?'—':bytes(size)}</span></span>;

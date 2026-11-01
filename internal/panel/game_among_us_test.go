@@ -46,7 +46,17 @@ func TestAmongUsReviewedDefaults(t *testing.T) {
 				}
 			}
 			for _, name := range []string{"among-us-install.py", "among-us-runtime.py", "native-release.py", "native-config.py", "bundle-debian-python.py"} {
-				source, err := os.ReadFile("game_library/scripts/" + name)
+				sourcePath := "game_library/scripts/" + name
+				// These reviewed per-recipe installers have preservation fixes
+				// beyond the original shared generator. Keep their shipped bytes.
+				if name == "among-us-install.py" || name == "among-us-runtime.py" {
+					variant := "impostor"
+					if strings.Contains(recipe, "bettercrewlink") {
+						variant = "crewlink"
+					}
+					sourcePath = "testdata/among-us/" + variant + "/" + name
+				}
+				source, err := os.ReadFile(sourcePath)
 				if err != nil || !strings.Contains(str(egg["script_install"]), string(source)) {
 					t.Fatal("missing or stale embedded source:", name, err)
 				}

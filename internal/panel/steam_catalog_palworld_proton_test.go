@@ -1,8 +1,6 @@
 package panel
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"testing"
 	"voltra/internal/palworldloader"
@@ -17,9 +15,13 @@ func TestPalworldProtonPreflightIsPrivateAndRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest := sha256.Sum256(linux)
-	if hex.EncodeToString(digest[:]) != "6932125150702342003f466009c5e08b7a1d3384a7f8e0e91ad5ead3245d7ebe" {
-		t.Fatal("Native Linux launcher changed during Proton integration")
+	// Shared readiness now authenticates both variants. Its exact generated
+	// hashes belong to TestSteamCatalogPalworldAuthenticatedReadiness; keep
+	// this test focused on Proton preflight not leaking into native Linux.
+	linuxText := string(linux)
+	if strings.Contains(linuxText, "runtime.py verify") || strings.Contains(linuxText, "/usr/bin/xvfb-run") ||
+		!strings.Contains(linuxText, "./Pal/Binaries/Linux/PalServer-Linux-Shipping Pal") || !strings.Contains(linuxText, "Shutdown 15") {
+		t.Fatal("Proton integration changed native Linux platform or stop controls")
 	}
 	proton, err := steamPalworldConsole("palworld-proton", 25585, artifact)
 	if err != nil {

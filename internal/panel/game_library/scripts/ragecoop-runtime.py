@@ -9,8 +9,9 @@ import xml.etree.ElementTree as ET
 def module(name):
     spec=importlib.util.spec_from_file_location(name,Path(__file__).with_name(name+'.py'));result=importlib.util.module_from_spec(spec);spec.loader.exec_module(result);return result
 
-def configure(root,env):
+def configure(root,env,validate_only=False):
     common=module('gta-runtime');path=root/'ragecoop/Settings.xml'
+    if not path.resolve().is_relative_to(root.resolve()):raise ValueError('Configuration escapes volume')
     raw=path.read_text() if path.is_file() else '<Settings/>'
     if '<!DOCTYPE' in raw.upper() or '<!ENTITY' in raw.upper():raise ValueError('XML entity declarations unsupported')
     config=ET.fromstring(raw,parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
@@ -23,7 +24,8 @@ def configure(root,env):
         node=matches[0] if matches else ET.SubElement(config,key);node.text=value
     # Missing fields retain publisher defaults. Existing operator P2P, voice,
     # ZeroTier, resources and automatic-update choices are never rewritten.
-    common.write_config(root,path,ET.tostring(config,encoding='unicode')+'\n');return values
+    if not validate_only:common.write_config(root,path,ET.tostring(config,encoding='unicode')+'\n')
+    return values
 
 def run(root,env):
     configure(root,env);env=dict(env);env.pop('PYTHONHOME',None);cwd=root/'ragecoop'

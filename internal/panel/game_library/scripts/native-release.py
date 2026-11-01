@@ -96,11 +96,50 @@ def extract(archive, target, prefix):
                 path.chmod(member.mode & 0o777)
 
 
-def install_release(root, release, target_name, executable, defaults=None):
+def validate_preserve_paths(target, executable, preserve_paths):
+    """Exact relative files or subtrees, seed once when absent; never code binaries.
+
+    Validate before acquisition/publication. Existing protected trees are left
+    in place, including files that match an old stock receipt.
+    """
+    paths = []
+    for name in preserve_paths:
+        if not isinstance(name, str) or not name or "\\" in name or ":" in name:
+            raise ValueError('Invalid preserve path')
+        parts = PurePosixPath(name).parts
+        if name.startswith('/') or any(p in ('', '.', '..') for p in name.split('/')):
+            raise ValueError('Invalid preserve path')
+        if executable == name or executable.startswith(name + '/'):
+            raise ValueError('Executable cannot be protected')
+        paths.append(name)
+    # Reject links even when they resolve inside the volume. Do not follow trees.
+    for path in [target, *target.parents]:
+        if path.is_symlink():
+            raise ValueError('Publication ancestor must not be a symlink')
+    for name in paths:
+        path = target
+        for part in PurePosixPath(name).parts:
+            path = path / part
+            if path.is_symlink():
+                raise ValueError('Protected path must not be a symlink')
+        if path.is_dir():
+            for child in path.rglob('*'):
+                if child.is_symlink():
+                    raise ValueError('Protected tree must not contain symlinks')
+    return tuple(paths)
+
+
+def protected_path(name, paths):
+    return any(name == path or name.startswith(path + '/') for path in paths)
+
+
+def install_release(root, release, target_name, executable, defaults=None, preserve_paths=()):
     root = root.resolve()
     state, target = root / '.voltra' / target_name, root / target_name
     if not state.resolve().is_relative_to(root) or not target.resolve().is_relative_to(root):
         raise ValueError('Native engine or state directory escapes the server volume')
+    validate_preserve_paths(state, executable, ())
+    preserve_paths = validate_preserve_paths(target, executable, preserve_paths)
     receipt = state / 'release.json'
     if receipt.is_symlink():
         raise ValueError('Native release receipt must not be a symbolic link')
@@ -122,6 +161,12 @@ def install_release(root, release, target_name, executable, defaults=None):
             if not (target / name).exists():
                 (ready / name).write_text(text)
         files = {p.relative_to(ready).as_posix(): sha256(p) for p in ready.rglob('*') if p.is_file()}
+        for name in files:
+            destination = target / name
+            if destination.is_symlink() or any(p.is_symlink() for p in destination.parents):
+                raise ValueError('Publication path must not contain symlinks')
+            if destination.exists() and not destination.is_file():
+                raise ValueError('Publication path conflict')
         backup = state / ('previous-' + str(time.time_ns()))
         replacements = []
         try:
@@ -136,7 +181,7 @@ def install_release(root, release, target_name, executable, defaults=None):
                         raise ValueError('Existing native file must be a regular file')
                     # Configuration and maps always remain operator-owned. Other
                     # modified stock assets remain overrides across updates.
-                    preserve = name.endswith('.cfg') or name.startswith(('data/maps/', 'data/maps7/', 'maps/'))
+                    preserve = protected_path(name, preserve_paths) or name.endswith('.cfg') or name.startswith(('data/maps/', 'data/maps7/', 'maps/'))
                     preserve |= name != executable and (name not in old.get('files', {}) or sha256(destination) != old['files'][name])
                     if preserve:
                         continue

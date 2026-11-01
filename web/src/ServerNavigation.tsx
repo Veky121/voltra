@@ -1,6 +1,9 @@
+import {useErrorState} from './notifications/useErrorState';
+import {ActionButton as MiraAction} from './ui/ActionButton';
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {api,rows} from './lib';
 import {Icon} from './Icons';
+import {observeLiveNavigation} from './hooks/liveEvents';
 
 export type NavigationServer={uuid:string;identifier:string;name:string;egg_name?:string;status:string|null;favorite:boolean;last_visited_at:string|null};
 type NavigationState={servers:NavigationServer[];loading:boolean;error:string;pending:Set<string>;reload:()=>void;visit:(id:string)=>void;favorite:(id:string,value:boolean)=>Promise<void>};
@@ -8,10 +11,11 @@ const Context=createContext<NavigationState>({servers:[],loading:true,error:'',p
 export const useServerNavigation=()=>useContext(Context);
 
 export function ServerNavigationProvider({children}:{children:ReactNode}){
- const [servers,setServers]=useState<NavigationServer[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[pending,setPending]=useState(new Set<string>());
+ const [servers,setServers]=useState<NavigationServer[]>([]),[loading,setLoading]=useState(true),[error,setError]=useErrorState('ServerNavigation.tsx'),[revision,setRevision]=useState(0),[pending,setPending]=useState(new Set<string>());
  const busy=useRef(new Set<string>());
  const writeVersion=useRef(0);
  const reload=useCallback(()=>setRevision(v=>v+1),[]);
+ useEffect(()=>observeLiveNavigation(reload),[reload]);
  useEffect(()=>{
   const abort=new AbortController();
   let timer:ReturnType<typeof setTimeout>;
@@ -47,5 +51,5 @@ export function ServerNavigationProvider({children}:{children:ReactNode}){
 
 export function FavoriteButton({id,name}:{id:string;name:string}){
  const nav=useServerNavigation(),server=nav.servers.find(s=>s.uuid===id||s.identifier===id);
- return <button type="button" className={`button secondary server-favorite${server?.favorite?' is-favorite':''}`} aria-label={`${server?.favorite?'Remove':'Add'} ${name} ${server?.favorite?'from':'to'} favorites`} title={server?.favorite?'Remove favorite':'Add to favorites'} aria-pressed={!!server?.favorite} disabled={!server||nav.pending.has(id)} onClick={()=>void nav.favorite(id,!server?.favorite)}><Icon name="star"/><span>{server?.favorite?'Favorited':'Favorite'}</span></button>;
+ return <MiraAction type="button" className={`button secondary server-favorite${server?.favorite?' is-favorite':''}`} aria-label={`${server?.favorite?'Remove':'Add'} ${name} ${server?.favorite?'from':'to'} favorites`} title={server?.favorite?'Remove favorite':'Add to favorites'} aria-pressed={!!server?.favorite} disabled={!server||nav.pending.has(id)} onClick={()=>void nav.favorite(id,!server?.favorite)}><Icon name="star"/><span>{server?.favorite?'Favorited':'Favorite'}</span></MiraAction>;
 }

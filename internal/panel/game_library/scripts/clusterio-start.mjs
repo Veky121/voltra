@@ -38,10 +38,28 @@ export function roleSettings(env) {
   return {'host.id':token.host,'host.name':env.HOST_NAME,'host.controller_url':url.href,'host.controller_token':env.CONTROLLER_TOKEN,'host.public_address':env.SERVER_IP,'host.factorio_directory':'factorio','host.factorio_port_range':[...new Set(ports)].join(',')};
 }
 
+function readConfig(file) {
+  let data;
+  try {data=JSON.parse(fs.readFileSync(file,'utf8'));} catch {throw Error('Cannot read Clusterio configuration JSON. Repair it before starting.');}
+  if(!data||typeof data!=='object'||Array.isArray(data))throw Error('Clusterio configuration must be a JSON object.');
+  return data;
+}
+
+export function preflightSetup(directory,env) {
+  roleSettings(env);
+  if(env.SERVER_MODE==='controller'&&(!env.ADMIN_STRING?.trim()||Array.from(env.ADMIN_STRING).length>64))throw Error('Choose an initial administrator name of at most 64 characters.');
+  const plugins=(env.PLUGINS||'').trim().split(/\s+/).filter(Boolean);
+  if(plugins.length>32||plugins.some(p=>!/^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@[0-9][0-9A-Za-z.+-]*)?$/.test(p)))throw Error('Plugins must be npm package names, optionally with exact versions, separated by spaces.');
+  for(const name of ['package.json',`config-${env.SERVER_MODE}.json`]){
+    const file=path.join(directory,name);
+    if(fs.existsSync(file))readConfig(file);
+  }
+  return plugins;
+}
+
 export function applySettings(directory,env) {
   const settings=roleSettings(env),file=path.join(directory,`config-${env.SERVER_MODE}.json`);
-  let existing;
-  try {existing=JSON.parse(fs.readFileSync(file,'utf8'));} catch {throw Error('Cannot read Clusterio configuration JSON. Repair it before starting.');}
+  const existing=readConfig(file);
   if(Object.entries(settings).every(([key,value])=>JSON.stringify(existing[key])===JSON.stringify(value)))return;
   const temp=file+'.voltra-tmp';
   fs.writeFileSync(temp,JSON.stringify({...existing,...settings},null,2)+'\n',{mode:0o600});

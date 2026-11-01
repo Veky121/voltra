@@ -1,3 +1,6 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {PageHeading} from '../ui/PageHeading';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {miBToGB} from "../resourceUnits.ts";
 import {startupVariableSection} from './startupSettingsModel';
 import {GameSwitch} from './GameSwitch';
@@ -26,7 +29,7 @@ export default function SteamGames() {
   const {game} = useParams();
   const request = useGameRequest<SteamOptions>(game && /^[a-z0-9-]+$/.test(game) ? `/api/client/game-library/steam/${encodeURIComponent(game)}` : null);
   return <div className="page steam-setup-page games-ui">
-    <header className="page-header"><div><Link className="steam-back" to="/game-library">← Game Library</Link><h1>{request.data?.name || 'Game'} easy setup</h1><p className="muted">Create a dedicated server with Steam updates managed by the panel.</p></div></header>
+    <header className="page-header"><div><Link className="steam-back" to="/game-library">← Game Library</Link><PageHeading title={<>{request.data?.name || 'Game'} easy setup</>}/></div></header>
     {!game ? <ErrorBox>This game does not have Steam easy setup.</ErrorBox> : <>
       <ErrorBox>{request.error}</ErrorBox>{request.error && <Button variant="secondary" onClick={request.reload}>Retry game options</Button>}
       {request.loading && !request.data && <p role="status">Loading setup options...</p>}
@@ -37,12 +40,11 @@ export default function SteamGames() {
 
 export function SteamSetupForm({game, options}: {game: SteamGame; options: SteamOptions}) {
   const navigate = useNavigate();
-  const initialNode=gameInitialNode(options.nodes);
-  const initialBudget=gameMemoryBudget(options.maximum_memory,initialNode);
+  const initialNode=gameInitialNode(options.nodes,{memory:options.defaults.memory});
   const [name, setName] = useState(`${options.name} server`);
   const [gameName, setGameName] = useState(`${options.name} server`);
   const [node, setNode] = useState(String(initialNode?.id ?? ''));
-  const [memory, setMemory] = useState(String(miBToGB(initialBudget>=options.minimum_memory ? Math.min(options.defaults.memory,initialBudget) : options.defaults.memory)));
+  const [memory, setMemory] = useState(String(miBToGB(options.defaults.memory)));
   const players = String(options.defaults.max_players);
   const [password, setPassword] = useState('');
   const preset = options.presets[0]?.value ?? '';
@@ -53,7 +55,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
     try {steamAdvancedEnvironment([field], {[field.key]: field.type === 'boolean' ? field.default === '1' : field.default}); return false;} catch {return true;}
   });
   const [advanced, setAdvanced] = useState<Record<string, string | boolean>>(() => Object.fromEntries(advancedFields.map(field => [field.key, field.type === 'boolean' ? field.default === '1' : field.default])));
-  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useErrorState('client/SteamGames.tsx');
   const submitting = useRef(false);
   const submission = useRef<{payload: string; id: string} | null>(null);
   const memoryValue = memoryMiB(memory);
@@ -87,6 +89,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
       <GameNameField value={name} onChange={setName}/>
       {options.supports_game_name && <Field label="In-game server name"><Input required maxLength={100} autoComplete="off" value={gameName} onChange={event => setGameName(event.target.value)}/></Field>}
       <div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={options.minimum_memory} maximum={Math.max(options.minimum_memory,memoryMaximum)} describedBy={memoryWarning ? "steam-memory-warning" : undefined}/></div>
+      {typeof options.defaults.disk === 'number' && Number.isFinite(options.defaults.disk) && options.defaults.disk > 0 && <p className="muted">Storage reserved: {miBToGB(options.defaults.disk)} GB.</p>}
       
       {selectedNode?.unavailable_reason && <p className="game-stop-note" role="status">{selectedNode.unavailable_reason}</p>}
       {memoryValue !== null && memoryValue > memoryMaximum && <p className="game-stop-note" role="status">This node has {miBToGB(memoryMaximum)} GB available for allocation. Lower the limit or choose another node.</p>}
@@ -94,11 +97,11 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
       <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/>
       {passwordRules.enabled && passwordRules.required && <Field label="Server password" hint={passwordRules.required ? `Required, ${passwordRules.min_length} to ${passwordRules.max_length} characters.` : 'Optional. Players use this when joining.'}><Input type="password" autoComplete="new-password" required={passwordRules.required} minLength={passwordRules.min_length} maxLength={passwordRules.max_length} value={password} onChange={event => setPassword(event.target.value)}/></Field>}
       <p className="muted">Game defaults are ready to use. Edit player limits, optional passwords and gameplay options in Settings after creation.</p>
-      <details className="steam-advanced"><summary>Installation options</summary><div className="steam-form-grid">
+      <Disclosure className="steam-advanced"><DisclosureTrigger>Installation options</DisclosureTrigger><div className="steam-form-grid">
         <SteamAdvancedControls fields={setupFields} values={advanced} onChange={(key, value) => setAdvanced(previous => ({...previous, [key]: value}))}/>
         {options.supports_install_only === true && <label className="game-boolean"><GameSwitch checked={startAfterInstall} onCheckedChange={checked => setStartAfterInstall(checked)}/><span>Start server after installation</span></label>}
         
-      </div></details>
+      </div></Disclosure>
       {!options.can_install && <p className="muted">You do not have permission to create this server.</p>}
       {!options.nodes.length && <p className="muted">No connected compatible Steam node is available. Ask an administrator to connect or upgrade a Linux amd64 node.</p>}
       <ErrorBox>{error}</ErrorBox><div className="steam-submit"><Button type="submit" disabled={!valid || !ports.data || ports.loading || !!ports.error || !options.can_install || busy} aria-busy={busy}>{busy ? 'Creating server...' : 'Create server'}</Button><span className="muted">{options.supports_install_only === true && !startAfterInstall ? 'Steam installs the game and leaves the server stopped.' : 'Steam installs the game, then starts the server.'}</span></div>

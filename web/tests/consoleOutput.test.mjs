@@ -32,3 +32,11 @@ test('brands only the leading container prompt and keeps the command intact', ()
   assert.equal(consoleOutput('container@pterodactyl~ bash -c eval$IFS"$VOLTRA_JAVA_SCRIPT"', 'console output'), 'container@voltra~ bash -c eval$IFS"$VOLTRA_JAVA_SCRIPT"');
   assert.equal(consoleOutput('Player says container@pterodactyl~', 'console output'), 'Player says container@pterodactyl~');
 });
+
+test('keeps carriage-return log records and nonzero process exits visible', () => {
+  const source = 'Downloading 10%\rDownloading 90%\r\n[Pterodactyl Daemon] Exit code: 137\rOut of memory: true';
+  assert.equal(consoleOutput(source, 'console output'),
+    'Downloading 10%\nDownloading 90%\n[Voltra] Exit code: 137\nOut of memory: true');
+  assert.equal(consoleOutput('VOLTRA_READY\rExit code: 1', 'console output'), 'Exit code: 1');
+  assert.equal(consoleOutput('\x1b[31mError\rFatal\x1b[0m', 'console output', true), '\x1b[31mError\nFatal\x1b[0m');
+});

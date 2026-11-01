@@ -266,58 +266,169 @@ def mods(root, env):
     return client, server, optional
 
 
-def lowercase_tree(path):
-    # Preflight the entire tree before renaming anything; never follow linked content.
+def checked_path(root, relative, directory=False):
+    path = confined(root, relative)
+    for parent in path.parents:
+        if parent == Path(root).resolve():
+            break
+        if parent.exists() and not parent.is_dir():
+            raise ValueError('Arma parent must be a directory')
+    if path.exists() and not (path.is_dir() if directory else path.is_file()):
+        raise ValueError('Unexpected Arma filesystem type')
+    return path
+
+
+def plan_lowercase_tree(path):
+    path = Path(path)
+    if path.is_symlink() or not path.is_dir():
+        raise ValueError('Mod must be an unlinked directory')
     directories = []
     for directory, children, files in os.walk(path, followlinks=False):
         directory = Path(directory)
         names = children + files
         if len({name.lower() for name in names}) != len(names):
             raise ValueError('Mod lowercase repair would overwrite a case collision')
-        if any((directory / name).is_symlink() for name in names):
-            raise ValueError('Mod lowercase repair refuses symbolic links')
-        directories.append((directory, names))
-    for directory, names in reversed(directories):
         for name in names:
-            if name != name.lower():
-                (directory / name).rename(directory / name.lower())
+            child = directory / name
+            if child.is_symlink() or not (child.is_file() or child.is_dir()):
+                raise ValueError('Mod repair refuses links and special files')
+        directories.append((directory, names))
+    return [(directory / name, directory / name.lower())
+            for directory, names in reversed(directories) for name in names if name != name.lower()]
 
 
-def publish_keys(root, lists):
-    keys = confined(root, 'keys')
-    keys.mkdir(exist_ok=True)
-    ledger_path = confined(root, '.voltra/arma-keys.json')
+def lowercase_tree(path):
+    for source, target in plan_lowercase_tree(path):
+        source.rename(target)
+
+
+def plan_keys(root, lists, lowercase=False):
+    keys = checked_path(root, 'keys', directory=True)
+    ledger_path = checked_path(root, '.voltra/arma-keys.json')
     previous = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
+    if not isinstance(previous, dict) or any(
+            not isinstance(name, str) or name in ('', '.', '..') or '/' in name or '\\' in name
+            or not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest)
+            for name, digest in previous.items()):
+        raise ValueError('Invalid Arma key ownership ledger')
     planned = {}
     for index, group in enumerate(lists):
         for name in group:
             directory = confined(root, name)
-            for source in directory.rglob('*'):
-                if source.suffix.lower() != '.bikey':
-                    continue
-                source = confined(root, source.relative_to(root))
-                destination = ('optional_' + Path(name).name.lstrip('@') + '_' if index == 2 else '') + source.name
-                data = source.read_bytes()
-                digest = hashlib.sha256(data).hexdigest()
-                if destination in planned and planned[destination][1] != digest:
-                    raise ValueError('Conflicting Arma signature keys')
-                target = confined(root, 'keys/' + destination)
-                if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() not in (digest, previous.get(destination)):
-                    raise ValueError('Arma signature key conflicts with operator file')
-                planned[destination] = (data, digest)
-    for name, digest in previous.items():
-        path = confined(root, 'keys/' + name)
-        if name not in planned and path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == digest:
-            path.unlink()
-    owned = {}
-    for name, (data, digest) in planned.items():
-        target = confined(root, 'keys/' + name)
-        if not target.exists() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
-            target.write_bytes(data)
+            # Validate every entry, including links that rglob would not traverse.
+            for base, dirs, files in os.walk(directory, followlinks=False):
+                for entry in dirs + files:
+                    source = confined(root, (Path(base) / entry).relative_to(root))
+                    if not (source.is_dir() or source.is_file()):
+                        raise ValueError('Invalid mod filesystem type')
+                    if source.suffix.lower() != '.bikey':
+                        continue
+                    if not source.is_file():
+                        raise ValueError('Signature key must be a regular file')
+                    # Read original bytes; only descendants, not the mod root, are renamed.
+                    filename = source.name.lower() if lowercase else source.name
+                    destination = ('optional_' + Path(name).name.lstrip('@') + '_' if index == 2 else '') + filename
+                    data = source.read_bytes()
+                    digest = hashlib.sha256(data).hexdigest()
+                    if destination in planned and planned[destination][1] != digest:
+                        raise ValueError('Conflicting Arma signature keys')
+                    planned[destination] = (data, digest)
+    if len({name.lower() for name in planned}) != len(planned):
+        raise ValueError('Case-colliding signature destinations')
+    existing = {p.name.lower(): p.name for p in keys.iterdir()} if keys.exists() else {}
+    if keys.exists() and len(existing) != len(list(keys.iterdir())):
+        raise ValueError('Case-colliding signature files')
+    owned, writes, removes = {}, [], []
+    for name in set(previous) | set(planned):
+        target = checked_path(root, 'keys/' + name)
+        if name.lower() in existing and existing[name.lower()] != name:
+            raise ValueError('Case-colliding signature target')
+        current = hashlib.sha256(target.read_bytes()).hexdigest() if target.exists() else None
+        if name not in planned:
+            if current == previous[name]:
+                removes.append(target)
+            continue
+        data, digest = planned[name]
+        if current is not None and current not in (digest, previous.get(name)):
+            raise ValueError('Arma signature key conflicts with operator file')
+        if current != digest:
+            writes.append((target, data))
             owned[name] = digest
         elif name in previous:
             owned[name] = digest
-    native.private_write(ledger_path, json.dumps(owned))
+    return keys, ledger_path, owned, writes, removes
+
+
+def apply_keys(plan):
+    keys, ledger, owned, writes, removes = plan
+    keys.mkdir(exist_ok=True)
+    for path in removes:
+        path.unlink()
+    for path, data in writes:
+        path.write_bytes(data)
+    native.private_write(ledger, json.dumps(owned))
+
+
+def publish_keys(root, lists):
+    apply_keys(plan_keys(root, lists))
+
+
+def plan_arma3(root, env, config_content=None):
+    agreement('arma3', env)
+    private_gate(env)
+    if integer(env, 'STEAMCMD_APPID', 233780, 1, 2147483647) != 233780:
+        raise ValueError('This adapter owns only Arma3 app233780')
+    main, hc, lists = arma_arguments(root, env)
+    checked_path(root, 'serverprofile', directory=True)
+    checked_path(root, 'basic.cfg')
+    path = checked_path(root, 'server.cfg')
+    content = path.read_text() if config_content is None else config_content
+    # Parse even file-authoritative content before any publication.
+    patch_cfg(content, {})
+    lower = boolean(env, 'MODS_LOWERCASE')
+    renames = []
+    names = list(dict.fromkeys(sum((list(group) for group in lists), [])))
+    for name in names:
+        directory = confined(root, name)
+        for reserved in ('keys', '.voltra', 'serverprofile'):
+            target = confined(root, reserved)
+            if directory.is_relative_to(target) or target.is_relative_to(directory):
+                raise ValueError('Mod overlaps adapter-owned paths')
+        if lower:
+            if any(directory != confined(root, other) and directory.is_relative_to(confined(root, other))
+                   for other in names):
+                raise ValueError('Overlapping lowercase mod roots')
+            renames.extend(plan_lowercase_tree(directory))
+    keys = plan_keys(root, lists, lower)
+    clients = [hc] * integer(env, 'HC_NUM', 0, 0, 5)
+    cache = []
+    if boolean(env, 'CLEAR_CACHE'):
+        home = checked_path(root, 'serverprofile/home', directory=True)
+        if home.exists():
+            for child in home.iterdir():
+                if child.name != 'Player':
+                    target = confined(root, child.relative_to(root))
+                    if target.is_dir():
+                        plan_lowercase_tree(target)  # Pure recursive link/type validation.
+                    elif not target.is_file():
+                        raise ValueError('Invalid cache entry')
+                    cache.append(target)
+    return main, clients, path, content, renames, keys, cache
+
+
+def publish_arma3(plan):
+    main, clients, path, content, renames, keys, cache = plan
+    for source, target in renames:
+        source.rename(target)
+    apply_keys(keys)
+    if not path.exists() or path.read_text() != content:
+        native.private_write(path, content)
+    for target in cache:
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+    return main, clients
 
 
 def arma_arguments(root, env):
@@ -487,30 +598,12 @@ def configure(root, game, env):
         if env.get('MAX_FPS', '120'):
             args += ['-maxFPS', str(integer(env, 'MAX_FPS', 120, 1, 100000))]
         return args, []
-    private_gate(env)
-    if integer(env, 'STEAMCMD_APPID', 233780, 1, 2147483647) != 233780:
-        raise ValueError('This adapter owns only Arma3 app233780')
-    main, hc, lists = arma_arguments(root, env)
-    if boolean(env, 'MODS_LOWERCASE'):
-        for name in dict.fromkeys(sum((list(group) for group in lists), [])):
-            lowercase_tree(confined(root, name))
-    publish_keys(root, lists)
-    path = confined(root, 'server.cfg')
-    native.private_write(path, patch_cfg(path.read_text(), {
+    path = checked_path(root, 'server.cfg')
+    content = patch_cfg(path.read_text(), {
         'password': cfg_string(text(env, 'SERVER_PASSWORD')),
         'maxPlayers': str(integer(env, 'MAX_PLAYERS', 32, 1, 2147483647)),
-        'headlessClients[]': '{"127.0.0.1"}', 'localClient[]': '{"127.0.0.1"}'}))
-    if boolean(env, 'CLEAR_CACHE'):
-        home = confined(root, 'serverprofile/home')
-        if home.is_dir():
-            for child in home.iterdir():
-                if child.name != 'Player':
-                    target = confined(root, child.relative_to(root))
-                    if target.is_dir():
-                        shutil.rmtree(target)
-                    else:
-                        target.unlink()
-    return main, [hc] * integer(env, 'HC_NUM', 0, 0, 5)
+        'headlessClients[]': '{"127.0.0.1"}', 'localClient[]': '{"127.0.0.1"}'})
+    return publish_arma3(plan_arma3(root, env, content))
 
 
 def child_environment(root, game, env):

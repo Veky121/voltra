@@ -37,3 +37,15 @@ test('source trailing blank lines remain literal and refresh is idempotent', () 
   assert(result.profiles.game.egg.scripts.installation.script.includes(source));
   assert.equal(refreshHelpers(result.profiles, new Map([['native_console', source]])).changes.length, 0);
 });
+
+test('quoted installer destinations refresh without expanding shell paths', () => {
+  const script = "cat > \"$stage/native-config.py\" <<'DOUBLE'\nold\nDOUBLE\ncat > 'path with spaces/native_config.py' <<'SINGLE'\nold\nSINGLE\n";
+  const input = {game: {egg: {variables: [{env_variable:'PRESERVE'}], scripts: {installation: {script}}}}};
+  const source = "value = \"$' $& $`\"\n";
+  const result = refreshHelpers(input, new Map([['native_config',source]]));
+  assert.equal(result.changes.length,2);
+  assert.equal(result.profiles.game.egg.scripts.installation.script,script.replaceAll('old',()=>source.trimEnd()));
+  assert.deepEqual(result.profiles.game.egg.variables,input.game.egg.variables);
+  assert.equal(input.game.egg.scripts.installation.script,script);
+  assert.equal(refreshHelpers(result.profiles,new Map([['native_config',source]])).changes.length,0);
+});

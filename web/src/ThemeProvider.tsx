@@ -1,3 +1,5 @@
+import {observedFetch} from './notifications/observedFetch';
+import {useErrorState} from './notifications/useErrorState';
 import {createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useState,type ReactNode} from 'react';
 import {defaultTheme,parseTheme,themeKey,themeVariables,type ThemePreferences} from './themePreferences';
 
@@ -5,7 +7,7 @@ type ThemeContextValue={saved:ThemePreferences;preview:(theme:ThemePreferences|n
 const ThemeContext=createContext<ThemeContextValue|null>(null);
 export function useTheme(){const context=useContext(ThemeContext);if(!context)throw new Error('Theme provider is missing.');return context}
 async function desktopTheme(account:string,theme?:ThemePreferences){
- const response=await fetch('/desktop/theme',{method:theme?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json','X-Voltra-Account':account},...(theme?{body:JSON.stringify(theme)}:{})});
+ const response=await observedFetch('/desktop/theme',{method:theme?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json','X-Voltra-Account':account},...(theme?{body:JSON.stringify(theme)}:{})});
  const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not access local theme settings.');
  if(data.theme!==null&&!parseTheme(data.theme))throw new Error('Saved theme settings are invalid.');
  return parseTheme(data.theme)||defaultTheme;
@@ -13,7 +15,7 @@ async function desktopTheme(account:string,theme?:ThemePreferences){
 export function ThemeProvider({account,children}:{account:string;children:ReactNode}){
  const desktop=import.meta.env.VITE_DESKTOP==='true';
  const key=themeKey(window.location.origin,account);
- const [saved,setSaved]=useState<ThemePreferences>(defaultTheme),[draft,setDraft]=useState<ThemePreferences|null>(null),[ready,setReady]=useState(false),[error,setError]=useState(''),[revision,setRevision]=useState(0);
+ const [saved,setSaved]=useState<ThemePreferences>(defaultTheme),[draft,setDraft]=useState<ThemePreferences|null>(null),[ready,setReady]=useState(false),[error,setError]=useErrorState('ThemeProvider.tsx'),[revision,setRevision]=useState(0);
  const reload=useCallback(()=>setRevision(v=>v+1),[]);
  const preview=useCallback((theme:ThemePreferences|null)=>setDraft(theme),[]);
  useEffect(()=>{

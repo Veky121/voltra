@@ -1,4 +1,5 @@
 export type StartupVariable = {
+  effect?: { kind: 'initial_default' };
   name?: string;
   description?: string;
   env_variable: string;
@@ -25,9 +26,22 @@ export type StartupMeta = {
 export type VariableWrite = { key: string; value: string } | { key: string; reset: true };
 export type VariableIntent = 'save' | 'clear' | 'reset';
 
+// These declared flags are enforced by the reviewed installers, not inferred
+// from arbitrary variable labels. Never turn them on automatically.
+const installationAcknowledgements = new Set([
+  'EULA_ACCEPTED', 'BEDROCK_TERMS_ACCEPTED', 'PNX_LICENSE_ACCEPTED', 'ACCEPT_WINDOWS_RUNTIME_LICENSES',
+  'ACKNOWLEDGE_LEGACY_PREREQUISITES',
+]);
+export function installationAcknowledgementVariable(variable: Pick<StartupVariable, 'env_variable'>): boolean {
+  return installationAcknowledgements.has(variable.env_variable.toUpperCase());
+}
+
 // Only known installation/process fields belong in Runtime. Custom template
 // fields stay available in Game settings rather than disappearing behind admin.
 const runtimeVariables = new Set([
+  ...installationAcknowledgements,
+  // Optional publisher acceptance can instead be completed in Console.
+  'SCPSL_ACCEPT_EULA',
   'SERVER_JARFILE', 'SERVER_JAR', 'JARFILE', 'JAR_FILE', 'JAR_NAME',
   'MINECRAFT_VERSION', 'MC_VERSION', 'VANILLA_VERSION', 'SERVER_VERSION', 'VERSION',
   'MINECRAFT_LOADER', 'MINECRAFT_LOADER_VERSION', 'ARCLIGHT_LOADER', 'DL_VERSION',
@@ -178,3 +192,14 @@ export function commandPreview(meta: StartupMeta, variables: StartupVariable[]):
   return command || 'No command preview is available.';
 }
 
+
+export function initialDefaultVariable(variable: StartupVariable): boolean {
+  return variable.effect?.kind === 'initial_default';
+}
+export function startupEffectHelp(variable: StartupVariable): string {
+  return initialDefaultVariable(variable) ? 'Used only when the native setting is missing. Existing native configuration keeps its value.' : '';
+}
+export function startupSaveMessage(variable: StartupVariable, intent: VariableIntent): string {
+  if (initialDefaultVariable(variable)) return (intent === 'reset' ? 'Initial default reset.' : 'Initial default saved.') + ' Existing native configuration keeps its value.';
+  return intent === 'reset' ? 'Template default restored. Applies next start.' : 'Saved. Applies next start.';
+}

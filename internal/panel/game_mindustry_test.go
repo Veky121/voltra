@@ -15,7 +15,7 @@ func TestMindustryReviewedSettings(t *testing.T) {
 			break
 		}
 	}
-	if entry.Profile != "mindustry-v160.7-v1" {
+	if entry.Profile != "mindustry-v160.7-v1-native-authority-wave9" {
 		t.Fatal("reviewed Mindustry missing")
 	}
 	egg, variables, err := parseEggDocument(entry.Egg)

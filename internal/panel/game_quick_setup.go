@@ -391,6 +391,15 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 			return nil, err
 		}
 	}
+	canvas, paper := false, false
+	if game == "minecraft" {
+		egg, e := a.one(ctx, "SELECT * FROM eggs WHERE id=$1", s["egg_id"])
+		if e != nil {
+			return nil, e
+		}
+		canvas = nativeSettingsIsRecipe(egg, canvasSettingsRecipe)
+		paper = nativeSettingsIsRecipe(egg, paperDifficultyRecipe)
+	}
 	fields := []M{}
 	if exists {
 		for _, field := range quickFields(game) {
@@ -434,12 +443,24 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 				}
 				row["options"] = options
 			}
+			if canvas {
+				canvasDifficultyPresentation(row)
+			}
+			if paper {
+				paperDifficultyPresentation(row)
+			}
 			fields = append(fields, row)
 		}
 	}
 	help := steamGameHelp(game)
 	if game == "minecraft" {
 		help = []M{{"label": "Minecraft properties", "text": "Changes take effect on the next start. Properties outside this form are preserved. Empty values mean the property is absent or could not be parsed; the game applies its defaults."}}
+	}
+	if canvas {
+		help = []M{{"label": "Minecraft properties", "text": "Most properties take effect on the next start. Difficulty applies to newly created worlds. Properties outside this form are preserved."}, canvasDifficultyHelp()}
+	}
+	if paper {
+		help = []M{{"label": "Minecraft properties", "text": "Most properties take effect on the next start. Existing worlds may keep their saved difficulty. Properties outside this form are preserved."}, paperDifficultyHelp()}
 	}
 	if !exists {
 		help = append(help, M{"label": "Configuration not created yet", "text": "Start the game once, stop it, then reload Quick setup."})

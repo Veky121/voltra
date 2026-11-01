@@ -75,6 +75,73 @@ def starmade_options(jar):
     return ['-javaagent:'+str(jar),'--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED','--add-opens=java.base/java.nio=ALL-UNNAMED']
 
 
+def validate_necesse(env):
+    """Pure pre-acquisition validation; no installed payload is required."""
+    port = integer(env,'SERVER_PORT',0,1,65535)
+    allocated = {int(value) for value in env.get('VOLTRA_ALLOCATED_PORTS','').split(',') if value}
+    if port not in allocated:raise ValueError('Primary gameplay port is not allocated')
+    integer(env,'SERVER_MEMORY',2048,512,1048576)
+    world = line(env.get('SAVE_NAME','Save1'),80)
+    if not world or world.startswith(('.', '-')) or any(c in world for c in '/\\'):raise ValueError('Choose a save name, not a path')
+    slots = integer(env,'SERVER_SLOTS',10,1,250)
+    pause = env.get('PAUSE_EMPTY','1')
+    if pause not in ('0','1'):raise ValueError('PAUSE_EMPTY must be 0 or 1')
+    password = line(env.get('SERVER_PASSWORD',''),128)
+    return world, slots, pause, password
+
+
+def validate_starmade(root, env):
+    """Validate operator inputs before acquisition; native server.cfg stays authoritative."""
+    port = integer(env,'SERVER_PORT',0,1,65535)
+    allocated = env.get('VOLTRA_ALLOCATED_PORTS','').split(',')
+    if any(not value.isascii() or not value.isdigit() or not 1 <= int(value) <= 65535 for value in allocated):
+        raise ValueError('Invalid allocated gameplay ports')
+    if port not in {int(value) for value in allocated}:raise ValueError('Primary gameplay port is not allocated')
+    integer(env,'SERVER_MEMORY',2048,512,1048576)
+    jar = line(env.get('SERVER_JARFILE','StarMade.jar'),64)
+    if not jar or not jar.endswith('.jar') or Path(jar).is_absolute() or '..' in Path(jar).parts or '\\' in jar:
+        raise ValueError('Choose a server jar within this volume')
+    inside(Path(root).resolve(),jar)
+    return jar
+
+
+def validate_rising(root, env):
+    """No acquisition or writes; native ordinary properties remain authoritative."""
+    root = Path(root).resolve()
+    port = integer(env,'SERVER_PORT',0,2,65531)
+    parts = env.get('VOLTRA_ALLOCATED_PORTS','').split(',')
+    if any(not p.isascii() or not p.isdigit() or not 1 <= int(p) <= 65535 for p in parts):raise ValueError('Invalid allocated ports')
+    allocated = set(map(int,parts));block = set(range(port-1,port+5))
+    if not block.issubset(allocated) or not allocated-block:raise ValueError('Allocate gameplay-1 through gameplay+4 and separate RCON')
+    integer(env,'SERVER_MEMORY',2048,512,1048576)
+    integer(env,'RCON_PORT',4253,1,65535)
+    if env.get('SRCDS_BETAID','java') not in ('','java','legacy'):raise ValueError('Choose the Java legacy branch')
+    target = inside(root,'server.properties')
+    native = {}
+    if target.exists():
+        if not target.is_file() or target.stat().st_size > 4*1024**2:raise ValueError('Invalid native properties file')
+        for text in target.read_text().splitlines():
+            if not text.strip() or text.lstrip().startswith(('#','!')):continue
+            # Refuse ambiguous syntax before touching native configuration.
+            if text.endswith('\\') or '\\' in text.split('=',1)[0]:raise ValueError('Unsupported native property key syntax')
+            match = re.match(r'^\s*([A-Za-z0-9_]+)\s*[=:]\s*(.*)$',text)
+            if not match:continue
+            if match[1] not in ('server_password','rcon_password','rcon_enabled'):continue
+            if match[1] in native:raise ValueError('Duplicate native property')
+            native[match[1]] = match[2]
+    values = {}
+    for key,envkey,default,limit in [('server_password','SERVER_PASSWORD','',80),('rcon_password','RCON_PASSWORD','',80)]:
+        if key not in native:values[key] = line(env.get(envkey,default),limit)
+    integer(env,'MAX_PLAYERS',4,1,64)
+    line(env.get('SERVER_NAME','Rising World Server'),128)
+    if len(native.get('rcon_password',values.get('rcon_password',''))) < 6:raise ValueError('Choose an RCON password of at least six characters')
+    library = line(env.get('VOLTRA_GAME_LD_LIBRARY_PATH','./linux64'),128)
+    for item in library.split(':'):
+        if not item:raise ValueError('Empty library path')
+        inside(root,item)
+    return values, native
+
+
 def launch(root, kind, env):
     root = Path(root).resolve()
     if kind not in ('necesse','starmade','rising-world-java'):raise ValueError('Unknown reviewed Java game')
@@ -89,19 +156,14 @@ def launch(root, kind, env):
     credentials = [env.get(key,'') for key in ('SERVER_PASSWORD','RCON_PASSWORD','STEAM_PASS','STEAM_AUTH','SRCDS_BETAPASS')]
     managed_properties = None
     if kind == 'necesse':
-        world = line(env.get('SAVE_NAME','Save1'),80)
-        if not world or world.startswith(('.', '-')) or any(c in world for c in '/\\'):raise ValueError('Choose a save name, not a path')
-        slots = integer(env,'SERVER_SLOTS',10,1,250)
-        pause = env.get('PAUSE_EMPTY','1')
-        if pause not in ('0','1'):raise ValueError('PAUSE_EMPTY must be 0 or 1')
-        password = line(env.get('SERVER_PASSWORD',''),128)
+        world, slots, pause, password = validate_necesse(env)
         argv = [str(inside(root,'jre/bin/java')),'-Xms128M','-Xmx'+str(heap)+'M','-Dterminal.jline=false','-Dterminal.ansi=false','-jar',str(inside(root,'Server.jar')),
                 '-localdir','-nogui','-world',world,'-port',str(port),'-slots',str(slots),'-password',password,'-pausewhenempty',pause]
         stop, ready = 'stop', b'Type help for list of commands.'
     else:
         java = inside(root,'.voltra/'+('java21' if kind=='starmade' else 'java8')+'/bin/java')
         if kind == 'starmade':
-            jar = line(env.get('SERVER_JARFILE','StarMade.jar'),64)
+            jar = validate_starmade(root,env)
             if not jar or not jar.endswith('.jar') or Path(jar).is_absolute():raise ValueError('Choose a server jar within this volume')
             jar_path=inside(root,jar)
             if not jar_path.is_file():raise ValueError('The configured server jar is missing')
@@ -114,11 +176,8 @@ def launch(root, kind, env):
             if not extra:raise ValueError('Allocate a separate RCON port')
             requested = integer(env,'RCON_PORT',4253,1,65535)
             rcon = requested if requested in extra else extra[0]
-            maximum = integer(env,'MAX_PLAYERS',4,1,64)
-            name = line(env.get('SERVER_NAME','Rising World Server'),128)
-            password = line(env.get('SERVER_PASSWORD',''),80)
-            rcon_password = line(env.get('RCON_PASSWORD',''),80)
-            if len(rcon_password)<6:raise ValueError('Choose an RCON password of at least six characters')
+            seed, native = validate_rising(root,env)
+            credentials.extend(native.get(key,'') for key in ('server_password','rcon_password'))
             # The Python bootstrap uses LD_LIBRARY_PATH for its private libpython.
             # Startup captures the operator's game-library setting separately.
             library = line(env.get('VOLTRA_GAME_LD_LIBRARY_PATH','./linux64'),128)
@@ -127,8 +186,9 @@ def launch(root, kind, env):
             sdk = inside(root,'.steam/sdk64')
             if sdk.is_dir():directories.append(sdk)
             child_env['LD_LIBRARY_PATH'] = ':'.join(dict.fromkeys(map(str,directories)))
-            managed_properties = {'rcon_enabled':'true','rcon_password':rcon_password,'server_password':password}
-            argv = [str(java),'-Xms128M','-Xmx'+str(heap)+'M','-jar',str(inside(root,'server.jar')),'+maxplayer='+str(maximum),'+serverport='+str(port),'+servername='+name,'+rconport='+str(rcon)]
+            managed_properties = {**seed,'rcon_enabled':'true'}
+            argv = [str(java),'-Xms128M','-Xmx'+str(heap)+'M','-jar',str(inside(root,'server.jar')),'+serverport='+str(port),'+rconport='+str(rcon)]
+            if not (root/'server.properties').exists():argv += ['+maxplayer='+str(integer(env,'MAX_PLAYERS',4,1,64)),'+servername='+line(env.get('SERVER_NAME','Rising World Server'),128)]
             # The publisher's earlier STARTED line precedes SteamAPI_Init.
             stop, ready = 'shutdown', b'Steam Query Server bind to ANY ('
     if not Path(argv[0]).is_file():raise ValueError('Install this game and its Java runtime first')
@@ -142,6 +202,9 @@ if __name__ == '__main__':
     kind = sys.argv[1]
     automatic = os.environ.get('VOLTRA_STEAM_AUTO_UPDATE',os.environ.get('AUTO_UPDATE','0'))
     if automatic not in ('0','1'):raise ValueError('AUTO_UPDATE must be 0 or 1')
+    if kind == 'necesse':validate_necesse(os.environ)
+    if kind == 'starmade':validate_starmade(Path.cwd(),os.environ)
+    if kind == 'rising-world-java':validate_rising(Path.cwd(),os.environ)
     if automatic == '1' and kind != 'starmade':
         from java_games_install import install
         install(Path.cwd(),kind,os.environ,False)

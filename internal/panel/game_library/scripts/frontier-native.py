@@ -47,6 +47,62 @@ def unique_object(pairs):
         value[key]=item
     return value
 
+def vein_configuration(root, env, assigned):
+    """Preserve existing ordinary scalars; reconcile only native bindings."""
+    relative = 'Vein/Saved/Config/LinuxServer/Game.ini'
+    target = confined(root, root/relative)
+    if target.exists() and (not target.is_file() or target.stat().st_size > 8*1024**2):
+        raise ValueError('VEIN configuration must be a bounded regular file')
+    raw = target.read_bytes() if target.exists() else b''
+    previous = raw.decode('utf-8')
+    session = '/Script/Vein.VeinGameSession'
+    schema = {'/Script/Engine.GameSession': {'MaxPlayers': ''}, session: {
+        'bShouldAdvertise': '', 'bPublic': '', 'ServerName': '', 'BindAddr': '', 'Password': ''},
+        'OnlineSubsystemSteam': {'GameServerQueryPort': ''}}
+    resolved = native.resolve_ini_identities(previous.lstrip('\ufeff'), schema)
+    existing = {}; current = None
+    for line in previous.lstrip('\ufeff').splitlines():
+        header = re.fullmatch(r'\s*\[([^\]]+)\]\s*(?:[;#].*)?', line.strip())
+        if header:
+            current = header[1]
+        elif current in resolved and not line.lstrip().startswith((';','#')) and '=' in line:
+            key, value = line.split('=', 1); key = key.strip()
+            if key[:1] in ('+','-','!','.') and any(key[1:].casefold() == k.casefold() for k in resolved[current]):
+                raise ValueError('Managed VEIN scalar cannot use array operators')
+            if key in resolved[current]:
+                existing[(current,key)] = value.strip()
+    updates = {}; secrets = []
+    for actual, keys in resolved.items():
+        canonical = next(s for s in schema if s.casefold() == actual.casefold())
+        for key in keys:
+            name = next(k for k in schema[canonical] if k.casefold() == key.casefold())
+            present = (actual,key) in existing
+            value = existing.get((actual,key))
+            if name == 'BindAddr': effective = '0.0.0.0'
+            elif name == 'GameServerQueryPort': effective = str(assigned['QUERY_PORT'])
+            else:
+                if not present:
+                    if name == 'MaxPlayers': value = str(integer(env,'MAX_PLAYERS',16,1,10000))
+                    elif name in ('bShouldAdvertise','bPublic'): value = 'True' if boolean(env,'PUBLIC_SERVER','True') else 'False'
+                    elif name == 'ServerName': value = text(env,'SERVER_NAME','Vein Server',64)
+                    else: value = text(env,'SERVER_PASSWORD','',32)
+                effective = json.loads(value) if value.startswith('"') else value
+                if not isinstance(effective,str): raise ValueError('Invalid VEIN scalar')
+                if name == 'MaxPlayers': integer({'value':effective},'value',16,1,10000)
+                elif name in ('bShouldAdvertise','bPublic'):
+                    if effective.lower() not in ('true','false','0','1'): raise ValueError('Invalid VEIN boolean')
+                else: text({'value':effective},'value','',64 if name == 'ServerName' else 32)
+                if name == 'Password':
+                    secrets.append(effective)
+                    if present and value != effective: secrets.append(value)
+                if present: continue
+                effective = value
+            if not present or value != effective:
+                updates.setdefault(actual,{})[key] = effective
+    updated = native.patch_ini(previous, updates).encode('utf-8') if updates else raw
+    return relative, updated, secrets, raw
+
+
 def plan(root,game,env):
     """Validate every managed setting and config before producing any writes."""
     if game == 'soulmask':
@@ -60,10 +116,10 @@ def plan(root,game,env):
     if game=='evrima' and env.get('SRCDS_BETAID','evrima')!='evrima':raise ValueError('This exact recipe requires the original Evrima branch')
     binary=confined(root,root/binary);writes={};secrets=[]
     if game=='vein':
-        p=ports(env,[('QUERY_PORT',27015)]);public='True' if boolean(env,'PUBLIC_SERVER','True') else 'False'
-        values={'/Script/Engine.GameSession':{'MaxPlayers':str(integer(env,'MAX_PLAYERS',16,1,10000))},'/Script/Vein.VeinGameSession':{'bShouldAdvertise':public,'bPublic':public,'ServerName':text(env,'SERVER_NAME','Vein Server',64),'BindAddr':'0.0.0.0','Password':text(env,'SERVER_PASSWORD','',32)},'OnlineSubsystemSteam':{'GameServerQueryPort':str(p['QUERY_PORT'])}}
-        path='Vein/Saved/Config/LinuxServer/Game.ini';writes[path]=native.patch_ini(read(root,path),values).encode()
-        argv=[str(binary),'-Port='+str(p['primary']),'-QueryPort='+str(p['QUERY_PORT']),'-log'];secrets=[env.get('SERVER_PASSWORD','')]
+        p=ports(env,[('QUERY_PORT',27015)])
+        path,updated,secrets,previous=vein_configuration(root,env,p)
+        if updated!=previous:writes[path]=updated
+        argv=[str(binary),'-Port='+str(p['primary']),'-QueryPort='+str(p['QUERY_PORT']),'-log']
     elif game=='evrima':
         rcon=boolean(env,'RCON','false');queue=boolean(env,'ENABLE_QUEUE','true');roles=[]
         if rcon:roles.append(('RCON_PORT',44000))

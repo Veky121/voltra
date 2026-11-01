@@ -15,7 +15,7 @@ func TestLuantiReviewedSettings(t *testing.T) {
 			break
 		}
 	}
-	if entry.Profile != "luanti-5.17.0-v1" || len(entry.Platforms) != 1 || entry.Platforms[0] != "linux/amd64" {
+	if entry.Profile != "luanti-5.17.0-file-authority-v2" || len(entry.Platforms) != 1 || entry.Platforms[0] != "linux/amd64" {
 		t.Fatal("reviewed Luanti platform/profile missing")
 	}
 	egg, variables, err := parseEggDocument(entry.Egg)
@@ -66,7 +66,9 @@ func TestLuantiReviewedSettings(t *testing.T) {
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 	for _, name := range []string{"luanti-runtime.py", "luanti-game-install.py", "luanti-admin.lua", "luanti-plain-console.cpp.inc", "luanti-patch-console.py"} {
 		source, err := os.ReadFile("game_library/scripts/" + name)
-		if err != nil || !strings.Contains(script, string(source)) {
+		// The reviewed Linux heredoc uses LF even in a CRLF Windows checkout.
+		// Keep the entire helper body comparison apart from that normalization.
+		if err != nil || !strings.Contains(strings.ReplaceAll(script, "\r\n", "\n"), strings.ReplaceAll(string(source), "\r\n", "\n")) {
 			t.Fatal("installer helper mismatch:", name, err)
 		}
 	}

@@ -1,8 +1,14 @@
+import '../ui/sectionTabs.css';
+import {useDiscardSettings} from '../client/PendingSettings';
+import {Checkbox} from '../components/ui/checkbox';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
+import {Input as MiraInput} from '../components/ui/input';
 import { formatMiBGB } from "../resourceUnits";
 import { useState, type ComponentProps } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Loading } from "../lib";
-import { SettingsSection } from "../ui/Settings";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { NodeConnection, NodeList } from "./node-pairing";
 import "./infrastructure-ui.css";
 import {
@@ -30,7 +36,7 @@ function ResourceEditor(props: ComponentProps<typeof SharedResourceEditor>) {
   return <div className="admin-infrastructure"><SharedResourceEditor {...props} /></div>;
 }
 function SettingsEditor({ title, ...props }: ComponentProps<typeof Editor>) {
-  return <SettingsSection title={title ?? "Settings"} plain className="infrastructure-settings-editor"><Editor {...props} /></SettingsSection>;
+  return <div className="infrastructure-settings-editor"><Editor title={title} {...props} /></div>;
 }
 
 const locations = "/api/application/locations",
@@ -162,13 +168,12 @@ function NodeExtras({ node }: { node: any }) {
             {
               label: "Select",
               render: (x) => (
-                <input
+                <Checkbox
                   aria-label={`Select allocation ${x.id}`}
-                  type="checkbox"
                   checked={selection.includes(x.id)}
-                  onChange={(e) =>
+                  onCheckedChange={(checked) =>
                     setSelection(
-                      e.target.checked
+                      checked
                         ? [...selection, x.id]
                         : selection.filter((y) => y !== x.id)
                     )
@@ -308,9 +313,9 @@ function NodeDiagnostics({ node }: { node: any }) {
             wings configure --panel-url {window.location.origin} --token{" "}
             {token.token} --node {token.node}
           </pre>
-          <button className="secondary" onClick={() => setToken(null)}>
+          <MiraAction className="secondary" onClick={() => setToken(null)}>
             Dismiss token
-          </button>
+          </MiraAction>
         </>
       )}
     </Panel>
@@ -344,12 +349,12 @@ function AllocationAlias({
         }
       }}
     >
-      <input
+      <MiraInput
         aria-label={`Alias for ${allocation.ip}:${allocation.port}`}
         value={alias}
         onChange={(e) => setAlias(e.target.value)}
       />
-      <button className="secondary">Save alias</button>
+      <MiraAction className="secondary">Save alias</MiraAction>
       <ErrorMessage error={err} />
     </form>
   );
@@ -489,84 +494,110 @@ export function Host() {
 }
 export function Settings() {
   const q = useAPI("/api/admin/settings");
+  const [tab,setTab]=useState('general');
+  const discard=useDiscardSettings();
   const initial = q.data ? q.data.attributes ?? q.data : undefined;
   return (
     <div className="admin-infrastructure infrastructure-settings">
       <Heading title="Panel settings" />
       <ErrorMessage error={q.error} />
-      {q.loading ? (
+      {q.loading && !q.data ? (
         <Loading />
       ) : (
-        <>
+        <Tabs value={tab} onValueChange={async value=>{
+          if(value===null||value===tab)return;
+          // The raw editor overlaps every form. Never save conflicting drafts.
+          if((value==='advanced'||tab==='advanced')&&!await discard())return;
+          setTab(String(value));
+        }} className="panel-settings-tabs">
+          <TabsList variant="line" className="section-tabs" aria-label="Panel settings" activateOnFocus={false}>
+            <TabsTrigger className="section-tab" value="general">General</TabsTrigger>
+            <TabsTrigger className="section-tab" value="backups">Backups</TabsTrigger>
+            <TabsTrigger className="section-tab" value="advanced">Advanced</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general" keepMounted>
           <SettingsEditor
-            title="Wings and allocation settings"
+            title="Server defaults"
+            groups={[
+              {title:'Wings',keys:['pterodactyl:guzzle:connect_timeout','pterodactyl:guzzle:timeout']},
+              {title:'Allocations',keys:['pterodactyl:client_features:allocations:enabled','pterodactyl:client_features:allocations:range_start','pterodactyl:client_features:allocations:range_end']},
+              {title:'Databases',keys:['pterodactyl:client_features:databases:enabled','pterodactyl:client_features:databases:allow_random']},
+              {title:'Limits & activity',keys:['pterodactyl:client_features:schedules:per_schedule_task_limit','activity:hide_admin_activity']},
+            ]}
             endpoint="/api/admin/settings"
             initial={initial}
             fields={[
               f(
                 "pterodactyl:guzzle:connect_timeout",
-                "Wings connection timeout (seconds)",
+                "Connection timeout (seconds)",
                 "number",
-                { default: 5 }
+                { default: 5, hint: "Time allowed to connect to Wings." }
               ),
               f(
                 "pterodactyl:guzzle:timeout",
-                "Wings request timeout (seconds)",
+                "Request timeout (seconds)",
                 "number",
-                { default: 60 }
+                { default: 60, hint: "Time allowed for a Wings request to finish." }
               ),
               f(
                 "pterodactyl:client_features:allocations:enabled",
-                "Allow automatic allocation creation",
-                "checkbox"
+                "Automatic allocations",
+                "checkbox",
+                { hint: "Let users assign ports from the range below." }
               ),
               f(
                 "pterodactyl:client_features:allocations:range_start",
-                "Allocation range start",
+                "Port range start",
                 "number",
                 { default: 25565 }
               ),
               f(
                 "pterodactyl:client_features:allocations:range_end",
-                "Allocation range end",
+                "Port range end",
                 "number",
                 { default: 26000 }
               ),
               f(
                 "pterodactyl:client_features:databases:enabled",
-                "Allow client database creation",
+                "Client database creation",
                 "checkbox",
-                { default: true }
+                { default: true, hint: "Let users create databases for their servers." }
               ),
               f(
                 "pterodactyl:client_features:databases:allow_random",
-                "Allow random database host selection",
+                "Random host selection",
                 "checkbox",
-                { default: true }
+                { default: true, hint: "Choose an available host when creating a database." }
               ),
               f(
                 "pterodactyl:client_features:schedules:per_schedule_task_limit",
-                "Maximum tasks per schedule",
+                "Tasks per schedule",
                 "number",
                 { default: 10 }
               ),
               f(
                 "activity:hide_admin_activity",
-                "Hide administrator activity from users",
-                "checkbox"
+                "Hide admin activity",
+                "checkbox",
+                { hint: "Keep administrator actions out of users' activity logs." }
               ),
             ]}
           />
-          <details className="card"><summary>Optional panel artwork pack</summary><p>Set <code>ARTWORK_DIRECTORY</code> on the panel host to a private directory outside the web root, containing a <code>manifest.json</code> that maps server and library IDs to JPG, PNG or WebP files. Restart the panel during maintenance to apply pack changes. Web and desktop load the pack after sign-in and keep original SVG tiles as fallbacks. See <code>SERVER_ARTWORK.md</code> for the manifest format. Operators are responsible for permission to host their chosen artwork.</p></details>
+          </TabsContent>
+          <TabsContent value="backups" keepMounted>
           <BackupSettings initial={initial} />
-          <details className="infrastructure-advanced-settings"><summary>Advanced settings</summary><SettingsEditor
+          </TabsContent>
+          <TabsContent value="advanced" keepMounted>
+          <SettingsEditor
             title="All settings"
             endpoint="/api/admin/settings"
             initial={{ settings: cleanSettings(initial ?? {}) }}
             fields={[f("settings", "Settings JSON", "json")]}
             transform={(v) => cleanSettings(v.settings)}
-          /></details>
-        </>
+          />
+          <Disclosure className="card"><DisclosureTrigger>Optional panel artwork pack</DisclosureTrigger><p>Set <code>ARTWORK_DIRECTORY</code> on the panel host to a private directory outside the web root, containing a <code>manifest.json</code> that maps server and library IDs to JPG, PNG or WebP files. Restart the panel during maintenance to apply pack changes. Web and desktop load the pack after sign-in and keep original SVG tiles as fallbacks. See <code>SERVER_ARTWORK.md</code> for the manifest format. Operators are responsible for permission to host their chosen artwork.</p></Disclosure>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

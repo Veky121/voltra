@@ -168,9 +168,10 @@ class SpaceSurvivalTests(unittest.TestCase):
         # Tiny local Python fixture, not a game server or publisher acceptance.
         with socket.socket()as reservation:reservation.bind(('127.0.0.1',0));port=reservation.getsockname()[1]
         child='import socket,sys\ns=socket.socket();s.bind(("127.0.0.1",int(sys.argv[1])));s.listen();c,_=s.accept();c.sendall(b"Please enter password:");f=c.makefile("rb");assert f.readline()==b"fixture-secret\\r\\n";assert f.readline()==b"help\\r\\n";assert f.readline()==b"saveandexit 0\\r\\n";c.sendall(b"fixture shutdown");c.close();s.close()'
-        stdin=type('Input',(),{'buffer':io.BytesIO(b'help\nsaveandexit 0\n')})()
+        read_fd,write_fd=os.pipe()
+        with os.fdopen(write_fd,'wb',buffering=0)as writer:writer.write(b'help\nsaveandexit 0\n')
         stdout=type('Output',(),{'buffer':io.BytesIO()})()
-        with mock.patch.object(console.sys,'stdin',stdin),mock.patch.object(console.sys,'stdout',stdout):
+        with os.fdopen(read_fd,'rb',buffering=0)as stdin,mock.patch.object(console.sys,'stdin',stdin),mock.patch.object(console.sys,'stdout',stdout):
             result=console.run(port,[sys.executable,'-c',child,str(port)],{**os.environ,'VOLTRA_EMPYRION_PASSWORD':'fixture-secret'})
         self.assertEqual(result,0)
 

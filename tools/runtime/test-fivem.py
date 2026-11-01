@@ -67,4 +67,42 @@ class FiveM(unittest.TestCase):
                 link=tarfile.TarInfo('alpine/lib/escape.so');link.type=tarfile.SYMTYPE;link.linkname='../../../../etc/passwd';tar.addfile(link)
             with self.assertRaises(ValueError):installer.extract_runtime(archive,out,None)
 
+class ConfigSafety(unittest.TestCase):
+    def test_preserves_order_comments_unknown_and_crlf(self):
+        cfg=load('fivem-cfg')
+        raw='# private comment\r\n  sv_hostname "old" # keep\r\nensure custom\r\nset secret "private;value"\r\n'
+        result=cfg.render(raw,{'sv_hostname':'"new"'})
+        self.assertEqual(result,raw.replace('"old"','"new"'))
+        self.assertEqual(cfg.render(result,{'sv_hostname':'"new"'}),result)
+    def test_ambiguous_input_refuses_without_mutation(self):
+        runtime=load('fivem-runtime')
+        for raw in ['exec resources.cfg\n','sv_hostname a; quit\n',
+                    'sv_hostname "unterminated\n','sv_hostname a\nSV_HOSTNAME b\n',
+                    'sv_maxclients 12\nsv_maxplayers 13\n','vstr bootstrap\n']:
+            with self.subTest(raw=raw),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);p=root/'server.cfg';p.write_bytes(raw.encode())
+                with self.assertRaises(ValueError):
+                    runtime.configure(root,{'SERVER_PORT':'28010','VOLTRA_ALLOCATED_PORTS':'28010'},require_license=False)
+                self.assertEqual(p.read_bytes(),raw.encode())
+                self.assertFalse((root/'.voltra').exists())
+    def test_typed_roundtrip_keeps_secrets_and_rejects_wrong_types(self):
+        cfg=load('fivem-cfg');raw='sv_licenseKey "private"\nsv_hostname "old" # retained\n'
+        changed=cfg.typed_patch(raw,{'sv_hostname':'new "quoted"','sv_maxclients':24,'sv_lan':True})
+        self.assertEqual(cfg.typed_values(changed),{'sv_hostname':'new "quoted"','sv_maxclients':24,'sv_lan':True})
+        self.assertIn('sv_licenseKey "private"',changed)
+        for changes in [{'sv_licensekey':'replacement'},{'sv_maxclients':True},{'sv_lan':'false'},{'sv_hostname':'bad\nquit'}]:
+            with self.assertRaises(ValueError):cfg.typed_patch(raw,changes)
+    def test_installer_validates_before_acquisition(self):
+        installer=load('fivem-install')
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);p=root/'server.cfg';p.write_text('exec @resource/private.cfg\n')
+            with self.assertRaisesRegex(ValueError,'plain Files'):
+                installer.install(root,{})
+            self.assertEqual(list(root.iterdir()),[p])
+    def test_redm_name_selects_slot_bound(self):
+        runtime=load('fivem-runtime')
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                runtime.configure(Path(tmp),{'SERVER_PORT':'28010','VOLTRA_ALLOCATED_PORTS':'28010','TXHOST_GAME_NAME':'redm','MAX_PLAYERS':'33'},require_license=False)
+
 if __name__=='__main__':unittest.main()

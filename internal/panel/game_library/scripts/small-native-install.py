@@ -40,12 +40,23 @@ def extract_zip(archive,target):
                 with source.open(entry) as src,path.open('wb') as dst:shutil.copyfileobj(src,dst)
                 path.chmod(0o644)
 
-def publish(root,stage,target,identity,binary):
-    root=root.resolve();target=Path(target);state=root/'.voltra'/identity['game'];state.mkdir(parents=True,exist_ok=True)
+def publish(root,stage,target,identity,binary,preserve_paths=()):
+    root=root.resolve();target=Path(target);state=root/'.voltra'/identity['game']
+    release.validate_preserve_paths(state,binary,())
+    preserve_paths=release.validate_preserve_paths(target,binary,preserve_paths)
+    if not state.resolve().is_relative_to(root) or state.is_symlink():raise ValueError('Invalid publication state')
+    state.mkdir(parents=True,exist_ok=True)
     if not target.resolve().is_relative_to(root):raise ValueError('Engine path escapes volume')
-    receipt=state/'release.json';old=json.loads(receipt.read_text()) if receipt.is_file() else {}
+    receipt=state/'release.json'
+    if receipt.is_symlink():raise ValueError('Invalid publication receipt')
+    old=json.loads(receipt.read_text()) if receipt.is_file() else {}
     files={p.relative_to(stage).as_posix():release.sha256(p) for p in stage.rglob('*') if p.is_file()}
     if binary not in files:raise ValueError('Publisher executable missing')
+    for name in files:
+        src=stage/name;dst=target/name
+        if src.is_symlink() or any(p.is_symlink() for p in src.parents):raise ValueError('Invalid staged file')
+        if dst.is_symlink() or any(p.is_symlink() for p in dst.parents) or dst.exists() and not dst.is_file():raise ValueError('Publication path conflict')
+        if not dst.resolve().is_relative_to(root):raise ValueError('Publication path escapes volume')
     previous=state/('previous-'+str(time.time_ns()));changes=[]
     try:
         for name,digest in files.items():
@@ -53,10 +64,12 @@ def publish(root,stage,target,identity,binary):
             if not dst.resolve().is_relative_to(root) or dst.is_symlink():raise ValueError('Engine publication escapes volume')
             backup=None
             if dst.exists():
+                if release.protected_path(name,preserve_paths):continue
                 current=release.sha256(dst)
                 if current==digest:continue
                 if name!=binary and current!=old.get('files',{}).get(name):continue
                 backup=previous/name;backup.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(dst,backup)
+                release.preserve_identity(backup,dst);release.preserve_identity(src,dst)
             dst.parent.mkdir(parents=True,exist_ok=True);os.replace(src,dst);changes.append((dst,backup))
         data={**identity,'files':files,'binary_sha256':release.sha256(target/binary)}
         temporary=state/'receipt.tmp';temporary.write_text(json.dumps(data,indent=2)+'\n')
@@ -70,7 +83,18 @@ def publish(root,stage,target,identity,binary):
         raise
 
 def install(root,game):
-    root=Path(root).resolve();state=root/'.voltra'/game;state.mkdir(parents=True,exist_ok=True)
+    root=Path(root).resolve()
+    if game=='openrct2':
+        spec=importlib.util.spec_from_file_location('runtime',Path(__file__).with_name('small-native-runtime.py'))
+        runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
+        # Validate with a synthetic default save only when the installer will seed it.
+        env=dict(os.environ)
+        version=env.get('VERSION','v0.5.6')
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}',version):raise ValueError('Invalid release version')
+        runtime.configure_openrct2(root,env,preflight=True,installing=True)
+        for name in ('OpenRCT2','.voltra/openrct2','ServerData/save/save.park'):
+            runtime.confined(root,name)
+    state=root/'.voltra'/game;state.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.install-',dir=state) as directory:
         stage=Path(directory);ready=stage/'ready';ready.mkdir()
         if game=='cs2d':
@@ -111,11 +135,14 @@ def install(root,game):
                 source=stage/'squashfs-root/usr'
                 for name in ['bin','lib','share']:shutil.copytree(source/name,ready/name,symlinks=False)
                 identity={'game':game,'version':version,'archive':asset};binary='bin/openrct2-cli'
+            default=root/'ServerData/save/save.park'
+            temporary=stage/'default.park'
+            if not default.exists():release.download(DEFAULT_PARK,temporary)
             publish(root,ready,root/'OpenRCT2',identity,binary)
             (root/'ServerData/save').mkdir(parents=True,exist_ok=True)
             default=root/'ServerData/save/save.park'
             if not default.exists():
-                temporary=stage/'default.park';release.download(DEFAULT_PARK,temporary);os.replace(temporary,default)
+                os.replace(temporary,default)
         else:raise ValueError('Unknown native game')
     print('Native '+game+' installed; operator files retained.',flush=True)
 

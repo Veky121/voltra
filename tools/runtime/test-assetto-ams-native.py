@@ -20,7 +20,7 @@ class Racing(unittest.TestCase):
    child="import pathlib,signal,time,sys\ndef stop(*args):\n assert pathlib.Path('/tmp/.X11-unix/X99').exists(); print('NATIVE_QUIT_DISPLAY_ALIVE',flush=True);sys.exit(0)\nsignal.signal(signal.SIGINT,stop)\nprint('NATIVE_READY',flush=True)\nwhile True:time.sleep(.05)"
    old={s:signal.getsignal(s) for s in (signal.SIGINT,signal.SIGTERM)};timer=threading.Timer(.4,lambda:os.kill(os.getpid(),signal.SIGTERM));timer.start()
    try:
-    with patch.dict(os.environ,{'PATH':str(root)+os.pathsep+os.environ['PATH']}),patch.object(racing,'configure',return_value=([sys.executable,'-c',child],())):
+    with patch.dict(os.environ,{'PATH':str(root)+os.pathsep+os.environ['PATH']}),patch.object(racing,'plan_ams2'),patch.object(racing,'configure',return_value=([sys.executable,'-c',child],())):
      self.assertEqual(racing.run(root,'ams2',{}),0)
    finally:
     timer.cancel()

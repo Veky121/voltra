@@ -50,6 +50,45 @@ func TestGameSettingsNativeRoundTrips(t *testing.T) {
 	}
 }
 
+func TestGameSettingsJSONExactNumbers(t *testing.T) {
+	input := `{"enabled":true,"operator":18446744073709551617,"decimal":0.123456789012345678901,"list":[18446744073709551618],"a/b":{"~name":"before"}}`
+	parsed, err := parseGameSettings("/server.json", []byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range parsed.fields {
+		if field.key == "/list" && field.value != "[18446744073709551618]" {
+			t.Fatalf("list display rounded an operator value: %s", field.value)
+		}
+	}
+	updated, err := parsed.patch(map[string]string{"/enabled": "false", "/a~1b/~0name": "after"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, exact := range []string{"18446744073709551617", "0.123456789012345678901", "18446744073709551618", `"~name": "after"`, `"enabled": false`} {
+		if !strings.Contains(string(updated), exact) {
+			t.Fatalf("lost exact JSON value %s: %s", exact, updated)
+		}
+	}
+	updated, err = parsed.patch(map[string]string{"/list": "[18446744073709551619,0.123456789012345678901]"})
+	if err != nil || !strings.Contains(string(updated), "18446744073709551619") || !strings.Contains(string(updated), "0.123456789012345678901") {
+		t.Fatalf("list precision lost: %s, %v", updated, err)
+	}
+}
+
+func TestGameSettingsUppercaseTOMLSafety(t *testing.T) {
+	if _, err := parseGameSettings("/server.TOML", []byte("name=1\nname=2\n")); err == nil {
+		t.Fatal("uppercase TOML bypassed duplicate rejection")
+	}
+	parsed, err := parseGameSettings("/server.TOML", []byte("settings={a=1}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed.fields) != 1 || parsed.fields[0].kind != "readonly" {
+		t.Fatal("complex uppercase TOML value became editable")
+	}
+}
+
 func TestGameSettingsListsAndBooleanEncoding(t *testing.T) {
 	parsed, err := parseGameSettings("/paper.yml", []byte("# keep\nallowed: []\nflags:\n  enabled: true\n"))
 	if err != nil {

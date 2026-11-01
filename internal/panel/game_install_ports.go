@@ -88,6 +88,9 @@ func gamePreferredPort(entry gameTemplate) int64 {
 
 // planGamePortLayout is pure: all candidates pass the same metadata validators as explicit installs.
 func planGamePortLayout(node M, allocations []M, entry gameTemplate, environment M) (gamePortPlan, M, error) {
+	if err := validateTemplateSetupEnvironment(entry.SetupValidation, entry.Egg, environment); err != nil {
+		return gamePortPlan{}, nil, err
+	}
 	ip := gamePortBindIP(allocations)
 	plan := gamePortPlan{IP: ip, Ports: []gamePlannedPort{}, Detail: "Database allocation conflicts checked. Host socket availability has not been checked.", Forwarding: M{"status": "unknown", "detail": "Internet reachability and forwarding have not been verified."}}
 	for _, rule := range entry.PortRules {
@@ -96,6 +99,13 @@ func planGamePortLayout(node M, allocations []M, entry gameTemplate, environment
 		}
 	}
 	preferred := gamePreferredPort(entry)
+	listener, explicitListener, err := templatePrimaryListenerPort(entry, environment)
+	if err != nil {
+		return plan, nil, err
+	}
+	if explicitListener {
+		preferred = listener
+	}
 	blockedReason := func(p int64) string {
 		for _, rule := range entry.PortRules {
 			if templatePortRuleActive(rule, environment) {
@@ -126,17 +136,26 @@ func planGamePortLayout(node M, allocations []M, entry gameTemplate, environment
 	}
 	available := func(p int64) bool { return blockedReason(p) == "" }
 	fallbackReason := blockedReason(preferred)
-	if !gamePortHasDeclaredPreference(entry) {
+	if explicitListener {
+		if fallbackReason != "" {
+			return plan, nil, bad("The configured primary listener is unavailable: " + fallbackReason)
+		}
+		plan.Detail += fmt.Sprintf(" The declared %s listener uses exact port %d.", entry.PrimaryPortEnv, listener)
+	} else if !gamePortHasDeclaredPreference(entry) {
 		plan.Detail += " This recipe has no declared preferred port; the search starts at 27015."
 	}
 	searchStart := preferred
 	for _, rule := range entry.PortRules {
-		if templatePortRuleActive(rule, environment) && preferred > int64(rule.Maximum) {
+		if !explicitListener && templatePortRuleActive(rule, environment) && preferred > int64(rule.Maximum) {
 			searchStart = int64(rule.Minimum)
 			fallbackReason = "Recipe port range requires a different starting port."
 		}
 	}
-	for primary := searchStart; primary <= 65535; primary++ {
+	lastPrimary := int64(65535)
+	if explicitListener {
+		lastPrimary = listener
+	}
+	for primary := searchStart; primary <= lastPrimary; primary++ {
 		if !available(primary) {
 			continue
 		}
@@ -443,6 +462,10 @@ func (a *App) gameTemplatePorts(w http.ResponseWriter, r *http.Request) {
 	}
 	env, err := templateEnvironment(variables, raw)
 	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err = validateTemplateSetupEnvironment(entry.SetupValidation, entry.Egg, env); err != nil {
 		fail(w, err)
 		return
 	}

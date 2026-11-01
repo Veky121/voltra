@@ -11,12 +11,18 @@ const upstream = '6987d5e6f0612133e031255a99655e822d30579a';
 const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
 if (git('rev-parse', 'HEAD') !== upstream) throw Error('Expected pinned Wings v1.13.3 commit');
 if (git('status', '--porcelain')) throw Error('Expected clean upstream checkout');
-const inputs = ['tools/runtime/wings-failed-install-logs.patch', 'tools/wings/install_wait_test.go.txt'];
+const inputs = ['tools/runtime/wings-failed-install-logs.patch', 'tools/wings/install_wait_test.go.txt', 'tools/wings/remote-download-headers.patch', 'tools/wings/remote_headers.go.txt', 'tools/wings/remote_headers_test.go.txt', 'tools/wings/remote_transfers.go.txt', 'tools/wings/remote_transfers_test.go.txt'];
 // This combined patch includes install-status.patch. Applying both would duplicate it.
 const patch = fs.readFileSync(path.join(moduleRoot, inputs[0]), 'utf8').replace(/\r\n/g, '\n');
 execFileSync('git', ['-C', root, 'apply', '--check', '-'], { input: patch });
 execFileSync('git', ['-C', root, 'apply', '-'], { input: patch });
 fs.copyFileSync(path.join(moduleRoot, inputs[1]), path.join(root, 'server/install_wait_test.go'));
+const headerPatch = fs.readFileSync(path.join(moduleRoot, inputs[2]), 'utf8').replace(/\r\n/g, '\n');
+execFileSync('git', ['-C', root, 'apply', '--check', '-'], { input: headerPatch });
+execFileSync('git', ['-C', root, 'apply', '-'], { input: headerPatch });
+for (const name of ['remote_headers.go', 'remote_headers_test.go', 'remote_transfers.go', 'remote_transfers_test.go']) {
+  fs.copyFileSync(path.join(moduleRoot, 'tools/wings', name + '.txt'), path.join(root, 'router/downloader', name));
+}
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const provenance = {
   upstream_repository: 'https://github.com/pterodactyl/wings',

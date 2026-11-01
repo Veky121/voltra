@@ -50,7 +50,7 @@ def configure(env, root, kind):
     game = confined(root, root / kind)
     mod = 'q3ut4' if kind == 'urbanterror' else 'legacy'
     folder = confined(root, game / 'userdata' / mod)
-    folder.mkdir(parents=True, exist_ok=True)
+    if kind != 'urbanterror':folder.mkdir(parents=True, exist_ok=True)
     lines = []
     if kind == 'urbanterror':
         architecture = env.get('EXE', 'x86_64')
@@ -97,6 +97,7 @@ def configure(env, root, kind):
     for key,cvar in [('SERVER_PASSWORD','g_password'),('RCON_PASSWORD','rconpassword')]:
         lines.append('set '+cvar+' '+quoted(env.get(key,''),127,key=='SERVER_PASSWORD'))
     managed = confined(root,folder/'voltra-managed.cfg')
+    if kind == 'urbanterror':folder.mkdir(parents=True, exist_ok=True)
     content = '\n'.join(lines)+'\n'
     if not managed.is_file() or managed.read_text()!=content:
         descriptor,temporary = tempfile.mkstemp(prefix='.voltra-',dir=folder)

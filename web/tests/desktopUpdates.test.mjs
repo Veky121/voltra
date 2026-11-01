@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {updateAction,startUpdateChecks,updateChannels,useDesktopUpdates} from '../src/desktopUpdates.ts';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+
+// Bundle local TS dependencies; keep React shared with the server renderer.
+const compiled=await build({entryPoints:[fileURLToPath(new URL('../src/desktopUpdates.ts',import.meta.url))],bundle:true,write:false,format:'cjs',platform:'node',packages:'external'});
+const module={exports:{}};
+new Function('require','module','exports',compiled.outputFiles[0].text)(createRequire(import.meta.url),module,module.exports);
+const {updateAction,startUpdateChecks,updateChannels,useDesktopUpdates}=module.exports;
 test('automatic checks respect cadence and staged updates; manual actions stay available',async()=>{
  const originalFetch=globalThis.fetch,originalNow=Date.now;
  let now=10000000,requests=[],state='idle',channel='release',interval,focus;

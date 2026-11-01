@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {uploadTarget,transferIdentity} from '../src/client/fileTransferPaths.ts';
+import {uploadTarget,transferIdentity,transferDestination} from '../src/client/fileTransferPaths.ts';
 
 test('folder uploads preserve every parent under captured target directory',()=>{
   assert.equal(uploadTarget('/world/','mods/nested/example.jar','example.jar'),'/world/mods/nested');
@@ -20,4 +20,12 @@ test('resume identity cannot cross server or upload directory',()=>{
   assert.notEqual(identity,transferIdentity('/api/client/servers/a','/world','same-file'));
   assert.equal(identity,transferIdentity('/api/client/servers/a','/mods','same-file'));
   assert.notEqual(transferIdentity('a:b','c','d'),transferIdentity('a','b:c','d'));
+});
+
+test('one selected folder is the destination; files and multi-selection use open folder',()=>{
+ const isFolder=p=>p==='/mods';
+ assert.equal(transferDestination('/world',['/mods'],isFolder),'/mods');
+ assert.equal(transferDestination('/world',['/a.zip'],isFolder),'/world');
+ assert.equal(transferDestination('/world',['/mods','/a.zip'],isFolder),'/world');
+ assert.equal(transferDestination('/world',[],isFolder),'/world');
 });

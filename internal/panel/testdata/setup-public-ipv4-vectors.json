@@ -1,0 +1,3391 @@
+{
+  "reference": "Python IPv4Address.is_global and not is_multicast",
+  "python": "3.15.1",
+  "source": "https://docs.python.org/3/library/ipaddress.html#ipaddress.IPv4Address.is_global",
+  "vectors": [
+    {
+      "value": "1.1.1.1",
+      "accept": true
+    },
+    {
+      "value": "8.8.8.8",
+      "accept": true
+    },
+    {
+      "value": "192.0.0.9",
+      "accept": true
+    },
+    {
+      "value": "192.0.0.10",
+      "accept": true
+    },
+    {
+      "value": "",
+      "accept": false
+    },
+    {
+      "value": "not-an-address",
+      "accept": false
+    },
+    {
+      "value": "127.0.0.1",
+      "accept": false
+    },
+    {
+      "value": "0.0.0.0",
+      "accept": false
+    },
+    {
+      "value": "10.0.0.1",
+      "accept": false
+    },
+    {
+      "value": "172.16.0.1",
+      "accept": false
+    },
+    {
+      "value": "192.168.0.1",
+      "accept": false
+    },
+    {
+      "value": "169.254.1.1",
+      "accept": false
+    },
+    {
+      "value": "100.64.0.1",
+      "accept": false
+    },
+    {
+      "value": "192.0.2.1",
+      "accept": false
+    },
+    {
+      "value": "198.51.100.1",
+      "accept": false
+    },
+    {
+      "value": "203.0.113.1",
+      "accept": false
+    },
+    {
+      "value": "224.0.0.1",
+      "accept": false
+    },
+    {
+      "value": "255.255.255.255",
+      "accept": false
+    },
+    {
+      "value": "::1",
+      "accept": false
+    },
+    {
+      "value": "2001:4860:4860::8888",
+      "accept": false
+    },
+    {
+      "value": "1.1.1.1\nInjected=true",
+      "accept": false
+    },
+    {
+      "value": "1.1.1.1\n",
+      "accept": false
+    },
+    {
+      "value": " 1.1.1.1",
+      "accept": false
+    },
+    {
+      "value": "1.1.1.1 ",
+      "accept": false
+    },
+    {
+      "value": "01.1.1.1",
+      "accept": false
+    },
+    {
+      "value": "1.1.1",
+      "accept": false
+    },
+    {
+      "value": "1.1.1.256",
+      "accept": false
+    },
+    {
+      "value": "+1.1.1.1",
+      "accept": false
+    },
+    {
+      "value": "::ffff:8.8.8.8",
+      "accept": false
+    },
+    {
+      "value": "1.1.1.1/32",
+      "accept": false
+    },
+    {
+      "value": "1.1.1.1\u0000",
+      "accept": false
+    },
+    {
+      "value": "\uff11.1.1.1",
+      "accept": false
+    },
+    {
+      "value": "0.255.255.255",
+      "accept": false
+    },
+    {
+      "value": "1.0.0.0",
+      "accept": true
+    },
+    {
+      "value": "9.255.255.255",
+      "accept": true
+    },
+    {
+      "value": "10.0.0.0",
+      "accept": false
+    },
+    {
+      "value": "10.255.255.255",
+      "accept": false
+    },
+    {
+      "value": "11.0.0.0",
+      "accept": true
+    },
+    {
+      "value": "100.63.255.255",
+      "accept": true
+    },
+    {
+      "value": "100.64.0.0",
+      "accept": false
+    },
+    {
+      "value": "100.127.255.255",
+      "accept": false
+    },
+    {
+      "value": "100.128.0.0",
+      "accept": true
+    },
+    {
+      "value": "126.255.255.255",
+      "accept": true
+    },
+    {
+      "value": "127.0.0.0",
+      "accept": false
+    },
+    {
+      "value": "127.255.255.255",
+      "accept": false
+    },
+    {
+      "value": "128.0.0.0",
+      "accept": true
+    },
+    {
+      "value": "169.253.255.255",
+      "accept": true
+    },
+    {
+      "value": "169.254.0.0",
+      "accept": false
+    },
+    {
+      "value": "169.254.255.255",
+      "accept": false
+    },
+    {
+      "value": "169.255.0.0",
+      "accept": true
+    },
+    {
+      "value": "172.15.255.255",
+      "accept": true
+    },
+    {
+      "value": "172.16.0.0",
+      "accept": false
+    },
+    {
+      "value": "172.31.255.255",
+      "accept": false
+    },
+    {
+      "value": "172.32.0.0",
+      "accept": true
+    },
+    {
+      "value": "191.255.255.255",
+      "accept": true
+    },
+    {
+      "value": "192.0.0.0",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.255",
+      "accept": false
+    },
+    {
+      "value": "192.0.1.0",
+      "accept": true
+    },
+    {
+      "value": "192.0.1.255",
+      "accept": true
+    },
+    {
+      "value": "192.0.2.0",
+      "accept": false
+    },
+    {
+      "value": "192.0.2.255",
+      "accept": false
+    },
+    {
+      "value": "192.0.3.0",
+      "accept": true
+    },
+    {
+      "value": "192.167.255.255",
+      "accept": true
+    },
+    {
+      "value": "192.168.0.0",
+      "accept": false
+    },
+    {
+      "value": "192.168.255.255",
+      "accept": false
+    },
+    {
+      "value": "192.169.0.0",
+      "accept": true
+    },
+    {
+      "value": "198.17.255.255",
+      "accept": true
+    },
+    {
+      "value": "198.18.0.0",
+      "accept": false
+    },
+    {
+      "value": "198.19.255.255",
+      "accept": false
+    },
+    {
+      "value": "198.20.0.0",
+      "accept": true
+    },
+    {
+      "value": "198.51.99.255",
+      "accept": true
+    },
+    {
+      "value": "198.51.100.0",
+      "accept": false
+    },
+    {
+      "value": "198.51.100.255",
+      "accept": false
+    },
+    {
+      "value": "198.51.101.0",
+      "accept": true
+    },
+    {
+      "value": "203.0.112.255",
+      "accept": true
+    },
+    {
+      "value": "203.0.113.0",
+      "accept": false
+    },
+    {
+      "value": "203.0.113.255",
+      "accept": false
+    },
+    {
+      "value": "203.0.114.0",
+      "accept": true
+    },
+    {
+      "value": "223.255.255.255",
+      "accept": true
+    },
+    {
+      "value": "224.0.0.0",
+      "accept": false
+    },
+    {
+      "value": "239.255.255.255",
+      "accept": false
+    },
+    {
+      "value": "240.0.0.0",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.1",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.2",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.3",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.4",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.5",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.6",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.7",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.8",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.11",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.12",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.13",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.14",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.15",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.16",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.17",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.18",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.19",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.20",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.21",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.22",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.23",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.24",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.25",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.26",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.27",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.28",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.29",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.30",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.31",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.32",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.33",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.34",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.35",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.36",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.37",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.38",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.39",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.40",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.41",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.42",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.43",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.44",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.45",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.46",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.47",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.48",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.49",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.50",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.51",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.52",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.53",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.54",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.55",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.56",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.57",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.58",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.59",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.60",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.61",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.62",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.63",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.64",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.65",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.66",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.67",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.68",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.69",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.70",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.71",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.72",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.73",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.74",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.75",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.76",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.77",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.78",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.79",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.80",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.81",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.82",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.83",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.84",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.85",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.86",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.87",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.88",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.89",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.90",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.91",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.92",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.93",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.94",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.95",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.96",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.97",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.98",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.99",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.100",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.101",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.102",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.103",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.104",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.105",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.106",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.107",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.108",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.109",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.110",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.111",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.112",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.113",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.114",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.115",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.116",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.117",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.118",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.119",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.120",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.121",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.122",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.123",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.124",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.125",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.126",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.127",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.128",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.129",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.130",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.131",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.132",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.133",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.134",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.135",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.136",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.137",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.138",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.139",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.140",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.141",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.142",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.143",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.144",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.145",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.146",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.147",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.148",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.149",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.150",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.151",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.152",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.153",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.154",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.155",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.156",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.157",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.158",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.159",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.160",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.161",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.162",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.163",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.164",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.165",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.166",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.167",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.168",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.169",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.170",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.171",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.172",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.173",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.174",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.175",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.176",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.177",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.178",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.179",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.180",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.181",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.182",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.183",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.184",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.185",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.186",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.187",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.188",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.189",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.190",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.191",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.192",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.193",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.194",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.195",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.196",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.197",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.198",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.199",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.200",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.201",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.202",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.203",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.204",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.205",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.206",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.207",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.208",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.209",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.210",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.211",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.212",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.213",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.214",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.215",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.216",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.217",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.218",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.219",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.220",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.221",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.222",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.223",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.224",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.225",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.226",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.227",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.228",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.229",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.230",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.231",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.232",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.233",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.234",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.235",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.236",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.237",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.238",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.239",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.240",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.241",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.242",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.243",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.244",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.245",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.246",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.247",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.248",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.249",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.250",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.251",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.252",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.253",
+      "accept": false
+    },
+    {
+      "value": "192.0.0.254",
+      "accept": false
+    },
+    {
+      "value": "136.157.163.75",
+      "accept": true
+    },
+    {
+      "value": "248.114.10.154",
+      "accept": false
+    },
+    {
+      "value": "117.206.222.6",
+      "accept": true
+    },
+    {
+      "value": "175.95.78.28",
+      "accept": true
+    },
+    {
+      "value": "66.255.145.134",
+      "accept": true
+    },
+    {
+      "value": "128.50.142.193",
+      "accept": true
+    },
+    {
+      "value": "65.84.89.127",
+      "accept": true
+    },
+    {
+      "value": "62.144.153.94",
+      "accept": true
+    },
+    {
+      "value": "71.177.41.254",
+      "accept": true
+    },
+    {
+      "value": "112.145.151.7",
+      "accept": true
+    },
+    {
+      "value": "51.185.234.168",
+      "accept": true
+    },
+    {
+      "value": "25.204.149.1",
+      "accept": true
+    },
+    {
+      "value": "78.195.174.175",
+      "accept": true
+    },
+    {
+      "value": "236.165.12.236",
+      "accept": false
+    },
+    {
+      "value": "74.183.39.89",
+      "accept": true
+    },
+    {
+      "value": "244.117.115.77",
+      "accept": false
+    },
+    {
+      "value": "223.111.49.107",
+      "accept": true
+    },
+    {
+      "value": "154.43.11.145",
+      "accept": true
+    },
+    {
+      "value": "121.98.250.163",
+      "accept": true
+    },
+    {
+      "value": "198.231.36.74",
+      "accept": true
+    },
+    {
+      "value": "161.111.89.205",
+      "accept": true
+    },
+    {
+      "value": "108.22.89.201",
+      "accept": true
+    },
+    {
+      "value": "84.32.45.187",
+      "accept": true
+    },
+    {
+      "value": "112.28.181.221",
+      "accept": true
+    },
+    {
+      "value": "164.40.238.234",
+      "accept": true
+    },
+    {
+      "value": "23.185.233.73",
+      "accept": true
+    },
+    {
+      "value": "254.177.51.97",
+      "accept": false
+    },
+    {
+      "value": "66.106.138.29",
+      "accept": true
+    },
+    {
+      "value": "120.214.118.110",
+      "accept": true
+    },
+    {
+      "value": "111.82.224.27",
+      "accept": true
+    },
+    {
+      "value": "244.172.78.129",
+      "accept": false
+    },
+    {
+      "value": "130.3.120.78",
+      "accept": true
+    },
+    {
+      "value": "43.107.33.33",
+      "accept": true
+    },
+    {
+      "value": "110.101.175.24",
+      "accept": true
+    },
+    {
+      "value": "124.175.182.192",
+      "accept": true
+    },
+    {
+      "value": "87.32.128.157",
+      "accept": true
+    },
+    {
+      "value": "38.141.155.232",
+      "accept": true
+    },
+    {
+      "value": "247.48.31.248",
+      "accept": false
+    },
+    {
+      "value": "191.83.235.215",
+      "accept": true
+    },
+    {
+      "value": "218.57.108.38",
+      "accept": true
+    },
+    {
+      "value": "61.212.39.17",
+      "accept": true
+    },
+    {
+      "value": "46.210.2.174",
+      "accept": true
+    },
+    {
+      "value": "50.29.155.122",
+      "accept": true
+    },
+    {
+      "value": "159.47.242.127",
+      "accept": true
+    },
+    {
+      "value": "137.175.81.19",
+      "accept": true
+    },
+    {
+      "value": "165.79.214.8",
+      "accept": true
+    },
+    {
+      "value": "176.127.130.43",
+      "accept": true
+    },
+    {
+      "value": "74.201.231.86",
+      "accept": true
+    },
+    {
+      "value": "36.49.23.4",
+      "accept": true
+    },
+    {
+      "value": "214.215.230.184",
+      "accept": true
+    },
+    {
+      "value": "88.150.228.68",
+      "accept": true
+    },
+    {
+      "value": "171.146.150.212",
+      "accept": true
+    },
+    {
+      "value": "127.106.161.8",
+      "accept": false
+    },
+    {
+      "value": "161.227.15.6",
+      "accept": true
+    },
+    {
+      "value": "228.116.58.75",
+      "accept": false
+    },
+    {
+      "value": "79.195.73.6",
+      "accept": true
+    },
+    {
+      "value": "227.232.70.8",
+      "accept": false
+    },
+    {
+      "value": "157.224.157.56",
+      "accept": true
+    },
+    {
+      "value": "19.55.177.196",
+      "accept": true
+    },
+    {
+      "value": "113.39.253.110",
+      "accept": true
+    },
+    {
+      "value": "172.89.99.23",
+      "accept": true
+    },
+    {
+      "value": "20.30.111.0",
+      "accept": true
+    },
+    {
+      "value": "225.240.228.13",
+      "accept": false
+    },
+    {
+      "value": "117.109.116.207",
+      "accept": true
+    },
+    {
+      "value": "126.30.72.203",
+      "accept": true
+    },
+    {
+      "value": "134.22.112.82",
+      "accept": true
+    },
+    {
+      "value": "188.204.9.12",
+      "accept": true
+    },
+    {
+      "value": "216.41.78.223",
+      "accept": true
+    },
+    {
+      "value": "48.91.34.11",
+      "accept": true
+    },
+    {
+      "value": "42.196.213.140",
+      "accept": true
+    },
+    {
+      "value": "177.250.187.103",
+      "accept": true
+    },
+    {
+      "value": "81.207.171.177",
+      "accept": true
+    },
+    {
+      "value": "140.78.12.153",
+      "accept": true
+    },
+    {
+      "value": "217.6.192.34",
+      "accept": true
+    },
+    {
+      "value": "15.29.231.115",
+      "accept": true
+    },
+    {
+      "value": "163.234.140.203",
+      "accept": true
+    },
+    {
+      "value": "175.145.242.143",
+      "accept": true
+    },
+    {
+      "value": "98.104.166.38",
+      "accept": true
+    },
+    {
+      "value": "10.110.2.162",
+      "accept": false
+    },
+    {
+      "value": "233.81.94.56",
+      "accept": false
+    },
+    {
+      "value": "221.42.90.2",
+      "accept": true
+    },
+    {
+      "value": "208.95.62.96",
+      "accept": true
+    },
+    {
+      "value": "14.245.5.15",
+      "accept": true
+    },
+    {
+      "value": "104.147.112.181",
+      "accept": true
+    },
+    {
+      "value": "16.3.187.254",
+      "accept": true
+    },
+    {
+      "value": "13.117.192.239",
+      "accept": true
+    },
+    {
+      "value": "84.148.92.230",
+      "accept": true
+    },
+    {
+      "value": "145.184.214.93",
+      "accept": true
+    },
+    {
+      "value": "229.168.163.118",
+      "accept": false
+    },
+    {
+      "value": "43.127.10.35",
+      "accept": true
+    },
+    {
+      "value": "224.183.42.75",
+      "accept": false
+    },
+    {
+      "value": "170.60.143.203",
+      "accept": true
+    },
+    {
+      "value": "114.70.208.204",
+      "accept": true
+    },
+    {
+      "value": "126.89.182.189",
+      "accept": true
+    },
+    {
+      "value": "39.129.41.3",
+      "accept": true
+    },
+    {
+      "value": "16.129.154.177",
+      "accept": true
+    },
+    {
+      "value": "27.96.215.253",
+      "accept": true
+    },
+    {
+      "value": "97.43.174.26",
+      "accept": true
+    },
+    {
+      "value": "216.209.189.8",
+      "accept": true
+    },
+    {
+      "value": "220.180.126.102",
+      "accept": true
+    },
+    {
+      "value": "53.92.110.55",
+      "accept": true
+    },
+    {
+      "value": "222.193.176.29",
+      "accept": true
+    },
+    {
+      "value": "244.217.180.102",
+      "accept": false
+    },
+    {
+      "value": "9.126.150.21",
+      "accept": true
+    },
+    {
+      "value": "68.152.180.238",
+      "accept": true
+    },
+    {
+      "value": "42.36.133.47",
+      "accept": true
+    },
+    {
+      "value": "5.141.192.230",
+      "accept": true
+    },
+    {
+      "value": "244.175.13.145",
+      "accept": false
+    },
+    {
+      "value": "126.27.199.182",
+      "accept": true
+    },
+    {
+      "value": "59.102.193.146",
+      "accept": true
+    },
+    {
+      "value": "163.22.240.39",
+      "accept": true
+    },
+    {
+      "value": "98.65.164.245",
+      "accept": true
+    },
+    {
+      "value": "135.46.150.212",
+      "accept": true
+    },
+    {
+      "value": "200.76.107.104",
+      "accept": true
+    },
+    {
+      "value": "240.213.81.114",
+      "accept": false
+    },
+    {
+      "value": "161.110.69.217",
+      "accept": true
+    },
+    {
+      "value": "178.126.235.102",
+      "accept": true
+    },
+    {
+      "value": "212.83.205.11",
+      "accept": true
+    },
+    {
+      "value": "254.177.195.150",
+      "accept": false
+    },
+    {
+      "value": "229.47.213.11",
+      "accept": false
+    },
+    {
+      "value": "147.64.116.46",
+      "accept": true
+    },
+    {
+      "value": "113.4.214.131",
+      "accept": true
+    },
+    {
+      "value": "46.7.172.198",
+      "accept": true
+    },
+    {
+      "value": "235.163.115.232",
+      "accept": false
+    },
+    {
+      "value": "141.59.31.235",
+      "accept": true
+    },
+    {
+      "value": "125.230.173.194",
+      "accept": true
+    },
+    {
+      "value": "80.24.4.77",
+      "accept": true
+    },
+    {
+      "value": "53.152.207.235",
+      "accept": true
+    },
+    {
+      "value": "71.86.30.103",
+      "accept": true
+    },
+    {
+      "value": "19.176.90.26",
+      "accept": true
+    },
+    {
+      "value": "155.14.104.189",
+      "accept": true
+    },
+    {
+      "value": "124.183.56.56",
+      "accept": true
+    },
+    {
+      "value": "25.53.29.41",
+      "accept": true
+    },
+    {
+      "value": "172.121.140.179",
+      "accept": true
+    },
+    {
+      "value": "125.0.190.106",
+      "accept": true
+    },
+    {
+      "value": "56.102.69.26",
+      "accept": true
+    },
+    {
+      "value": "239.20.177.102",
+      "accept": false
+    },
+    {
+      "value": "251.102.191.227",
+      "accept": false
+    },
+    {
+      "value": "18.207.141.71",
+      "accept": true
+    },
+    {
+      "value": "64.12.237.186",
+      "accept": true
+    },
+    {
+      "value": "175.228.190.101",
+      "accept": true
+    },
+    {
+      "value": "239.19.181.53",
+      "accept": false
+    },
+    {
+      "value": "94.250.178.151",
+      "accept": true
+    },
+    {
+      "value": "200.196.123.15",
+      "accept": true
+    },
+    {
+      "value": "1.57.162.202",
+      "accept": true
+    },
+    {
+      "value": "10.204.36.104",
+      "accept": false
+    },
+    {
+      "value": "225.94.17.29",
+      "accept": false
+    },
+    {
+      "value": "177.162.213.124",
+      "accept": true
+    },
+    {
+      "value": "185.58.170.17",
+      "accept": true
+    },
+    {
+      "value": "77.23.166.164",
+      "accept": true
+    },
+    {
+      "value": "238.63.109.194",
+      "accept": false
+    },
+    {
+      "value": "84.231.146.123",
+      "accept": true
+    },
+    {
+      "value": "227.104.36.156",
+      "accept": false
+    },
+    {
+      "value": "0.8.19.195",
+      "accept": false
+    },
+    {
+      "value": "215.196.66.74",
+      "accept": true
+    },
+    {
+      "value": "25.214.39.204",
+      "accept": true
+    },
+    {
+      "value": "206.190.116.222",
+      "accept": true
+    },
+    {
+      "value": "113.120.150.99",
+      "accept": true
+    },
+    {
+      "value": "127.197.103.11",
+      "accept": false
+    },
+    {
+      "value": "115.99.201.10",
+      "accept": true
+    },
+    {
+      "value": "59.11.70.117",
+      "accept": true
+    },
+    {
+      "value": "88.165.166.24",
+      "accept": true
+    },
+    {
+      "value": "251.240.185.87",
+      "accept": false
+    },
+    {
+      "value": "156.72.241.60",
+      "accept": true
+    },
+    {
+      "value": "233.126.103.157",
+      "accept": false
+    },
+    {
+      "value": "138.148.62.55",
+      "accept": true
+    },
+    {
+      "value": "90.183.160.118",
+      "accept": true
+    },
+    {
+      "value": "75.229.71.108",
+      "accept": true
+    },
+    {
+      "value": "70.223.75.107",
+      "accept": true
+    },
+    {
+      "value": "105.214.181.49",
+      "accept": true
+    },
+    {
+      "value": "20.52.227.216",
+      "accept": true
+    },
+    {
+      "value": "212.115.61.5",
+      "accept": true
+    },
+    {
+      "value": "218.241.143.91",
+      "accept": true
+    },
+    {
+      "value": "143.194.146.168",
+      "accept": true
+    },
+    {
+      "value": "140.54.166.148",
+      "accept": true
+    },
+    {
+      "value": "215.147.66.152",
+      "accept": true
+    },
+    {
+      "value": "44.106.44.70",
+      "accept": true
+    },
+    {
+      "value": "69.96.216.235",
+      "accept": true
+    },
+    {
+      "value": "186.55.199.122",
+      "accept": true
+    },
+    {
+      "value": "105.32.212.87",
+      "accept": true
+    },
+    {
+      "value": "235.233.24.210",
+      "accept": false
+    },
+    {
+      "value": "236.98.232.56",
+      "accept": false
+    },
+    {
+      "value": "212.169.210.103",
+      "accept": true
+    },
+    {
+      "value": "29.95.205.42",
+      "accept": true
+    },
+    {
+      "value": "185.90.177.50",
+      "accept": true
+    },
+    {
+      "value": "115.154.127.214",
+      "accept": true
+    },
+    {
+      "value": "92.135.33.239",
+      "accept": true
+    },
+    {
+      "value": "160.58.35.69",
+      "accept": true
+    },
+    {
+      "value": "10.93.76.118",
+      "accept": false
+    },
+    {
+      "value": "246.103.202.41",
+      "accept": false
+    },
+    {
+      "value": "21.237.136.81",
+      "accept": true
+    },
+    {
+      "value": "82.245.45.98",
+      "accept": true
+    },
+    {
+      "value": "40.32.87.30",
+      "accept": true
+    },
+    {
+      "value": "65.201.142.33",
+      "accept": true
+    },
+    {
+      "value": "100.221.175.209",
+      "accept": true
+    },
+    {
+      "value": "176.229.245.16",
+      "accept": true
+    },
+    {
+      "value": "69.246.142.12",
+      "accept": true
+    },
+    {
+      "value": "104.62.48.247",
+      "accept": true
+    },
+    {
+      "value": "151.110.7.21",
+      "accept": true
+    },
+    {
+      "value": "207.84.244.223",
+      "accept": true
+    },
+    {
+      "value": "52.173.11.166",
+      "accept": true
+    },
+    {
+      "value": "246.63.253.76",
+      "accept": false
+    },
+    {
+      "value": "158.121.147.183",
+      "accept": true
+    },
+    {
+      "value": "107.58.219.59",
+      "accept": true
+    },
+    {
+      "value": "228.131.38.18",
+      "accept": false
+    },
+    {
+      "value": "122.148.49.142",
+      "accept": true
+    },
+    {
+      "value": "247.137.93.254",
+      "accept": false
+    },
+    {
+      "value": "33.111.177.165",
+      "accept": true
+    },
+    {
+      "value": "131.241.110.189",
+      "accept": true
+    },
+    {
+      "value": "104.93.63.249",
+      "accept": true
+    },
+    {
+      "value": "199.35.132.186",
+      "accept": true
+    },
+    {
+      "value": "211.151.157.98",
+      "accept": true
+    },
+    {
+      "value": "198.213.100.9",
+      "accept": true
+    },
+    {
+      "value": "209.147.43.114",
+      "accept": true
+    },
+    {
+      "value": "12.44.12.66",
+      "accept": true
+    },
+    {
+      "value": "124.8.232.8",
+      "accept": true
+    },
+    {
+      "value": "144.166.51.246",
+      "accept": true
+    },
+    {
+      "value": "123.244.160.31",
+      "accept": true
+    },
+    {
+      "value": "193.166.197.85",
+      "accept": true
+    },
+    {
+      "value": "211.34.249.227",
+      "accept": true
+    },
+    {
+      "value": "160.247.2.216",
+      "accept": true
+    },
+    {
+      "value": "127.55.216.71",
+      "accept": false
+    },
+    {
+      "value": "241.241.51.170",
+      "accept": false
+    },
+    {
+      "value": "54.236.106.144",
+      "accept": true
+    },
+    {
+      "value": "3.36.230.43",
+      "accept": true
+    },
+    {
+      "value": "55.217.197.146",
+      "accept": true
+    },
+    {
+      "value": "84.117.204.237",
+      "accept": true
+    },
+    {
+      "value": "45.143.183.178",
+      "accept": true
+    },
+    {
+      "value": "245.253.145.150",
+      "accept": false
+    },
+    {
+      "value": "200.110.22.43",
+      "accept": true
+    },
+    {
+      "value": "40.220.150.96",
+      "accept": true
+    },
+    {
+      "value": "82.116.207.109",
+      "accept": true
+    },
+    {
+      "value": "3.5.136.38",
+      "accept": true
+    },
+    {
+      "value": "154.140.120.46",
+      "accept": true
+    },
+    {
+      "value": "152.103.222.223",
+      "accept": true
+    },
+    {
+      "value": "125.245.10.216",
+      "accept": true
+    },
+    {
+      "value": "171.5.124.49",
+      "accept": true
+    },
+    {
+      "value": "135.191.115.146",
+      "accept": true
+    },
+    {
+      "value": "93.141.75.1",
+      "accept": true
+    },
+    {
+      "value": "129.211.56.30",
+      "accept": true
+    },
+    {
+      "value": "102.4.89.128",
+      "accept": true
+    },
+    {
+      "value": "180.144.222.20",
+      "accept": true
+    },
+    {
+      "value": "222.34.224.26",
+      "accept": true
+    },
+    {
+      "value": "8.158.161.71",
+      "accept": true
+    },
+    {
+      "value": "61.252.162.102",
+      "accept": true
+    },
+    {
+      "value": "240.33.254.28",
+      "accept": false
+    },
+    {
+      "value": "84.34.120.65",
+      "accept": true
+    },
+    {
+      "value": "25.223.166.111",
+      "accept": true
+    },
+    {
+      "value": "228.241.216.67",
+      "accept": false
+    },
+    {
+      "value": "197.56.173.155",
+      "accept": true
+    },
+    {
+      "value": "165.177.94.34",
+      "accept": true
+    },
+    {
+      "value": "6.214.141.142",
+      "accept": true
+    },
+    {
+      "value": "168.76.144.166",
+      "accept": true
+    },
+    {
+      "value": "191.208.48.213",
+      "accept": true
+    },
+    {
+      "value": "0.231.227.187",
+      "accept": false
+    },
+    {
+      "value": "134.254.202.2",
+      "accept": true
+    },
+    {
+      "value": "104.40.82.168",
+      "accept": true
+    },
+    {
+      "value": "15.18.78.190",
+      "accept": true
+    },
+    {
+      "value": "63.166.82.42",
+      "accept": true
+    },
+    {
+      "value": "208.187.242.181",
+      "accept": true
+    },
+    {
+      "value": "141.90.163.29",
+      "accept": true
+    },
+    {
+      "value": "158.2.21.217",
+      "accept": true
+    },
+    {
+      "value": "108.179.173.153",
+      "accept": true
+    },
+    {
+      "value": "104.238.152.195",
+      "accept": true
+    },
+    {
+      "value": "171.205.232.120",
+      "accept": true
+    },
+    {
+      "value": "9.243.132.198",
+      "accept": true
+    },
+    {
+      "value": "184.95.55.1",
+      "accept": true
+    },
+    {
+      "value": "140.105.22.27",
+      "accept": true
+    },
+    {
+      "value": "225.112.5.66",
+      "accept": false
+    },
+    {
+      "value": "149.0.159.232",
+      "accept": true
+    },
+    {
+      "value": "81.202.72.149",
+      "accept": true
+    },
+    {
+      "value": "54.80.163.75",
+      "accept": true
+    },
+    {
+      "value": "120.191.241.166",
+      "accept": true
+    },
+    {
+      "value": "123.206.69.21",
+      "accept": true
+    },
+    {
+      "value": "107.245.14.89",
+      "accept": true
+    },
+    {
+      "value": "140.218.141.209",
+      "accept": true
+    },
+    {
+      "value": "27.127.165.218",
+      "accept": true
+    },
+    {
+      "value": "41.225.189.161",
+      "accept": true
+    },
+    {
+      "value": "43.109.58.77",
+      "accept": true
+    },
+    {
+      "value": "1.52.68.45",
+      "accept": true
+    },
+    {
+      "value": "237.121.111.89",
+      "accept": false
+    },
+    {
+      "value": "49.54.219.21",
+      "accept": true
+    },
+    {
+      "value": "139.124.114.104",
+      "accept": true
+    },
+    {
+      "value": "46.150.83.121",
+      "accept": true
+    },
+    {
+      "value": "68.213.221.137",
+      "accept": true
+    },
+    {
+      "value": "145.12.3.132",
+      "accept": true
+    },
+    {
+      "value": "137.175.88.130",
+      "accept": true
+    },
+    {
+      "value": "43.92.91.252",
+      "accept": true
+    },
+    {
+      "value": "153.13.119.218",
+      "accept": true
+    },
+    {
+      "value": "128.101.227.98",
+      "accept": true
+    },
+    {
+      "value": "15.20.213.229",
+      "accept": true
+    },
+    {
+      "value": "57.255.136.113",
+      "accept": true
+    },
+    {
+      "value": "37.250.229.169",
+      "accept": true
+    },
+    {
+      "value": "163.255.220.240",
+      "accept": true
+    },
+    {
+      "value": "86.38.83.13",
+      "accept": true
+    },
+    {
+      "value": "148.223.215.250",
+      "accept": true
+    },
+    {
+      "value": "175.55.252.237",
+      "accept": true
+    },
+    {
+      "value": "32.193.137.80",
+      "accept": true
+    },
+    {
+      "value": "57.75.67.137",
+      "accept": true
+    },
+    {
+      "value": "112.72.129.247",
+      "accept": true
+    },
+    {
+      "value": "248.127.109.151",
+      "accept": false
+    },
+    {
+      "value": "13.42.24.149",
+      "accept": true
+    },
+    {
+      "value": "150.223.85.5",
+      "accept": true
+    },
+    {
+      "value": "121.67.125.119",
+      "accept": true
+    },
+    {
+      "value": "32.250.163.2",
+      "accept": true
+    },
+    {
+      "value": "231.207.124.113",
+      "accept": false
+    },
+    {
+      "value": "193.154.182.64",
+      "accept": true
+    },
+    {
+      "value": "2.8.29.246",
+      "accept": true
+    },
+    {
+      "value": "32.21.118.237",
+      "accept": true
+    },
+    {
+      "value": "45.186.27.162",
+      "accept": true
+    },
+    {
+      "value": "24.101.53.110",
+      "accept": true
+    },
+    {
+      "value": "182.58.76.125",
+      "accept": true
+    },
+    {
+      "value": "127.106.47.240",
+      "accept": false
+    },
+    {
+      "value": "36.23.214.126",
+      "accept": true
+    },
+    {
+      "value": "186.111.100.69",
+      "accept": true
+    },
+    {
+      "value": "105.176.148.104",
+      "accept": true
+    },
+    {
+      "value": "197.56.136.160",
+      "accept": true
+    },
+    {
+      "value": "179.57.40.221",
+      "accept": true
+    },
+    {
+      "value": "170.221.17.145",
+      "accept": true
+    },
+    {
+      "value": "83.148.71.41",
+      "accept": true
+    },
+    {
+      "value": "242.100.74.183",
+      "accept": false
+    },
+    {
+      "value": "74.135.155.145",
+      "accept": true
+    },
+    {
+      "value": "167.171.234.191",
+      "accept": true
+    },
+    {
+      "value": "115.203.19.130",
+      "accept": true
+    },
+    {
+      "value": "14.111.66.183",
+      "accept": true
+    },
+    {
+      "value": "54.203.83.176",
+      "accept": true
+    },
+    {
+      "value": "26.97.17.168",
+      "accept": true
+    },
+    {
+      "value": "129.64.29.89",
+      "accept": true
+    },
+    {
+      "value": "132.213.53.150",
+      "accept": true
+    },
+    {
+      "value": "82.214.231.192",
+      "accept": true
+    },
+    {
+      "value": "224.222.103.223",
+      "accept": false
+    },
+    {
+      "value": "95.110.221.177",
+      "accept": true
+    },
+    {
+      "value": "149.21.163.119",
+      "accept": true
+    },
+    {
+      "value": "221.169.74.123",
+      "accept": true
+    },
+    {
+      "value": "218.20.52.90",
+      "accept": true
+    },
+    {
+      "value": "204.59.99.131",
+      "accept": true
+    },
+    {
+      "value": "105.149.9.217",
+      "accept": true
+    },
+    {
+      "value": "228.110.245.103",
+      "accept": false
+    },
+    {
+      "value": "165.161.101.155",
+      "accept": true
+    },
+    {
+      "value": "232.148.58.80",
+      "accept": false
+    },
+    {
+      "value": "16.225.3.194",
+      "accept": true
+    },
+    {
+      "value": "24.20.219.130",
+      "accept": true
+    },
+    {
+      "value": "33.110.221.39",
+      "accept": true
+    },
+    {
+      "value": "51.248.249.200",
+      "accept": true
+    },
+    {
+      "value": "39.87.146.53",
+      "accept": true
+    },
+    {
+      "value": "231.30.193.220",
+      "accept": false
+    },
+    {
+      "value": "224.27.96.26",
+      "accept": false
+    },
+    {
+      "value": "78.137.73.132",
+      "accept": true
+    },
+    {
+      "value": "252.231.229.45",
+      "accept": false
+    },
+    {
+      "value": "254.48.211.148",
+      "accept": false
+    },
+    {
+      "value": "30.114.178.71",
+      "accept": true
+    },
+    {
+      "value": "151.17.185.73",
+      "accept": true
+    },
+    {
+      "value": "68.242.201.225",
+      "accept": true
+    },
+    {
+      "value": "127.12.110.4",
+      "accept": false
+    },
+    {
+      "value": "126.4.86.236",
+      "accept": true
+    },
+    {
+      "value": "45.5.102.10",
+      "accept": true
+    },
+    {
+      "value": "76.174.12.211",
+      "accept": true
+    },
+    {
+      "value": "209.54.53.160",
+      "accept": true
+    },
+    {
+      "value": "20.131.231.82",
+      "accept": true
+    },
+    {
+      "value": "80.27.222.223",
+      "accept": true
+    },
+    {
+      "value": "184.45.198.39",
+      "accept": true
+    },
+    {
+      "value": "189.63.223.107",
+      "accept": true
+    },
+    {
+      "value": "205.158.147.27",
+      "accept": true
+    },
+    {
+      "value": "34.184.58.7",
+      "accept": true
+    },
+    {
+      "value": "216.64.243.11",
+      "accept": true
+    },
+    {
+      "value": "109.72.171.171",
+      "accept": true
+    },
+    {
+      "value": "109.0.250.67",
+      "accept": true
+    },
+    {
+      "value": "8.81.1.73",
+      "accept": true
+    },
+    {
+      "value": "43.218.245.152",
+      "accept": true
+    },
+    {
+      "value": "133.8.34.93",
+      "accept": true
+    },
+    {
+      "value": "107.48.212.170",
+      "accept": true
+    },
+    {
+      "value": "105.190.80.77",
+      "accept": true
+    },
+    {
+      "value": "234.148.162.224",
+      "accept": false
+    },
+    {
+      "value": "216.69.167.137",
+      "accept": true
+    },
+    {
+      "value": "77.65.41.226",
+      "accept": true
+    },
+    {
+      "value": "165.37.130.243",
+      "accept": true
+    },
+    {
+      "value": "226.249.116.67",
+      "accept": false
+    },
+    {
+      "value": "57.171.190.233",
+      "accept": true
+    },
+    {
+      "value": "159.70.101.111",
+      "accept": true
+    },
+    {
+      "value": "132.178.25.214",
+      "accept": true
+    },
+    {
+      "value": "114.149.255.231",
+      "accept": true
+    },
+    {
+      "value": "76.77.62.133",
+      "accept": true
+    },
+    {
+      "value": "216.166.220.162",
+      "accept": true
+    },
+    {
+      "value": "128.108.66.221",
+      "accept": true
+    },
+    {
+      "value": "13.146.76.21",
+      "accept": true
+    },
+    {
+      "value": "171.233.168.100",
+      "accept": true
+    },
+    {
+      "value": "228.154.103.62",
+      "accept": false
+    },
+    {
+      "value": "135.206.149.64",
+      "accept": true
+    },
+    {
+      "value": "9.166.140.165",
+      "accept": true
+    },
+    {
+      "value": "133.71.240.140",
+      "accept": true
+    },
+    {
+      "value": "33.217.75.118",
+      "accept": true
+    },
+    {
+      "value": "65.34.148.244",
+      "accept": true
+    },
+    {
+      "value": "9.188.28.150",
+      "accept": true
+    },
+    {
+      "value": "242.88.11.143",
+      "accept": false
+    },
+    {
+      "value": "254.38.100.171",
+      "accept": false
+    },
+    {
+      "value": "114.41.58.217",
+      "accept": true
+    },
+    {
+      "value": "227.111.170.223",
+      "accept": false
+    },
+    {
+      "value": "112.230.9.13",
+      "accept": true
+    },
+    {
+      "value": "170.110.64.21",
+      "accept": true
+    },
+    {
+      "value": "40.191.208.147",
+      "accept": true
+    },
+    {
+      "value": "12.18.121.191",
+      "accept": true
+    },
+    {
+      "value": "82.55.132.91",
+      "accept": true
+    },
+    {
+      "value": "60.25.56.202",
+      "accept": true
+    },
+    {
+      "value": "70.245.224.12",
+      "accept": true
+    },
+    {
+      "value": "175.42.216.180",
+      "accept": true
+    },
+    {
+      "value": "217.93.236.105",
+      "accept": true
+    },
+    {
+      "value": "18.25.251.229",
+      "accept": true
+    },
+    {
+      "value": "53.119.228.231",
+      "accept": true
+    },
+    {
+      "value": "141.4.84.193",
+      "accept": true
+    },
+    {
+      "value": "4.240.15.78",
+      "accept": true
+    },
+    {
+      "value": "251.133.4.152",
+      "accept": false
+    },
+    {
+      "value": "162.1.79.36",
+      "accept": true
+    },
+    {
+      "value": "174.84.243.122",
+      "accept": true
+    },
+    {
+      "value": "11.27.121.77",
+      "accept": true
+    },
+    {
+      "value": "64.2.62.222",
+      "accept": true
+    },
+    {
+      "value": "19.32.38.149",
+      "accept": true
+    },
+    {
+      "value": "38.30.26.205",
+      "accept": true
+    },
+    {
+      "value": "17.15.114.10",
+      "accept": true
+    },
+    {
+      "value": "217.38.248.224",
+      "accept": true
+    },
+    {
+      "value": "99.233.152.173",
+      "accept": true
+    },
+    {
+      "value": "230.16.94.179",
+      "accept": false
+    },
+    {
+      "value": "223.225.243.5",
+      "accept": true
+    },
+    {
+      "value": "8.69.46.134",
+      "accept": true
+    },
+    {
+      "value": "254.118.39.27",
+      "accept": false
+    },
+    {
+      "value": "99.114.80.147",
+      "accept": true
+    },
+    {
+      "value": "208.112.99.134",
+      "accept": true
+    },
+    {
+      "value": "216.197.70.186",
+      "accept": true
+    },
+    {
+      "value": "182.104.4.53",
+      "accept": true
+    },
+    {
+      "value": "86.61.123.31",
+      "accept": true
+    },
+    {
+      "value": "19.199.9.1",
+      "accept": true
+    },
+    {
+      "value": "17.122.124.26",
+      "accept": true
+    },
+    {
+      "value": "179.102.205.129",
+      "accept": true
+    },
+    {
+      "value": "15.103.125.241",
+      "accept": true
+    },
+    {
+      "value": "147.182.106.169",
+      "accept": true
+    },
+    {
+      "value": "240.151.45.64",
+      "accept": false
+    },
+    {
+      "value": "236.54.8.33",
+      "accept": false
+    },
+    {
+      "value": "16.206.131.50",
+      "accept": true
+    },
+    {
+      "value": "72.199.199.43",
+      "accept": true
+    },
+    {
+      "value": "1.235.203.132",
+      "accept": true
+    },
+    {
+      "value": "7.18.49.62",
+      "accept": true
+    },
+    {
+      "value": "8.253.9.84",
+      "accept": true
+    },
+    {
+      "value": "145.248.70.110",
+      "accept": true
+    },
+    {
+      "value": "54.186.180.99",
+      "accept": true
+    },
+    {
+      "value": "33.155.94.69",
+      "accept": true
+    },
+    {
+      "value": "172.55.136.128",
+      "accept": true
+    },
+    {
+      "value": "44.121.96.246",
+      "accept": true
+    },
+    {
+      "value": "163.33.215.205",
+      "accept": true
+    },
+    {
+      "value": "80.242.167.192",
+      "accept": true
+    },
+    {
+      "value": "191.43.86.46",
+      "accept": true
+    },
+    {
+      "value": "224.186.124.10",
+      "accept": false
+    },
+    {
+      "value": "240.46.121.176",
+      "accept": false
+    },
+    {
+      "value": "254.63.196.199",
+      "accept": false
+    },
+    {
+      "value": "239.153.47.55",
+      "accept": false
+    },
+    {
+      "value": "87.197.19.107",
+      "accept": true
+    },
+    {
+      "value": "78.196.183.247",
+      "accept": true
+    },
+    {
+      "value": "167.89.102.82",
+      "accept": true
+    },
+    {
+      "value": "192.49.157.234",
+      "accept": true
+    },
+    {
+      "value": "189.146.60.165",
+      "accept": true
+    },
+    {
+      "value": "156.235.253.212",
+      "accept": true
+    },
+    {
+      "value": "161.39.176.11",
+      "accept": true
+    },
+    {
+      "value": "105.247.155.199",
+      "accept": true
+    },
+    {
+      "value": "138.88.176.238",
+      "accept": true
+    },
+    {
+      "value": "1.211.237.28",
+      "accept": true
+    },
+    {
+      "value": "199.14.43.2",
+      "accept": true
+    },
+    {
+      "value": "238.91.61.59",
+      "accept": false
+    },
+    {
+      "value": "45.168.194.248",
+      "accept": true
+    },
+    {
+      "value": "151.201.96.132",
+      "accept": true
+    },
+    {
+      "value": "200.45.78.66",
+      "accept": true
+    },
+    {
+      "value": "3.198.130.227",
+      "accept": true
+    },
+    {
+      "value": "146.206.94.242",
+      "accept": true
+    },
+    {
+      "value": "146.238.115.175",
+      "accept": true
+    },
+    {
+      "value": "105.66.175.150",
+      "accept": true
+    },
+    {
+      "value": "63.76.94.23",
+      "accept": true
+    },
+    {
+      "value": "229.22.146.10",
+      "accept": false
+    },
+    {
+      "value": "84.183.202.2",
+      "accept": true
+    },
+    {
+      "value": "171.196.1.239",
+      "accept": true
+    },
+    {
+      "value": "11.117.216.57",
+      "accept": true
+    },
+    {
+      "value": "203.188.85.236",
+      "accept": true
+    },
+    {
+      "value": "173.123.152.12",
+      "accept": true
+    },
+    {
+      "value": "112.240.28.66",
+      "accept": true
+    },
+    {
+      "value": "165.83.30.91",
+      "accept": true
+    },
+    {
+      "value": "61.11.212.144",
+      "accept": true
+    },
+    {
+      "value": "149.130.50.124",
+      "accept": true
+    },
+    {
+      "value": "115.4.244.37",
+      "accept": true
+    },
+    {
+      "value": "160.170.159.166",
+      "accept": true
+    },
+    {
+      "value": "131.62.203.80",
+      "accept": true
+    },
+    {
+      "value": "154.83.47.185",
+      "accept": true
+    },
+    {
+      "value": "83.161.233.116",
+      "accept": true
+    },
+    {
+      "value": "143.229.120.203",
+      "accept": true
+    },
+    {
+      "value": "102.15.113.95",
+      "accept": true
+    },
+    {
+      "value": "2.21.242.127",
+      "accept": true
+    },
+    {
+      "value": "6.35.210.250",
+      "accept": true
+    },
+    {
+      "value": "76.251.166.135",
+      "accept": true
+    },
+    {
+      "value": "190.218.184.34",
+      "accept": true
+    },
+    {
+      "value": "35.10.34.232",
+      "accept": true
+    },
+    {
+      "value": "182.94.70.115",
+      "accept": true
+    },
+    {
+      "value": "234.131.229.230",
+      "accept": false
+    },
+    {
+      "value": "9.135.7.183",
+      "accept": true
+    },
+    {
+      "value": "129.15.171.8",
+      "accept": true
+    },
+    {
+      "value": "21.213.40.163",
+      "accept": true
+    },
+    {
+      "value": "216.12.120.179",
+      "accept": true
+    },
+    {
+      "value": "199.43.150.10",
+      "accept": true
+    },
+    {
+      "value": "132.218.144.3",
+      "accept": true
+    },
+    {
+      "value": "57.32.144.163",
+      "accept": true
+    },
+    {
+      "value": "216.99.48.95",
+      "accept": true
+    },
+    {
+      "value": "192.128.80.125",
+      "accept": true
+    },
+    {
+      "value": "137.179.173.9",
+      "accept": true
+    },
+    {
+      "value": "74.102.135.139",
+      "accept": true
+    },
+    {
+      "value": "175.73.242.200",
+      "accept": true
+    },
+    {
+      "value": "172.255.18.19",
+      "accept": true
+    },
+    {
+      "value": "158.122.139.22",
+      "accept": true
+    },
+    {
+      "value": "102.215.162.131",
+      "accept": true
+    }
+  ]
+}

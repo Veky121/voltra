@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 
-import {observeQuery} from './queryCache';
+import {observeQuery,applyLiveQuery,invalidateQueryCache} from './queryCache';
+import {observeLivePath,isLivePathFresh} from './liveEvents';
 
 type Request = <T>(path:string,options?:RequestInit)=>Promise<T>;
 type RequestState<T> = {path:string|null;data:T|null;error:string;loading:boolean};
@@ -9,6 +10,20 @@ export function useAPIRequest<T>(path:string|null,request:Request) {
   const [state,setState]=useState<RequestState<T>>({path,data:null,error:'',loading:!!path});
   const refresh=useRef<()=>void>(()=>{});
   const reload=useCallback(()=>refresh.current(),[]);
+  const liveVersion=useRef(0);
+  useEffect(()=>{
+    if(!path)return;
+    const stop=observeLivePath(path,sample=>{
+      liveVersion.current++;
+      if(sample.invalidate){invalidateQueryCache(path);refresh.current();return}
+      const error=sample.status>=400?(sample.data?.errors?.[0]?.detail||'Live update unavailable.'):'';
+      const data=sample.status>=400?null:sample.data;
+      applyLiveQuery(path,data,error);setState({path,data,error,loading:false});
+    });
+    if(!stop)return;
+    const fallback=setInterval(()=>{if(!document.hidden&&!isLivePathFresh(path))refresh.current()},5000);
+    return()=>{clearInterval(fallback);stop()};
+  },[path]);
 
   useEffect(()=>{
     if(!path){
@@ -28,12 +43,13 @@ export function useAPIRequest<T>(path:string|null,request:Request) {
       // or start more than one request at a time for this resource.
       if(inFlight){queued=true;return;}
       inFlight=true;
+      const version=liveVersion.current;
       setState(previous=>({path,data:previous.path===path?previous.data:null,error:'',loading:true}));
       try {
         const data=await request<T>(path!,{signal:abort.signal});
-        if(active)setState({path,data,error:'',loading:false});
+        if(active&&version===liveVersion.current)setState({path,data,error:'',loading:false});
       } catch(error) {
-        if(active)setState(previous=>({...previous,data:[401,403,404].includes(Number((error as any)?.status))?null:previous.data,error:error instanceof Error?error.message:String(error),loading:false}));
+        if(active&&version===liveVersion.current)setState(previous=>({...previous,data:[401,403,404].includes(Number((error as any)?.status))?null:previous.data,error:error instanceof Error?error.message:String(error),loading:false}));
       } finally {
         inFlight=false;
         if(active&&queued){queued=false;void load();}

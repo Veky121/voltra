@@ -13,7 +13,7 @@ import (
 
 func startupSecretName(name string) bool {
 	name = strings.ToUpper(name)
-	if name == "GAME_SERIAL" || name == "DLC_PRODUCT_KEY" {
+	if name == "GAME_SERIAL" || name == "DLC_PRODUCT_KEY" || name == "TIMED_URL" {
 		return true
 	}
 	for _, part := range []string{"PASSWORD", "PASSWD", "PASSPHRASE", "TOKEN", "SECRET", "API_KEY", "APIKEY", "PRIVATE_KEY", "ACCESS_KEY", "LICENSE_KEY", "LICENCE_KEY", "CREDENTIAL"} {
@@ -32,6 +32,9 @@ func maskStartupArguments(command string) string {
 
 // Public startup metadata never returns saved secret contents or secret defaults.
 func (a *App) annotateStartupFields(ctx context.Context, server M, variables []M) error {
+	if err := a.annotateStartupSeedFields(ctx, server, variables); err != nil {
+		return err
+	}
 	secrets, err := a.serverIntegrationSecrets(ctx, num(server["id"]))
 	if err != nil {
 		return err
@@ -130,6 +133,23 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 		return
 	}
 	server = fresh
+	egg, err := a.serverEffectiveEgg(ctx, server)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if nativeSettingsIsRecipe(egg, fiveMRecipe) {
+		env, envErr := a.serverEnvironment(ctx, server)
+		if envErr != nil {
+			fail(w, envErr)
+			return
+		}
+		env[str(original["env_variable"])] = next
+		if err = validateCfxEnvironment(egg, env); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	old, oldErr := a.one(ctx, "SELECT variable_value FROM server_variables WHERE server_id=$1 AND variable_id=$2", server["id"], changed["id"])
 	if oldErr != nil && !errors.Is(oldErr, pgx.ErrNoRows) {
 		fail(w, oldErr)
@@ -140,7 +160,7 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 		fail(w, secretErr)
 		return
 	}
-	if secretErr == nil && str(secret["source"]) != "server" && !a.isFS25Password(ctx, server, str(changed["env_variable"])) {
+	if secretErr == nil && str(secret["source"]) != "server" {
 		fail(w, forbidden())
 		return
 	}
@@ -220,56 +240,10 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 	}
 	a.opAudit(r, server, "server:startup.edit", M{"variable": input["key"], "reset": reset, "configured": value != ""})
 	response := item("egg_variable", opVariable(changed))
-	response["meta"] = M{"applies": "next_start"}
+	applies := "next_start"
+	if asMap(changed["effect"])["kind"] == "initial_default" {
+		applies = "initial_default"
+	}
+	response["meta"] = M{"applies": applies}
 	writeJSON(w, 200, response)
-}
-
-// Reveal is explicit and requires both startup permissions. Admin integration
-// credentials remain private even when their variable is visible.
-func (a *App) revealStartupField(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
-	server, err := a.server(r, "startup.read")
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	if _, err = a.server(r, "startup.update"); err != nil {
-		fail(w, err)
-		return
-	}
-	v, err := a.one(r.Context(), `SELECT ev.user_viewable,COALESCE(sv.variable_value,ev.default_value) AS value,ss.value AS sealed,ss.source FROM egg_variables ev LEFT JOIN server_variables sv ON sv.variable_id=ev.id AND sv.server_id=$1 LEFT JOIN server_integration_secrets ss ON ss.variable_id=ev.id AND ss.server_id=$1 WHERE ev.egg_id=$2 AND ev.env_variable=$3`, server["id"], server["egg_id"], r.PathValue("key"))
-	if err != nil {
-		fail(w, notFound())
-		return
-	}
-	visible := boolean(v["user_viewable"])
-	if !visible {
-		egg, e := a.one(r.Context(), "SELECT features FROM eggs WHERE id=$1", server["egg_id"])
-		key := r.PathValue("key")
-		visible = e == nil && fs25Egg(egg) && (key == "WEB_PASSWORD" || key == "GAME_PASSWORD" || key == "ADMIN_PASSWORD")
-	}
-	if !visible || (str(v["source"]) != "" && str(v["source"]) != "server" && !a.isFS25Password(r.Context(), server, r.PathValue("key"))) {
-		fail(w, forbidden())
-		return
-	}
-	value := str(v["value"])
-	if str(v["sealed"]) != "" {
-		value, err = a.unseal(str(v["sealed"]))
-		if err != nil {
-			fail(w, err)
-			return
-		}
-	}
-	a.opAudit(r, server, "server:startup.reveal", M{"variable": r.PathValue("key")})
-	writeJSON(w, 200, item("startup_value", M{"value": value}))
-}
-
-// Early FS25 installs marked user passwords as integration-owned. These three
-// game credentials remain owner-editable, independently of licence credentials.
-func (a *App) isFS25Password(ctx context.Context, server M, key string) bool {
-	if key != "WEB_PASSWORD" && key != "GAME_PASSWORD" && key != "ADMIN_PASSWORD" {
-		return false
-	}
-	egg, err := a.one(ctx, "SELECT features FROM eggs WHERE id=$1", server["egg_id"])
-	return err == nil && fs25Egg(egg)
 }

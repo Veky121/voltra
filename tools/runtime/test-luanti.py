@@ -1,6 +1,7 @@
 """Native configuration and staged game-install fixtures; not gameplay proof."""
 import io
 import json
+import os
 import stat
 import tempfile
 import types
@@ -18,6 +19,105 @@ exec(PATCH_SOURCE, patcher.__dict__)
 
 
 class ConfigTests(unittest.TestCase):
+    def test_native_unicode_edges_and_nested_literal_delimiters(self):
+        for edge in ('\u0085','\u2028','\u2029'):
+            value=edge+'literal'+edge
+            self.assertEqual(runtime.scalar(value,'server_name'),value)
+            text='custom = {\nkey = '+edge+'{\n}\nserver_name = '+value+'\n'
+            self.assertEqual(runtime.render(text,{'server_name':'ignored'}),text)
+
+    def test_existing_world_retains_its_native_game_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);world=root/'.minetest/worlds/fixture';world.mkdir(parents=True)
+            metadata=world/'world.mt';original=b'# operator\r\ngameid = existing_game\r\nbackend = sqlite3\r\n';metadata.write_bytes(original)
+            self.assertEqual(runtime.selected_world_game(root,'fixture','startup_default'),'existing_game')
+            self.assertEqual(metadata.read_bytes(),original)
+            (root/'.voltra').mkdir();(root/'.voltra/luanti-admin.lua').write_bytes(b'-- controlled fixture\n')
+            game=root/'.minetest/games/existing_game';game.mkdir(parents=True);(game/'game.conf').write_bytes(b'title = Fixture\n')
+            env=dict(SERVER_ADMIN_NAME='Owner',SERVER_NAME='Server',SERVER_ANNOUNCE='false',SERVER_MAX_USERS='15',SERVER_PORT='23560',DEFAULT_GAME='uninstalled_startup_default',WORLD_NAME='fixture')
+            with mock.patch.object(runtime.subprocess,'run',return_value=types.SimpleNamespace(stdout='Luanti 5.17.0 (Linux)\n')),mock.patch.object(runtime.os,'execve') as execute,mock.patch.object(runtime.os,'chdir'):
+                runtime.launch(root,env)
+            arguments=execute.call_args.args[1]
+            self.assertEqual(arguments[arguments.index('--gameid')+1],'existing_game')
+            self.assertEqual(metadata.read_bytes(),original)
+            metadata.write_bytes(original+b'gameid = another\n')
+            with self.assertRaises(ValueError):runtime.selected_world_game(root,'fixture','startup_default')
+
+    def test_native_authority_resource_spans_and_unicode(self):
+        for separator in ('\u0085', '\u2028', '\u2029'):
+            text = '# operator\r\nserver_name = Native' + separator + 'Name\r\n  port  = 25565  \r\ncustom = {\nserver_name = nested\n}\n'
+            expected = text.replace('25565', '23560')
+            self.assertEqual(runtime.render(text, {'server_name':'ignored', 'port':'23560'}), expected)
+
+    def test_native_gameplay_and_admin_name_survive_stale_startup(self):
+        env = dict(SERVER_ADMIN_NAME='Owner', SERVER_NAME='Startup', SERVER_ANNOUNCE='false', SERVER_MAX_USERS='15', SERVER_PORT='23560', DEFAULT_GAME='minetest', WORLD_NAME='world', SERVER_ADMIN_PASSWORD='synthetic-fixture-password')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.voltra').mkdir()
+            (root / '.voltra/luanti-admin.lua').write_bytes(b'-- controlled fixture\n')
+            (root / '.minetest/games/minetest').mkdir(parents=True)
+            (root / '.minetest/games/minetest/game.conf').write_bytes(b'title = Fixture\n')
+            config = root / '.minetest/minetest.conf'
+            original = b'# operator\nname = NativeAdmin\nserver_name = Native server\nmax_users = 7\nserver_announce = false\nmotd = """\nNative\nmessage\n"""\n'
+            config.write_bytes(original)
+            with mock.patch.object(runtime.subprocess,'run',return_value=types.SimpleNamespace(stdout='Luanti 5.17.0 (Linux)\n')),mock.patch.object(runtime.os,'execve'),mock.patch.object(runtime.os,'chdir'):
+                runtime.launch(root,env)
+                first=config.read_bytes()
+                self.assertTrue(first.startswith(original))
+                pending=root/'.minetest/worlds/world/.voltra-admin-bootstrap.json'
+                self.assertEqual(json.loads(pending.read_text())['name'],'NativeAdmin')
+                config.chmod(0o640)
+                runtime.launch(root,dict(env,SERVER_NAME='bad\nunused',SERVER_ADMIN_NAME='bad unused',SERVER_MAX_USERS='unused',SERVER_ANNOUNCE='unused'))
+                self.assertEqual(config.read_bytes(),first)
+                if os.name!='nt':self.assertEqual(config.stat().st_mode&0o777,0o640)
+
+    def test_duplicate_refusal_preserves_complete_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);config=root/'.minetest/minetest.conf';config.parent.mkdir()
+            config.write_bytes(b'server_name = one\nserver_name = two\n')
+            before={str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            with self.assertRaises(ValueError):runtime.planned_settings(root,dict(SERVER_PORT='23560',DEFAULT_GAME='minetest'))
+            self.assertEqual({str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()},before)
+
+    def test_modified_bootstrap_mod_refuses_before_config_publication(self):
+        env=dict(SERVER_ADMIN_NAME='Owner',SERVER_NAME='Server',SERVER_ANNOUNCE='false',SERVER_MAX_USERS='15',SERVER_PORT='23560',DEFAULT_GAME='minetest',WORLD_NAME='world')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'.voltra').mkdir();(root/'.voltra/luanti-admin.lua').write_bytes(b'-- managed\n')
+            game=root/'.minetest/games/minetest';game.mkdir(parents=True);(game/'game.conf').write_bytes(b'title = Fixture\n')
+            mod=root/'.minetest/worlds/world/worldmods/voltra_admin_bootstrap';mod.mkdir(parents=True);(mod/'init.lua').write_bytes(b'-- operator modification\n')
+            before={str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            with mock.patch.object(runtime.subprocess,'run',return_value=types.SimpleNamespace(stdout='Luanti 5.17.0 (Linux)\n')):
+                with self.assertRaisesRegex(ValueError,'Modified administrator'):runtime.launch(root,env)
+            self.assertEqual({str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()},before)
+
+    def test_private_new_secret_preserves_existing_owner_and_other_modes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'minetest.conf';path.write_bytes(b'# nonsecret operator file\n');path.chmod(0o644)
+            identity=(path.stat().st_uid,path.stat().st_gid)
+            runtime.configure(path,{'default_password':'synthetic-fixture-secret'})
+            if os.name!='nt':
+                self.assertEqual(path.stat().st_mode&0o777,0o600)
+                self.assertEqual((path.stat().st_uid,path.stat().st_gid),identity)
+            content=path.read_bytes();path.chmod(0o640)
+            self.assertFalse(runtime.configure(path,{'default_password':'ignored-new-secret'}))
+            self.assertEqual(path.read_bytes(),content)
+            if os.name!='nt':self.assertEqual(path.stat().st_mode&0o777,0o640)
+
+    def test_changed_preflight_refuses_without_backup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'minetest.conf';path.write_bytes(b'server_name = current\n')
+            with self.assertRaisesRegex(ValueError,'changed during preflight'):runtime.configure(path,{'port':'23560'},expected=b'stale')
+            self.assertEqual(path.read_bytes(),b'server_name = current\n')
+            self.assertEqual(len(list(path.parent.iterdir())),1)
+
+    def test_symlink_configuration_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'.minetest').mkdir();target=root/'operator.conf';target.write_bytes(b'unchanged')
+            try:(root/'.minetest/minetest.conf').symlink_to(target)
+            except OSError:self.skipTest('Windows symlink privilege unavailable')
+            with self.assertRaises(ValueError):runtime.planned_settings(root,dict(SERVER_PORT='23560',DEFAULT_GAME='minetest'))
+            self.assertEqual(target.read_bytes(),b'unchanged')
+
     def test_literal_punctuation(self):
         value = 'Name, $HOME = "quoted" # literal 世界'
         self.assertEqual(runtime.render('', {'server_name': value}), 'server_name = ' + value + '\n')
@@ -29,14 +129,18 @@ class ConfigTests(unittest.TestCase):
 
     def test_preserves_unrelated_groups_and_multiline(self):
         unrelated = '# operator data\ncustom = {\nserver_name = nested\nother = """\n  """\nserver_name = still text\n"""\n}\nmotd = """\nserver_name = text\n"""\n'
-        self.assertEqual(runtime.render(unrelated + 'server_name = old\n', {'server_name': 'new'}), unrelated + 'server_name = new\n')
+        self.assertEqual(runtime.render(unrelated + 'server_name = old\n', {'server_name': 'new'}), unrelated + 'server_name = old\n')
 
     def test_replace_multiline_and_group_managed_values(self):
-        old = 'server_name = """\nold\n"""\nmax_users = {\nx = y\n}\n'
-        self.assertEqual(runtime.render(old, {'server_name': 'new', 'max_users': '30'}), 'server_name = new\nmax_users = 30\n')
+        old = 'server_name = """\nold\n"""\n'
+        self.assertEqual(runtime.render(old, {'server_name': 'new'}), old)
+        with self.assertRaises(ValueError):
+            runtime.render('max_users = {\nx = y\n}\n', {'max_users': '30'})
 
     def test_duplicates_and_no_final_newline(self):
-        self.assertEqual(runtime.render('server_name = old\nserver_name = duplicate\nkeep = yes', {'server_name': 'new', 'port': '23560'}), 'server_name = new\nkeep = yes\nport = 23560\n')
+        with self.assertRaises(ValueError):
+            runtime.render('server_name = old\nserver_name = duplicate\nkeep = yes', {'server_name': 'new', 'port': '23560'})
+        self.assertEqual(runtime.render('server_name = old\nkeep = yes', {'server_name': 'new', 'port': '23560'}), 'server_name = old\nkeep = yes\nport = 23560\n')
 
     def test_identical_bytes_and_backup(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -46,8 +150,11 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(runtime.configure(path, {'server_name': 'same'}))
             self.assertEqual(path.read_bytes(), old)
             self.assertFalse(path.with_name(path.name + '.voltra-backup').exists())
-            self.assertTrue(runtime.configure(path, {'server_name': 'changed'}))
-            self.assertEqual(path.with_name(path.name + '.voltra-backup').read_bytes(), old)
+            self.assertFalse(runtime.configure(path, {'server_name': 'changed'}))
+            self.assertTrue(runtime.configure(path, {'server_name': 'changed', 'port': '23560'}))
+            backups = list(path.parent.glob(path.name + '.voltra-backup-*'))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_bytes(), old)
 
     def test_invalid_config_unchanged(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -106,7 +213,8 @@ class ConfigTests(unittest.TestCase):
             generated = json.loads(pending.read_text())
             self.assertTrue(generated['generated'])
             self.assertGreaterEqual(len(generated['password']), 32)
-            self.assertEqual(pending.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':
+                self.assertEqual(pending.stat().st_mode & 0o777, 0o600)
             pending.rename(world / 'voltra-admin-password-Owner.json')
             runtime.prepare_admin(root, 'world', env)
             self.assertEqual(json.loads(pending.read_text())['password'], generated['password'])
@@ -132,7 +240,9 @@ def game_zip(extra=(), symlink=False):
         zipped.writestr('pack/game.conf', 'title = Fixture Game\n')
         zipped.writestr('pack/mods/fixture/init.lua', '-- fixture\n')
         for name, value in extra:
-            zipped.writestr(name, value)
+            entry = zipfile.ZipInfo('literal-entry')
+            entry.filename = entry.orig_filename = name
+            zipped.writestr(entry, value)
         if symlink:
             link = zipfile.ZipInfo('pack/link')
             link.create_system = 3
@@ -149,6 +259,44 @@ class GameTests(unittest.TestCase):
 
     def fetch(self, url):
         return dict(self.release) if '/releases/' in url else {'type': 'game'}
+
+    def test_default_fallback_pins_game_tree_across_zip_envelopes(self):
+        env=dict(self.env,COMMUNITY_GAME_AUTOR='Luanti',COMMUNITY_GAME_NAME='minetest_game')
+        repacked=io.BytesIO()
+        with zipfile.ZipFile(repacked,'w',compression=zipfile.ZIP_DEFLATED) as zipped:
+            zipped.writestr('another-root/mods/fixture/init.lua','-- fixture\n')
+            zipped.writestr('another-root/game.conf','title = Fixture Game\n')
+        self.assertNotEqual(self.archive,repacked.getvalue())
+        for archive in (self.archive,repacked.getvalue()):
+            with tempfile.TemporaryDirectory() as directory,mock.patch.object(installer,'REVIEWED_GAME_TREE','33cc5127dd2a280f666f3fa3261e396c38bd8e3a58131a742c6c65644e249fca'):
+                def unavailable(_):raise installer.MetadataUnavailable('ContentDB unavailable',503)
+                def download(url):
+                    self.assertEqual(url,installer.REVIEWED_GAME_GIT_URL)
+                    return io.BytesIO(archive)
+                self.assertTrue(installer.install(directory,env,unavailable,download))
+                receipt=json.loads((Path(directory)/'.minetest/games/minetest/.voltra-contentdb.json').read_text())
+                self.assertEqual(receipt['source'],'reviewed_official_git_commit')
+                self.assertEqual(receipt['commit'],'c42e4d0c0ff9d27ff7b9b308c3cfc14098dd3a0f')
+
+    def test_exact_default_cache_avoids_network_and_tamper_never_publishes(self):
+        env=dict(self.env,COMMUNITY_GAME_AUTOR='Luanti',COMMUNITY_GAME_NAME='minetest_game')
+        for archive,valid in [(self.archive,True),(game_zip([('pack/extra.lua','unexpected')]),False)]:
+            with tempfile.TemporaryDirectory() as directory,mock.patch.object(installer,'REVIEWED_GAME_TREE','33cc5127dd2a280f666f3fa3261e396c38bd8e3a58131a742c6c65644e249fca'):
+                root=Path(directory);cache=root/'.voltra/luanti-cache'/('minetest-game-'+installer.REVIEWED_GAME_COMMIT+'.zip');cache.parent.mkdir(parents=True);cache.write_bytes(archive)
+                def no_network(_):self.fail('Verified default cache must avoid network')
+                if valid:self.assertTrue(installer.install(root,env,no_network,no_network))
+                else:
+                    with self.assertRaisesRegex(ValueError,'content tree'):installer.install(root,env,no_network,no_network)
+                    self.assertFalse((root/'.minetest/games/minetest').exists())
+
+    def test_fallback_never_changes_custom_latest_or_authorization_semantics(self):
+        exact=dict(self.env,COMMUNITY_GAME_AUTOR='Luanti',COMMUNITY_GAME_NAME='minetest_game')
+        for env,status in [(exact,403),(dict(exact,COMMUNITY_GAME_RELEASE='0'),503),(self.env,503)]:
+            with tempfile.TemporaryDirectory() as directory:
+                def unavailable(_):raise installer.MetadataUnavailable('Metadata unavailable',status)
+                def no_download(_):self.fail('Fallback must not change requested release or permissions')
+                with self.assertRaises(installer.MetadataUnavailable):installer.install(directory,env,unavailable,no_download)
+                self.assertFalse((Path(directory)/'.minetest/games/minetest').exists())
 
     def test_staged_install_and_receipt(self):
         with tempfile.TemporaryDirectory() as directory:

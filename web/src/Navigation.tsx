@@ -1,3 +1,5 @@
+import {ToggleGroup,ToggleGroupItem} from './components/ui/toggle-group';
+import {Disclosure,DisclosureTrigger} from './ui/Disclosure';
 import {Children,cloneElement,createContext,isValidElement,useContext,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {Link,NavLink,useLocation,type NavLinkRenderProps,type To} from 'react-router-dom';
@@ -8,11 +10,11 @@ export const SidebarTarget=createContext<HTMLDivElement|null>(null);
 
 export function PanelSwitcher({admin,administrator}:{admin:boolean;administrator:boolean}){
   const canSwitch=admin||administrator;
-  return <nav className="panel-switcher" data-panel={admin?'admin':'servers'} data-single={!canSwitch||undefined} aria-label="Panel switcher">
+  return <ToggleGroup render={<nav/>} value={[admin?'admin':'servers']} className="panel-switcher" data-panel={admin?'admin':'servers'} data-single={!canSwitch||undefined} aria-label="Panel switcher">
     <span className="panel-switcher-indicator" aria-hidden="true"/>
-    {canSwitch&&<Link to="/admin" title="Admin" aria-label="Admin" aria-current={admin?'page':undefined} className={admin?'is-selected':''}><NavIcon name="settings"/><span>Admin</span></Link>}
-    <Link to="/" title="Servers" aria-label="Servers" aria-current={!admin?'page':undefined} className={!admin?'is-selected':''}><NavIcon name="server"/><span>Servers</span></Link>
-  </nav>;
+    {canSwitch&&<ToggleGroupItem value="admin" nativeButton={false} render={<Link to="/admin"/>} title="Admin" data-panel-option="admin" aria-label="Admin" aria-current={admin?'page':undefined} className={admin?'is-selected':''}><NavIcon name="settings"/><span>Admin</span></ToggleGroupItem>}
+    <ToggleGroupItem value="servers" nativeButton={false} render={<Link to="/"/>} title="Servers" data-panel-option="servers" aria-label="Servers" aria-current={!admin?'page':undefined} className={!admin?'is-selected':''}><NavIcon name="server"/><span>Servers</span></ToggleGroupItem>
+  </ToggleGroup>;
 }
 
 type GroupProps={label:string;description?:string;children:ReactNode;detail?:boolean;className?:string};
@@ -50,23 +52,23 @@ export function AdminNavigation(){
       ['/admin','Overview'],['/admin/settings','Settings'],['/admin/integrations','Integrations'],
     ]},
     {label:'Management',description:'Servers, people and infrastructure',links:[
-      ['/admin/servers','Manage servers'],['/admin/users','Users'],['/admin/nodes','Nodes'],['/admin/database-hosts','Database hosts'],
+      ['/admin/users','Users'],['/admin/nodes','Nodes'],['/admin/database-hosts','Database hosts'],
     ]},
     {label:'Service management',description:'Game templates and Java runtimes',links:[
-      ['/admin/nests','Nests & eggs'],['/admin/java-runtimes','Java runtimes'],
+      ['/admin/nests','Game templates'],['/admin/java-runtimes','Java runtimes'],
     ]},
   ];
   return <div className="sidebar-admin-groups">{groups.map(group=><NavigationGroup key={group.label} label={group.label} description={group.description}>
     {group.links.map(([to,label])=><NavLink key={to} to={to} title={label} end={to==='/admin'} className={({isActive})=>isActive||(to==='/admin/nests'&&pathname.startsWith('/admin/eggs/'))?'active':''}><NavIcon name={({'/admin/proxy-gateways':'network','/admin':'dashboard','/admin/settings':'settings','/admin/integrations':'key','/admin/api-keys':'key','/admin/servers':'server','/admin/users':'users','/admin/nodes':'nodes','/admin/locations':'locations','/admin/database-hosts':'databases','/admin/nests':'eggs','/admin/java-runtimes':'startup','/admin/mounts':'mounts'} as Record<string,IconName>)[to]}/><span>{label}</span></NavLink>)}
   </NavigationGroup>)}
-    <details className="voltra-sidebar-advanced" open={pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations')}>
-      <summary title="Advanced administration">Advanced</summary>
+    <Disclosure className="voltra-sidebar-advanced" key={String(pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations'))} defaultOpen={pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations')}>
+      <DisclosureTrigger title="Advanced administration">Advanced</DisclosureTrigger>
       <NavigationGroup label="Advanced" className="voltra-advanced-group">
         <NavLink to="/admin/locations" title="Groups" className={({isActive})=>isActive?'active':''}><NavIcon name="locations"/><span>Groups</span></NavLink>
         <NavLink to="/admin/api-keys" title="Application API" className={({isActive})=>isActive?'active':''}><NavIcon name="key"/><span>Application API</span></NavLink>
         <NavLink to="/admin/mounts" title="Mounts" className={({isActive})=>isActive?'active':''}><NavIcon name="mounts"/><span>Mounts</span></NavLink>
       </NavigationGroup>
-    </details>
+    </Disclosure>
   </div>;
 }
 

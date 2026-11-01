@@ -1,3 +1,4 @@
+import {observedFetch} from './notifications/observedFetch';
 import {useSyncExternalStore} from 'react';
 export const updateChannels=[{value:'release',label:'Release'},{value:'nightly',label:'Nightly'}] as const;
 export type UpdateChannel=typeof updateChannels[number]['value'];
@@ -12,7 +13,7 @@ export async function updateAction(path:string,body:unknown={},automatic=false){
  if(automatic&&(snapshot.status?.state==='ready'||snapshot.status?.state==='available'||(snapshot.checkedAt!==null&&Date.now()-snapshot.checkedAt<60*60*1000)))return false;
  publish({busy:true,error:''});
  try{
-  const response=await fetch(`/desktop/${path}`,{method:path==='update-status'?'GET':'POST',headers:{'Content-Type':'application/json'},body:path==='update-status'?undefined:JSON.stringify(body),cache:'no-store'});
+  const response=await observedFetch(`/desktop/${path}`,{method:path==='update-status'?'GET':'POST',headers:{'Content-Type':'application/json'},body:path==='update-status'?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json();if(!response.ok){if(data.state)publish({status:data});throw new Error(data.error||'Update request failed.');}
   publish({status:data,...(path==='updates'?{checkedAt:Date.now()}:{}),...(path==='update-channel'?{checkedAt:null}:{})});
   return true;

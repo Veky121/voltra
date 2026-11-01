@@ -1,3 +1,4 @@
+import {ActionButton as MiraAction} from '../ui/ActionButton';
 import type {CSSProperties} from "react";
 
 export function MinecraftSegments<T extends string>({label, value, options, onChange, disabled = false}: {
@@ -5,6 +6,6 @@ export function MinecraftSegments<T extends string>({label, value, options, onCh
 }) {
   return <div className="mc-segments" role="group" aria-label={label} style={{"--mc-count": options.length, "--mc-index": Math.max(0, options.findIndex(option => option.id === value))} as CSSProperties}>
     <span className="mc-segment-indicator" aria-hidden="true"/>
-    {options.map(option => <button type="button" key={option.id} aria-pressed={value === option.id} disabled={disabled} onClick={() => onChange(option.id)}>{option.name}</button>)}
+    {options.map(option => <MiraAction type="button" key={option.id} aria-pressed={value === option.id} disabled={disabled} onClick={() => onChange(option.id)}>{option.name}</MiraAction>)}
   </div>;
 }

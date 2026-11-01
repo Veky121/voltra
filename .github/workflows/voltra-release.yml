@@ -83,6 +83,7 @@ jobs:
           ./desktop/build.ps1 -Version $env:RELEASE_VERSION -UpdateManifestURL 'https://github.com/Veky121/voltra/releases/download/update-{{channel}}/manifest.json' -UpdatePublicKey $env:VOLTRA_UPDATER_PUBLIC_KEY
           New-Item -ItemType Directory out | Out-Null
           Copy-Item desktop/bin/Voltra.exe out/Voltra-windows-amd64.exe
+          Copy-Item desktop/bin/Voltra-Setup.exe out/Voltra-Setup-windows-amd64.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-desktop
@@ -153,7 +154,7 @@ jobs:
           VOLTRA_UPDATER_PUBLIC_KEY: ${{ vars.VOLTRA_UPDATER_PUBLIC_KEY }}
         run: |
           go run ./tools/release manifest "$RELEASE_TAG" out/Voltra-windows-amd64.exe out/manifest.json
-          go run ./tools/release checksums out/DESKTOP-SHA256SUMS out/Voltra-windows-amd64.exe
+          go run ./tools/release checksums out/DESKTOP-SHA256SUMS out/Voltra-windows-amd64.exe out/Voltra-Setup-windows-amd64.exe
       - name: Publish version assets and channel feed
         env:
           GH_TOKEN: ${{ github.token }}

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import urllib.parse
 import urllib.request
 import zipfile
@@ -58,8 +59,8 @@ def select_release(project,env,jar):
         return {'project':project,'version':version,'build':actual,'url':base+'/'+actual+'/download','algorithm':'md5','hash':digest,'sha256':'','channel':'SUCCESS'}
     if build=='latest':
         rows=metadata(base+'/builds')
-        candidates=[row for row in rows if row.get('channel')=='STABLE'] or rows
-        if not candidates:raise ValueError('No builds exist for this Minecraft version')
+        candidates=[row for row in rows if row.get('channel')=='STABLE']
+        if not candidates:raise ValueError('No stable builds exist for this Minecraft version')
         row=max(candidates,key=lambda entry:int(entry['id']))
     else:row=metadata(base+'/builds/'+build)
     if build!='latest' and str(row['id'])!=build:raise ValueError('PaperMC returned a different build')
@@ -85,13 +86,27 @@ def inspect_jar(data):
         return main,major
 
 
+def managed_target(root,name):
+    # lstat rejects dangling links and special files without following them.
+    target=root/name
+    for current in [root, *reversed(list(target.parents)[:len(target.relative_to(root).parts)-1]), target]:
+        try:mode=current.lstat().st_mode
+        except FileNotFoundError:pass
+        else:
+            valid=stat.S_ISREG(mode) if current==target else stat.S_ISDIR(mode)
+            if not valid:raise ValueError('Managed destination requires regular files and directory parents')
+    return target
+
+
 def install(root,project,env):
     root=Path(root).resolve()
     jar=env.get('SERVER_JARFILE','server.jar')
     if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,74}\.jar',jar):raise ValueError('Choose a jar filename within this volume')
-    target=minecraft.safe_target(root,jar)
+    target=managed_target(root,jar)
+    cache=managed_target(root,'.voltra/paper-family/download.jar')
+    receipt=managed_target(root,'.voltra/paper-family/release.json')
+    properties=managed_target(root,'server.properties')
     release=select_release(project,env,jar)
-    cache=confined(root,'.voltra/paper-family/download.jar')
     expected=release.get('sha256','')
     if expected and cache.is_file() and hashlib.sha256(cache.read_bytes()).hexdigest()==expected:data=cache.read_bytes()
     elif release['algorithm']=='sha256' and release['hash'] and minecraft.allowed_url(release['url']):
@@ -103,8 +118,6 @@ def install(root,project,env):
     main,major=inspect_jar(data)
     # Preflight every managed path before publishing program files. Native data,
     # plugins, EULA and operator JVM args are intentionally never rewritten here.
-    properties=minecraft.safe_target(root,'server.properties')
-    receipt=confined(root,'.voltra/paper-family/release.json')
     write(cache,data);write(target,data)
     if not properties.exists():write(properties,b'server-ip=0.0.0.0\nserver-port=25565\nquery.port=25565\nonline-mode=true\nenable-query=false\nmax-players=20\nmotd=A Minecraft server\n')
     source=urllib.parse.urlsplit(release['url'])._replace(query='').geturl()

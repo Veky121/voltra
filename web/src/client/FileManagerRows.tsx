@@ -1,3 +1,5 @@
+import {IconButton} from '../ui/IconButton';
+import {Checkbox} from '../components/ui/checkbox';
 import {useEffect,useState,type RefObject} from 'react';
 import {createPortal} from 'react-dom';
 import type {IApi} from '@svar-ui/react-filemanager';
@@ -38,10 +40,10 @@ export default function FileManagerRows({host,manager,selected,onOpen,onMenu}:{
     const checked=slot.panel===(api?.getState().activePanel||0)?selected.includes(slot.id):!!api?.getState().panels?.[slot.panel]?.selected?.includes(slot.id);
     async function activate(){if(api?.getState().activePanel!==slot.panel)await api?.exec('set-active-panel',{panel:slot.panel})}
     async function select(toggle:boolean,range=false){await activate();await api?.exec('select-file',{id:slot.id,toggle,range,panel:slot.panel})}
-    return createPortal(<div className={`fm-entry-content${file?.type==='folder'?' is-folder':''}${parent?' is-parent':''}`} onKeyDownCapture={event=>{if(event.key==='Enter'||event.key===' ')event.stopPropagation()}}>
-      {!parent&&<input type="checkbox" className="fm-entry-check" aria-label={`Select ${name}`} checked={checked}
-        onClickCapture={event=>{event.stopPropagation();void select(true)}} onDoubleClickCapture={event=>event.stopPropagation()}
-        onChange={()=>{}}/>}
+    return createPortal(<div className={`fm-entry-content${file?.type==='folder'?' is-folder':''}${parent?' is-parent':''}`} onKeyDown={event=>{if(event.key==='Enter'||event.key===' ')event.stopPropagation()}}>
+      {!parent&&<Checkbox className="fm-entry-check" aria-label={`Select ${name}`} checked={checked}
+        onClick={event=>event.stopPropagation()} onDoubleClick={event=>event.stopPropagation()}
+        onCheckedChange={()=>void select(true)}/>}
       <button type="button" className="fm-entry-open" title={name} disabled={!parent&&!file} onClickCapture={async event=>{
         event.stopPropagation();
         if(!plainFileClick(event)){void select(event.ctrlKey||event.metaKey,event.shiftKey);return}
@@ -50,9 +52,9 @@ export default function FileManagerRows({host,manager,selected,onOpen,onMenu}:{
       }} onDoubleClickCapture={event=>{event.preventDefault();event.stopPropagation()}}>
         <Icon name={parent?'back':file?.type==='folder'?'files':'file'}/><span>{name}</span>
       </button>
-      {!parent&&<button type="button" className="fm-entry-menu" aria-label={`Options for ${name}`} title={`Options for ${name}`} aria-haspopup="menu" onClickCapture={async event=>{
+      {!parent&&<IconButton type="button" className="fm-entry-menu" aria-label={`Options for ${name}`} title={`Options for ${name}`} aria-haspopup="menu" onClickCapture={async event=>{
         event.stopPropagation();const anchor=event.currentTarget;await activate();onMenu(slot.id,anchor);
-      }} onDoubleClickCapture={event=>event.stopPropagation()}><Icon name="more"/></button>}
+      }} onDoubleClickCapture={event=>event.stopPropagation()}><Icon name="more"/></IconButton>}
     </div>,slot.cell,`${slot.key}:${slot.id}`);
   });
 }

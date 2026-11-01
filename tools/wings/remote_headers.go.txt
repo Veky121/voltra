@@ -1,0 +1,60 @@
+package downloader
+
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+)
+
+// These are public compatibility headers supplied by the authenticated panel.
+// Credential, routing, range and transport headers are deliberately excluded.
+func ValidateRemoteHeaders(u *url.URL, headers map[string]string) error {
+	if len(headers) == 0 {
+		return nil
+	}
+	if u == nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || (u.Port() != "" && u.Port() != "443") || len(headers) > 4 {
+		return fmt.Errorf("download headers require HTTPS on port 443")
+	}
+	seen := map[string]bool{}
+	for key, value := range headers {
+		name := http.CanonicalHeaderKey(key)
+		switch name {
+		case "Referer", "User-Agent", "Accept", "Accept-Language":
+		default:
+			return fmt.Errorf("unsupported download header")
+		}
+		if seen[name] || len(value) == 0 || len(value) > 1024 {
+			return fmt.Errorf("invalid download header value")
+		}
+		seen[name] = true
+		for _, c := range value {
+			if c < 32 || c > 126 {
+				return fmt.Errorf("invalid download header value")
+			}
+		}
+		if name == "Referer" {
+			ref, err := url.Parse(value)
+			if err != nil || ref.Scheme != "https" || ref.Hostname() == "" || ref.User != nil || ref.RawQuery != "" || ref.Fragment != "" {
+				return fmt.Errorf("invalid download Referer")
+			}
+		}
+	}
+	return nil
+}
+
+func applyRemoteHeaders(req *http.Request, headers map[string]string) error {
+	if err := ValidateRemoteHeaders(req.URL, headers); err != nil {
+		return err
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
+	return nil
+}
+
+// Return the upstream status without reflecting URLs, queries or response bodies.
+type RemoteStatusError struct{ StatusCode int }
+
+func (e *RemoteStatusError) Error() string {
+	return fmt.Sprintf("Download site returned %d %s", e.StatusCode, http.StatusText(e.StatusCode))
+}

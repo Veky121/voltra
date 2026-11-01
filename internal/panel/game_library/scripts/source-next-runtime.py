@@ -6,12 +6,58 @@ import re
 import time
 import threading
 import shutil
+import stat
 from source_runtime import GAMES, configure, private_write
 from native_console import run
 from source_install import update
 from source_l4d import query_ready, local_query_address
 
 READY='VOLTRA_SOURCE_MAP_READY'
+
+
+def coop_preflight(root):
+    """Refuse unsafe destinations/content before configure can mutate anything.
+
+    This is a stopped-volume preflight, not a concurrent-writer transaction.
+    Never follow even an in-volume or dangling destination symlink.
+    """
+    root = root.absolute()
+    def check(path, directory=False, text=False):
+        for parent in reversed((path, *path.parents)):
+            if parent.is_symlink():
+                raise ValueError('SourceCoop configuration escapes server volume')
+            if parent.exists():
+                mode = parent.stat().st_mode
+                if parent != path or directory:
+                    if not stat.S_ISDIR(mode):
+                        raise ValueError('SourceCoop configuration parent must be a directory')
+                elif not stat.S_ISREG(mode):
+                    raise ValueError('SourceCoop configuration must be a regular file')
+        if text and path.exists():
+            content = path.read_bytes().decode('utf-8')
+            if '\x00' in content:
+                raise ValueError('SourceCoop configuration contains NUL bytes')
+            return content
+        return None
+    check(root, directory=True)
+    if not root.is_dir():
+        raise ValueError('SourceCoop server volume must exist')
+    for directory in ('.voltra/source/config-backups', '.voltra/source-next/config-backups'):
+        path = root / directory
+        check(path, directory=True)
+        # configure chooses timestamp names later. Reject unsafe existing entries
+        # now, including dangling links that could collide with a future name.
+        if path.exists():
+            for entry in path.iterdir():
+                check(entry)
+    original = None
+    for name in ('voltra-managed.cfg', 'voltra-server.cfg', 'voltra-login.cfg',
+                 'voltra-coop.cfg', 'voltra-coop-defaults.cfg', 'server.cfg'):
+        content = check(root / 'bms/cfg' / name, text=True)
+        if name == 'voltra-coop.cfg':
+            original = content
+    check(root / 'srcds_run')
+    return root, original
 
 
 class CoopBoot:
@@ -107,6 +153,8 @@ def launch(root, settings):
         if env.get('PUBLIC_SERVER', '0') == '1' and not env['STEAM_GSLT']:
             raise ValueError('Garrys Mod Internet mode requires a real game server login token')
     elif app=='244310': env['MAX_PLAYERS'] = env.get('MAXPLAYERS', '24')
+    if app == '346680':
+        root, coop_original = coop_preflight(root)
     argv, environment = configure(root, env,launcher=launcher)
     if app == '4020':
         argv[1:1] = ['-tickrate', str(tickrate), '+gamemode', mode]
@@ -116,9 +164,8 @@ def launch(root, settings):
         target=root.resolve()/'bms/cfg/voltra-coop.cfg'
         backups=root.resolve()/'.voltra/source-next/config-backups'
         defaults=root.resolve()/'bms/cfg/voltra-coop-defaults.cfg'
-        if any(not p.resolve().is_relative_to(root.resolve()) for p in (target,backups,defaults)):raise ValueError('SourceCoop configuration escapes server volume')
         content='mp_teamplay 1\nmp_friendlyfire '+env.get('FRIENDLY_FIRE','0')+'\nmod_forcetouchdata '+env.get('MOD_FORCETOUCHDATA','1')+'\n'
-        if target.exists() and target.read_text()!=content:private_write(backups/(str(time.time_ns())+'.cfg'),target.read_text())
+        if coop_original is not None and coop_original!=content:private_write(backups/(str(time.time_ns())+'.cfg'),coop_original)
         private_write(target,content)
         private_write(defaults,'mp_timelimit 0\nmp_fraglimit 0\nsv_always_run 0\nmp_mapcycle_empty_timeout_seconds 3600\nsourcecoop_homemap "bm_c0a0a"\nsv_tags "custom, coop, sourcecoop"\nsv_cheats 0\nsv_alltalk 1\n')
         private_write(root.resolve()/'bms/cfg/voltra-server.cfg','exec voltra-coop-defaults.cfg\nexec server.cfg\nexec voltra-managed.cfg\nexec voltra-coop.cfg\n')

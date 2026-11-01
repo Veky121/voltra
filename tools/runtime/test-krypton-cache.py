@@ -70,7 +70,7 @@ class CacheTests(unittest.TestCase):
             self.assertIn(file,identity['files'])
 
     def test_actual_installer_import_aliases_preserve_context_bytes(self):
-        stage=Path('.local/java-forks/profiles.json')
+        stage=HERE.parents[1]/'artifacts/game-parity-20261029/krypton-owner/profile.pending.json'
         if not stage.exists():self.skipTest('Generate five-profile stage first')
         script=json.loads(stage.read_text())['minecraft/java/krypton/egg-krypton.json']['egg']['scripts']['installation']['script']
         expected=cache.context()

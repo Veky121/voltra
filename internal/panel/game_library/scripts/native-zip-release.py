@@ -17,6 +17,9 @@ def extract(archive, target, prefix, paths=None):
         for member in source.infolist():
             parts = PurePosixPath(member.filename).parts
             mode = member.external_attr >> 16
+            # Validate every member, including excluded paths and the prefix root.
+            if stat.S_IFMT(mode) not in (0, stat.S_IFDIR, stat.S_IFREG):
+                raise ValueError('ZIP links and special files are unsupported')
             if not parts or member.filename.startswith('/') or '..' in parts or '\\' in member.filename:
                 raise ValueError('Unsafe ZIP release path')
             if prefix is not None:
@@ -29,7 +32,6 @@ def extract(archive, target, prefix, paths=None):
                 parts = parts[1:]
             relative = PurePosixPath(*parts)
             name = relative.as_posix()
-            kind = stat.S_IFMT(mode)
             if str(relative) in seen:
                 raise ValueError('Duplicate ZIP paths are unsupported')
             seen.add(str(relative))
@@ -38,11 +40,6 @@ def extract(archive, target, prefix, paths=None):
                 raise ValueError('ZIP release exceeds extraction limits')
             if paths is not None and not any(name == selected or selected.endswith('/') and name.startswith(selected) for selected in paths):
                 continue
-            # Multi-platform publisher bundles can contain links for another OS.
-            # A trusted path allowlist never extracts them; selected links and
-            # every traversal/duplicate path still fail before publication.
-            if kind not in (0, stat.S_IFDIR, stat.S_IFREG):
-                raise ValueError('ZIP links and special files are unsupported')
             path = target.joinpath(*relative.parts)
             if member.is_dir():
                 path.mkdir(parents=True, exist_ok=True)

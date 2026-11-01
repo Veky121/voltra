@@ -129,14 +129,25 @@ def configure(root,game,env):
         target=confined(root,root/'cfg/server_cfg.ini');native.configure_ini(root,target,{'SERVER':values},confined(root,root/'.voltra/assetto/config-backups'))
         return [str(root/('AssettoServer' if custom else 'acServer'))],(values['ADMIN_PASSWORD'],values['PASSWORD'])
     if game!='ams2':raise ValueError('Unsupported racing recipe')
-    selected=roles(env,['STEAM_PORT','QUERY_PORT']);target=confined(root,root/'server.cfg')
-    values={'name':text(env,'SERVER_NAME','Automobilista2',100),'password':text(env,'SERVER_PASSWORD','',32),
-            'steamPort':selected['STEAM_PORT'],'hostPort':selected['primary'],'queryPort':selected['QUERY_PORT'],'maxPlayerCount':integer(env,'MAX_PLAYERS',16,1,32)}
-    previous=target.read_text(encoding='utf-8-sig');updated=patch_colon_config(previous,values)
+    target,previous,updated,values=plan_ams2(root,env)
     if updated!=previous:
         backup=confined(root,root/'.voltra/ams2/config-backups'/str(time.time_ns()));native.private_write(backup,previous);native.private_write(target,updated)
     else:target.chmod(0o600)
     return ['wine',str(root/'DedicatedServerCmd.exe')],(values['password'],)
+
+
+def plan_ams2(root,env,allow_missing=False):
+    """Validate AMS2 options and publisher grammar without acquisition or writes."""
+    root=Path(root).resolve()
+    selected=roles(env,['STEAM_PORT','QUERY_PORT']);target=confined(root,root/'server.cfg')
+    values={'name':text(env,'SERVER_NAME','Automobilista2',100),'password':text(env,'SERVER_PASSWORD','',32),
+            'steamPort':selected['STEAM_PORT'],'hostPort':selected['primary'],'queryPort':selected['QUERY_PORT'],'maxPlayerCount':integer(env,'MAX_PLAYERS',16,1,32)}
+    text(env,'WINEDEBUG','-all',20)
+    confined(root,root/'.voltra/ams2/config-backups')
+    if allow_missing and not target.exists():return target,None,None,values
+    previous=target.read_text(encoding='utf-8-sig');updated=patch_colon_config(previous,values)
+    return target,previous,updated,values
+
 
 def install_steam(root,game,env,validate=True):
     app=302550 if game=='assetto' else 1338040
@@ -177,6 +188,7 @@ def install(root,game,env):
     if not entry.exists():native.private_write(entry,'; Import your licensed/operator-provided server preset.\n')
 
 def run(root,game,env):
+    if game=='ams2':plan_ams2(root,env,allow_missing=env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1')
     if game in ('assetto','ams2') and env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1':install_steam(root,game,env,validate=env.get('VALIDATE','0')=='1')
     argv,secrets=configure(root,game,env)
     environment=dict(os.environ)

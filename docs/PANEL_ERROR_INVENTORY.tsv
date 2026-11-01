@@ -1,0 +1,269 @@
+file	line	path type
+web/src/admin/eggs.tsx	94	shared error state
+web/src/admin/eggs.tsx	146	catch
+web/src/admin/eggs.tsx	165	shared error state
+web/src/admin/eggs.tsx	216	catch
+web/src/admin/FleetCPU.tsx	27	catch
+web/src/admin/FS25Licences.tsx	10	shared error state
+web/src/admin/FS25Licences.tsx	19	catch
+web/src/admin/GameLicences.tsx	15	shared error state
+web/src/admin/GameLicences.tsx	28	catch
+web/src/admin/GameLicences.tsx	34	catch
+web/src/admin/GameLicences.tsx	50	catch
+web/src/admin/GatewaySubdomains.tsx	9	shared error state
+web/src/admin/GatewaySubdomains.tsx	11	catch
+web/src/admin/infrastructure.tsx	346	catch
+web/src/admin/integrations.tsx	97	shared error state
+web/src/admin/integrations.tsx	120	catch
+web/src/admin/JavaEgg.tsx	37	shared error state
+web/src/admin/JavaEgg.tsx	59	catch
+web/src/admin/JavaRuntimes.tsx	41	shared error state
+web/src/admin/JavaRuntimes.tsx	70	catch
+web/src/admin/MinecraftRuntimeRules.tsx	21	shared error state
+web/src/admin/MinecraftRuntimeRules.tsx	27	throw
+web/src/admin/MinecraftRuntimeRules.tsx	30	catch
+web/src/admin/node-pairing.tsx	70	shared error state
+web/src/admin/node-pairing.tsx	89	catch
+web/src/admin/node-pairing.tsx	115	shared error state
+web/src/admin/node-pairing.tsx	130	catch
+web/src/admin/node-pairing.tsx	394	throw
+web/src/admin/node-pairing.tsx	401	catch
+web/src/admin/node-pairing.tsx	418	throw
+web/src/admin/node-pairing.tsx	421	catch
+web/src/admin/node-pairing.tsx	430	catch
+web/src/admin/ProxyGateways.tsx	41	shared error state
+web/src/admin/ProxyGateways.tsx	47	catch
+web/src/admin/ProxyGateways.tsx	58	throw
+web/src/admin/ProxyGatewayWizard.tsx	13	observed fetch
+web/src/admin/ProxyGatewayWizard.tsx	14	throw
+web/src/admin/ProxyGatewayWizard.tsx	15	throw
+web/src/admin/ProxyGatewayWizard.tsx	25	shared error state
+web/src/admin/ProxyGatewayWizard.tsx	26	catch
+web/src/admin/ProxyGatewayWizard.tsx	32	throw
+web/src/admin/ProxyInstallGuide.tsx	7	shared error state
+web/src/admin/resourceLimits.ts	14	throw
+web/src/admin/resourceLimits.ts	19	throw
+web/src/admin/servers.tsx	106	shared error state
+web/src/admin/servers.tsx	227	catch
+web/src/admin/servers.tsx	551	shared error state
+web/src/admin/servers.tsx	596	catch
+web/src/admin/servers.tsx	827	shared error state
+web/src/admin/servers.tsx	839	catch
+web/src/admin/shared.tsx	24	shared error state
+web/src/admin/shared.tsx	47	catch
+web/src/admin/shared.tsx	318	throw
+web/src/admin/shared.tsx	320	throw
+web/src/admin/shared.tsx	358	shared error state
+web/src/admin/shared.tsx	397	catch
+web/src/admin/shared.tsx	436	shared error state
+web/src/admin/shared.tsx	455	catch
+web/src/App.tsx	22	catch
+web/src/App.tsx	41	catch
+web/src/App.tsx	44	catch
+web/src/client/Appearance.tsx	25	shared error state
+web/src/client/Appearance.tsx	32	catch
+web/src/client/artworkColor.ts	35	catch
+web/src/client/ArtworkProvider.tsx	12	catch
+web/src/client/common.tsx	39	shared error state
+web/src/client/common.tsx	53	catch
+web/src/client/Console.tsx	28	transport callback
+web/src/client/Console.tsx	54	shared error state
+web/src/client/Console.tsx	55	shared error state
+web/src/client/Console.tsx	145	catch
+web/src/client/Console.tsx	250	catch
+web/src/client/Console.tsx	259	catch
+web/src/client/Console.tsx	263	transport callback
+web/src/client/Console.tsx	275	catch
+web/src/client/Console.tsx	305	catch
+web/src/client/consoleFormatting.ts	35	catch
+web/src/client/consoleLifecycle.ts	24	catch
+web/src/client/editorLanguages.ts	37	catch
+web/src/client/editorLanguages.ts	63	catch
+web/src/client/editorLanguages.ts	87	catch, throw
+web/src/client/editorLanguages.ts	88	throw
+web/src/client/FileDocument.tsx	17	catch
+web/src/client/FileDocument.tsx	18	throw
+web/src/client/FileDocument.tsx	28	shared error state
+web/src/client/FileDocument.tsx	48	throw
+web/src/client/FileDocument.tsx	53	observed fetch
+web/src/client/FileDocument.tsx	70	catch
+web/src/client/FileDocument.tsx	71	catch
+web/src/client/FileDocument.tsx	82	observed fetch
+web/src/client/FileDocument.tsx	84	throw
+web/src/client/FileDocument.tsx	89	catch
+web/src/client/FileDocument.tsx	96	observed fetch
+web/src/client/FileDocument.tsx	97	throw
+web/src/client/FileDocument.tsx	100	catch
+web/src/client/FileEditor.tsx	50	catch
+web/src/client/FileEditor.tsx	52	shared error state
+web/src/client/FileEditor.tsx	82	catch
+web/src/client/FileEditor.tsx	87	catch
+web/src/client/FileManager.tsx	38	shared error state
+web/src/client/FileManager.tsx	61	catch
+web/src/client/FileManager.tsx	71	catch
+web/src/client/fileManagerModel.ts	3	throw
+web/src/client/fileManagerModel.ts	19	throw
+web/src/client/FilesV0.tsx	49	shared error state
+web/src/client/FilesV0.tsx	81	throw
+web/src/client/FilesV0.tsx	82	observed fetch
+web/src/client/FilesV0.tsx	83	catch, throw
+web/src/client/FilesV0.tsx	87	catch
+web/src/client/FilesV0.tsx	129	observed fetch
+web/src/client/FilesV0.tsx	130	throw
+web/src/client/fileTransferPaths.ts	5	throw
+web/src/client/fileTransferPaths.ts	6	throw
+web/src/client/fileTransferPaths.ts	7	throw
+web/src/client/FileTransfers.tsx	24	shared error state
+web/src/client/FileTransfers.tsx	41	catch
+web/src/client/FileTransfers.tsx	47	throw
+web/src/client/FileTransfers.tsx	60	catch, observed fetch
+web/src/client/FileTransfers.tsx	68	transport callback
+web/src/client/FileTransfers.tsx	77	catch
+web/src/client/FileTransfers.tsx	81	throw
+web/src/client/FileTransfers.tsx	82	throw
+web/src/client/FileTransfers.tsx	85	catch
+web/src/client/FileTransfers.tsx	90	observed fetch
+web/src/client/FileTransfers.tsx	91	throw
+web/src/client/FileTransfers.tsx	94	catch
+web/src/client/GamePorts.tsx	20	catch
+web/src/client/GamePorts.tsx	45	catch
+web/src/client/GamePorts.tsx	49	catch
+web/src/client/GamePorts.tsx	56	catch
+web/src/client/GamePorts.tsx	64	catch
+web/src/client/GamePorts.tsx	73	catch
+web/src/client/GameQuickSetup.tsx	52	shared error state
+web/src/client/GameQuickSetup.tsx	70	catch
+web/src/client/gameSetupModel.ts	25	throw
+web/src/client/gameSetupModel.ts	26	throw
+web/src/client/gameSetupModel.ts	27	throw
+web/src/client/gameSetupModel.ts	28	throw
+web/src/client/gameSetupModel.ts	29	throw
+web/src/client/gameSetupModel.ts	32	throw
+web/src/client/gameSetupModel.ts	106	throw
+web/src/client/gameSetupModel.ts	109	throw
+web/src/client/JavaSettings.tsx	48	throw
+web/src/client/JavaSettings.tsx	50	throw
+web/src/client/JavaSettings.tsx	102	throw
+web/src/client/JavaSettings.tsx	104	throw
+web/src/client/MinecraftContent.tsx	40	shared error state
+web/src/client/MinecraftContent.tsx	60	catch
+web/src/client/MinecraftContent.tsx	101	shared error state
+web/src/client/MinecraftContent.tsx	108	throw
+web/src/client/MinecraftContent.tsx	110	catch
+web/src/client/MinecraftLibrary.ts	28	catch
+web/src/client/MinecraftSetup.tsx	50	shared error state
+web/src/client/MinecraftSetup.tsx	92	throw
+web/src/client/MinecraftSetup.tsx	95	catch
+web/src/client/Overview.tsx	27	shared error state
+web/src/client/Overview.tsx	105	catch
+web/src/client/Overview.tsx	145	catch
+web/src/client/PendingSettings.tsx	23	shared error state
+web/src/client/PendingSettings.tsx	40	catch
+web/src/client/PrivateSteamMaintenance.tsx	35	shared error state
+web/src/client/PrivateSteamMaintenance.tsx	54	catch
+web/src/client/privateSteamModel.ts	9	throw
+web/src/client/privateSteamModel.ts	11	throw
+web/src/client/privateSteamModel.ts	14	throw
+web/src/client/privateSteamModel.ts	20	throw
+web/src/client/privateSteamModel.ts	21	throw
+web/src/client/privateSteamTemplateModel.ts	21	catch
+web/src/client/privateSteamTemplateModel.ts	26	throw
+web/src/client/privateSteamTemplateModel.ts	31	throw
+web/src/client/privateSteamTemplateModel.ts	44	throw
+web/src/client/privateSteamTemplateModel.ts	57	throw
+web/src/client/privateSteamTemplateModel.ts	66	throw
+web/src/client/privateSteamTemplateModel.ts	69	throw
+web/src/client/ServerAdminTools.tsx	70	throw
+web/src/client/ServerAdminTools.tsx	71	throw
+web/src/client/ServerAdminTools.tsx	76	throw
+web/src/client/ServerAdminTools.tsx	78	throw
+web/src/client/ServerAdminTools.tsx	82	catch, throw
+web/src/client/ServerAdminTools.tsx	84	throw
+web/src/client/ServerAdminTools.tsx	165	shared error state
+web/src/client/ServerAdminTools.tsx	233	catch
+web/src/client/ServerDashboard.tsx	63	catch
+web/src/client/ServerDashboard.tsx	76	shared error state
+web/src/client/ServerDashboard.tsx	101	catch
+web/src/client/ServerStartup.tsx	30	shared error state
+web/src/client/ServerStartup.tsx	65	catch
+web/src/client/ServerStartup.tsx	113	shared error state
+web/src/client/ServerStartup.tsx	127	catch
+web/src/client/ServerStartup.tsx	169	throw
+web/src/client/ServerSubdomain.tsx	12	shared error state
+web/src/client/ServerSubdomain.tsx	15	catch
+web/src/client/ServerSubdomain.tsx	16	catch
+web/src/client/SFTPPassword.tsx	23	throw
+web/src/client/SFTPPassword.tsx	24	throw
+web/src/client/startupSettingsModel.ts	157	throw
+web/src/client/startupSettingsModel.ts	159	throw
+web/src/client/startupSettingsModel.ts	163	throw
+web/src/client/startupSettingsModel.ts	165	throw
+web/src/client/startupSettingsModel.ts	170	throw
+web/src/client/startupSettingsModel.ts	173	throw
+web/src/client/SteamGames.tsx	55	catch
+web/src/client/SteamGames.tsx	58	shared error state
+web/src/client/SteamGames.tsx	74	catch
+web/src/client/SteamGames.tsx	81	throw
+web/src/client/SteamGames.tsx	84	catch
+web/src/client/SteamMaintenance.tsx	42	shared error state
+web/src/client/SteamMaintenance.tsx	53	catch
+web/src/client/SteamMaintenance.tsx	62	catch
+web/src/client/TemplateGames.tsx	80	shared error state
+web/src/client/TemplateGames.tsx	84	catch
+web/src/client/TemplateGames.tsx	120	catch
+web/src/client/Terminal.tsx	69	throw
+web/src/components/AppSidebar.tsx	47	shared error state
+web/src/components/AppSidebar.tsx	54	catch
+web/src/desktop.tsx	16	observed fetch
+web/src/desktop.tsx	18	throw
+web/src/desktop.tsx	34	shared error state
+web/src/desktop.tsx	36	catch
+web/src/desktop.tsx	64	shared error state
+web/src/desktop.tsx	67	catch
+web/src/desktop.tsx	72	catch
+web/src/desktop.tsx	95	catch
+web/src/desktop.tsx	97	shared error state
+web/src/desktop.tsx	101	catch
+web/src/desktop.tsx	103	catch
+web/src/desktop.tsx	115	catch
+web/src/desktopPairing.ts	8	catch
+web/src/desktopPairing.ts	13	catch
+web/src/desktopUpdates.ts	16	observed fetch
+web/src/desktopUpdates.ts	17	throw
+web/src/desktopUpdates.ts	20	catch
+web/src/hooks/liveEvents.ts	22	transport callback
+web/src/hooks/liveEvents.ts	43	catch
+web/src/hooks/liveEvents.ts	46	catch
+web/src/hooks/liveEvents.ts	61	transport callback
+web/src/hooks/preloadRoute.ts	5	catch
+web/src/hooks/queryCache.ts	10	catch
+web/src/hooks/useAPIRequest.ts	51	catch
+web/src/hooks/visiblePoll.ts	10	catch
+web/src/lib.tsx	35	catch
+web/src/lib.tsx	44	catch
+web/src/lib.tsx	49	catch
+web/src/ServerNavigation.tsx	14	shared error state
+web/src/ServerNavigation.tsx	25	catch
+web/src/ServerNavigation.tsx	39	catch
+web/src/ServerNavigation.tsx	47	catch
+web/src/setup.tsx	46	shared error state
+web/src/setup.tsx	113	shared error state
+web/src/setup.tsx	121	catch
+web/src/setup.tsx	130	shared error state
+web/src/setup.tsx	147	catch
+web/src/setup.tsx	161	shared error state
+web/src/setup.tsx	172	throw
+web/src/setup.tsx	174	catch
+web/src/setup.tsx	197	shared error state
+web/src/setup.tsx	210	catch
+web/src/ThemeProvider.tsx	8	throw
+web/src/ThemeProvider.tsx	10	observed fetch
+web/src/ThemeProvider.tsx	11	throw
+web/src/ThemeProvider.tsx	12	throw
+web/src/ThemeProvider.tsx	18	shared error state
+web/src/ThemeProvider.tsx	23	throw
+web/src/ThemeProvider.tsx	25	catch
+web/src/ThemeProvider.tsx	34	throw
+web/src/ThemeProvider.tsx	35	throw
+web/src/ThemeProvider.tsx	36	catch, throw
+web/src/ui/CopyButton.tsx	18	catch

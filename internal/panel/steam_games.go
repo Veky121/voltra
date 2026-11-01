@@ -40,7 +40,7 @@ var steamGameSpecs = []steamGameSpec{
 	{ID: "satisfactory", Name: "Satisfactory", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb151", AppID: 1690800, Memory: 12288, MinimumMemory: 8192, Players: 4, MaximumPlayers: 2147483647, Disk: 20480, Image: steamLaunchImage, Description: "Build a factory with friends.", AfterSetup: "Open Satisfactory's Server Manager, add the server address, claim it and create or load a session.", Startup: "./FactoryServer.sh -Port={{SERVER_PORT}} -ReliablePort=8888 -unattended", Ready: "Engine Initialization", Ports: 2, Prepare: (*App).satisfactoryAfterInstall},
 	{ID: "palworld", Name: "Palworld", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb152", AppID: 2394010, Memory: 16384, MinimumMemory: 8192, Players: 16, MaximumPlayers: 32, Disk: 32768, Image: steamLaunchImage, Description: "Create a persistent world with simple gameplay settings.", AfterSetup: "Join using the server address and game port. Change settings and upload saves from Quick setup.", Startup: "./PalServer.sh -port={{SERVER_PORT}}", Ready: "Setting breakpad minidump AppID = 2394010", Ports: 1, PasswordMaximum: 128},
 	{ID: "valheim", Name: "Valheim", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb153", AppID: 896660, Memory: 4096, MinimumMemory: 2048, Players: 10, MaximumPlayers: 10, Disk: 8192, Image: "ghcr.io/ptero-eggs/games:valheim", Description: "Explore a persistent Viking world with friends.", AfterSetup: "Join by IP using the game port and your server password. The server starts private, with Steam networking. Stop it before replacing world files.", Startup: valheimStartup, Ready: "DungeonDB Start", Ports: 2, ConsecutivePorts: true, FixedPlayers: true, PasswordMinimum: 5, PasswordMaximum: 20, Prepare: (*App).valheimAfterInstall},
-	{ID: "7days", Name: "7 Days to Die", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb154", AppID: 294420, Memory: 8192, MinimumMemory: 8192, Players: 8, MaximumPlayers: 2147483647, Disk: 32768, Image: steamLaunchImage, Description: "Survive in a persistent zombie world.", AfterSetup: "Join by the server address and game port. The server starts unlisted. Manage world settings from Quick setup and back up saves before changing worlds.", Startup: sevenDaysStartup, Ready: "VOLTRA_7DAYS_CONSOLE_READY", Stop: "shutdown", Ports: 4, ConsecutivePorts: true, PasswordMaximum: 128, Prepare: (*App).sevenDaysAfterInstall},
+	{ID: "7days", Name: "7 Days to Die", EggUUID: "6ed6972a-865a-473a-bc9e-22ff682bb154", AppID: 294420, Memory: 8192, MinimumMemory: 8192, Players: 8, MaximumPlayers: 32, Disk: 32768, Image: steamLaunchImage, Description: "Survive in a persistent zombie world.", AfterSetup: "Join by the server address and game port. The server starts unlisted. Manage world settings from Quick setup and back up saves before changing worlds.", Startup: sevenDaysStartup, Ready: "VOLTRA_7DAYS_CONSOLE_READY", Stop: "shutdown", Ports: 4, ConsecutivePorts: true, PasswordMaximum: 128, Prepare: (*App).sevenDaysAfterInstall},
 }
 
 func steamGameSpecFor(game string) (steamGameSpec, bool) {
@@ -191,7 +191,7 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 		minimumPlayers = spec.Players
 	}
 	options := steamGameSummary(spec)
-	for key, value := range (M{"id": spec.ID, "name": spec.Name, "can_install": boolean(u["root_admin"]), "nodes": nodes, "defaults": M{"memory": spec.Memory, "max_players": spec.Players}, "minimum_memory": spec.MinimumMemory, "maximum_memory": 131072, "minimum_players": minimumPlayers, "maximum_players": spec.MaximumPlayers, "presets": []M{{"value": "default", "label": "Standard"}}, "help": steamGameHelp(spec.ID)}) {
+	for key, value := range (M{"id": spec.ID, "name": spec.Name, "can_install": boolean(u["root_admin"]), "nodes": nodes, "defaults": M{"memory": spec.Memory, "disk": spec.Disk, "max_players": spec.Players}, "minimum_memory": spec.MinimumMemory, "maximum_memory": 131072, "minimum_players": minimumPlayers, "maximum_players": spec.MaximumPlayers, "presets": []M{{"value": "default", "label": "Standard"}}, "help": steamGameHelp(spec.ID)}) {
 		options[key] = value
 	}
 	options["advanced_fields"] = steamCatalogFieldRows(spec.ID)
@@ -205,10 +205,10 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 
 type steamGameInput struct {
 	Name, RequestID, Password string
-	GameName                  string `json:",omitempty"`
-	NodeID, Memory, Players   int64
-	Catalog                   *steamCatalogConfiguration
-	StartOnCompletion         bool `json:"-"`
+	GameName string `json:",omitempty"`
+	NodeID, Memory, Players             int64
+	Catalog                             *steamCatalogConfiguration
+	StartOnCompletion                   bool `json:"-"`
 }
 
 var steamRequestID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)

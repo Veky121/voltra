@@ -4,3 +4,8 @@ dialog.modal-backdrop::backdrop{background:transparent}
 dialog.modal-backdrop>.modal{flex-shrink:0;max-height:calc(100dvh - 48px);overscroll-behavior:contain}
 dialog.mc-dialog{overscroll-behavior:contain}
 @media(max-width:760px){dialog.modal-backdrop>.modal{max-height:calc(100dvh - 24px)}}
+
+/* Mira dialog composition: retain room for existing forms and nested menus. */
+.voltra-dialog[data-slot=dialog-content]{z-index:260;width:min(680px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 48px);overflow-y:auto;background:var(--scn-popover,var(--ui-surface));color:var(--text)}
+[data-slot=dialog-overlay]{z-index:259}
+.voltra-dialog>[data-slot=dialog-header]{padding-right:24px}

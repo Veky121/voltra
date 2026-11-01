@@ -14,6 +14,11 @@ def quote(value):
     return '"'+value.replace('\\','\\\\').replace('"','\\"')+'"'
 
 def configure(root,env,require_license=True):
+    root=root.resolve();cfg=root/'server.cfg'
+    if cfg.is_symlink() or (cfg.exists() and not cfg.is_file()):raise ValueError('server.cfg must be a regular native file')
+    raw=cfg.read_bytes().decode('utf-8') if cfg.exists() else ''
+    parser=module('fivem-cfg')
+    env=parser.native_environment(raw,env)
     common=module('gta-runtime');primary,ports=common.allocated(env)
     lan=common.number(env,'LAN_ONLY',1,0,1);txadmin=common.number(env,'TXADMIN_ENABLE',0,0,1)
     license=common.text(env,'FIVEM_LICENSE',env.get('CFX_LICENSE',''),256)
@@ -31,16 +36,23 @@ def configure(root,env,require_license=True):
     # Retain the original container path API and allow only owned descendants.
     path=root/'txData' if txdata=='/home/container/txData' else (Path(txdata) if Path(txdata).is_absolute() else root/txdata)
     if not path.resolve().is_relative_to(root):raise ValueError('TXHOST_DATA_PATH escapes owned volume')
+    maximum=32 if game=='redm' else 48
+    values={'endpoint_add_tcp':quote('0.0.0.0:'+str(primary)),
+            'endpoint_add_udp':quote('0.0.0.0:'+str(primary)),
+            'sv_hostname':quote(common.text(env,'SERVER_HOSTNAME','My new FXServer!',128)),
+            'sv_maxclients':str(common.number(env,'MAX_PLAYERS',32 if maximum==32 else 48,1,maximum)),
+            'sv_lan':'true' if lan else 'false',
+            'gamename':quote('rdr3' if game=='redm' else 'gta5'),
+            'sv_licensekey':quote(license),
+            'steam_webapikey':quote(common.text(env,'STEAM_WEBAPIKEY','none',256))}
+    # Validate effective values above, but retain the exact operator token bytes.
+    for _,key,_ in parser.parse(raw):
+        canonical='sv_maxclients' if key=='sv_maxplayers' else key
+        if canonical not in ('endpoint_add_tcp','endpoint_add_udp'):values.pop(canonical,None)
+    content=parser.render(raw,values)
     if txadmin:path.mkdir(parents=True,exist_ok=True)
-    cfg=root/'server.cfg';raw=cfg.read_text() if cfg.is_file() else ''
-    keys=['sv_licenseKey','steam_webApiKey','sv_maxclients','sv_maxplayers','sv_hostname','sv_lan','gamename']
-    pattern=re.compile(r'^\s*(?:(?:set|setr|sets)\s+)?(?:'+('|'.join(keys))+r')\s+',re.I)
-    # Preserve comments, resource startup, ACE/ACL/RCON and every other convar.
-    lines=[line for line in raw.splitlines() if not pattern.match(line) and not re.match(r'^\s*endpoint_add_(?:tcp|udp)\s+',line,re.I)]
-    maximum=32 if env.get('VOLTRA_CFX_GAME')=='redm' else 48
-    lines.extend(['endpoint_add_tcp '+quote('0.0.0.0:'+str(primary)),'endpoint_add_udp '+quote('0.0.0.0:'+str(primary)),'sv_hostname '+quote(common.text(env,'SERVER_HOSTNAME','My new FXServer!',128)),'sv_maxclients '+str(common.number(env,'MAX_PLAYERS',32 if maximum==32 else 48,1,maximum)),'set sv_lan '+('true' if lan else 'false'),'set gamename '+quote('rdr3' if game=='redm' else 'gta5'),'sv_licenseKey '+quote(license),'set steam_webApiKey '+quote(common.text(env,'STEAM_WEBAPIKEY','none',256))])
-    common.write_config(root,cfg,'\n'.join(lines)+'\n')
-    return {'txadmin':bool(txadmin),'txport':txport,'txdata':path,'game':game,'lan':bool(lan),'primary':primary}
+    common.write_config(root,cfg,content)
+    return {'txadmin':bool(txadmin),'txport':txport,'txdata':path,'game':game,'lan':bool(lan),'primary':primary,'credentials':[license,env.get('STEAM_WEBAPIKEY','')]}
 
 def run(root,env):
     settings=configure(root,env);env=dict(env);env.pop('PYTHONHOME',None)
@@ -48,6 +60,6 @@ def run(root,env):
     argv=[str(server/'ld-musl-x86_64.so.1'),'--library-path',':'.join(str(engine/p) for p in ['usr/lib/v8','lib','usr/lib']),'--',str(server/'FXServer'),'+set','citizen_dir',str(server/'citizen'),'+set','sv_lan','true' if settings['lan'] else 'false']
     if settings['txadmin']:argv.extend(['+set','txAdminPort',str(settings['txport']),'+set','txDataPath',str(settings['txdata']),'+set','gamename','rdr3' if settings['game']=='redm' else 'gta5'])
     else:argv.extend(['+exec','server.cfg'])
-    return module('native-console').run(root,argv,env,'quit',credentials=[env.get('FIVEM_LICENSE',''),env.get('CFX_LICENSE',''),env.get('STEAM_WEBAPIKEY','')],terminal_input=True)
+    return module('native-console').run(root,argv,env,'quit',credentials=settings['credentials'],terminal_input=True)
 
 if __name__=='__main__':sys.exit(run(Path(os.environ.get('VOLTRA_SERVER_ROOT','/home/container')).resolve(),os.environ))

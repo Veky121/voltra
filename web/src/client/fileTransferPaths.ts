@@ -11,3 +11,7 @@ export function uploadTarget(directory: string, relativePath: string, name: stri
 export function transferIdentity(base: string, directory: string, id: string) {
   return `${encodeURIComponent(base)}:${encodeURIComponent(directory)}:${id}`;
 }
+
+export function transferDestination(openDirectory:string,selected:string[],isDirectory:(path:string)=>boolean){
+  return selected.length===1&&isDirectory(selected[0])?selected[0]:openDirectory;
+}

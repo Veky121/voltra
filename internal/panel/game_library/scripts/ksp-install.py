@@ -87,6 +87,28 @@ def owned_git_environment(environment,paths):
         environment['GIT_CONFIG_KEY_'+str(index)]='safe.directory'
         environment['GIT_CONFIG_VALUE_'+str(index)]=str(path)
 def install(root,game,env):
+    if game=='dmp':
+        # Refuse unsafe existing installer/output paths before acquisition or writes.
+        candidate=Path(root).resolve()
+        for relative in ('.voltra','.voltra/ksp','Config','Universe','Plugins','Backups','Logs','DMPModControl.txt','DMPServer.dll'):
+            path=candidate/relative
+            if path.is_symlink() or not path.resolve().is_relative_to(candidate):raise ValueError('Unsafe DMP installation path')
+            if path.exists() and relative in ('DMPModControl.txt','DMPServer.dll') and not path.is_file():raise ValueError('Invalid DMP installation file')
+        private_candidate=candidate/'.voltra/ksp'
+        if private_candidate.exists():
+            for path in private_candidate.rglob('*'):
+                if path.is_symlink():raise ValueError('Unsafe DMP installer state link')
+    if game=='lmp':
+        version=env.get('LMP_VERSION','') or '0.29.2'
+        if not re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.-]{0,19}',version):raise ValueError('Choose an exact public LMP release tag')
+        candidate=Path(root).resolve()
+        for relative in ('.voltra','.voltra/ksp','LMPServer'):
+            path=candidate/relative
+            if path.is_symlink() or not path.resolve().is_relative_to(candidate) or (path.exists() and not path.is_dir()):raise ValueError('Unsafe LMP installation directory')
+        for folder in (candidate/'.voltra/ksp',candidate/'LMPServer'):
+            if folder.exists():
+                for path in folder.rglob('*'):
+                    if path.is_symlink():raise ValueError('Unsafe LMP installation link')
     root=Path(root).resolve();private=root/'.voltra/ksp';private.mkdir(parents=True,exist_ok=True)
     if not private.resolve().is_relative_to(root):raise ValueError('KSP installer state escapes volume')
     if game=='dmp':
@@ -103,10 +125,17 @@ def install(root,game,env):
         for path,digest in modules.items():
             if subprocess.check_output(['git','-C',str(source/path),'rev-parse','HEAD'],env=buildenv,text=True).strip()!=digest:raise ValueError('DMP dependency pin mismatch')
         dmp_patch(source);output=private/'dmp-output';subprocess.run(['dotnet','publish',str(source/'Server/Server.csproj'),'-c','Release','--self-contained','false','-o',str(output),'-m:1','-p:UseSharedCompilation=false'],check=True,env=buildenv)
+        publications=[]
         for path in output.rglob('*'):
+            if path.is_symlink():raise ValueError('Unsafe DMP published link')
             if not path.is_file():continue
             destination=root/path.relative_to(output)
             if not destination.resolve().is_relative_to(root):raise ValueError('DMP output escapes volume')
+            if path.relative_to(output).parts[0].casefold() in ('config','universe','plugins','backups','logs') or path.name.casefold()=='dmpmodcontrol.txt':continue
+            if destination.is_symlink() or (destination.exists() and not destination.is_file()):raise ValueError('Unsafe DMP output destination')
+            publications.append((path,destination))
+        if not any(destination==root/'DMPServer.dll' for _,destination in publications):raise ValueError('DMP publish omitted DMPServer.dll')
+        for path,destination in publications:
             destination.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,destination)
         shutil.copyfile(source/'LICENCE.txt',private/'DMP-LICENCE.txt')
         patches={str(path):subprocess.check_output(['git','-C',str(path),'diff'],env=buildenv,text=True) for path in [source,*[source/name for name in modules]]}

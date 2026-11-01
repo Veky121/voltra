@@ -93,8 +93,29 @@ def seed_config(root,game,data):
 def install(root,game,env):
     root=Path(root).resolve();jar=env.get('SERVER_JARFILE','server.jar')
     if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,74}\.jar',jar):raise ValueError('Use a confined jar filename ending .jar')
+    if game=='velocity':
+        # Refuse invalid operator state before publisher metadata or jar acquisition.
+        import tomllib
+        for name in [jar,'velocity.toml','forwarding.secret','.voltra/proxy-family/release.json','.voltra/proxy-family/cache']:
+            path=confined(root,name)
+            for part in [path,*path.parents]:
+                if part==root:break
+                if part.is_symlink():raise ValueError('Velocity installation paths must not be symlinks')
+            if path.exists() and (not path.is_dir() if name.endswith('/cache') else not path.is_file()):
+                raise ValueError('Invalid Velocity installation path type')
+            for parent in path.parents:
+                if parent==root:break
+                if parent.exists() and not parent.is_dir():raise ValueError('Invalid Velocity installation parent')
+        config=root/'velocity.toml'
+        if config.exists():tomllib.loads(config.read_text(encoding='utf-8'))
     release=select_release(game,env,jar);target=confined(root,jar);receipt=confined(root,'.voltra/proxy-family/release.json')
     data=verified(root,release);main,major=jar_info(data)
+    if game=='velocity' and not (root/'velocity.toml').exists():
+        # Validate the seed before replacing a working jar or writing configuration.
+        with zipfile.ZipFile(io.BytesIO(data)) as package:
+            seed=package.getinfo('default-velocity.toml')
+            if seed.file_size>1024**2:raise ValueError('Velocity default configuration too large')
+            tomllib.loads(package.read(seed).decode('utf-8'))
     write(target,data);seed_config(root,game,data)
     if game in ['waterfall','travertine']:
         for key,asset in release.get('modules',{}).items():

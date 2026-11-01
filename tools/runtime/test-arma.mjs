@@ -1,11 +1,12 @@
 import fs from'node:fs';import path from'node:path';import assert from'node:assert/strict';import{spawnSync}from'node:child_process';
-const image=spawnSync('docker',['image','inspect','python:3.13-slim','--format','{{.Id}}'],{encoding:'utf8',windowsHide:true});if(image.status)throw Error('Existing fixture Python image required');
-const result=spawnSync('docker',['run','--rm','--network','none','--memory','256m','--mount',`type=bind,source=${path.resolve('.')},target=/workspace,readonly`,'-w','/workspace',image.stdout.trim(),'python3','-B','tools/runtime/test-arma.py'],{encoding:'utf8',windowsHide:true});console.log(result.stdout+result.stderr);if(result.status)process.exit(result.status);
-const profiles=JSON.parse(fs.readFileSync('.local/arma-games/profiles.json')),catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));assert.equal(Object.keys(profiles).length,2);
+const image=spawnSync('docker',['--context','desktop-linux','image','inspect','python:3.13-slim','--format','{{.Id}}'],{encoding:'utf8',windowsHide:true});if(image.status)throw Error('Existing fixture Python image required');
+const result=spawnSync('docker',['--context','desktop-linux','run','--rm','--network','none','--memory','256m','--cpus','1','--read-only','--tmpfs','/tmp:rw,exec,size=64m','--mount',`type=bind,source=${path.resolve('.')},target=/workspace,readonly`,'-w','/workspace',image.stdout.trim(),'python3','-B','tools/runtime/test-arma.py'],{encoding:'utf8',windowsHide:true});console.log(result.stdout+result.stderr);if(result.status)process.exit(result.status);
+const all=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const profiles=Object.fromEntries(['arma/arma3/egg-arma3.json','arma/arma_reforger/egg-arma-reforger.json'].map(key=>[key,all[key]])),catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));assert(Object.values(profiles).every(Boolean));
 for(const[key,p]of Object.entries(profiles)){
  const original=catalog.entries.find(x=>x.path===key);assert.equal(p.upstream_sha256,original.sha256);
  for(const v of original.egg.variables)assert(p.egg.variables.some(candidate=>candidate.env_variable===v.env_variable),'Lost original '+v.env_variable);
- for(const name of['arma-native.py','arma-releases.json','native-config.py','steam-template.py','bundle-debian-python.py'])assert(p.egg.scripts.installation.script.includes(fs.readFileSync('internal/panel/game_library/scripts/'+name,'utf8')),'Stale embedded '+name);
+ for(const name of['arma-native.py','arma-releases.json','native-config.py','steam-template.py','bundle-debian-python.py'])assert(p.egg.scripts.installation.script.replaceAll('\r\n','\n').includes(fs.readFileSync('internal/panel/game_library/scripts/'+name,'utf8').replaceAll('\r\n','\n')),'Stale embedded '+name);
  assert.equal(p.egg.config.files,'{}');assert.equal(p.egg.config.stop,'^SIGTERM');
  assert(p.egg.features.includes('voltra_steam_template'));assert(p.setup_steps.join(' ').includes('native'));
 }

@@ -1,0 +1,7 @@
+.dev-preview-controls{position:fixed;z-index:70;bottom:52px;right:12px;display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--scn-border,#424654);border-radius:10px;background:var(--scn-popover,#1b202b);color:var(--scn-foreground,#eceef3);box-shadow:0 4px 16px #0003;font:12px/1.4 system-ui,sans-serif}
+.dev-preview-controls.is-demo{left:50%;right:auto;bottom:12px;transform:translateX(-50%)}
+.dev-preview-controls strong{color:var(--scn-primary,#b8a1ff)}
+/* Leave room to scroll form footers clear of the fixed demo controls. */
+html[data-dev-demo=true] .server-admin-tools{padding-bottom:100px}
+.dev-preview-controls span{color:var(--scn-muted-foreground,#a5adbb)}
+@media(max-width:600px){.dev-preview-controls.is-demo{width:max-content;max-width:calc(100% - 16px);gap:8px}.dev-preview-controls.is-demo span{max-width:110px;font-size:11px}}

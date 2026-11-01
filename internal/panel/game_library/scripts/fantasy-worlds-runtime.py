@@ -253,7 +253,43 @@ def portal(root, env):
     return root, [sys.executable, str(confined(root, '.voltra/fantasy_worlds_wine.py'))], '\x03', credentials, b'VOLTRA_PORTAL_READY'
 
 
-def solace(root, env):
+def preserved_json(source, value):
+    """Replace changed scalar tokens only; retain unknown JSON bytes and numbers."""
+    decoder = json.JSONDecoder()
+    edits = []
+    def white(i):
+        while i < len(source) and source[i].isspace(): i += 1
+        return i
+    def visit(i, wanted):
+        i = white(i)
+        old, end = decoder.raw_decode(source, i)
+        if old == wanted: return end
+        if isinstance(old, dict) and isinstance(wanted, dict):
+            cursor = white(i + 1)
+            found = set()
+            while cursor < end and source[cursor] != '}':
+                key, cursor = decoder.raw_decode(source, cursor)
+                cursor = white(cursor)
+                if source[cursor] != ':': raise ValueError('Invalid JSON object')
+                cursor = white(cursor + 1)
+                if key not in wanted: raise ValueError('JSON key deletion unsupported')
+                cursor = white(visit(cursor, wanted[key]))
+                found.add(key)
+                if source[cursor] == ',': cursor = white(cursor + 1)
+            additions = {k:v for k,v in wanted.items() if k not in found}
+            if additions:
+                content = json.dumps(additions, ensure_ascii=False, allow_nan=False)[1:-1]
+                edits.append((end-1, end-1, (',' if found else '') + content))
+        else:
+            edits.append((i, end, json.dumps(wanted, ensure_ascii=False, allow_nan=False)))
+        return end
+    visit(0, value)
+    for start, end, replacement in sorted(edits, reverse=True):
+        source = source[:start] + replacement + source[end:]
+    return source
+
+def solace_plan(root, env):
+    """Read-only validation, shared by install and start before acquisition."""
     primary, query = port_values(env, 'QUERY_PORT')
     path = confined(root, SOLACE + '/servercfg.dat')
     value = read_json(path) if path.exists() else defaults()['solace']
@@ -268,8 +304,15 @@ def solace(root, env):
     integer(value.get('autoRestart'), 0, 2147483647)
     credentials = [text(value.get(key, ''), 1024) for key in ('password', 'adminPassword', 'moderatorPassword')]
     value.update(port=primary, steamQueryPort=query)
+    # Resolve the executable before any config publication as well.
+    confined(root, 'Solace Crafting.x86_64')
+    return path, value, original, credentials
+
+
+def solace(root, env):
+    path, value, original, credentials = solace_plan(root, env)
     if not path.exists() or value != original:
-        update_file(root, path, (json.dumps(value, ensure_ascii=False, indent=2) + '\n').encode())
+        update_file(root, path, (preserved_json(path.read_bytes().decode('utf-8'), value) if path.exists() else json.dumps(value, ensure_ascii=False, indent=2) + '\n').encode())
     else:
         path.chmod(0o600)
     return root, [str(confined(root, 'Solace Crafting.x86_64')), '-batchmode', '-nographics', '-logFile', '-'], '\x03', credentials, b' server started . (True)'

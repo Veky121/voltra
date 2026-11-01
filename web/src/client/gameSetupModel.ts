@@ -3,12 +3,12 @@ export type SteamGame = string;
 export type GameProfile = {id: string; name: string; description: string; after_setup: string; ports: number; consecutive_ports: boolean; password: {enabled: boolean; required: boolean; min_length: number; max_length: number}};
 export type Choice = {value: string; label: string};
 export type GameHelp = {label: string; url?: string; text?: string};
-export type SteamAdvancedField = {key: string; label: string; group?: string; help?: string; type: 'text' | 'integer' | 'number' | 'boolean' | 'select'; default: string; required?: boolean; max_length?: number; options?: string[]; secret?: boolean; min?: number; max?: number; description?: string};
+export type SteamAdvancedField = {key: string; label: string; type: 'text' | 'integer' | 'number' | 'boolean' | 'select'; default: string; required?: boolean; max_length?: number; options?: string[]; secret?: boolean; min?: number; max?: number; description?: string};
 export type SetupNode = {id: string | number; name: string; free_allocations?: number; automatic_ports?: boolean; setup_available?: boolean; unavailable_reason?: string; available_memory?: number; available_disk?: number};
 export type SteamOptions = GameProfile & {
   id: SteamGame; name: string; can_install: boolean;
   nodes: SetupNode[];
-  defaults: {memory: number; max_players: number};
+  defaults: {memory: number; disk?: number; max_players: number};
   minimum_memory: number; maximum_memory: number;
   minimum_players: number; maximum_players: number;
   presets: Choice[]; help: GameHelp[];
@@ -35,7 +35,7 @@ export function steamAdvancedEnvironment(fields: SteamAdvancedField[], draft: Re
   }));
 }
 export type QuickValue = string | number | boolean | null;
-export type QuickField = {key: string; label: string; group?: string; help?: string; type: 'text' | 'number' | 'boolean' | 'select' | 'readonly' | 'list'; readonly?: boolean; value: QuickValue; options?: Choice[]; min?: number; max?: number; secret?: boolean; configured?: boolean; required?: boolean};
+export type QuickField = {key: string; label: string; group?: string; type: 'text' | 'number' | 'boolean' | 'select' | 'readonly' | 'list'; readonly?: boolean; value: QuickValue; options?: Choice[]; min?: number; max?: number; secret?: boolean; configured?: boolean; required?: boolean; help?: string};
 export type QuickSetup = {game: string; fields: QuickField[]; folders: {label: string; path: string; description?: string}[]; help: GameHelp[]; requires_stop: boolean; revision: string};
 export type SteamJob = {id: string; operation: string; status: string; stage: string; detail: string; created_at: string; restart?: boolean; started_at?: string | null; completed_at?: string | null; error?: string; logs?: {stage: string; detail: string; created_at: string}[]};
 export type SteamStatus = {supported: boolean; game: string; app_id: number; branch: string; mode: 'on_start' | 'scheduled' | 'off'; check_interval_seconds: number; last_checked_at?: string | null; last_attempt_at?: string | null; last_failed_at?: string | null; installed_build: string; latest_build: string; update_available: boolean; needs_repair: boolean; current_job?: SteamJob | null; jobs: SteamJob[]; node_available: boolean};
@@ -57,8 +57,10 @@ export function gameMemoryBudget(maximum: number, node?: SetupNode): number {
 export function gameResourceBudget(maximum: number, available?: number): number {
   return typeof available === 'number' && Number.isFinite(available) ? Math.max(0, Math.min(maximum, Math.floor(available))) : maximum;
 }
-export function gameInitialNode(nodes: SetupNode[]): SetupNode | undefined {
-  return nodes.find(node => node.setup_available !== false && (node.automatic_ports === true || node.free_allocations === undefined || node.free_allocations > 0)) ?? nodes[0];
+export function gameInitialNode(nodes: SetupNode[], defaults?: {memory: number; disk?: number}): SetupNode | undefined {
+  const viable = nodes.filter(node => node.setup_available !== false && (node.automatic_ports === true || node.free_allocations === undefined || node.free_allocations > 0));
+  const fitting = defaults && viable.find(node => gameResourceBudget(Number.MAX_SAFE_INTEGER, node.available_memory) >= defaults.memory && (defaults.disk === undefined || gameResourceBudget(Number.MAX_SAFE_INTEGER, node.available_disk) >= defaults.disk));
+  return fitting || viable[0] || nodes[0];
 }
 export function steamMemoryWarning(options: SteamOptions, memory: number | null): string | null {
   if (memory === null || memory < options.minimum_memory || memory > options.maximum_memory || memory >= options.defaults.memory) return null;

@@ -2,6 +2,7 @@ package panel
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -106,5 +107,20 @@ func TestGameNetworkFRPOwnershipIntegration(t *testing.T) {
 	wildcard, err := a.createGameFRPRoute(ctx, node, server, "0.0.0.0", 25567, "tcp")
 	if err != nil || str(wildcard["local_ip"]) != "100.107.3.95" || num(wildcard["allocation_id"]) != 9913 {
 		t.Fatalf("wildcard target did not retain allocation ownership: %v %v", wildcard, err)
+	}
+}
+
+func TestGameNetworkUnavailableDoesNotDiagnoseVersion(t *testing.T) {
+	for _, capabilities := range []map[string]bool{nil, {"network-v1": false}} {
+		a := &App{}
+		a.connectors().controls[1] = &connectorControl{capabilities: capabilities}
+		got, err := a.probeGamePortAvailability(context.Background(), M{"id": int64(1)}, "0.0.0.0", []int64{27015})
+		if err != nil || str(got["status"]) != "unverified" {
+			t.Fatalf("%v %v", got, err)
+		}
+		detail := str(got["detail"])
+		if !strings.Contains(detail, "availability is unknown") || !strings.Contains(detail, "only if") || !strings.Contains(detail, "forwarding separately") {
+			t.Fatal(detail)
+		}
 	}
 }

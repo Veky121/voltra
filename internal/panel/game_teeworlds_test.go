@@ -14,7 +14,7 @@ func TestTeeworldsReviewedSettings(t *testing.T) {
 			entry = candidate
 		}
 	}
-	if entry.Profile != "teeworlds-0.7.5-console-v1" || len(entry.Platforms) != 1 || entry.Platforms[0] != "linux/amd64" {
+	if entry.Profile != "teeworlds-0.7.5-file-authority-v2" || len(entry.Platforms) != 1 || entry.Platforms[0] != "linux/amd64" {
 		t.Fatal("profile or platform missing")
 	}
 	egg, variables, err := parseEggDocument(entry.Egg)

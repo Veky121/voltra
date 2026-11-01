@@ -61,27 +61,26 @@ func TestFileValidationInvalidRequestsNeverReachWings(t *testing.T) {
 	}
 }
 
-func TestFilePullLimitSharedByServerAndExpires(t *testing.T) {
+func TestFilePullLimitPerUserAndExpires(t *testing.T) {
 	f := operationsFixtureNew(t)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 30; i++ {
 		user := f.owner
-		if i%2 == 1 {
-			user = f.admin
-		}
+
 		operationsExpect(t, f.request("POST", f.serverPath("/files/pull"), M{"url": "https://example.com/a"}, user), 204)
 	}
-	w := f.request("POST", f.serverPath("/files/pull"), M{"url": "https://example.com/a"}, f.admin)
+	w := f.request("POST", f.serverPath("/files/pull"), M{"url": "https://example.com/a"}, f.owner)
 	operationsExpect(t, w, http.StatusTooManyRequests)
-	if seconds, err := strconv.Atoi(w.Header().Get("Retry-After")); err != nil || seconds < 1 || seconds > 600 {
+	if seconds, err := strconv.Atoi(w.Header().Get("Retry-After")); err != nil || seconds < 1 || seconds > 60 {
 		t.Fatalf("bad retry header: %q", w.Header().Get("Retry-After"))
 	}
 	f.mu.Lock()
 	calls := len(f.calls)
 	f.mu.Unlock()
-	if calls != 5 {
+	if calls != 30 {
 		t.Fatalf("throttled request reached daemon: %d", calls)
 	}
-	if err := f.a.exec(context.Background(), "UPDATE settings SET value=jsonb_set(value,'{expires}','0'::jsonb) WHERE key=$1", "rate:file-pull:"+str(f.server["uuid"])); err != nil {
+	operationsExpect(t, f.request("POST", f.serverPath("/files/pull"), M{"url": "https://example.com/a"}, f.admin), 204)
+	if err := f.a.exec(context.Background(), "UPDATE settings SET value=jsonb_set(value,'{expires}','0'::jsonb) WHERE key=$1", "rate:file-pull-v2:"+str(f.server["uuid"])+":"+strconv.FormatInt(num(f.owner["id"]), 10)); err != nil {
 		t.Fatal(err)
 	}
 	operationsExpect(t, f.request("POST", f.serverPath("/files/pull"), M{"url": "https://example.com/a"}, f.owner), 204)
@@ -90,8 +89,8 @@ func TestFilePullLimitSharedByServerAndExpires(t *testing.T) {
 func TestFilePullLimitConcurrentAtomicity(t *testing.T) {
 	f := operationsFixtureNew(t)
 	var wait sync.WaitGroup
-	statuses := make(chan int, 12)
-	for i := 0; i < 12; i++ {
+	statuses := make(chan int, 36)
+	for i := 0; i < 36; i++ {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
@@ -111,7 +110,7 @@ func TestFilePullLimitConcurrentAtomicity(t *testing.T) {
 			t.Fatalf("unexpected status %d", status)
 		}
 	}
-	if success != 5 || limited != 7 {
+	if success != 30 || limited != 6 {
 		t.Fatalf("concurrent limit bypassed: %d accepted, %d limited", success, limited)
 	}
 }

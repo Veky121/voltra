@@ -63,7 +63,10 @@ def operator_files(root):
 
 
 def install(root,env):
-    root=Path(root).resolve();identity(env);mode=engineering.choice(env,'INSTALL_MODE','steam',('steam','operator_files'))
+    root=Path(root).resolve();identity(env);typed_environment(env);ports(env)
+    mode=engineering.choice(env,'INSTALL_MODE','steam',('steam','operator_files'))
+    # Refuse unsafe active/template paths before acquisition or preservation writes.
+    for name in (CONFIG,TEMPLATE):shared.confined(root,root/name)
     if mode=='steam':steam.arguments(root,2058450,env,platform='windows')
     else:operator_files(root)
     with shared.preserve(root):

@@ -1,3 +1,5 @@
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
 import './games-ui.css';
 import {panelArtwork} from './artworkLibrary';
 import {useArtworkLibrary} from './ArtworkProvider';
@@ -33,11 +35,11 @@ export function GameLibraryCard({name,subtitle,artwork,to,onClick,note,noteTitle
     {disabledReason&&<span className="library-card-action">{disabledReason}</span>}
   </>;
   return <article className="library-card games-ui">
-    {to&&!disabledReason?<Link className="library-card-main" to={to}>{content}</Link>:onClick&&!disabledReason?<button type="button" className="library-card-main" onClick={onClick} aria-haspopup="dialog">{content}</button>:<div className="library-card-main library-card-main--disabled" aria-disabled="true">{content}</div>}
+    {to&&!disabledReason?<Link className="library-card-main" to={to}>{content}</Link>:onClick&&!disabledReason?<MiraAction type="button" className="library-card-main" onClick={onClick} aria-haspopup="dialog">{content}</MiraAction>:<div className="library-card-main library-card-main--disabled" aria-disabled="true">{content}</div>}
     {(note||source)&&<div className="library-card-foot"><span title={noteTitle}>{note}</span>{source&&<a href={source} target="_blank" rel="noreferrer" aria-label={`View recipe for ${name}`}>Recipe<Icon name="chevron"/></a>}</div>}
   </article>;
 }
 
 export function GameArtworkCredits(){
-  return <details className="library-artwork-credits"><summary>Artwork credits</summary><p>Original Voltra typography and geometric tiles. Game names identify compatible software and remain the property of their respective owners. No publisher artwork or logos are included.</p><ul>{Object.entries(assets).sort(([,a],[,b])=>a.title.localeCompare(b.title)).map(([id,a])=><li key={id}><a href={a.sourcePage} target="_blank" rel="noreferrer">{a.title}</a><span>{a.credit}</span></li>)}</ul></details>;
+  return <Disclosure className="library-artwork-credits"><DisclosureTrigger>Artwork credits</DisclosureTrigger><p>Original Voltra typography and geometric tiles. Game names identify compatible software and remain the property of their respective owners. No publisher artwork or logos are included.</p><ul>{Object.entries(assets).sort(([,a],[,b])=>a.title.localeCompare(b.title)).map(([id,a])=><li key={id}><a href={a.sourcePage} target="_blank" rel="noreferrer">{a.title}</a><span>{a.credit}</span></li>)}</ul></Disclosure>;
 }

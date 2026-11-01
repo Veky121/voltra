@@ -214,6 +214,12 @@ func TestAutomaticGamePortCatalogLayouts(t *testing.T) {
 			for _, v := range vars {
 				env[str(v["env_variable"])] = v["default_value"]
 			}
+			// Layout checks use valid prerequisite input without making network calls.
+			for _, rule := range entry.SetupValidation {
+				if rule.Type == "public_ipv4" {
+					env[rule.Environment] = "1.1.1.1"
+				}
+			}
 			plan, resolved, err := planGamePortLayout(M{}, nil, entry, env)
 			if err != nil {
 				t.Fatal(err)

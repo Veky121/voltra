@@ -47,6 +47,9 @@ def install(root,game,env,validate=True):
  root=root.resolve();app=APPS[game]
  if env.get('SRCDS_APPID',app)!=app:raise ValueError('This recipe requires its original dedicated-server app ID')
  steam_template.arguments(root,int(app),env,validate) # Private-credential gate precedes all writes/processes.
+ if game=='nuclear':
+  from light_games_next_runtime import configure
+  configure(root,game,env,publish=False) # Refuse before acquisition or managed writes.
  paths=[config_path(root,game,env)]
  if game=='puck':paths.extend(confined(root,name) for name in ['server_config.json','public_game_mode_config.json'])
  saved=[]

@@ -1,5 +1,5 @@
 import fs from'node:fs';
-const path='gta/samp/egg-s-a--m-p.json',revision='samp-operator-archive-v1',catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),entry=catalog.entries.find(e=>e.path===path),egg=structuredClone(entry.egg),prior=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const path='gta/samp/egg-s-a--m-p.json',revision='samp-byte-preservation-v2',catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')),entry=catalog.entries.find(e=>e.path===path),egg=structuredClone(entry.egg),prior=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
 egg.docker_images={'Debian12 legacy32 dedicated archive':'ghcr.io/ptero-eggs/steamcmd@sha256:c8a93dc0e256d1dba10aed6a0d8d6e739d4f1809f4e3b7428d0c01adc6e6e68b'};
 egg.startup='exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/samp-runtime.py';
 egg.config={files:'{}',startup:entry.egg.config.startup,logs:'{}',stop:'^SIGINT'};
@@ -19,7 +19,7 @@ let script='#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractiv
 for(const name of['gta-legacy-install.py','samp-runtime.py','gta-install.py','gta-runtime.py','native-release.py','native-config.py','native-console.py','bundle-debian-python.py'])script+=`cat > .voltra/${name} <<'VOLTRA_SOURCE'\n${fs.readFileSync('internal/panel/game_library/scripts/'+name,'utf8')}\nVOLTRA_SOURCE\n`;
 script+=`cat > .voltra/steam_template.py <<'VOLTRA_SOURCE'\n${fs.readFileSync('internal/panel/game_library/scripts/steam-template.py','utf8')}\nVOLTRA_SOURCE\npython3 .voltra/bundle-debian-python.py\npython3 .voltra/gta-legacy-install.py samp 2>&1 | tee .voltra/samp-install.log\n`;
 egg.scripts.installation={script,container:'debian:bookworm-slim',entrypoint:'bash'};
-const stage='.local/gta-next/profiles.json',profiles=fs.existsSync(stage)?JSON.parse(fs.readFileSync(stage)):{};
+const stage='.local/samp-owner/profiles.json',profiles={};
 profiles[path]={upstream_sha256:entry.sha256,revision,platforms:['linux/amd64'],defaults:{memory:512,disk:4096},required_ports:1,egg,verification:prior[path]?.revision===revision?prior[path].verification:'not_verified',detail:prior[path]?.revision===revision?prior[path].detail:'Original SA-MP configuration/archive integration fixture-tested; native blocked by unavailable verified dedicated distribution.',setup_steps:[
  'This remains the original SA-MP dedicated server recipe, never a silent open.mp replacement. Former primary sa-mp.com/download.php and files.sa-mp.com downloads plus the original recipe mirror were inaccessible during review. No claim that these downloads or legacy master services remain supported is made.',
  'Installation requires your authorized Linux dedicated-server tar archive and SHA256. Select the original mixed-case Version control matching that archive, keep publisher license/notices, and set its top directory. Missing archive details fail explicitly. Only the dedicated server is accepted; no GTA client assets, license keys or accounts are supplied.',
@@ -28,4 +28,4 @@ profiles[path]={upstream_sha256:entry.sha256,revision,platforms:['linux/amd64'],
  'Blank RCON_PASS generates a private persistent credential; no publisher changeme default is used. Console forwards native input and Stop sends Ctrl+C. Back up gamemode/scriptfiles/bans before changing versions. Native acceptance and client gameplay remain explicitly unverified.',
  ]};
 for(const[p,v]of Object.entries(profiles))if(prior[p]?.revision===v.revision){v.verification=prior[p].verification;v.detail=prior[p].detail;}
-fs.mkdirSync('.local/gta-next',{recursive:true});fs.writeFileSync(stage,JSON.stringify(profiles,null,2)+'\n');console.log('Staged original SA-MP operator archive with honest native distribution blocker.');
+fs.mkdirSync('.local/samp-owner',{recursive:true});fs.writeFileSync(stage,JSON.stringify(profiles,null,2)+'\n');console.log('Staged original SA-MP operator archive with honest native distribution blocker.');

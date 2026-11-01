@@ -72,3 +72,9 @@ test('expired directory cache revalidates on return',async()=>{
  const b=c.observeQuery(path+'/files/list?directory=%2F',n.request,s=>state=s);await tick();assert.equal(n.calls.length,2);assert.equal(state.loading,true);b.unsubscribe();
  }finally{Date.now=original;}
 });
+test('live snapshots fence older HTTP results and clear forbidden authority',async()=>{
+ c.purgeQueryCache();const n=network();let state;const a=c.observeQuery(path,n.request,s=>state=s);await tick();
+ c.applyLiveQuery(path,{name:'live'},'');assert.equal(n.calls[0].options.signal.aborted,true);
+ n.calls[0].resolve({name:'older HTTP'});await tick();assert.equal(state.data.name,'live');
+ c.applyLiveQuery(path,null,'Access changed');assert.equal(state.data,null);assert.equal(state.error,'Access changed');a.unsubscribe();
+});

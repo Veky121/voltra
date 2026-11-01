@@ -1,9 +1,12 @@
-.section-tabs{display:flex;align-items:stretch;flex-wrap:nowrap;gap:4px;max-width:100%;min-width:0;margin:0 0 24px;padding:0;border:0;border-bottom:1px solid var(--ui-divider,var(--line));overflow-x:auto;scrollbar-width:thin}
-.section-tabs>.section-tab{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:7px;min-height:var(--ui-control-height,36px);margin:0;padding:10px 12px;border:0;border-bottom:2px solid transparent;border-radius:8px 8px 3px 3px;background:transparent;color:var(--muted);font:inherit;font-size:calc(13px * var(--ui-font-scale,1));font-weight:400;line-height:1.4;text-decoration:none;white-space:nowrap;box-shadow:none;filter:none;cursor:pointer;transition:background 150ms,color 150ms,border-color 150ms}
-.section-tabs>.section-tab:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--text);border-bottom-color:transparent;text-decoration:none;filter:none}
-.section-tabs>.section-tab.active,.section-tabs>.section-tab[aria-current=page],.section-tabs>.section-tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+.section-tabs{display:flex;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;gap:20px;width:100%;max-width:100%;min-width:0;height:41px;margin:0 0 16px;padding:0;border:0;border-bottom:1px solid var(--ui-divider,var(--line));border-radius:0;background:transparent;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.section-tabs::-webkit-scrollbar{display:none}
+/* Route links and in-page Mira tabs share the same line navigation. */
+.section-tabs>.section-tab{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:7px;height:40px;min-height:40px;margin:0;padding:8px 2px;border:0;border-radius:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:400;line-height:20px;text-decoration:none;white-space:nowrap;box-shadow:none;filter:none;translate:none;cursor:pointer;transition:color 150ms,box-shadow 150ms}
+.section-tabs>.section-tab::after{display:none}
+.section-tabs>.section-tab:hover{background:transparent;color:var(--text);text-decoration:none;filter:none}
+.section-tabs>.section-tab.active,.section-tabs>.section-tab[aria-current=page],.section-tabs>.section-tab[aria-selected=true],.section-tabs>.section-tab[data-active]{color:var(--text);box-shadow:inset 0 -2px var(--accent)}
 .section-tabs>.section-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
-.section-tabs>.section-tab:disabled{opacity:.45;cursor:not-allowed;background:transparent}
+.section-tabs>.section-tab:disabled,.section-tabs>.section-tab[aria-disabled=true]{opacity:.45;cursor:not-allowed;background:transparent}
 .section-tabs>.section-tab .nav-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;min-width:0;padding:0;border:0;background:transparent;color:inherit}
 .section-tabs>.section-tab svg{width:14px;height:14px;flex-shrink:0}
 @media(prefers-reduced-motion:reduce){.section-tabs>.section-tab{transition:none}}

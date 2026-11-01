@@ -37,12 +37,11 @@ def atomic(path, value):
     finally:
         if os.path.exists(name): os.unlink(name)
 
-def options(root, env, update=False):
+def options(root, env, update=False, write=True):
     path = confined(root, root/'data'/'Config'/'options.json')
     if path.exists():
         value = json.loads(path.read_text())
         if not isinstance(value, dict): raise ValueError('Foundry options must be a JSON object')
-        if not update: return value
     else: value = {'upnp':False, 'fullscreen':False, 'proxySSL':False, 'minifyStaticFiles':True}
     port = env.get('SERVER_PORT', '30000')
     if not re.fullmatch('[0-9]+', port) or not 1 <= int(port) <= 65535: raise ValueError('Invalid server port')
@@ -51,7 +50,7 @@ def options(root, env, update=False):
         if len(text)>limit or any(ord(c)<32 or ord(c)==127 for c in text): raise ValueError('Invalid '+key)
         value[target] = text
     value['port'] = int(port)
-    atomic(path, value)
+    if write and (update or not path.exists()): atomic(path, value)
     return value
 
 def https(url):
@@ -107,15 +106,17 @@ def install(root, env, downloader=download):
     app = confined(root, root/'app'); backup = confined(root, root/'.voltra'/'foundry-app-backup')
     if backup.exists(): raise ValueError('Previous Foundry application backup needs operator recovery')
     # Validate existing configuration before any download or application replacement.
-    options(root, env)
+    options(root, env, write=False)
     pin = env.get('FOUNDRY_SHA256', '')
     if pin and not re.fullmatch('[a-fA-F0-9]{64}', pin): raise ValueError('Invalid optional archive SHA256')
+    https(env.get('TIMED_URL', ''))
     with tempfile.TemporaryDirectory(prefix='.foundry-install-', dir=root) as temporary:
         temporary = Path(temporary); archive = temporary/'package.zip'; candidate = temporary/'app'; candidate.mkdir()
         downloader(env.get('TIMED_URL',''), archive)
         with archive.open('rb') as stream: digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         if pin and digest != pin.lower(): raise ValueError('Licensed archive checksum mismatch')
         extract(archive, candidate); entrypoint(candidate)
+        options(root, env)
         backup.parent.mkdir(parents=True, exist_ok=True)
         existed = app.exists()
         if existed: os.replace(app, backup)

@@ -34,10 +34,10 @@ function fixture({permissions=['*'], state='offline', reply}={}) {
     useRef(initial) {const i=cursor++; if (!(i in slots)) slots[i]={current:initial}; return slots[i];},
     useEffect() {},
   };
-  const modules = {'./PendingSettings':{PendingSettings:({children})=>children,usePendingSetting:(_key,_dirty,change)=>{pendingChange=change;}},
+  const modules = {'../ui/ConfirmAction':{confirmAction:async()=>true},'../notifications/useErrorState':{useErrorState:()=>react.useState('')},'./PendingSettings':{PendingSettings:({children})=>children,usePendingSetting:(_key,_dirty,change)=>{pendingChange=change;}},
     react,
     'react-router-dom':{},
-    '../lib':{api:async(path, options)=>{calls.push({path, ...options, payload:JSON.parse(options.body)}); return reply ? reply() : {attributes:{...data, revision:'saved-revision'}};}, unwrap:r=>r.attributes, Button:'button', Card:'section', ErrorBox:'div', Input:'input', Select:'select'},
+    '../ui/ActionButton':{ActionButton:'button'}, '../lib':{api:async(path, options)=>{calls.push({path, ...options, payload:JSON.parse(options.body)}); return reply ? reply() : {attributes:{...data, revision:'saved-revision'}};}, unwrap:r=>r.attributes, Button:'button', Card:'section', ErrorBox:'div', Input:'input', Select:'select'},
     './common':{can:(p,v)=>p.includes('*')||p.includes(v), json:(method,body)=>({method,body:JSON.stringify(body)}), useServer:()=>({base:'/api/client/servers/fixture',permissions,server:{status:''}})},
     './gameSetupModel':model,
     './ServerDashboard':{useServerTelemetry:()=>({state,updated:1,error:''})},

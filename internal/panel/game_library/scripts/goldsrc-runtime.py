@@ -40,8 +40,7 @@ def selection(env):
     return flavor, game
 
 
-def configure(root, env):
-    root = root.resolve()
+def settings(env):
     flavor, game = selection(env)
     game_map = env.get('SRV_STARTMAP' if flavor == 'cs16' else 'SRCDS_MAP', 'de_dust2')
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', game_map):
@@ -70,6 +69,29 @@ def configure(root, env):
               'sv_password': text(env.get('SERVER_PASSWORD', '')),
               'rcon_password': text(env.get('RCON_PASSWORD', '')),
               'sv_lan': '0' if public == '1' else '1', 'sys_ticrate': str(tickrate)}
+    return flavor, game, game_map, main, vac, maximum, boost, secure, values
+
+
+def preflight(root, env):
+    """Pure operator validation, before acquisition or configuration writes."""
+    from steam_template import arguments
+    flavor, *_ = settings(env)
+    for key in ('AUTO_UPDATE', 'VOLTRA_STEAM_AUTO_UPDATE', 'VALIDATE'):
+        if key in env and env[key] not in ('0', '1'):
+            raise ValueError(key + ' must be 0 or 1')
+    if flavor == 'rehlds':
+        if env.get('SRCDS_BETAID', '') != 'steam_legacy':
+            raise ValueError('ReHLDS requires the publisher steam_legacy branch')
+        if not re.fullmatch(r'(latest|v?[0-9]+(?:\.[0-9]+){2,3})', env.get('VERSION', 'latest')):
+            raise ValueError('Choose a native ReHLDS release tag or latest')
+    arguments(root, 90, env)
+
+
+def configure(root, env):
+    root = root.resolve()
+    flavor, game, game_map, main, vac, maximum, boost, secure, values = settings(env)
+    if flavor in ('generic', 'rehlds'):
+        preflight(root, env)
     folder = root / game
     managed = folder / 'voltra_managed.cfg'
     wrapper = folder / 'voltra_server.cfg'
@@ -149,7 +171,9 @@ def await_native_info(env, finished):
 
 if __name__ == '__main__':
     root = Path.cwd()
-    _, game = selection(os.environ)
+    flavor, game = selection(os.environ)
+    if flavor in ('generic', 'rehlds'):
+        preflight(root, os.environ)
     automatic = os.environ.get('VOLTRA_STEAM_AUTO_UPDATE', os.environ.get('AUTO_UPDATE', '0'))
     if automatic not in ('0', '1'): raise ValueError('AUTO_UPDATE must be 0 or 1')
     if automatic == '1':

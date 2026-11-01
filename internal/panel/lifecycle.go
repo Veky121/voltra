@@ -405,7 +405,7 @@ func (a *App) clientServer(ctx context.Context, user M, s M) (M, error) {
 	}
 	variables := []M{}
 	invocation := str(s["startup"])
-	vars, err := a.query(ctx, "SELECT ev.*,sv.id IS NOT NULL AS is_overridden,COALESCE(sv.variable_value,ev.default_value) server_value FROM egg_variables ev LEFT JOIN server_variables sv ON sv.variable_id=ev.id AND sv.server_id=$1 WHERE ev.egg_id=$2 ORDER BY ev.id", s["id"], s["egg_id"])
+	vars, err := a.query(ctx, clientVariablesSQL, s["id"], s["egg_id"])
 	if err != nil {
 		return nil, err
 	}
@@ -442,13 +442,20 @@ func (a *App) clientServer(ctx context.Context, user M, s M) (M, error) {
 	if err != nil {
 		return nil, err
 	}
-	return M{"server_owner": num(user["id"]) == num(s["owner_id"]), "identifier": s["uuid_short"], "__deprecated_uuid_short": s["uuid_short"], "server_identifier": s["identifier"], "internal_id": s["id"], "uuid": s["uuid"], "name": s["name"], "node": node["name"], "is_node_under_maintenance": node["maintenance_mode"], "sftp_details": a.clientSFTPDetails(ctx, node), "description": s["description"], "limits": serverLimits(s), "feature_limits": serverFeatures(s), "invocation": invocation, "java_managed": javaDisplay["java_managed"], "java_effective_error": javaDisplay["java_effective_error"], "docker_image": s["image"], "game": clientGameID(egg), "steam_managed": steamGameID(egg) != "", "egg_features": egg["features"], "status": s["status"], "is_suspended": str(s["status"]) == "suspended", "is_installing": !serverInstalled(s), "is_transferring": len(transfers) > 0, "skip_scripts": s["skip_scripts"], "artwork": a.clientArtworkMetadata(ctx, user, s, egg), "relationships": M{"allocations": collection("allocation", visible), "variables": collection("egg_variable", variables)}}, nil
+	return M{"server_owner": num(user["id"]) == num(s["owner_id"]), "identifier": s["uuid_short"], "__deprecated_uuid_short": s["uuid_short"], "server_identifier": s["identifier"], "internal_id": s["id"], "uuid": s["uuid"], "name": s["name"], "node": node["name"], "is_node_under_maintenance": node["maintenance_mode"], "sftp_details": a.clientSFTPDetails(ctx, node), "description": s["description"], "limits": serverLimits(s), "feature_limits": serverFeatures(s), "invocation": invocation, "java_managed": javaDisplay["java_managed"], "java_effective_error": javaDisplay["java_effective_error"], "docker_image": s["image"], "game": clientGameID(egg), "steam_managed": steamGameID(egg) != "", "egg_features": egg["features"], "console_input_supported": serverConsoleInputSupported(s, egg), "status": s["status"], "is_suspended": str(s["status"]) == "suspended", "is_installing": !serverInstalled(s), "is_transferring": len(transfers) > 0, "skip_scripts": s["skip_scripts"], "artwork": a.clientArtworkMetadata(ctx, user, s, egg), "relationships": M{"allocations": collection("allocation", visible), "variables": collection("egg_variable", variables)}}, nil
 }
 
 func (a *App) applicationServer(ctx context.Context, s M) (M, error) {
 	env, err := a.serverEnvironment(ctx, s)
 	if err != nil {
 		return nil, err
+	}
+	// Legacy Foundry rows may still contain a plaintext acquisition URL.
+	// Public application responses must not disclose that capability either.
+	for key, value := range env {
+		if strings.EqualFold(key, "TIMED_URL") && str(value) != "" {
+			env[key] = integrationPlaceholder
+		}
 	}
 	out := M{"id": s["id"], "java_config": asMap(s["java_config"]), "external_id": s["external_id"], "uuid": s["uuid"], "identifier": s["uuid_short"], "name": s["name"], "description": s["description"], "status": s["status"], "suspended": str(s["status"]) == "suspended", "limits": serverLimits(s), "feature_limits": serverFeatures(s), "user": s["owner_id"], "node": s["node_id"], "allocation": s["allocation_id"], "nest": s["nest_id"], "egg": s["egg_id"], "container": M{"startup_command": s["startup"], "image": s["image"], "installed": map[bool]int{true: 1, false: 0}[serverInstalled(s)], "environment": env, "skip_scripts": s["skip_scripts"]}, "created_at": s["created_at"], "updated_at": s["updated_at"]}
 	return out, nil
@@ -1058,6 +1065,9 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err = validateCfxEnvironment(egg, env); err != nil {
+		return nil, err
+	}
 	vars, err := a.eggVariables(ctx, num(egg["id"]))
 	if err != nil {
 		return nil, err
@@ -1107,6 +1117,66 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 	if num(d["node_id"]) != 0 && num(d["node_id"]) != nodeID {
 		return nil, bad("Allocation does not belong to the selected node.")
 	}
+	// Validate exact managed recipe contracts against locked candidate rows before
+	// inserting a server or assigning any allocation. Other addresses remain extras.
+	for _, entry := range gameTemplates().Entries {
+		if str(egg["uuid"]) != gameTemplateEggUUID(entry) {
+			continue
+		}
+		ids := []int64{allocationID}
+		for _, raw := range asSlice(d["allocation_additional"]) {
+			ids = append(ids, num(raw))
+		}
+		rows, e := tx.Query(ctx, "SELECT id,node_id,server_id,ip,port FROM allocations WHERE id=ANY($1) ORDER BY id FOR UPDATE", ids)
+		if e != nil {
+			return nil, e
+		}
+		selected := map[int64]M{}
+		for rows.Next() {
+			var id, node, port int64
+			var owner *int64
+			var ip string
+			if e = rows.Scan(&id, &node, &owner, &ip, &port); e != nil {
+				rows.Close()
+				return nil, e
+			}
+			if node != nodeID || owner != nil {
+				rows.Close()
+				return nil, bad("An additional allocation is assigned or on another node.")
+			}
+			selected[id] = M{"id": id, "ip": ip, "port": port}
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return nil, e
+		}
+		primary := selected[allocationID]
+		extra := []M{}
+		seen := map[int64]bool{allocationID: true}
+		for _, id := range ids {
+			row, exists := selected[id]
+			if !exists {
+				return nil, bad("Select valid additional allocations.")
+			}
+			if !seen[id] && str(row["ip"]) == str(primary["ip"]) {
+				extra = append(extra, row)
+			}
+			seen[id] = true
+		}
+		resolved, e := normalizeTemplatePortEnvironment(entry, env, primary, extra)
+		if e != nil {
+			return nil, e
+		}
+		if e = validateTemplatePortLayout(entry, primary, extra); e != nil {
+			return nil, e
+		}
+		if e = validateTemplatePortRules(entry, resolved, primary, extra); e != nil {
+			return nil, e
+		}
+		env = resolved
+		break
+	}
 	uuid := newUUID()
 	columns := []string{"uuid", "uuid_short", "identifier", "name", "description", "owner_id", "node_id", "nest_id", "egg_id", "allocation_id", "startup", "image", "status", "skip_scripts", "memory", "swap", "disk", "io", "cpu", "threads", "oom_disabled", "allocation_limit", "database_limit", "backup_limit", "external_id", "installation_id", "java_config", "minecraft_pack"}
 	d["installation_id"] = "pending:initial:" + newUUID()
@@ -1148,12 +1218,19 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 	for _, v := range vars {
 		name := str(v["env_variable"])
 		value := str(env[name])
-		if _, ok := bound[name]; ok {
+		// Foundry signed download URLs carry an acquisition capability. Keep
+		// explicit per-server values encrypted and editable through Startup.
+		_, integrated := bound[name]
+		if integrated || (strings.EqualFold(name, "TIMED_URL") && value != "") {
 			sealed, e := a.seal(value)
 			if e != nil {
 				return nil, e
 			}
-			if _, e = tx.Exec(ctx, "INSERT INTO server_integration_secrets(server_id,variable_id,value) VALUES($1,$2,$3)", id, v["id"], sealed); e != nil {
+			source := "server"
+			if integrated {
+				source = "integration"
+			}
+			if _, e = tx.Exec(ctx, "INSERT INTO server_integration_secrets(server_id,variable_id,value,source) VALUES($1,$2,$3,$4)", id, v["id"], sealed, source); e != nil {
 				return nil, e
 			}
 			value = integrationPlaceholder
@@ -1168,28 +1245,77 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 	}
 	s, err := a.one(ctx, "SELECT * FROM servers WHERE id=$1", id)
 	if err != nil {
-		return nil, err
+		return nil, compensateCreateServer(a.DB.Begin, id, err, false)
 	}
 	node, err := a.node(ctx, nodeID)
+	daemonAttempted := false
 	if err == nil {
 		var res *http.Response
+		daemonAttempted = true
 		res, err = a.daemon(ctx, node, "POST", "/api/servers", M{"uuid": uuid, "start_on_completion": boolean(d["start_on_completion"])})
 		if res != nil {
 			res.Body.Close()
 		}
 	}
 	if err != nil {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		cleanup, e := a.DB.Begin(cleanupCtx)
-		if e == nil {
-			_, _ = cleanup.Exec(cleanupCtx, "UPDATE allocations SET server_id=NULL WHERE server_id=$1", id)
-			_, _ = cleanup.Exec(cleanupCtx, "DELETE FROM servers WHERE id=$1", id)
-			_ = cleanup.Commit(cleanupCtx)
-		}
-		return nil, err
+		return nil, compensateCreateServer(a.DB.Begin, id, err, daemonAttempted)
 	}
 	return s, nil
+}
+
+// createCompensationError keeps private database/transport details out of the
+// response while retaining causal errors for errors.Is/As and reconciliation.
+type createCompensationError struct {
+	api            APIError
+	cause, cleanup error
+}
+
+func (e *createCompensationError) Error() string   { return e.api.Detail }
+func (e *createCompensationError) Unwrap() []error { return []error{e.cause, e.cleanup} }
+func (e *createCompensationError) As(target any) bool {
+	if api, ok := target.(*APIError); ok {
+		*api = e.api
+		return true
+	}
+	return false
+}
+
+// Only panel state is compensated. A failed create response cannot prove that
+// Wings did not accept the request; never delete unknown daemon state here.
+func compensateCreateServer(begin func(context.Context) (pgx.Tx, error), id int64, cause error, daemonAttempted bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	step := "begin"
+	tx, cleanup := begin(ctx)
+	if cleanup == nil {
+		// A separate rollback context still releases the connection if cleanup times out.
+		defer func() {
+			rollbackCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stop()
+			_ = tx.Rollback(rollbackCtx)
+		}()
+		step = "allocation release"
+		_, cleanup = tx.Exec(ctx, "UPDATE allocations SET server_id=NULL WHERE server_id=$1", id)
+		if cleanup == nil {
+			step = "server delete"
+			_, cleanup = tx.Exec(ctx, "DELETE FROM servers WHERE id=$1", id)
+		}
+		if cleanup == nil {
+			step = "commit"
+			cleanup = tx.Commit(ctx)
+		}
+	}
+	if cleanup == nil && !daemonAttempted {
+		return cause
+	}
+	detail := fmt.Sprintf("Server creation failed for server %d. Panel cleanup completed.", id)
+	if cleanup != nil {
+		detail = fmt.Sprintf("Server creation failed for server %d. Panel cleanup failed at %s; residual state requires reconciliation.", id, step)
+	}
+	if daemonAttempted {
+		detail += " Wings creation outcome is uncertain; reconcile daemon state before retrying."
+	}
+	return &createCompensationError{api: APIError{Status: 502, Code: "ServerCreationFailed", Detail: detail}, cause: cause, cleanup: cleanup}
 }
 
 func (a *App) selectDeployment(ctx context.Context, tx pgx.Tx, d M) (int64, error) {
@@ -1600,6 +1726,10 @@ func (a *App) lifecycleStartup(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
+	if e = validateCfxEnvironment(egg, env); e != nil {
+		fail(w, e)
+		return
+	}
 	vars, e := a.eggVariables(r.Context(), eggID)
 	if e != nil {
 		fail(w, e)
@@ -1807,6 +1937,10 @@ func (a *App) lifecycleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
+	if e = a.cleanupServerSubdomains(ctx, num(s["id"])); e != nil {
+		fail(w, e)
+		return
+	}
 	if e = a.cleanupServerProxyRoutes(ctx, s); e != nil {
 		fail(w, e)
 		return

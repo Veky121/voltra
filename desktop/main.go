@@ -4,9 +4,11 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Desktop and web compile the same React/Vite source. build.ps1 puts the
@@ -27,6 +29,12 @@ var updatePublicKey = "y8rFHtqICd2gOO0yeuowfzeqfQcBILEEEu180ZNykCI="
 var webviewTestArguments []string
 
 func main() {
+	if handled, err := desktopInstallation(); handled {
+		if err != nil {
+			showInstallError(err)
+		}
+		return
+	}
 	dir, err := configDirectory()
 	if err != nil {
 		log.Fatal(err)
@@ -80,6 +88,15 @@ func main() {
 			window.HandleMessage("wails:drag")
 		}
 		return window.IsMaximised(), nil
+	})
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
+		if exe, err := os.Executable(); err == nil {
+			if err := acceptPreviousExecutable(exe); err != nil {
+				log.Printf("Previous version retention: %v", err)
+			} else {
+				cleanUpdateAsides(exe)
+			}
+		}
 	})
 	if err = app.Run(); err != nil {
 		log.Fatal(err)

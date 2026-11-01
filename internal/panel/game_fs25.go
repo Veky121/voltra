@@ -54,6 +54,7 @@ func farmingSimulatorTemplate() gameTemplate {
 	egg["docker_images"] = M{"WineHQ 11 (pinned)": "ghcr.io/nn-home-com/farming-simulator-25-egg@sha256:10073fd00ab197e36c45dd8af94ca297c04ae2a4288d4b3bd65c16aa468b8dc8"}
 	egg["scripts"] = M{"installation": M{"script": script, "container": "debian:bookworm-slim", "entrypoint": "bash"}}
 	egg["features"] = []any{"voltra_fs25"}
+	egg["voltra"] = M{"download_headers": M{giantsDownloadHostPattern: M{"Referer": "https://www.farming-simulator.com/"}}}
 	egg["config"] = M{"files": "{}", "startup": M{"done": fs25ReadyPattern, "strip_ansi": true}, "logs": "{}", "stop": "^C"}
 	egg["description"] = "GIANTS-licensed FS25 server under Wine. Downloads from GIANTS or accepts an uploaded installer. Separate server licence required."
 	vars := asSlice(egg["variables"])

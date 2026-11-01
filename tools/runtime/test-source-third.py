@@ -121,9 +121,9 @@ class SourceThirdTests(unittest.TestCase):
     def test_sven_command_values_safe_for_goldsrc_boundary_parser(self):
         with tempfile.TemporaryDirectory()as directory:
             root=Path(directory);env=self.fixture(root,'sven');argv,_,_=runtime.configure(root,env)
-            self.assertEqual(argv[argv.index('+servercfgfile')+1],'voltra_server.cfg');self.assertEqual(argv[argv.index('+exec')+1],'voltra_managed.cfg')
+            self.assertNotIn('+map',argv);self.assertEqual(argv[argv.index('+exec')+1],'voltra_bootstrap.cfg')
             # GoldSrc command values must not introduce another '-' boundary.
-            for key in('+servercfgfile','+exec'):
+            for key in('+exec',):
                 value=argv[argv.index(key)+1];self.assertRegex(value,r'^[A-Za-z0-9_]+\.cfg$');self.assertNotIn('-',value)
             wrapper=root/'svencoop/voltra_server.cfg';self.assertEqual(wrapper.read_text(),'exec server.cfg\nexec voltra_managed.cfg\n');self.assertTrue((root/'svencoop/voltra_managed.cfg').is_file())
         with tempfile.TemporaryDirectory()as directory,tempfile.TemporaryDirectory()as outside:

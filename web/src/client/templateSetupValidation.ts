@@ -1,12 +1,30 @@
+import {templateSetupRuleProblems,type TemplateSetupValidation} from './templateSetupRules.ts';
 import {miBToGB} from "../resourceUnits.ts";
 import {templateAgreementsAccepted,templateVariableProblem,type TemplateVariableDefinition,type GameAgreement} from './gameTemplateModel.ts';
+import {installationAcknowledgementVariable} from './startupSettingsModel.ts';
 
 export type SetupProblem={field?:string;message:string};
+// Conditional prerequisites need their selectors available during creation,
+// even when the selector's default is valid and ordinary game fields defer.
+export function templateSetupDependencyVariables(variables:TemplateVariableDefinition[]):Set<string>{
+  const known=new Set(variables.map(variable=>variable.env_variable)), names=new Set<string>();
+  for(const variable of variables)for(const rule of variable.rules.split('|')){
+    const match=/^required_(if|unless|with|with_all|without|without_all):(.+)$/.exec(rule);
+    if(!match)continue;
+    const arguments_=match[2].split(',');
+    for(const argument of (match[1]==='if'||match[1]==='unless'?arguments_.slice(0,1):arguments_)){
+      const name=argument.replace(/^environment\./,'');
+      if(known.has(name))names.add(name);
+    }
+  }
+  return names;
+}
 export type TemplateReadiness={
   name:string;node?:{setup_available?:boolean;private_content_ready?:boolean;unavailable_reason?:string};
   memory:number|null;memoryMaximum:number;disk:number|null;diskMaximum:number;imageValid:boolean;
   portsReady:boolean;portsLoading:boolean;portsError:boolean;steamError:boolean;
   privateContent:boolean;privateSupported:boolean;fs25:boolean;savedLicence:boolean;
+  setupValidation?:TemplateSetupValidation[]|null;
   variables:(TemplateVariableDefinition&{name:string})[];environment:Record<string,string>;agreements?:GameAgreement[];
 };
 export function templateSetupProblems(input:TemplateReadiness):SetupProblem[]{
@@ -33,7 +51,10 @@ export function templateSetupProblems(input:TemplateReadiness):SetupProblem[]{
   for(const variable of input.variables){
     const problem=templateVariableProblem(variable,input.environment);
     if(problem)add(`game-template-${variable.env_variable}`,`${variable.name}: ${problem}`);
+    else if(installationAcknowledgementVariable(variable)&&!input.agreements?.some(agreement=>agreement.environment===variable.env_variable)&&input.environment[variable.env_variable]!=='true')
+      add(`game-template-${variable.env_variable}`,`${variable.name}: Review and enable this acknowledgement before installation.`);
   }
+  for(const problem of templateSetupRuleProblems(input.setupValidation,input.variables,input.environment))if(!problems.some(p=>p.field===problem.field))problems.push(problem);
   if(input.fs25&&!problems.some(p=>p.field==='game-template-WEB_PASSWORD')&&Array.from(input.environment.WEB_PASSWORD??'').length<12)
     add('game-template-WEB_PASSWORD','Web portal password: Use at least 12 characters.');
   return problems;

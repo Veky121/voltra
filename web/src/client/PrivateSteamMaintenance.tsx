@@ -1,3 +1,5 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {GameSwitch} from './GameSwitch';
 import './games-ui.css';
 import {useEffect, useRef, useState, type FormEvent} from 'react';
@@ -30,7 +32,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
   const [profileAction, setProfileAction] = useState('create'), [now, setNow] = useState(Date.now());
   const [authorization, setAuthorization] = useState(''), [jobPassword, setJobPassword] = useState('');
   const [branch, setBranch] = useState(status.branch || 'public'), [betaPassword, setBetaPassword] = useState('');
-  const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useErrorState('client/PrivateSteamMaintenance.tsx'), [message, setMessage] = useState('');
   const submitting = useRef(false);
   const recovery = useRef<AbortController | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -93,7 +95,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
       <div className="actions"><Button disabled={blocked || !selected || !stopped} onClick={() => void run('install')}>Install</Button><Button variant="secondary" disabled={blocked || !selected || !stopped} onClick={() => void run('update')}>Update</Button><Button variant="secondary" disabled={blocked || !selected || !stopped} onClick={() => void run('verify')}>Verify</Button></div>
       {!stopped && <p className="game-stop-note">Stop the server before installing or maintaining private game files.</p>}
     </div>}
-    <details className="steam-advanced steam-authorization"><summary>Add or update Steam account authorization</summary><form onSubmit={create}>
+    <Disclosure className="steam-advanced steam-authorization"><DisclosureTrigger>Add or update Steam account authorization</DisclosureTrigger><form onSubmit={create}>
       <Field label="Authorization action"><Select value={profileAction} onChange={event => {setProfileAction(event.target.value); setUsername(''); setPassword(''); setSavePassword(false);}} disabled={busy}><option value="create">Add account</option><option value="update" disabled={!selected}>Update selected authorization</option></Select></Field>
       {profileAction === 'update' && <p className="muted">Re-enter the same account name to keep its content ownership. Updating cancels its earlier jobs. Clearing the save option removes its stored password. Changing accounts requires a separate content migration.</p>}
       <fieldset className="steam-fields" disabled={profileBlocked}>
@@ -101,7 +103,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
       <label className="steam-save-password"><GameSwitch checked={savePassword} onCheckedChange={checked => setSavePassword(checked)}/> Save an encrypted password for future jobs</label>
       {savePassword && <Field label={privateOriginalLabel(status.original_controls?.password, 'Steam password')}><Input type="password" autoComplete="new-password" required value={password} onChange={event => setPassword(event.target.value)}/></Field>}
       <Button type="submit" disabled={profileBlocked}>{profileAction === 'update' ? 'Update authorization' : 'Add authorization'}</Button>
-    </fieldset></form></details>
+    </fieldset></form></Disclosure>
     {active && <div className="steam-job"><p role="status">{active.operation} · {active.status} · {current.data?.detail || active.detail}</p>
       {guard && privateGuardUsable(guard, now) && <form onSubmit={event => {event.preventDefault(); if (busy) return; void mutate(() => api(`${endpoint}/jobs/${encodeURIComponent(active.id)}/guard`, json('POST', privateGuardReply(guard, guard.kind === 'device_confirmation' ? {accepted: true} : {code}))), 'Guard response sent.');}}>
         <p>Steam Guard · expires {date(guard.expires_at)}</p>
@@ -112,7 +114,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
       {guard && !privateGuardUsable(guard, now) && <p role="status">This Steam Guard challenge expired. Wait for a new challenge or cancel and create a new job.</p>}
       <Button variant="danger" disabled={busy} onClick={() => void mutate(() => api(`${endpoint}/jobs/${encodeURIComponent(active.id)}/cancel`, json('POST', {})), 'Cancellation requested.')}>Cancel job</Button>
     </div>}
-    {history.length > 0 && <details className="steam-history"><summary>Private Steam jobs</summary><ul>{history.map(job => <li key={job.id}><strong>{job.operation} · {job.status.replaceAll('_', ' ')}</strong><p>{job.detail || job.stage}</p><small>{date(job.completed_at || job.created_at)}</small>{job.error && <ErrorBox>{job.error}</ErrorBox>}</li>)}</ul></details>}
+    {history.length > 0 && <Disclosure className="steam-history"><DisclosureTrigger>Private Steam jobs</DisclosureTrigger><ul>{history.map(job => <li key={job.id}><strong>{job.operation} · {job.status.replaceAll('_', ' ')}</strong><p>{job.detail || job.stage}</p><small>{date(job.completed_at || job.created_at)}</small>{job.error && <ErrorBox>{job.error}</ErrorBox>}</li>)}</ul></Disclosure>}
   </Card>;
 }
 

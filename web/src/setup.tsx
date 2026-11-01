@@ -1,3 +1,6 @@
+import {useErrorState} from './notifications/useErrorState';
+import {Checkbox} from './components/ui/checkbox';
+import {Input as MiraInput} from './components/ui/input';
 import { createContext, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {Select,  api, Button, Card, ErrorBox, Field, Loading, queryCacheSessionIdentity } from "./lib";
@@ -40,7 +43,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const explicitSetup = location.pathname.replace(/\/+$/, "") === "/setup";
   const [state, setState] = useState<{ status: SetupStatus; session: Session } | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('setup.tsx');
   const checking = useRef(false);
   const authEpoch = useRef(0);
   const [revision, setRevision] = useState(0);
@@ -107,7 +110,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('setup.tsx');
   return <div className="setup-session-controls">
     {error && <span role="alert">{error}</span>}
     {session.user?.root_admin && <Link to="/setup">Setup</Link>}
@@ -124,7 +127,7 @@ function SessionControls({ session, onSignedOut }: { session: Session; onSignedO
 function PendingHTTPS({ session, restartRequired, onVerified }: { session: Session; restartRequired: boolean; onVerified: () => void }) {
   const [result, setResult] = useState<HTTPSVerification | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('setup.tsx');
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
   return <SetupFrame title="HTTPS pending">
@@ -155,7 +158,7 @@ function Login({ session, onAuthenticated }: { session: Session; onAuthenticated
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('setup.tsx');
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
   async function submit(event: FormEvent) {
@@ -172,8 +175,8 @@ function Login({ session, onAuthenticated }: { session: Session; onAuthenticated
     finally { clearTimeout(timeout); active.current = null; setBusy(false); }
   }
   return <SetupFrame title="Sign in"><form onSubmit={submit}>
-    <Field label="Username"><input required name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} disabled={busy} autoFocus /></Field>
-    <Field label="Password"><input required name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} /></Field>
+    <Field label="Username"><MiraInput required name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} disabled={busy} autoFocus /></Field>
+    <Field label="Password"><MiraInput required name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} /></Field>
     <ErrorBox>{error}</ErrorBox><Button type="submit" disabled={busy}>{busy ? "Signing in..." : "Sign in"}</Button>
   </form></SetupFrame>;
 }
@@ -191,7 +194,7 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
   const [validation, setValidation] = useState<Validation | null>(null);
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('setup.tsx');
   const active = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => () => active.current?.abort(), []);
@@ -235,17 +238,17 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
   return <SetupFrame title="Set up your panel"><p className="setup-progress muted">{step < 2 ? "Administrator" : step < 4 ? "Address" : "Checks"}</p><h2 ref={heading} tabIndex={-1}>{titles[step]}</h2><form onSubmit={submit}>
     <fieldset disabled={!!busy} className="setup-fields">
       {step === 0 && <>
-        <Field label="Username"><input required name="username" minLength={2} maxLength={64} pattern="[a-zA-Z0-9_.\-]+" title="Use letters, numbers, underscores, dots, or hyphens." autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} autoFocus /></Field>
-        <Field label="Email"><input required name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+        <Field label="Username"><MiraInput required name="username" minLength={2} maxLength={64} pattern="[a-zA-Z0-9_.\-]+" title="Use letters, numbers, underscores, dots, or hyphens." autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} autoFocus /></Field>
+        <Field label="Email"><MiraInput required name="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
       </>}
-      {step === 1 && <Field label="Password" hint="At least 12 characters."><input required name="password" type="password" minLength={12} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus /></Field>}
+      {step === 1 && <Field label="Password" hint="At least 12 characters."><MiraInput required name="password" type="password" minLength={12} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus /></Field>}
       {step === 2 && <>
         <div className="setup-choices" role="group" aria-label="Panel access"><Button variant="secondary" aria-pressed={accessMode === "local"} onClick={() => setAccessMode("local")}>Local</Button><Button variant="secondary" aria-pressed={accessMode === "public"} onClick={() => setAccessMode("public")}>Public</Button></div>
-        <Field label={accessMode === "local" ? "Local panel URL" : "Public panel URL"} hint={accessMode === "local" ? "Use the address you open on this machine." : "Use your panel's HTTPS domain."}><input required name="public_url" type="url" autoComplete="url" value={publicURL} onChange={(event) => setPublicURL(event.target.value)} /></Field>
+        <Field label={accessMode === "local" ? "Local panel URL" : "Public panel URL"} hint={accessMode === "local" ? "Use the address you open on this machine." : "Use your panel's HTTPS domain."}><MiraInput required name="public_url" type="url" autoComplete="url" value={publicURL} onChange={(event) => setPublicURL(event.target.value)} /></Field>
       </>}
       {step === 3 && <>
         <Field label="HTTPS mode"><Select name="tls_mode" value={tlsMode} onChange={(event) => setTLSMode(event.target.value as "proxy" | "automatic")}><option value="proxy">Existing reverse proxy</option><option value="automatic">Automatic certificates</option></Select></Field>
-        {tlsMode === "automatic" ? <><Field label="Certificate email" hint="Point the domain to this server and allow port 443. Certificates need a successful HTTPS check."><input required type="email" name="acme_email" autoComplete="email" value={acmeEmail || email} onChange={(event) => setAcmeEmail(event.target.value)} /></Field><label className="setup-terms"><input required type="checkbox" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} /><span>I accept the <a href="https://letsencrypt.org/repository/" target="_blank" rel="noreferrer">certificate authority terms</a>.</span></label></> : <p className="muted">Your reverse proxy must already serve this panel over HTTPS.</p>}
+        {tlsMode === "automatic" ? <><Field label="Certificate email" hint="Point the domain to this server and allow port 443. Certificates need a successful HTTPS check."><MiraInput required type="email" name="acme_email" autoComplete="email" value={acmeEmail || email} onChange={(event) => setAcmeEmail(event.target.value)} /></Field><label className="setup-terms"><Checkbox required checked={acceptTerms} onCheckedChange={setAcceptTerms} /><span>I accept the <a href="https://letsencrypt.org/repository/" target="_blank" rel="noreferrer">certificate authority terms</a>.</span></label></> : <p className="muted">Your reverse proxy must already serve this panel over HTTPS.</p>}
       </>}
       {step === 4 && <>
         <p className="setup-address">{publicURL}</p>

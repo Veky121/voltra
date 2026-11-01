@@ -114,12 +114,30 @@ def starmade(root):
         if sum(entry.file_size for entry in entries)>4*1024**3:raise ValueError('Expanded StarMade archive is too large')
         for entry in entries:
             relative=member_path(entry.filename)
+            if not relative.parts or relative.parts[0]=='.voltra':raise ValueError('Unexpected StarMade archive member')
             if stat.S_ISLNK(entry.external_attr>>16):raise ValueError('StarMade archive contains a symlink')
             confined(root,str(relative))
+        names=[entry.filename for entry in entries]
+        if len(names)!=len(set(names)):raise ValueError('Duplicate StarMade archive member')
+        if 'StarMade.jar' not in names or 'version.txt' not in names:raise ValueError('Unexpected StarMade release contents')
+        version=package.getinfo('version.txt')
+        if version.file_size>256 or package.read(version).decode('utf-8').strip()!=STARMADE['version']:raise ValueError('Unexpected StarMade release contents')
+        preserved={name for name in persistent if (root/name).exists()}
+        files={str(member_path(entry.filename)) for entry in entries if not entry.is_dir()}
+        for entry in entries:
+            relative=member_path(entry.filename)
+            if relative.parts[0] in preserved:continue
+            target=confined(root,str(relative))
+            if any(str(parent) in files for parent in relative.parents if str(parent)!='.'):
+                raise ValueError('Conflicting StarMade archive paths')
+            if any(parent.exists() and not parent.is_dir() for parent in target.parents if parent.is_relative_to(root)):
+                raise ValueError('StarMade destination parent is not a directory')
+            if target.exists() and target.is_dir()!=entry.is_dir():raise ValueError('StarMade destination type differs')
+        if package.testzip() is not None:raise ValueError('Corrupt StarMade archive member')
         for entry in entries:
             relative=member_path(entry.filename);target=confined(root,str(relative))
             if not relative.parts or relative.parts[0]=='.voltra':raise ValueError('Unexpected StarMade archive member')
-            if relative.parts[0] in persistent and target.exists():continue
+            if relative.parts[0] in preserved:continue
             if entry.is_dir():target.mkdir(parents=True,exist_ok=True);continue
             target.parent.mkdir(parents=True,exist_ok=True)
             fd,temporary=tempfile.mkstemp(prefix='.publisher-',dir=target.parent)
@@ -132,9 +150,44 @@ def starmade(root):
     write_receipt(confined(root,'.voltra/java-game/release.json'),STARMADE)
 
 
+def rising_update(root, env, validate):
+    # Publisher writes into a fresh tree. Existing worlds/plugins never enter it.
+    with tempfile.TemporaryDirectory(prefix='voltra-rising-') as directory:
+        stage=Path(directory)
+        update(stage,339010,env,validate=validate,required=('server.jar',))
+        entries=list(stage.rglob('*')); planned=[]
+        for source in entries:
+            relative=source.relative_to(stage)
+            if relative.parts[0] in ('Worlds','plugins','server.properties') and (root/relative.parts[0]).exists():continue
+            if relative.parts[:2]==('.voltra','steamcmd') and (root/'.voltra/steamcmd').exists():continue
+            if source.is_symlink():raise ValueError('Unexpected publisher symlink')
+            target=confined(root,str(relative))
+            if target.is_symlink() or (target.exists() and target.is_dir()!=source.is_dir()):raise ValueError('Publisher destination type differs')
+            if any(p.exists() and not p.is_dir() for p in target.parents if p.is_relative_to(root)):raise ValueError('Publisher destination parent differs')
+            planned.append((source,target))
+        for source,target in planned:
+            if source.is_dir():target.mkdir(parents=True,exist_ok=True);continue
+            target.parent.mkdir(parents=True,exist_ok=True)
+            fd,temporary=tempfile.mkstemp(prefix='.rising-',dir=target.parent)
+            try:
+                with os.fdopen(fd,'wb') as output,source.open('rb') as incoming:shutil.copyfileobj(incoming,output)
+                os.chmod(temporary,stat.S_IMODE(source.stat().st_mode));os.replace(temporary,target)
+            finally:
+                if os.path.exists(temporary):os.unlink(temporary)
+
+
 def install(root, kind, env, validate=True):
     root=Path(root).resolve()
     if kind not in ('necesse','starmade','rising-world-java'):raise ValueError('Unknown reviewed Java game')
+    if kind=='starmade':
+        from java_games_runtime import validate_starmade
+        validate_starmade(root,env)
+    if kind=='necesse':
+        from java_games_runtime import validate_necesse
+        validate_necesse(env)
+    if kind=='rising-world-java':
+        from java_games_runtime import validate_rising
+        validate_rising(root,env)
     effective_env=dict(env)
     if kind=='rising-world-java':
         branch=effective_env.get('SRCDS_BETAID') or 'java'
@@ -147,7 +200,8 @@ def install(root, kind, env, validate=True):
             if path.stat().st_size>4*1024**2:raise ValueError('Existing game configuration is too large')
             saved[relative]=(path.read_bytes(),path.stat())
     try:
-        if kind=='starmade':starmade(root)
+        if kind=='rising-world-java':rising_update(root,effective_env,validate)
+        elif kind=='starmade':starmade(root)
         else:update(root,1169370 if kind=='necesse' else 339010,effective_env,validate=validate,required=('Server.jar','jre/bin/java') if kind=='necesse' else ('server.jar',))
     finally:
         for relative,(content,metadata) in saved.items():

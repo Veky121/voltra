@@ -2,6 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readableSettingName,settingsGroups} from '../src/client/gameSettingsLayout.ts';
 const field=(key,label=key)=>({key,label,type:'text',value:''});
+test('native API groups keep Sons base and gameplay controls together',()=>{
+ const fields=[
+  {...field('/ServerName'),group:'General'},
+  {...field('/Password'),group:'General',secret:true},
+  {...field('/SaveSlot'),group:'World'},
+  {...field('/GameSettings/Gameplay.TreeRegrowth'),group:'Gameplay',type:'boolean'},
+  {...field('/CustomGameModeSettings/GameSetting.Vail.EnemySpawn'),group:'Custom game (new saves)',type:'boolean'},
+  {...field('/Future/Option'),group:'   '},
+ ];
+ const groups=settingsGroups(fields,'sons','/dedicatedserver.cfg');
+ assert.deepEqual(groups.map(group=>group.label),['General','World','Gameplay','Custom game (new saves)','Future']);
+ assert.deepEqual(groups[0].fields,fields.slice(0,2));
+ assert.deepEqual(groups.flatMap(group=>group.fields),fields);
+});
+test('Minecraft and Palworld purpose groups retain precedence over API hints',()=>{
+ assert.equal(settingsGroups([{...field('view-distance'),group:'General'}],'minecraft','/server.properties')[0].id,'performance');
+ assert.equal(settingsGroups([{...field('PalSpawnNumRate'),group:'General'}],'palworld','/PalWorldSettings.ini')[0].id,'pals');
+});
 test('Minecraft settings group by purpose and retain every property exactly once',()=>{
  const fields=['motd','gamemode','level-seed','view-distance','server-port','resource-pack','rcon.password','unknown-future-option'].map(key=>field(key));
  const groups=settingsGroups(fields,'minecraft','/server.properties');

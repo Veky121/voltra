@@ -35,6 +35,28 @@ STOCK = b'''<?xml version="1.0"?>
 '''
 
 class Tests(unittest.TestCase):
+    def test_headless_server_ignores_image_xvfb_during_native_cleanup(self):
+        _, argv, child, _, _, _ = stk.configure(self.root,
+            {**self.environment, 'DISPLAY': ':0', 'SDL_VIDEODRIVER': 'x11'})
+        self.assertIn('--no-graphics', argv)
+        self.assertEqual(child['SDL_VIDEODRIVER'], 'dummy')
+        self.assertEqual(child['DISPLAY'], ':0')
+
+    def test_launch_reports_raw_child_status_without_masking_failure(self):
+        config = (Path('stk'), ['binary'], {'VERSION': '1.5'}, 'quit', (), 'Available command:')
+        for code, diagnostic in [(0, 'returncode=0'), (245, 'returncode=245'),
+                                 (-11, 'returncode=-11 signal=SIGSEGV'),
+                                 (-15, 'returncode=-15 signal=SIGTERM'),
+                                 (127, 'returncode=127')]:
+            with self.subTest(code=code), patch.object(stk, 'configure', return_value=config), \
+                    patch.object(stk, 'run', return_value=code) as runner, redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(stk.launch(Path('fixture'), {}), code)
+                self.assertIn(diagnostic, output.getvalue())
+                runner.assert_called_once_with(*config[:5], ready_marker=config[5].encode(),
+                                               terminal_input=True, terminal_query_reply=True)
+                if code == 245:
+                    self.assertNotIn('SIGSEGV', output.getvalue())
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -63,7 +85,10 @@ class Tests(unittest.TestCase):
                       '--difficulty=3','--max-players=24','--motd=literal ; motd',
                       '--no-graphics','--network-console','--stk-config='+stk.GENERATED]:
             self.assertIn(value,argv)
-        self.assertEqual(child['SUPERTUXKART_DATADIR'],str(self.root/'stk/data'))
+        self.assertEqual(child['SUPERTUXKART_DATADIR'],str(self.root/'stk'))
+        self.assertEqual(child['SUPERTUXKART_ASSETS_DIR'],str(self.root/'stk')+'/data/')
+        self.assertEqual(child['SDL_VIDEODRIVER'],'dummy')
+        self.assertEqual(child['LD_LIBRARY_PATH'],str(self.root/'stk/lib'))
         self.assertEqual(stop,'quit');self.assertEqual(ready,'Available command:')
         self.assertEqual(self.stock.read_bytes(),STOCK)
         self.assertEqual(self.operator.read_bytes(),b'operator server configuration remains untouched')
@@ -72,6 +97,19 @@ class Tests(unittest.TestCase):
         self.assertIn(b'server-port="28000"',updated)
         self.assertIn(b'client-port="2758"',updated)
         self.assertEqual(updated,STOCK.replace(b'server-port="2759"',b'server-port="28000"'))
+
+    def test_publisher_asset_root_identity_prevents_duplicate_kart_loading(self):
+        _, _, child, _, _, _ = stk.configure(self.root, self.environment)
+        # Pinned FileManager compares the unnormalized strings, not Paths.
+        # A trailing-slash mismatch loads the same root twice and duplicates
+        # cache-borrowed kart models. Path equality would miss this regression.
+        root_dir = child['SUPERTUXKART_DATADIR'] + '/data/'
+        assets_dir = child['SUPERTUXKART_ASSETS_DIR']
+        roots = [root_dir]
+        if assets_dir and assets_dir != root_dir:
+            roots.append(assets_dir)
+        self.assertEqual(roots, [root_dir])
+        self.assertTrue(assets_dir.endswith('/'))
 
     def test_auto_secondary_uses_selected_allocations_only(self):
         primary, discovery = stk.select_ports({**self.environment,'VOLTRA_ALLOCATED_PORTS':'28000,28100,28009','DISCOVERY_PORT':''})

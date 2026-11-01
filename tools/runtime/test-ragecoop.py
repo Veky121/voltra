@@ -22,7 +22,8 @@ class RageCOOP(unittest.TestCase):
             root=Path(tmp)
             for name in ['../escape','/escape','x\\escape']:
                 archive=root/'archive.zip'
-                with zipfile.ZipFile(archive,'w') as z:z.writestr(name,'bad')
+                info=zipfile.ZipInfo('fixture');info.filename=name
+                with zipfile.ZipFile(archive,'w') as z:z.writestr(info,'bad')
                 with self.assertRaises(ValueError):installer.extract(archive,root/'out')
     def test_default_pinned(self):
         self.assertEqual(load('ragecoop-install').identity({})['sha256'],'85cb91487993138f30f913ed2fe7bffbcc5c9e2f2c2b59eba91480ce1016fd8d')

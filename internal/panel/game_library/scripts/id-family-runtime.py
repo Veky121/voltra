@@ -27,11 +27,31 @@ def native_value(value):
  if any(c in value for c in '"\\'):raise ValueError('Native NZP console strings cannot contain double quotes or backslashes')
  return '"'+value+'"'
 
+def zandronum_preflight(env,root,acquisition=False):
+ game=confined(root,root/'zandronum')
+ number(env,'SERVER_PORT',10666,1,65535)
+ number(env,'MAX_PLAYERS',16,1,128);number(env,'SKILL',3,0,15)
+ for key in ['DMFLAGS','DMFLAGS2','ZADMFLAGS','COMPATFLAGS','COMPATFLAGS2','ZACOMPATFLAGS']:
+  number(env,key,0,-2147483648,4294967295)
+ number(env,'PUBLIC_SERVER',0,0,1);number(env,'GEOIP',1,0,1)
+ text(env.get('SERVER_NAME','Zandronum server'));text(env.get('SERVER_PASSWORD',''))
+ mapname=env.get('MAP','') or 'e1m1'
+ if not re.fullmatch(r'[A-Za-z0-9_/-]{1,63}',mapname) or '..' in mapname.split('/'):raise ValueError('Invalid native map basename')
+ iwad=env.get('IWAD','freedoom1.wad');pwads=shlex.split(text(env.get('PWADS','')))
+ for folder,names in [('IWAD',[iwad]),('PWAD',pwads)]:
+  base=confined(game,game/folder)
+  for name in names:
+   if not name or name.startswith(('-','/','\\')) or '..' in Path(name).parts:raise ValueError('Invalid WAD path')
+   path=confined(base,base/name)
+   if not path.is_file() and not (acquisition and folder=='IWAD' and name in ('freedoom1.wad','freedoom2.wad')):raise ValueError('Selected '+folder+' is missing')
+ return game
+
 def configure(env,root,kind):
  mode=env.get('NZP_ENGINE','vril')
  if kind=='nzportable' and mode not in ('vril','fte_legacy'):raise ValueError('Choose modern Vril or legacy FTE')
  game=confined(root,root/kind/mode if kind=='nzportable' else root/kind);port=number(env,'SERVER_PORT',10666,1,65535)
  if kind=='zandronum':
+  zandronum_preflight(env,root)
   binary=game/'zandronum-server';iwad=env.get('IWAD','freedoom1.wad')
   if not iwad or not confined(game,game/'IWAD'/iwad).is_file():raise ValueError('Selected IWAD is missing')
   argv=[str(binary),'-port',str(port),'-config',str(confined(game,game/'zandronum.ini')),'-iwad',str(game/'IWAD'/iwad)]
@@ -57,6 +77,9 @@ def configure(env,root,kind):
   if not .001<=float(tick)<=20:raise ValueError('TICKRATE outside supported range')
   protocol=text(env.get('PROTOCOL','NZP-REBOOT'),50)
   extra=shlex.split(text(env.get('GAME_ARGS',''),200))
+  reserved={'port','sv_port','sv_port_tcp','basedir','game','dedicated','exec','maxclients','maxplayers','sv_maxplayers'}
+  for value in extra:
+   if ';' in value or value.lstrip('+-').lower() in reserved:raise ValueError('GAME_ARGS cannot override managed native controls')
   if mode=='vril':extra=[native_value(value) if any(c.isspace() for c in value) or ';' in value else value for value in extra]
   # Arguments use native argv, never shell evaluation. Native +commands remain supported.
   maximum=number(env,'NZP_MAXPLAYERS',4,1,16)
@@ -64,10 +87,10 @@ def configure(env,root,kind):
   if mode=='vril':
    if protocol!='NZP-REBOOT':raise ValueError('Custom FTE/Web PROTOCOL requires the matched legacy FTE engine')
    if number(env,'PUBLIC_SERVER',0,0,1):raise ValueError('Master registration is available only in legacy FTE mode')
-   argv=[str(binary),'-dedicated',str(maximum),'-basedir',str(game),'-game','nzp','-port',str(port),'+vid_renderer','headless','+exec','voltra-server.cfg','+sys_ticrate',tick,'+hostname',native_value(env.get('SERVER_NAME','Nazi Zombies: Portable server')),*extra]
+   argv=[str(binary),'-dedicated',str(maximum),'-basedir',str(game),'-game','nzp','-port',str(port),*extra,'+vid_renderer','headless','+exec','voltra-server.cfg','+sys_ticrate',tick,'+hostname',native_value(env.get('SERVER_NAME','Nazi Zombies: Portable server'))]
   else:
-   argv=[str(binary),'-dedicated','-nohome','-basedir',str(game),'-game','nzp','+exec','voltra-server.cfg','+sv_port',str(port),'+sv_port_tcp',str(port),'+com_protocolname',protocol,'+net_enable_websockets',str(int(protocol.upper().endswith(('-WEB','_WEB')))),'+sv_mintic',tick,
-         '+hostname',text(env.get('SERVER_NAME','Nazi Zombies: Portable server'),100),'+sv_public',str(number(env,'PUBLIC_SERVER',0,0,1)),*extra]
+   argv=[str(binary),'-dedicated','-nohome','-basedir',str(game),'-game','nzp',*extra,'+exec','voltra-server.cfg','+sv_port',str(port),'+sv_port_tcp',str(port),'+com_protocolname',protocol,'+net_enable_websockets',str(int(protocol.upper().endswith(('-WEB','_WEB')))),'+sv_mintic',tick,
+         '+hostname',text(env.get('SERVER_NAME','Nazi Zombies: Portable server'),100),'+sv_public',str(number(env,'PUBLIC_SERVER',0,0,1))]
  if not re.fullmatch(r'[A-Za-z0-9_/-]{1,63}',mapname) or '..' in mapname.split('/'):raise ValueError('Invalid native map basename')
  argv+=['+map',mapname]
  return game,argv,port

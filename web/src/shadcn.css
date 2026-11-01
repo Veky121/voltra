@@ -4,13 +4,14 @@
 @source "./App.tsx";
 @source "./Navigation.tsx";
 @source "./client";
+@source "./admin";
 @custom-variant dark (&:is(.dark, .dark *));
 
 /* A scoped preflight for new controls; legacy screens retain their base CSS. */
 @layer base {
-  :where([data-slot="button"],[data-slot="sidebar-menu-button"],[data-slot="sidebar-trigger"],[data-slot="input"],[data-slot="dropdown-menu-trigger"],[data-slot="dropdown-menu-item"]){box-sizing:border-box;font:inherit;color:inherit;background:transparent;border:0 solid;padding:0;margin:0;text-decoration:none;min-height:0;min-width:0}
+  :where([data-slot="alert-dialog-action"],[data-slot="alert-dialog-cancel"],[data-slot="button"],[data-slot="sidebar-menu-button"],[data-slot="sidebar-trigger"],[data-slot="input"],[data-slot="dropdown-menu-trigger"],[data-slot="dropdown-menu-item"]){box-sizing:border-box;font:inherit;color:inherit;background:transparent;border:0 solid;padding:0;margin:0;text-decoration:none;min-height:0;min-width:0}
 }
-:where([data-slot="button"],[data-slot="sidebar-menu-button"],[data-slot="sidebar-trigger"],[data-slot="input"],[data-slot="dropdown-menu-trigger"],[data-slot="dropdown-menu-item"]){all:revert-layer}
+:where([data-slot="alert-dialog-action"],[data-slot="alert-dialog-cancel"],[data-slot="button"],[data-slot="sidebar-menu-button"],[data-slot="sidebar-trigger"],[data-slot="input"],[data-slot="dropdown-menu-trigger"],[data-slot="dropdown-menu-item"]){all:revert-layer}
 
 @theme inline {
   --color-background: var(--scn-background);

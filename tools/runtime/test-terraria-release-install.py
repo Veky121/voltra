@@ -65,13 +65,59 @@ class TerrariaReleaseTests(unittest.TestCase):
             with mock.patch.object(m,'resolve',return_value=dict(item)),mock.patch.dict(sys.modules,{'tshock_runtime':primitive}):
                 with self.assertRaises(ValueError):m.install(root,env,download=download,machine='x86_64')
                 self.assertEqual([],called);self.assertFalse((root/'tModLoader.dll').exists())
-                (root/'serverconfig.txt').rmdir();(root/'serverconfig.txt').write_text('operator config')
+                operator_config=b'# operator config\r\ncustom_option=keep\r\n'
+                (root/'serverconfig.txt').rmdir();(root/'serverconfig.txt').write_bytes(operator_config)
                 (root/'saves/Worlds').mkdir(parents=True);(root/'saves/Worlds/old.wld').write_bytes(b'world');(root/'saves/Worlds/old.twld').write_bytes(b'modworld')
                 m.install(root,env,download=download,machine='x86_64')
                 receipt=json.loads((root/'.voltra/terraria-release/release.json').read_text())
                 self.assertEqual(6,receipt['runtime_major']);self.assertEqual('6.0.36',receipt['private_runtime']['version'])
-                self.assertEqual(['x64'],called);self.assertEqual('operator config',(root/'serverconfig.txt').read_text())
+                self.assertEqual(['x64'],called);self.assertEqual(operator_config,(root/'serverconfig.txt').read_bytes())
                 self.assertEqual(b'world',(root/'saves/Worlds/old.wld').read_bytes());self.assertEqual(b'modworld',(root/'saves/Worlds/old.twld').read_bytes())
+    def test_vanilla_path_refusal_precedes_metadata_acquisition_and_recovery(self):
+        for conflict in ('serverconfig.txt', 'saves'):
+            with self.subTest(conflict=conflict), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                if conflict == 'serverconfig.txt': (root / conflict).mkdir()
+                else: (root / conflict).write_bytes(b'operator bytes')
+                (root / 'TerrariaServer.bin.x86_64').write_bytes(b'old runtime')
+                boundary = mock.Mock(side_effect=AssertionError('external boundary reached'))
+                with mock.patch.object(m, 'recover', boundary):
+                    with self.assertRaises(ValueError):
+                        m.install(root, {'VOLTRA_TERRARIA_KIND': 'vanilla', 'TERRARIA_VERSION': 'latest'}, read_metadata=boundary, download=boundary, machine='x86_64')
+                boundary.assert_not_called()
+                self.assertEqual(b'old runtime', (root / 'TerrariaServer.bin.x86_64').read_bytes())
+                if conflict == 'saves': self.assertEqual(b'operator bytes', (root / conflict).read_bytes())
+
+    def test_vanilla_update_failure_preserves_receipt_config_world_and_runtime(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = b'# operator\r\npassword=private\r\nunknown=keep\r\n'
+            (root / 'serverconfig.txt').write_bytes(config)
+            (root / 'saves/Worlds').mkdir(parents=True)
+            (root / 'saves/Worlds/world.wld').write_bytes(b'world')
+            elf = b'\x7fELF\x02\x01' + b'\0' * 12 + (62).to_bytes(2, 'little')
+            def download(item, destination, cache):
+                with zipfile.ZipFile(destination, 'w') as archive:
+                    archive.writestr(item['version'].replace('.', '') + '/Linux/TerrariaServer.bin.x86_64', elf + item['version'].encode())
+                return m.digest(destination)
+            env = {'VOLTRA_TERRARIA_KIND': 'vanilla', 'TERRARIA_VERSION': '1.4.4.9'}
+            with mock.patch.object(m, 'metadata', side_effect=AssertionError('network')), mock.patch.object(m.urllib.request, 'build_opener', side_effect=AssertionError('network')):
+                m.install(root, env, download=download, machine='x86_64')
+                receipt = root / '.voltra/terraria-release/release.json'
+                before = receipt.read_bytes()
+                runtime = (root / 'TerrariaServer.bin.x86_64').read_bytes()
+                failed = mock.Mock(side_effect=ValueError('fixture acquisition failed'))
+                with self.assertRaises(ValueError):
+                    m.install(root, {**env, 'TERRARIA_VERSION': '1.4.4.8'}, download=failed, machine='x86_64')
+                failed.assert_called_once()
+                self.assertEqual(before, receipt.read_bytes())
+                self.assertEqual(runtime, (root / 'TerrariaServer.bin.x86_64').read_bytes())
+                m.install(root, {**env, 'TERRARIA_VERSION': '1.4.4.8'}, download=download, machine='x86_64')
+            self.assertEqual('1.4.4.8', json.loads(receipt.read_text())['version'])
+            self.assertEqual(elf + b'1.4.4.8', (root / 'TerrariaServer.bin.x86_64').read_bytes())
+            self.assertEqual(config, (root / 'serverconfig.txt').read_bytes())
+            self.assertEqual(b'world', (root / 'saves/Worlds/world.wld').read_bytes())
+
     def test_pins_and_input(self):
         for (kind, version, arch), (_, checksum) in m.PINS.items():
             item = m.resolve(kind, version, arch, read_metadata=lambda _: self.fail('pinned metadata network'))

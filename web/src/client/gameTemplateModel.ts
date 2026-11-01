@@ -195,8 +195,25 @@ export function templateVariableControl(variable: TemplateVariableDefinition, en
   const maximum = upperBounds.length ? Math.min(...upperBounds) : undefined;
   const booleanChoices = rules.includes('boolean') ? (/^(?:true|false)$/.test(variable.default_value) ? ['false', 'true'] : ['0', '1']) : undefined;
   const conditionalRequired = rules.some(rule => {
-    const match = /^required_if:environment\.([A-Za-z0-9_]+),([A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*)$/.exec(rule);
-    return !!match && match[2].split(',').includes(environment[match[1]]);
+    // Only interpret simple environment references. Quoted CSV and other
+    // Laravel field paths remain the backend validator's responsibility.
+    const match = /^required_(if|unless):environment\.([A-Za-z0-9_]+),([A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*)$/.exec(rule);
+    if (match) {
+      const matches = match[3].split(',').includes(environment[match[2]]);
+      return match[1] === 'if' ? matches : !matches;
+    }
+    const dependent = /^required_(with|with_all|without|without_all):(.+)$/.exec(rule);
+    if (!dependent) return false;
+    const names = dependent[2].split(',');
+    if (!names.every(name => /^environment\.[A-Za-z0-9_]+$/.test(name))) return false;
+    const filled = names.map(name => !!environment[name.slice(12)]?.trim());
+    switch (dependent[1]) {
+      case 'with': return filled.some(Boolean);
+      case 'with_all': return filled.every(Boolean);
+      case 'without': return !filled.every(Boolean);
+      case 'without_all': return !filled.some(Boolean);
+    }
+    return false;
   });
   const toggleChoices = choices ?? booleanChoices;
   const boolean = !secret && !!toggleChoices && toggleChoices.length === 2 && (toggleChoices.includes('0') && toggleChoices.includes('1') || toggleChoices.includes('true') && toggleChoices.includes('false'));

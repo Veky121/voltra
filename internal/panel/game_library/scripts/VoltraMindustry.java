@@ -35,20 +35,45 @@ public final class VoltraMindustry {
     }
 
     private static void configure() {
+        // Validate creation controls before changing native settings in memory.
         String name = required("SAVE_NAME");
         if(name.equals(".") || name.equals("..") || name.contains("/") || name.contains("\\")) {
             throw new IllegalArgumentException("Save name must be a file name without a path.");
         }
+        int port = integer("SERVER_PORT", 1, 65535);
+        String serverName = required("SERVER_NAME");
+        String description = System.getenv().getOrDefault("SERVER_DESCRIPTION", "");
+        int players = integer("MAX_PLAYERS", 0, 999);
+        int spacing = integer("AUTOSAVE_SECONDS", 30, 3600);
+        String pause = required("AUTO_PAUSE");
+        if(!pause.equals("0") && !pause.equals("1"))throw new IllegalArgumentException("Invalid AUTO_PAUSE.");
+        required("MAPNAME");
+        Gamemode.valueOf(required("GAMEMODE"));
+        for(Config config : Config.all) {
+            Object value = Core.settings.get(config.key, config.defaultValue);
+            if(!config.defaultValue.getClass().isInstance(value))throw new IllegalArgumentException("Wrong native type for " + config.name);
+        }
+        if(Core.settings.has("playerlimit") && (!(Core.settings.get("playerlimit", 0) instanceof Integer) || Core.settings.getInt("playerlimit") < 0))throw new IllegalArgumentException("Invalid native player limit.");
+        int nativeSpacing = Core.settings.getInt(Config.autosaveSpacing.key, spacing);
+        if(nativeSpacing < 1)throw new IllegalArgumentException("Native autosave spacing must be positive.");
+
         persistentSave = Vars.saveDirectory.child(name + ".msav");
-        Config.port.set(integer("SERVER_PORT", 1, 65535));
-        Config.serverName.set(required("SERVER_NAME"));
-        Config.desc.set(System.getenv().getOrDefault("SERVER_DESCRIPTION", ""));
-        Vars.netServer.admins.setPlayerLimit(integer("MAX_PLAYERS", 0, 999));
-        Config.autoPause.set("1".equals(System.getenv("AUTO_PAUSE")));
-        Config.autosave.set(true);
-        Config.autosaveSpacing.set(integer("AUTOSAVE_SECONDS", 30, 3600));
+        seed(Config.serverName, serverName);
+        seed(Config.desc, description);
+        if(!Core.settings.has("playerlimit"))Core.settings.put("playerlimit", players);
+        seed(Config.autoPause, pause.equals("1"));
+        seed(Config.autosave, true);
+        seed(Config.autosaveSpacing, spacing);
+        // Persist publisher-defined scalar defaults so the shared native editor
+        // can show them. Existing operator and opaque admin/player rows survive.
+        for(Config config : Config.all)seed(config, config.defaultValue);
+        Config.port.set(port);
         Config.autoUpdate.set(false);
         Core.settings.forceSave();
+    }
+
+    private static void seed(Config config, Object value) {
+        if(!Core.settings.has(config.key))config.set(value);
     }
 
     private static void resumeOrHost() {
@@ -77,8 +102,8 @@ public final class VoltraMindustry {
                 Log.info("VOLTRA_MINDUSTRY_NEW_WORLD");
             }
         }
-        int seconds = integer("AUTOSAVE_SECONDS", 30, 3600);
-        Timer.schedule(() -> { if(Vars.state.isGame())savePersistent(); }, seconds, seconds);
+        int seconds = Config.autosaveSpacing.num();
+        Timer.schedule(() -> { if(Config.autosave.bool() && Vars.state.isGame())savePersistent(); }, seconds, seconds);
         Log.info("VOLTRA_MINDUSTRY_READY");
     }
 
@@ -107,6 +132,9 @@ public final class VoltraMindustry {
                 SaveIO.save(persistentSave);
                 Log.info("VOLTRA_MINDUSTRY_SAVED");
             }
+            // Administration.save() only marks records dirty; serialize them
+            // before flushing settings so a prompt Stop retains bans/admins.
+            Vars.netServer.admins.forceSave();
             Core.settings.forceSave();
             return true;
         } catch(Throwable error) {

@@ -13,7 +13,6 @@ import time
 import urllib.request
 import zipfile
 from native_release import sha256
-from native_zip_release import extract
 
 STABLE_SHA512 = 'cb39879e96f19abb2877588c2d50c5d3e64dd68153bec3dd1bebedf4d765e506afa419c28381d7005aed664cb1a042571c132b5b319e4308cab67745d996c2a6'
 MAX_ARCHIVE = 3 * 1024**3
@@ -71,7 +70,8 @@ def resolve_release(env):
 
 def unpack(archive, ready):
     # Preserve publisher source/licenses and safely materialize internal ZIP links.
-    # The shared extractor still owns traversal, duplicate and expansion limits.
+    # Validate the whole package before extracting only regular Linux files.
+    # Other ZIP callers retain their default refusal of all symbolic links.
     links, regular = {}, []
     with zipfile.ZipFile(archive) as source:
         seen, total = set(), 0
@@ -84,12 +84,19 @@ def unpack(archive, ready):
             total += member.file_size
             if len(seen) > 100000 or total > 4 * 1024**3:
                 raise ValueError('Xonotic ZIP exceeds extraction limits')
+            mode = member.external_attr >> 16
+            if stat.S_IFMT(mode) not in (0, stat.S_IFDIR, stat.S_IFREG, stat.S_IFLNK):
+                raise ValueError('Xonotic ZIP special files are unsupported')
+            if len(parts) == 1:
+                if not member.is_dir() or stat.S_IFMT(mode) not in (0, stat.S_IFDIR):
+                    raise ValueError('Xonotic ZIP root must be a directory')
+                continue
             relative = '/'.join(parts[1:])
             # The Linux server does not use the macOS application bundle. Its
             # framework directory links are outside this Linux-only profile.
             if relative == 'Xonotic.app' or relative.startswith('Xonotic.app/'):
                 continue
-            if stat.S_ISLNK(member.external_attr >> 16):
+            if stat.S_ISLNK(mode):
                 if member.file_size > 4096:
                     raise ValueError('Oversized Xonotic ZIP link')
                 value = source.read(member).decode('utf-8')
@@ -98,8 +105,20 @@ def unpack(archive, ready):
                     raise ValueError('Xonotic ZIP link escapes the release')
                 links[relative] = target
             elif relative:
-                regular.append(relative)
-    extract(archive, ready, 'Xonotic', regular)
+                regular.append((relative, member))
+    # Xonotic intentionally ships links. Never hand those entries to the
+    # generic extractor or create filesystem links: copy validated regular
+    # members first, then materialize supported internal file aliases below.
+    with zipfile.ZipFile(archive) as source:
+        for name, member in regular:
+            destination = ready / name
+            if member.is_dir():
+                destination.mkdir(parents=True, exist_ok=True)
+            else:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with source.open(member) as inp, destination.open('xb') as output:
+                    shutil.copyfileobj(inp, output)
+                destination.chmod((member.external_attr >> 16 & 0o777) or 0o644)
     for name, target in links.items():
         origin = ready / target
         if not origin.is_file() or origin.is_symlink():

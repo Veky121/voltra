@@ -33,6 +33,7 @@ import (
 
 func (a *App) registerOperations(mux *http.ServeMux) {
 	a.registerFileTransfers(mux)
+	mux.HandleFunc("GET /api/client/servers/{server}/files/pulls", a.clientRemoteTransfers)
 	mux.HandleFunc("GET /api/client/{$}", a.clientServers)
 	mux.HandleFunc("GET /api/client", a.clientServers)
 	mux.HandleFunc("GET /api/client/servers/{server}", a.clientServerDetail)
@@ -66,8 +67,6 @@ func (a *App) registerOperations(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/client/servers/{server}/network/allocations/{allocation}/primary", a.clientAllocations)
 	mux.HandleFunc("GET /api/client/servers/{server}/startup", a.clientStartup)
 	mux.HandleFunc("PUT /api/client/servers/{server}/startup/variable", a.clientStartup)
-	mux.HandleFunc("GET /api/client/servers/{server}/startup/variable/{key}/reveal", a.revealStartupField)
-	mux.HandleFunc("POST /api/client/servers/{server}/startup/fs25-forward", a.forwardFS25Dashboard)
 	mux.HandleFunc("POST /api/client/servers/{server}/settings/rename", a.clientSettings)
 	mux.HandleFunc("POST /api/client/servers/{server}/settings/reinstall", a.clientSettings)
 	mux.HandleFunc("PUT /api/client/servers/{server}/settings/docker-image", a.clientSettings)
@@ -153,8 +152,18 @@ func (a *App) clientServers(w http.ResponseWriter, r *http.Request) {
 		end = total
 	}
 	out := []any{}
+	ctx := r.Context()
+	if _, ok := ctx.Value(requestReadContextKey{}).(*requestReadScope); !ok {
+		ctx = context.WithValue(ctx, requestReadContextKey{}, &requestReadScope{rows: make(map[requestReadKey][]M)})
+	}
+	if end > start {
+		if err := a.preloadClientList(ctx, filtered[start:end]); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	for _, s := range filtered[start:end] {
-		attrs, e := a.clientServer(r.Context(), u, s)
+		attrs, e := a.clientServer(ctx, u, s)
 		if e != nil {
 			fail(w, e)
 			return
@@ -198,19 +207,17 @@ func (a *App) clientResources(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	resp, e := a.daemonServer(r.Context(), s, "GET", "", nil)
+	m, e := a.clientResourceSnapshot(r.Context(), s)
 	if e != nil {
 		fail(w, e)
 		return
 	}
-	m, e := opJSON(resp)
-	if e != nil {
-		fail(w, e)
-		return
-	}
+	writeJSON(w, 200, clientResourceResponse(m))
+}
+func clientResourceResponse(m M) M {
 	u := asMap(m["utilization"])
 	n := asMap(u["network"])
-	writeJSON(w, 200, item("stats", M{"current_state": opDefault(str(m["state"]), "stopped"), "is_suspended": boolean(m["is_suspended"]), "resources": M{"memory_bytes": num(u["memory_bytes"]), "cpu_absolute": u["cpu_absolute"], "disk_bytes": num(u["disk_bytes"]), "network_rx_bytes": num(n["rx_bytes"]), "network_tx_bytes": num(n["tx_bytes"]), "uptime": num(u["uptime"])}}))
+	return item("stats", M{"current_state": opDefault(str(m["state"]), "stopped"), "is_suspended": boolean(m["is_suspended"]), "resources": M{"memory_bytes": num(u["memory_bytes"]), "cpu_absolute": u["cpu_absolute"], "disk_bytes": num(u["disk_bytes"]), "network_rx_bytes": num(n["rx_bytes"]), "network_tx_bytes": num(n["tx_bytes"]), "uptime": num(u["uptime"])}})
 }
 func (a *App) clientCommand(w http.ResponseWriter, r *http.Request) {
 	s, e := a.server(r, "control.console")
@@ -486,9 +493,6 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	if op == "pull" && !a.allowFilePull(w, r, s) {
-		return
-	}
 	if op == "download" || op == "upload" {
 		a.clientSignedFile(w, r, s, op)
 		return
@@ -496,6 +500,7 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	path := "/files/" + op
 	var body any
+	trackedPull := false
 	auditEvent := "server:file." + op
 	auditProperties := M{}
 	method := r.Method
@@ -554,6 +559,18 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 			delete(d, "root")
 		}
 		if op == "pull" {
+			trackedPull = boolean(d["tracked"])
+			if trackedPull {
+				d["foreground"] = false
+			}
+			delete(d, "tracked")
+			if err := a.applyDownloadHeaders(r.Context(), s, d); err != nil {
+				fail(w, err)
+				return
+			}
+			if !a.allowFilePull(w, r, s) {
+				return
+			}
 			d["root"] = opDefault(str(d["directory"]), "/")
 			delete(d, "directory")
 			if v, ok := d["filename"]; ok {
@@ -573,6 +590,16 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	if op == "pull" && trackedPull {
+		var result M
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			fail(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, result)
+		a.opAudit(r, s, auditEvent, auditProperties)
+		return
+	}
 	if op == "list" {
 		var files []M
 		if e = json.NewDecoder(resp.Body).Decode(&files); e != nil {
@@ -1236,7 +1263,7 @@ func opVariable(m M) M {
 		out["secret"] = boolean(m["secret"])
 		out["configured"] = boolean(m["configured"])
 	}
-	for _, key := range []string{"secret_configured", "is_overridden", "can_reset"} {
+	for _, key := range []string{"secret_configured", "is_overridden", "can_reset", "effect"} {
 		if v, ok := m[key]; ok {
 			out[key] = v
 		}
@@ -1259,23 +1286,10 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	startupEgg, eggErr := a.one(ctx, "SELECT features FROM eggs WHERE id=$1", s["egg_id"])
-	if eggErr != nil {
-		fail(w, eggErr)
-		return
-	}
 	var changed M
 	if e = a.maskIntegrationVariables(ctx, num(s["id"]), rows); e != nil {
 		fail(w, e)
 		return
-	}
-	if fs25Egg(startupEgg) {
-		for _, v := range rows {
-			switch str(v["env_variable"]) {
-			case "WEB_PASSWORD", "GAME_PASSWORD", "ADMIN_PASSWORD":
-				v["user_viewable"], v["user_editable"] = true, true
-			}
-		}
 	}
 	if e = a.steamCatalogMaskVariables(ctx, s, rows); e != nil {
 		fail(w, e)
@@ -1321,7 +1335,12 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if boolean(d["reset"]) || boolean(changed["secret"]) {
+		cfxEgg, cfxErr := a.serverEffectiveEgg(ctx, s)
+		if cfxErr != nil {
+			fail(w, cfxErr)
+			return
+		}
+		if nativeSettingsIsRecipe(cfxEgg, fiveMRecipe) || boolean(d["reset"]) || boolean(changed["secret"]) {
 			a.saveStartupField(w, r, s, changed, d, rawValue)
 			return
 		}
@@ -1396,6 +1415,9 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 	}
 	meta := M{"startup_command": maskStartupArguments(startup), "raw_startup_command": maskStartupArguments(str(s["startup"])), "raw_startup_is_template": true, "java_managed": javaDisplay["java_managed"], "java_effective_error": javaDisplay["java_effective_error"], "docker_images": egg["docker_images"], "applies": "next_start"}
 	if changed != nil {
+		if asMap(changed["effect"])["kind"] == "initial_default" {
+			meta["applies"] = "initial_default"
+		}
 		out := item("egg_variable", opVariable(changed))
 		out["meta"] = meta
 		writeJSON(w, 200, out)

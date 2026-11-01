@@ -1,8 +1,19 @@
+import {usePendingSetting} from '../client/PendingSettings';
+import {confirmAction} from '../ui/ConfirmAction';
+import {useErrorState} from '../notifications/useErrorState';
+import {FieldGroup} from '../components/ui/field';
+import {PageHeading} from '../ui/PageHeading';
+import {Alert,AlertDescription} from '../components/ui/alert';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
+import {Input as MiraInput} from '../components/ui/input';
+import {Textarea as MiraTextarea} from '../components/ui/textarea';
+import {Table as MiraTable,TableHeader as MiraTableHeader,TableRow as MiraTableRow,TableHead as MiraTableHead,TableBody as MiraTableBody,TableCell as MiraTableCell} from '../components/ui/table';
+import {Card as MiraCard} from '../components/ui/card';
 import { miBToGB, gbToMiB, formatMiBGB } from "../resourceUnits";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useRef, useId, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {Select,  api, rows, unwrap, useAPI as useCoreAPI } from "../lib";
-import { Switch } from "../ui/Settings";
+import { Switch, SettingsField, SettingsSection, useSettingsLayout } from "../ui/Settings";
 import "./management-ui.css";
 
 export { api, rows, unwrap };
@@ -12,7 +23,7 @@ export function useAPI(path: string | null) {
   const source = useCoreAPI(path);
   const [complete, setComplete] = useState<any>(null);
   const [loadingPages, setLoadingPages] = useState(false);
-  const [pageError, setPageError] = useState("");
+  const [pageError, setPageError] = useErrorState('admin/shared.tsx');
   useEffect(() => {
     let cancelled = false;
     setComplete(null);
@@ -108,9 +119,7 @@ export function defaults(fields: FieldSpec[]) {
 }
 export function ErrorMessage({ error }: { error?: string }) {
   return error ? (
-    <div className="error admin-feedback management-ui" role="alert">
-      {error}
-    </div>
+    <Alert variant="destructive" className="error admin-feedback management-ui"><AlertDescription>{error}</AlertDescription></Alert>
   ) : null;
 }
 export function Notice({ children }: { children: ReactNode }) {
@@ -127,15 +136,7 @@ export function Heading({
   title: string;
   children?: ReactNode;
 }) {
-  return (
-    <div className="page-header admin-heading management-ui">
-      <div>
-        <p className="eyebrow">Administration</p>
-        <h1>{title}</h1>
-      </div>
-      <div className="actions">{children}</div>
-    </div>
-  );
+  return <PageHeading title={title}>{children}</PageHeading>;
 }
 export function Panel({
   title,
@@ -146,11 +147,16 @@ export function Panel({
   children: ReactNode;
   className?: string;
 }) {
+  const settings=useSettingsLayout();
+  if(settings){
+    if(className.includes('admin-grouped-editor'))return <div className="settings-grouped-form">{children}</div>;
+    return <SettingsSection title={title || 'Settings'} className={`settings-panel management-ui ${className}`}>{children}</SettingsSection>;
+  }
   return (
-    <section className={`card admin-panel management-ui ${className}`}>
+    <MiraCard as="section" className={`card admin-panel management-ui scn:gap-0 ${className}`}>
       {title && <h2>{title}</h2>}
       {children}
-    </section>
+    </MiraCard>
   );
 }
 export function DataTable({
@@ -171,7 +177,7 @@ export function DataTable({
   return (
     <div className="admin-data management-ui" aria-busy={loading}>
       <div className="toolbar admin-data-toolbar">
-        <input
+        <MiraInput
           type="search"
           aria-label="Search records"
           placeholder="Search records…"
@@ -181,25 +187,25 @@ export function DataTable({
         <span className="muted admin-record-count" role="status">{loading ? "Loading..." : `${filtered.length} ${filtered.length === 1 ? "record" : "records"}`}</span>
       </div>
       <div className="admin-table-scroll">
-        <table className="table">
-          <thead>
-            <tr>
+        <MiraTable className="table">
+          <MiraTableHeader>
+            <MiraTableRow>
               {columns.map((c) => (
-                <th scope="col" key={c.label}>{c.label}</th>
+                <MiraTableHead scope="col" key={c.label}>{c.label}</MiraTableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? <tr><td colSpan={columns.length} className="admin-table-empty">Loading records...</td></tr> : filtered.map((r, i) => (
-              <tr key={r.id ?? r.identifier ?? i}>
+            </MiraTableRow>
+          </MiraTableHeader>
+          <MiraTableBody>
+            {loading ? <MiraTableRow><MiraTableCell colSpan={columns.length} className="admin-table-empty">Loading records...</MiraTableCell></MiraTableRow> : filtered.map((r, i) => (
+              <MiraTableRow key={r.id ?? r.identifier ?? i}>
                 {columns.map((c) => (
-                  <td key={c.label}>{c.render(r)}</td>
+                  <MiraTableCell key={c.label}>{c.render(r)}</MiraTableCell>
                 ))}
-              </tr>
+              </MiraTableRow>
             ))}
-            {!loading && !filtered.length && <tr><td colSpan={columns.length} className="admin-table-empty">{search ? "No records match your search." : empty}</td></tr>}
-          </tbody>
-        </table>
+            {!loading && !filtered.length && <MiraTableRow><MiraTableCell colSpan={columns.length} className="admin-table-empty">{search ? "No records match your search." : empty}</MiraTableCell></MiraTableRow>}
+          </MiraTableBody>
+        </MiraTable>
       </div>
     </div>
   );
@@ -214,16 +220,15 @@ export function Fields({
   onChange: (value: RecordData) => void;
 }) {
   return (
-    <div className="form-grid admin-fields management-ui">
+    <FieldGroup className="form-grid admin-fields management-ui settings-fields">
       {fields.map((field) => {
         const v = value[field.key] ?? "";
         const set = (next: any) => onChange({ ...value, [field.key]: next });
         return (
-          <label className={`field admin-field${field.type === "checkbox" ? " admin-field-switch" : ""}${field.type === "json" ? " admin-field-code" : ""}`} key={field.key}>
-            <span>
+          <SettingsField className={`admin-field${field.type === "checkbox" ? " admin-field-switch" : ""}${field.type === "json" ? " admin-field-code" : ""}`} key={field.key} label={<>
               {field.label}
               {field.required && " *"}
-            </span>
+            </>} description={field.hint}>
             {field.type === "checkbox" ? (
               <div className="admin-switch-control"><Switch
                 aria-label={field.label}
@@ -233,6 +238,7 @@ export function Fields({
               /></div>
             ) : field.type === "select" || field.type === "multiselect" ? (
               <Select
+                aria-label={field.label}
                 disabled={field.disabled}
                 multiple={field.type === "multiselect"}
                 required={field.required}
@@ -268,7 +274,9 @@ export function Fields({
                 ))}
               </Select>
             ) : field.type === "textarea" || field.type === "json" ? (
-              <textarea
+              <MiraTextarea
+                disabled={field.disabled}
+                aria-label={field.label}
                 rows={field.type === "json" ? 7 : 4}
                 required={field.required}
                 value={typeof v === "object" ? JSON.stringify(v, null, 2) : v}
@@ -276,7 +284,9 @@ export function Fields({
                 spellCheck={false}
               />
             ) : (
-              <input
+              <MiraInput
+                disabled={field.disabled}
+                aria-label={field.label}
                 required={field.required}
                 type={field.type ?? "text"}
                 step={field.unit === "GB" ? "any" : field.step}
@@ -293,11 +303,10 @@ export function Fields({
                 }
               />
             )}
-            {field.hint && <small className="muted">{field.hint}</small>}
-          </label>
+          </SettingsField>
         );
       })}
-    </div>
+    </FieldGroup>
   );
 }
 export function normalize(fields: FieldSpec[], value: RecordData) {
@@ -327,6 +336,7 @@ export function normalize(fields: FieldSpec[], value: RecordData) {
 export function Editor({
   title,
   fields,
+  groups,
   initial,
   endpoint,
   method = "PATCH",
@@ -336,6 +346,7 @@ export function Editor({
 }: {
   title?: string;
   fields: FieldSpec[];
+  groups?: {title:string;keys:string[]}[];
   initial?: RecordData;
   endpoint: string;
   method?: string;
@@ -348,60 +359,49 @@ export function Editor({
     ...resourceDraft(fields, initial ?? {}),
   });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/shared.tsx');
   const [saved, setSaved] = useState(false);
+  const [baseline,setBaseline]=useState(value);
+  const form=useRef<HTMLFormElement>(null),key=useId();
+  const dirty=JSON.stringify(value)!==JSON.stringify(baseline);
+  const initialKey=JSON.stringify(initial);
   useEffect(() => {
-    setValue({ ...defaults(fields), ...resourceDraft(fields, initial ?? {}) });
-  }, [initial]);
+    if(dirty)return;
+    const next={...defaults(fields),...resourceDraft(fields,initial??{})};
+    setValue(next);setBaseline(next);
+  }, [initialKey]);
+  async function save(){
+    if(!form.current?.reportValidity())throw new Error('Check the highlighted fields.');
+    setBusy(true);setError('');setSaved(false);
+    try{
+      const selected=Object.fromEntries(fields.filter(field=>!(method==='PATCH'&&field.type==='password'&&!value[field.key])).map(field=>[field.key,value[field.key]]));
+      const normalized=normalize(fields.filter(field=>field.key in selected),selected);
+      const result=await api(endpoint,{method,body:JSON.stringify(transform?transform(normalized):normalized)});
+      resultRef.current=result;
+      const clean={...value};for(const field of fields)if(field.type==='password')clean[field.key]='';
+      setValue(clean);setBaseline(clean);setSaved(true);
+    }catch(err){setError(err instanceof Error?err.message:String(err));throw err}finally{setBusy(false)}
+  }
+  const resultRef=useRef<any>(null);
+  const shared=usePendingSetting(`editor:${key}`,method!=='POST'&&dirty,{blocked:busy,save,afterSave:()=>onSaved?.(resultRef.current),discard:()=>{setValue(baseline);setError('');setSaved(false)}});
+
   return (
-    <Panel title={title}>
+    <Panel title={title} className={`settings-editor-panel${groups?" admin-grouped-editor":""}`}>
       <form
         className="admin-editor-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setError("");
-          setSaved(false);
-          try {
-            const selected = Object.fromEntries(
-              fields
-                .filter(
-                  (field) =>
-                    !(
-                      method === "PATCH" &&
-                      field.type === "password" &&
-                      !value[field.key]
-                    )
-                )
-                .map((field) => [field.key, value[field.key]])
-            );
-            const normalized = normalize(
-              fields.filter((field) => field.key in selected),
-              selected
-            );
-            const result = await api(endpoint, {
-              method,
-              body: JSON.stringify(
-                transform ? transform(normalized) : normalized
-              ),
-            });
-            setSaved(true);
-            onSaved?.(result);
-          } catch (err) {
-            setError(String(err instanceof Error ? err.message : err));
-          } finally {
-            setBusy(false);
-          }
-        }}
+        ref={form}
+        onSubmit={async e=>{e.preventDefault();try{await save();onSaved?.(resultRef.current)}catch{/* Inline error retains this draft. */}}}
       >
         <ErrorMessage error={error} />
         {saved && <Notice>Changes saved.</Notice>}
-        <Fields fields={fields} value={value} onChange={setValue} />
-        <div className="actions admin-form-actions">
-          <button disabled={busy} type="submit">
+        {groups ? <div className="admin-editor-groups">{groups.map(group=><SettingsSection title={group.title} className="admin-editor-group" key={group.title}>
+          <Fields fields={fields.filter(field=>group.keys.includes(field.key))} value={value} onChange={setValue}/>
+        </SettingsSection>)}</div> : <Fields fields={fields} value={value} onChange={setValue} />}
+        {(!shared||method==='POST')&&<div className="actions admin-form-actions">
+          <MiraAction disabled={busy} type="submit">
             {busy ? "Saving…" : submit}
-          </button>
-        </div>
+          </MiraAction>
+        </div>}
       </form>
     </Panel>
   );
@@ -424,15 +424,15 @@ export function Action({
   danger?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/shared.tsx');
   const [done, setDone] = useState(false);
   return (
     <div className="admin-action management-ui">
-      <button
+      <MiraAction
         className={danger ? "danger" : "secondary"}
         disabled={busy}
         onClick={async () => {
-          if (confirm && !window.confirm(confirm)) return;
+          if (confirm && !await confirmAction({title:typeof children==='string'?children:'Confirm action',description:confirm,confirmLabel:typeof children==='string'?children:'Continue',danger})) return;
           setBusy(true);
           setError("");
           setDone(false);
@@ -451,7 +451,7 @@ export function Action({
         }}
       >
         {busy ? "Working…" : children}
-      </button>
+      </MiraAction>
       <ErrorMessage error={error} />
       {done && (
         <small className="success admin-action-status" role="status">
@@ -481,13 +481,13 @@ export function ResourceList({
         <Link className="button" to={`${base}/new`}>
           Create {title.toLowerCase().replace(/s$/, "")}
         </Link>
-        <button className="secondary" onClick={q.reload}>
+        <MiraAction className="secondary" onClick={q.reload}>
           Refresh
-        </button>
+        </MiraAction>
       </Heading>
       {description && <p className="muted">{description}</p>}
       <ErrorMessage error={q.error} />
-      {q.loading ? (
+      {q.loading && !q.data ? (
         <p className="admin-loading" role="status">Loading records...</p>
       ) : (
         <Panel>
@@ -590,7 +590,7 @@ export function JsonView({ value }: { value: any }) {
 }
 export function DownloadJSON({ value, name }: { value: any; name: string }) {
   return (
-    <button
+    <MiraAction
       className="secondary"
       onClick={() => {
         const a = document.createElement("a");
@@ -605,6 +605,6 @@ export function DownloadJSON({ value, name }: { value: any; name: string }) {
       }}
     >
       Download JSON
-    </button>
+    </MiraAction>
   );
 }

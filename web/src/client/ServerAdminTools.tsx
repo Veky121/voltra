@@ -1,20 +1,24 @@
+import {useDiscardSettings,usePendingSetting} from './PendingSettings';
+import {useErrorState} from '../notifications/useErrorState';
+import {Input as MiraInput} from '../components/ui/input';
+import {Textarea as MiraTextarea} from '../components/ui/textarea';
 import './gameSwitch.css';
 import { useEffect, useState } from "react";
 import { api, Button, Card, ErrorBox, Loading, unwrap, useAPI } from "../lib";
 import {
-  Build, DeleteServer, Details, Manage, ServerDatabases, ServerMounts,
+  Build, DeleteServer, Details, ServerLifecycle, Transfer, ServerMounts,
   ServerSettingsTabs, RuntimeAssignment, Startup,
 } from "../admin/servers";
 import {useSearchParams} from 'react-router-dom';
 import {Settings} from './Operations';
 import ServerStartup from "./ServerStartup";
 import { can, useServer } from "./common";
-import {Switch} from '../ui/Settings';
+import {Switch,SettingsRow,SettingsSection,SettingsLayout} from '../ui/Settings';
 import "./serverAdminTools.css";
 
 const tabs = [
-  ["general", "General"], ["runtime", "Runtime"], ["limits", "Resources"], ["mounts", "Mounts"],
-  ["configuration", "Advanced"], ["manage", "Management"],
+  ["general", "General"], ["runtime", "Startup"], ["limits", "Resources"], ["mounts", "Mounts"],
+  ["configuration", "Advanced"], ["manage", "Transfer"],
 ] as const;
 
 const configurationFields = [
@@ -95,18 +99,19 @@ export default function ServerAdminTools() {
   if (account.error) return <Card><ErrorBox>{account.error}</ErrorBox><Button variant="secondary" onClick={account.reload}>Retry administrator check</Button></Card>;
   // Ownership and wildcard server permissions do not grant panel administration.
   // Each application/admin/configuration endpoint also enforces backend admin auth.
-  if (unwrap(account.data)?.root_admin !== true) return <ClientRuntimeTools/>;
+  if (unwrap(account.data)?.root_admin !== true) return <SettingsLayout><ClientRuntimeTools/></SettingsLayout>;
   const id = serverAdminID(server.internal_id);
   if (id === null) return <ErrorBox>This server's internal ID is unavailable. Reload the server before opening resource controls.</ErrorBox>;
-  return <AuthorizedServerTools key={id} serverID={id} />;
+  return <SettingsLayout><AuthorizedServerTools key={id} serverID={id} /></SettingsLayout>;
 }
 
 function ClientRuntimeTools() {
-  const {permissions} = useServer();
+  const {permissions,reload} = useServer();
+  const discard=useDiscardSettings();
   const [search] = useSearchParams();
-  const [active, setActive] = useState(search.get('tab') === 'general' || !can(permissions, 'startup.read') ? 'general' : 'runtime');
-  return <section className="server-admin-tools" aria-label="Runtime and resources">
-    <ServerSettingsTabs scope="client-runtime" tabs={[["general", "General"], ["runtime", "Runtime"]]} active={active} onChange={setActive}/>
+  const [active, setActive] = useState(search.get('tab') === 'runtime' && can(permissions, 'startup.read') ? 'runtime' : 'general');
+  return <section className="server-admin-tools settings-responsive" aria-label="Server settings">
+    <ServerSettingsTabs scope="client-runtime" tabs={[["general", "General"], ["runtime", "Startup"]]} active={active} onChange={async tab=>{if(tab!==active&&await discard()){setActive(tab);reload();}}}/>
     <section role="tabpanel" id={`client-runtime-panel-${active}`} aria-labelledby={`client-runtime-tab-${active}`} tabIndex={0}>
       {active === 'general' ? <Settings/> : <ServerStartup section="runtime"/>}
     </section>
@@ -117,37 +122,34 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
   const { reload } = useServer();
   const query = useAPI(`/api/application/servers/${serverID}?include=allocations,variables,user,node,egg`);
   const [search] = useSearchParams();
-  const [active, setActive] = useState(search.get("tab") === "general" ? "general" : "runtime");
+  const [active, setActive] = useState(search.get("tab") === "runtime" ? "runtime" : "general");
   const [configurationDirty, setConfigurationDirty] = useState(false);
-  const [refreshVersion, setRefreshVersion] = useState(0);
   const record = query.data ? unwrap(query.data) : null;
   const scope = `server-admin-${serverID}`;
-  const discard = () => !configurationDirty || window.confirm("Discard unsaved runtime or advanced configuration changes?");
+  const discard = useDiscardSettings();
   const saved = () => { query.reload(); reload(); };
-  return <section className="server-admin-tools" aria-label="Runtime and resources">
-    <div className="toolbar server-page-toolbar">
-      <Button variant="secondary" disabled={query.loading} onClick={() => {
-        if (!window.confirm("Reload all server settings? Unsaved changes in this tab will be discarded.")) return;
-        setConfigurationDirty(false);
-        setRefreshVersion(version => version + 1);
-        query.reload(); reload();
-      }}>Refresh settings</Button>
-    </div>
+  return <section className="server-admin-tools settings-responsive" aria-label="Server settings">
     <ErrorBox>{query.error}</ErrorBox>
-    <ServerSettingsTabs scope={scope} tabs={tabs} active={active} onChange={tab => {
-      if (tab === active || !discard()) return;
+    {query.error && <Button variant="secondary" onClick={()=>{query.reload();reload();}}>Retry</Button>}
+    <ServerSettingsTabs scope={scope} tabs={tabs} active={active} onChange={async tab => {
+      if (tab === active || !await discard()) return;
       setConfigurationDirty(false);
       setActive(tab);
+      query.reload(); reload();
     }} />
-    {query.loading && !record ? <Loading /> : record && serverAdminID(record.id) !== serverID
+    {query.loading && !record ? <Loading /> : query.error ? null : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
-      : record && <section key={`${active}-${refreshVersion}`} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
-        {active === "general" && <Settings/>}
+      : record && <section key={active} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
+        {active === "general" && <>
+          <Settings details={<Details record={record} onSaved={saved}/>} showReinstall={false}/>
+          <ServerLifecycle record={record} onSaved={saved}/>
+          <DeleteServer record={record} returnTo="/"/>
+        </>}
         {active === "limits" && <Build record={record} onSaved={saved} />}
         {active === "runtime" && <ServerStartup section="runtime" administrator showCommandPreview={false} runtimeCommand={<RuntimeAssignment record={record} onSaved={saved}/>} onDirtyChange={setConfigurationDirty}/>}
         {active === "mounts" && <ServerMounts record={record} contextual />}
         {active === "configuration" && <><Startup record={record} onSaved={saved} contextual restrictedOnly/><ServerConfigurationEditor serverID={serverID} onSaved={saved} onDirtyChange={setConfigurationDirty} /></>}
-        {active === "manage" && <><Manage record={record} onSaved={saved} /><Details record={record} onSaved={saved}/><ServerDatabases record={record}/><DeleteServer record={record} returnTo="/" /></>}
+        {active === "manage" && <Transfer record={record} onSaved={saved}/>}
       </section>}
   </section>;
 }
@@ -162,11 +164,11 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
   const [configuration, setConfiguration] = useState<ServerConfiguration | null>(null);
   const [draft, setDraft] = useState<ConfigurationDraft>({});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('client/ServerAdminTools.tsx');
   const [success, setSuccess] = useState("");
   const dirty = configuration !== null && JSON.stringify(draft) !== JSON.stringify(configurationDraft(configuration));
   useEffect(() => {
-    if (!query.data) return;
+    if (!query.data || dirty) return;
     const next = unwrap(query.data) as ServerConfiguration;
     setConfiguration(next);
     setDraft(configurationDraft(next));
@@ -179,6 +181,29 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty]);
 
+  async function saveConfiguration(){
+    if (!configuration || !configuration.can_update || busy || !dirty) return;
+    setError(""); setSuccess("");
+    try {
+      const body = configurationRequest(configuration, draft);
+      setBusy(true);
+      const response = await api(endpoint, { method: "PUT", body: JSON.stringify(body) });
+      const next = unwrap(response);
+      if (next?.revision) {
+        setConfiguration(next);
+        setDraft(configurationDraft(next));
+      } else {
+        query.reload();
+      }
+      setSuccess("Server overrides saved. Process changes apply on the next start. Installer changes apply on the next install or reinstall. Nothing was started or reinstalled.");
+
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));throw error;
+    } finally {
+      setBusy(false);
+    }
+  }
+  usePendingSetting(`configuration:${serverID}`,dirty,{blocked:!configuration?.can_update||busy||query.loading||!!query.error,save:saveConfiguration,afterSave:onSaved,discard:()=>{if(configuration)setDraft(configurationDraft(configuration));setError('')}});
   if (!configuration) return <Card><h3>Installation &amp; process</h3><ErrorBox>{query.error}</ErrorBox>
     {query.loading ? <Loading /> : <Button variant="secondary" onClick={query.reload}>Retry configuration</Button>}
   </Card>;
@@ -199,61 +224,36 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
     const text = overridden ? draft[field.key]! : fieldText(configuration.defaults[field.key]);
     const changed = overridden !== Object.hasOwn(configuration.overrides, field.key)
       || overridden && draft[field.key] !== configurationDraft(configuration)[field.key];
-    const controls = <>
-      <div className="server-configuration-field-heading"><label htmlFor={id}>{field.label}</label>
-        <span className="muted">{changed ? "Unsaved" : overridden ? "Server override" : "Template default"}</span>
-      </div>
-      <div className="actions server-configuration-inheritance">
-        <label><Switch checked={overridden} disabled={!editable || managed && !overridden}
-          onCheckedChange={checked => change(field.key, checked ? fieldText(configuration.effective[field.key]) : undefined)} />Override template</label>
+    return <SettingsRow key={field.key} className={`server-configuration-option server-configuration-${field.kind}`}
+      label={<><label htmlFor={id}>{field.label}</label><span className="server-configuration-state">{changed ? "Unsaved" : overridden ? "Server override" : "Template default"}</span></>}
+      description={<span id={`${id}-hint`}>{field.hint}</span>}
+      control={<div className="server-configuration-inheritance">
+        <span className="muted">Override</span>
+        <Switch aria-label={`Override ${field.label}`} checked={overridden} disabled={!editable || managed && !overridden}
+          onCheckedChange={checked => change(field.key, checked ? fieldText(configuration.effective[field.key]) : undefined)} />
         {overridden && <Button variant="secondary" disabled={!editable} onClick={() => change(field.key)}>Use template</Button>}
-      </div>
-      <p id={`${id}-hint`} className="muted">{field.hint}</p>
-      {field.kind === "text" ? <input id={id} value={text} disabled={!editable || managed || !overridden} aria-describedby={`${id}-hint`} onChange={event => change(field.key, event.target.value)} />
-        : <textarea id={id} value={text} rows={field.kind === "script" ? 14 : field.key === "config_files" && text.trim() === "{}" ? 3 : 5} spellCheck={false}
+      </div>}>
+      {field.kind === "text" ? <MiraInput id={id} value={text} disabled={!editable || managed || !overridden} aria-describedby={`${id}-hint`} onChange={event => change(field.key, event.target.value)} />
+        : <MiraTextarea id={id} value={text} rows={field.kind === "script" ? 10 : 5} spellCheck={false}
           disabled={!editable || managed || !overridden} aria-describedby={`${id}-hint`} onChange={event => change(field.key, event.target.value)} />}
-    </>;
-    return <div key={field.key} className={`server-configuration-field server-configuration-${field.kind}`}>{controls}</div>;
+    </SettingsRow>;
   };
-  return <form className="server-configuration-editor" onSubmit={async event => {
-    event.preventDefault();
-    if (!editable || !dirty) return;
-    setError(""); setSuccess("");
-    try {
-      const body = configurationRequest(configuration, draft);
-      setBusy(true);
-      const response = await api(endpoint, { method: "PUT", body: JSON.stringify(body) });
-      const next = unwrap(response);
-      if (next?.revision) {
-        setConfiguration(next);
-        setDraft(configurationDraft(next));
-      } else {
-        query.reload();
-      }
-      setSuccess("Server overrides saved. Process changes apply on the next start. Installer changes apply on the next install or reinstall. Nothing was started or reinstalled.");
-      onSaved();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
-    }
-  }}>
+  return <form className="server-configuration-editor" onSubmit={event=>{event.preventDefault();void saveConfiguration().catch(()=>{})}}>
     <div className="server-configuration-notice">
-      {!configuration.can_update && <p role="status" className="muted">{configuration.update_unavailable_reason || "Stop the server, then refresh settings to edit."}</p>}
+      {!configuration.can_update && <p role="status" className="muted">{configuration.update_unavailable_reason || "Stop the server, then reopen this tab to edit."}</p>}
       <ErrorBox>{error || query.error}</ErrorBox>
       {success && <p className="success" role="status">{success}</p>}
     </div>
-    <Card><h3>Process configuration</h3>
+    <SettingsSection title="Process configuration" className="server-configuration-section"><div className="server-configuration-grid">
       {configurationFields.filter(field => field.group === "process").map(renderField)}
-    </Card>
-    <Card><h3>Installation settings</h3>
-      <p className="muted">Used on the next install or reinstall. Saving does not run the installer.</p>
-      {configuration.managed && <p role="status" className="muted">This server uses a managed installer. Installer overrides are unavailable. Use its managed installation controls. Process overrides can still be edited when the server is stopped.</p>}
+    </div></SettingsSection>
+    <SettingsSection title="Installation settings" className="server-configuration-section">
+      <p className="settings-section-note">Applies on the next install or reinstall.</p>
+      {configuration.managed && <p role="status" className="settings-section-note">Managed installer. Use the game's installation controls to change it.</p>}
+      <div className="server-configuration-grid">
       {configurationFields.filter(field => field.group === "installation").map(renderField)}
-    </Card>
-    <div className="actions"><Button type="submit" disabled={!editable || !dirty}>{busy ? "Saving server overrides..." : "Save server overrides"}</Button>
-      <span className="muted" role="status">{dirty ? "Unsaved changes. Saving does not reinstall." : "No unsaved changes."}</span>
-    </div>
+    </div></SettingsSection>
+
   </form>;
 }
 

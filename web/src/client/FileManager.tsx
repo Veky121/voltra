@@ -1,3 +1,6 @@
+import {transferDestination} from './fileTransferPaths';
+import {useErrorState} from '../notifications/useErrorState';
+import {PageHeading} from '../ui/PageHeading';
 import './gameSwitch.css';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
@@ -19,7 +22,7 @@ import './fileWorkspace.css';
 import './fileMenu.css';
 import './files-ui.css';
 
-type Dialog={kind:'folder'|'new'|'rename'|'move'|'chmod'|'delete'|'pull'|'details';paths:string[]};
+type Dialog={kind:'folder'|'new'|'rename'|'move'|'chmod'|'delete'|'pull'|'details';paths:string[];target:string};
 export default function FileManager(){const {base,permissions}=useServer();return <Workspace key={base} base={base} permissions={permissions}/>}
 function Workspace({base,permissions}:{base:string;permissions:string[]}){
   const [query,setQuery]=useSearchParams();
@@ -33,12 +36,12 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
     return()=>window.clearTimeout(timer);
   },[opened]);
   const displayedFile=opened||retainedFile;
-  const [epoch,setEpoch]=useState(0),[selected,setSelected]=useState<string[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  const [epoch,setEpoch]=useState(0),[selected,setSelected]=useState<string[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/FileManager.tsx'),[notice,setNotice]=useState('');
   const [documentDirty,setDocumentDirty]=useState(false),[pendingTransfers,setPendingTransfers]=useState(false);
   const [rowMenu,setRowMenu]=useState<{id:string;anchor:HTMLButtonElement}|null>(null);
   useEffect(()=>setRowMenu(null),[directory,opened,epoch]);
   const navigationGuard=useFileNavigationGuard(documentDirty||pendingTransfers,({currentLocation,nextLocation})=>blocksFileNavigation(documentDirty,pendingTransfers,currentLocation,nextLocation));
-  const [dialog,setDialog]=useState<Dialog|null>(null),[name,setName]=useState(''),[url,setURL]=useState(''),[mode,setMode]=useState('644'),[useHeader,setUseHeader]=useState(false),[foreground,setForeground]=useState(false),[dragging,setDragging]=useState(false);
+  const [dialog,setDialog]=useState<Dialog|null>(null),[name,setName]=useState(''),[url,setURL]=useState(''),[mode,setMode]=useState('644'),[useHeader,setUseHeader]=useState(false),[dragging,setDragging]=useState(false);
   const transfers=useRef<FileTransfersHandle>(null),folderInput=useRef<HTMLInputElement>(null),fileInput=useRef<HTMLInputElement>(null),records=useRef(new Map<string,FileEntry>()),directoryEntries=useRef(new Map<string,FileEntry[]>()),latest=useRef({directory,opened,query,permissions});
   latest.current={directory,opened,query,permissions};
   const busyRef=useRef(false);
@@ -58,10 +61,12 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
     if(busyRef.current)return;busyRef.current=true;setBusy(true);setError('');setNotice('');
     try{await action();setDialog(null);setNotice(message);refresh()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{busyRef.current=false;setBusy(false)}
   }
-  function show(kind:Dialog['kind'],paths=selected){setDialog({kind,paths:[...paths]});setError('');setName(kind==='rename'?fileName(paths[0]):kind==='move'?directory:'');setMode(records.current.get(paths[0])?.mode_bits||'644');setURL('');setUseHeader(false);setForeground(false)}
+  function show(kind:Dialog['kind'],paths=selected){setDialog({kind,paths:[...paths],target:destination()});setError('');setName(kind==='rename'?fileName(paths[0]):kind==='move'?directory:'');setMode(records.current.get(paths[0])?.mode_bits||'644');setURL('');setUseHeader(false);}
+  const uploadDirectory=useRef(directory);
+  function destination(){return transferDestination(latest.current.directory,selected,path=>records.current.get(path)?.is_file===false)}
   function nativeDownload(path:string){const link=document.createElement('a');link.href=`${base}/files/download-stream?file=${encodeURIComponent(path)}`;link.download=fileName(path);document.body.append(link);link.click();link.remove()}
   async function dropFiles(data:DataTransfer){
-    const target=latest.current.directory;
+    const target=destination();
     try{
       const files=await getDroppedFiles(data,{logDropError:()=>setError('Some dropped items could not be read by the browser. Try Upload folder for those items.')});
       if(files.length)await transfers.current?.addFiles(files,true,target);
@@ -78,21 +83,21 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
         case 'move':{const target=filePath(name.startsWith('/')?name:`${directory}/${name}`);await api(`${base}/files/rename`,json('PUT',{root:'/',files:paths.map(path=>({from:path.slice(1),to:childPath(target,fileName(path)).slice(1)}))}));break}
         case 'chmod':await api(`${base}/files/chmod`,json('POST',{root:'/',files:paths.map(path=>({file:path.slice(1),mode}))}));break;
         case 'delete':await api(`${base}/files/delete`,json('POST',{root:'/',files:paths.map(path=>path.slice(1))}));break;
-        case 'pull':await api(`${base}/files/pull`,json('POST',{url,directory,filename:name||undefined,use_header:useHeader,foreground}));break;
+        case 'pull':if(!transfers.current)throw new Error('Transfers are starting. Try again.');await transfers.current.addRemote({url,directory:dialog.target,filename:name||undefined,use_header:useHeader});break;
       }
-    },kind==='pull'&&!foreground?'Remote download queued. Refresh to see completed files.':'Changes saved.');
+    },kind==='pull'?`Download queued to ${dialog.target}. Follow its progress in Transfers.`:'Changes saved.');
   }
   const single=selected.length===1?records.current.get(selected[0]):undefined,detail=dialog?.paths[0]?records.current.get(dialog.paths[0]):undefined;
   const menuFile=rowMenu?records.current.get(rowMenu.id):undefined;
   function menuAction(label:string,icon:IconName,action:()=>void,danger=false){return <DropdownMenuItem className={`file-menu-item${danger?' is-danger':''}`} variant={danger?'destructive':'default'} disabled={busy} onClick={()=>{setRowMenu(null);action()}}><Icon name={icon}/>{label}</DropdownMenuItem>}
   const titles={folder:'Create folder',new:'Create file',rename:'Rename',move:'Move items',chmod:'Unix permissions',delete:'Delete items',pull:'Download from URL',details:'File details'};
   return <section className="fm-workspace" aria-label="File manager">
-    <header className="fm-heading server-page-toolbar"><h1>Files</h1>
+    <header className="fm-heading server-page-toolbar"><PageHeading title={<>Files</>}/>
     <div className="fm-actions" role="toolbar" aria-label="File tools">
       <Button variant="secondary" disabled={busy} onClick={refresh}><Icon name="restart"/>Refresh</Button>
-      {allowed('file.create')&&<><Button variant="secondary" disabled={busy} onClick={()=>show('folder',[])}><Icon name="folderPlus"/>New folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('new',[])}><Icon name="newFile"/>New file</Button><Button onClick={()=>fileInput.current?.click()}><Icon name="upload"/>Upload files</Button><Button variant="secondary" onClick={()=>folderInput.current?.click()}>Upload folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('pull',[])}><Icon name="download"/>From URL</Button></>}
-      <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]));e.target.value=''}}/>
-      <input ref={folderInput} type="file" multiple hidden {...{webkitdirectory:'',directory:''}} aria-label="Choose folder to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),true);e.target.value=''}}/>
+      {allowed('file.create')&&<><Button variant="secondary" disabled={busy} onClick={()=>show('folder',[])}><Icon name="folderPlus"/>New folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('new',[])}><Icon name="newFile"/>New file</Button><Button onClick={()=>{uploadDirectory.current=destination();fileInput.current?.click()}}><Icon name="upload"/>Upload files</Button><Button variant="secondary" onClick={()=>{uploadDirectory.current=destination();folderInput.current?.click()}}>Upload folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('pull',[])}><Icon name="download"/>From URL</Button></>}
+      <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),false,uploadDirectory.current);e.target.value=''}}/>
+      <input ref={folderInput} type="file" multiple hidden {...{webkitdirectory:'',directory:''}} aria-label="Choose folder to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),true,uploadDirectory.current);e.target.value=''}}/>
     </div>
     </header>
     <FileStorageSummary/>
@@ -117,7 +122,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
       <Button variant="secondary" onClick={()=>setSelected([])}>Clear selection</Button>
     </div>}
     {pendingTransfers&&!documentDirty&&navigationGuard.attention>0&&<div ref={navigationGuard.bar} tabIndex={-1} role="alert" className="fm-notice">Finish or cancel your queued transfers before leaving Files. Folder navigation remains available.</div>}
-    {allowed('file.create')&&<FileTransfers ref={transfers} base={base} directory={directory} permissions={permissions} onComplete={refresh} onPendingChange={setPendingTransfers}/>}
+    {allowed('file.create')&&<FileTransfers ref={transfers} base={base} directory={destination()} permissions={permissions} onComplete={refresh} onPendingChange={setPendingTransfers}/>}
     {rowMenu&&menuFile&&<FileMenu anchor={rowMenu.anchor} label={`Options for ${menuFile.name}`} onClose={restore=>{if(restore)rowMenu.anchor.focus();setRowMenu(null)}}>
       {(!menuFile.is_file||allowed('file.read-content'))&&menuAction(menuFile.is_file?'Open / preview':'Open folder',menuFile.is_file?'file':'files',()=>openEntry(rowMenu.id))}
       {menuFile.is_file&&allowed('file.read-content')&&menuAction('Download','download',()=>nativeDownload(rowMenu.id))}
@@ -134,7 +139,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
         {dialog.kind==='delete'?<><p>Delete {dialog.paths.length} selected {dialog.paths.length===1?'item':'items'}? This cannot be undone.</p><ul>{dialog.paths.slice(0,10).map(path=><li key={path}>{path}</li>)}</ul></>:dialog.kind==='chmod'?<Field label="Octal mode"><Input required pattern="[0-7]{3,4}" autoFocus value={mode} onChange={e=>setMode(e.target.value)}/></Field>:<>
           {dialog.kind==='pull'&&<Field label="Source URL"><Input required type="url" value={url} onChange={e=>setURL(e.target.value)}/></Field>}
           <Field label={dialog.kind==='move'?'Destination directory':dialog.kind==='pull'?'File name, optional':'Name'}><Input autoFocus required={dialog.kind!=='pull'} value={name} onChange={e=>setName(e.target.value)}/></Field>
-          {dialog.kind==='pull'&&<><label className="fm-check"><Switch checked={useHeader} onCheckedChange={checked => setUseHeader(checked)}/>Use the source Content-Disposition filename</label><label className="fm-check"><Switch checked={foreground} onCheckedChange={checked => setForeground(checked)}/>Wait for download to finish</label></>}
+          {dialog.kind==='pull'&&<><p>Download to <strong>{dialog.target}</strong>. Progress and errors appear in Transfers.</p><label className="fm-check"><Switch checked={useHeader} onCheckedChange={checked => setUseHeader(checked)}/>Use the filename supplied by the download site</label></>}
         </>}
         <div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setDialog(null)}>Cancel</Button><Button type="submit" disabled={busy} variant={dialog.kind==='delete'?'danger':'default'}>{busy?'Working…':dialog.kind==='delete'?'Delete':dialog.kind==='pull'?'Download':'Save'}</Button></div>
       </form>}

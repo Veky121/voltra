@@ -105,27 +105,27 @@ func validateOriginalFileRequest(op string, d M) error {
 	return nil
 }
 
-// Original ResourceLimit::FilePull is shared by all users of a server. Store
-// its fixed window atomically in PostgreSQL so workers and restarts share it.
+// Limit bursts per user/server, not an entire server for ten minutes. Wings
+// separately enforces its three simultaneous download limit.
 func (a *App) allowFilePull(w http.ResponseWriter, r *http.Request, s M) bool {
 	var count int64
 	var remaining float64
 	err := a.DB.QueryRow(r.Context(), `INSERT INTO settings(key,value)
-		VALUES($1,jsonb_build_object('count',1,'expires',extract(epoch FROM clock_timestamp())+600))
+		VALUES($1,jsonb_build_object('count',1,'expires',extract(epoch FROM clock_timestamp())+60))
 		ON CONFLICT(key) DO UPDATE SET value=CASE
 		WHEN (settings.value->>'expires')::numeric<=extract(epoch FROM clock_timestamp())
-		THEN jsonb_build_object('count',1,'expires',extract(epoch FROM clock_timestamp())+600)
+		THEN jsonb_build_object('count',1,'expires',extract(epoch FROM clock_timestamp())+60)
 		ELSE jsonb_set(settings.value,'{count}',to_jsonb((settings.value->>'count')::bigint+1)) END
-		RETURNING (value->>'count')::bigint,GREATEST(0,(value->>'expires')::numeric-extract(epoch FROM clock_timestamp()))`, "rate:file-pull:"+str(s["uuid"])).Scan(&count, &remaining)
+		RETURNING (value->>'count')::bigint,GREATEST(0,(value->>'expires')::numeric-extract(epoch FROM clock_timestamp()))`, "rate:file-pull-v2:"+str(s["uuid"])+":"+strconv.FormatInt(UserID(r), 10)).Scan(&count, &remaining)
 	if err != nil {
 		fail(w, err)
 		return false
 	}
-	w.Header().Set("X-RateLimit-Limit", "5")
-	w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(max(0, 5-count), 10))
-	if count > 5 {
+	w.Header().Set("X-RateLimit-Limit", "30")
+	w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(max(0, 30-count), 10))
+	if count > 30 {
 		w.Header().Set("Retry-After", strconv.Itoa(max(1, int(math.Ceil(remaining)))))
-		fail(w, &APIError{Status: 429, Code: "TooManyRequestsHttpException", Detail: "Only five file pulls may be requested per server within ten minutes"})
+		fail(w, &APIError{Status: 429, Code: "TooManyRequestsHttpException", Detail: "Too many download requests. Retry in " + strconv.Itoa(max(1, int(math.Ceil(remaining)))) + " seconds."})
 		return false
 	}
 	return true

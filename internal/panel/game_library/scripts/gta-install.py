@@ -98,16 +98,26 @@ def migrate(root,game,names):
             if not old.is_file():continue
             new=target/old.relative_to(source) if source.is_dir() else target
             if not new.resolve().is_relative_to(root):raise ValueError('Legacy destination escapes volume')
+            if new.exists():continue
             new.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(old,new);copied.append(old.relative_to(root).as_posix())
     marker.write_text(json.dumps({'copied':copied,'originals_retained':True},indent=2)+'\n')
 
 def install(game,root=ROOT,env=None):
-    env=os.environ if env is None else env;root.mkdir(parents=True,exist_ok=True)
+    env=os.environ if env is None else env;root=root.resolve()
+    spec=importlib.util.spec_from_file_location('gta_runtime',Path(__file__).with_name('gta-runtime.py'))
+    runtime=importlib.util.module_from_spec(spec);spec.loader.exec_module(runtime)
+    runtime.preflight(game,root,env)
+    if game=='openmp':
+        version=env.get('VERSION',OPENMP['version'])
+        if not re.fullmatch(r'[A-Za-z0-9._-]{1,40}',version):raise ValueError('Invalid VERSION')
+        if env.get('RELEASE_SHA256') and not re.fullmatch(r'[A-Fa-f0-9]{64}',env['RELEASE_SHA256']):raise ValueError('Invalid RELEASE_SHA256')
+    if game=='mtasa' and env.get('MTA_RELEASE_SHA256') and not re.fullmatch(r'[A-Fa-f0-9]{64}',env['MTA_RELEASE_SHA256']):raise ValueError('Invalid MTA_RELEASE_SHA256')
+    root.mkdir(parents=True,exist_ok=True)
     if not (root/'.voltra').resolve().is_relative_to(root) or not (root/'.voltra'/game).resolve().is_relative_to(root):raise ValueError('Installer state escapes volume')
     if game=='openmp':
         bundle_openmp_compat(root)
         identity=resolve_openmp(env.get('VERSION',OPENMP['version']),env.get('RELEASE_SHA256','').lower())
-        release.install_release(root,identity,'openmp','omp-server')
+        release.install_release(root,identity,'openmp','omp-server',preserve_paths=('config.json','bans.json','scriptfiles','gamemodes','filterscripts','models'))
         migrate(root,'openmp',['config.json','server.cfg','bans.json','gamemodes','filterscripts','plugins','components','scriptfiles','models','recordings'])
         if not (root/'openmp/LICENSE.md').exists():release.download(OPENMP_LICENSE,root/'openmp/LICENSE.md')
     elif game=='mtasa':

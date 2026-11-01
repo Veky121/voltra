@@ -402,9 +402,25 @@ sys.exit(250)
             start = time.monotonic()
             self.assertTrue(relay.finish())
             self.assertLess(time.monotonic() - start, .5)
-        self.assertEqual(len(output.buffer.getvalue()), 12)
+        self.assertEqual(len(output.buffer.getvalue()), 300)
         self.assertFalse(relay.thread.is_alive())
         self.assertTrue(relay.finish())
+
+    def test_final_backlog_timeout_reports_failure_instead_of_success(self):
+        root, logs = self.fixture()
+        output, error = Output(), Error()
+        with patch.object(module.sys, 'stdout', output), patch.object(module.sys, 'stderr', error):
+            relay = module.NativeLogRelay(root)
+            relay.INTERVAL = 60
+            relay.FINISH_TIMEOUT = .2
+            relay.start()
+            with patch.object(relay, '_poll', return_value=True):
+                started = time.monotonic()
+                self.assertFalse(relay.finish())
+                self.assertLess(time.monotonic() - started, .5)
+        self.assertEqual(error.getvalue(), 'Native log relay unavailable.\n')
+        self.assertFalse(relay.thread.is_alive())
+        self.assertIsNone(relay.root_fd)
 
     def test_bad_encoding_is_safe_diagnostic_and_partial_bom_waits(self):
         root, logs = self.fixture()

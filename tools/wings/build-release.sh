@@ -12,6 +12,7 @@ version=$3
 node "$root/tools/wings/apply-release.mjs" "$source"
 cd -- "$source"
 go test ./server -run 'TestVoltraInstall' -count=1
+go test ./router/downloader ./router -run 'TestVoltraRemote' -count=1
 for arch in amd64 arm64; do
   GOOS=linux GOARCH=$arch go build -mod=readonly -trimpath -buildvcs=false \
     -ldflags "-s -w -buildid= -X github.com/pterodactyl/wings/system.Version=${version#v}-voltra-upstream1.13.3" \

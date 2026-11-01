@@ -442,7 +442,7 @@ func (a *App) managedServerPower(ctx context.Context, server M, action string) (
 
 // Quick setup is also available to Minecraft, whose normal power path must use
 // the same mutation lock even though it has no Steam maintenance configuration.
-func (a *App) unmanagedServerPower(ctx context.Context, server M, action string) (*http.Response, error) {
+func (a *App) unmanagedServerPower(ctx context.Context, server M, action string, socketUser ...M) (*http.Response, error) {
 	if action != "start" && action != "restart" {
 		return a.daemonServerRaw(ctx, server, "POST", "/power", M{"action": action})
 	}
@@ -454,6 +454,29 @@ func (a *App) unmanagedServerPower(ctx context.Context, server M, action string)
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", "voltra:server-mutation:"+str(server["uuid"])); err != nil {
 		return nil, err
 	}
+	// Revalidate after waiting for settings mutations, before any outbound power.
+	fresh, err := a.one(ctx, `SELECT s.*,n.maintenance_mode,
+ EXISTS(SELECT 1 FROM server_transfers t WHERE t.server_id=s.id AND t.successful IS NULL AND NOT t.archived) AS transferring
+ FROM servers s JOIN nodes n ON n.id=s.node_id WHERE s.id=$1 AND s.uuid=$2`, server["id"], server["uuid"])
+	if err != nil {
+		return nil, err
+	}
+	if str(fresh["status"]) != "" || boolean(fresh["maintenance_mode"]) || boolean(fresh["transferring"]) {
+		return nil, APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance or suspension."}
+	}
+	if len(socketUser) > 0 {
+		current, e := a.one(ctx, "SELECT * FROM users WHERE id=$1", socketUser[0]["id"])
+		if e != nil {
+			return nil, e
+		}
+		if !a.can(ctx, current, fresh, "control."+action) {
+			return nil, forbidden()
+		}
+	}
+	if err = blockPublicSteamOwnership(ctx, a.DB, num(fresh["id"])); err != nil {
+		return nil, err
+	}
+	server = fresh
 	response, err := a.daemonServerRaw(ctx, server, "POST", "/power", M{"action": action})
 	if err != nil {
 		return nil, err
@@ -482,7 +505,7 @@ func (a *App) steamSocketPower(ctx context.Context, user, server M, raw []byte) 
 		if err != nil {
 			return true, err
 		}
-		if !private {
+		if !private && len(message.Args) == 1 && (message.Args[0] == "stop" || message.Args[0] == "kill") {
 			return false, nil
 		}
 	}
@@ -497,6 +520,11 @@ func (a *App) steamSocketPower(ctx context.Context, user, server M, raw []byte) 
 	if action != "start" && action != "stop" && action != "restart" && action != "kill" {
 		return true, bad("Unsupported power action.")
 	}
+	current, err := a.one(ctx, "SELECT * FROM users WHERE id=$1", user["id"])
+	if err != nil {
+		return true, err
+	}
+	user = current
 	if !a.can(ctx, user, server, permission) {
 		return true, forbidden()
 	}
@@ -508,7 +536,12 @@ func (a *App) steamSocketPower(ctx context.Context, user, server M, raw []byte) 
 	if str(fresh["status"]) != "" || boolean(fresh["maintenance_mode"]) {
 		return true, APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance or suspension."}
 	}
-	response, err := a.managedServerPower(ctx, fresh, action)
+	var response *http.Response
+	if !managed && (action == "start" || action == "restart") {
+		response, err = a.unmanagedServerPower(ctx, fresh, action, user)
+	} else {
+		response, err = a.managedServerPower(ctx, fresh, action)
+	}
 	if response != nil {
 		response.Body.Close()
 	}

@@ -6,7 +6,10 @@ Voltra publishes its patched Wings daemon and outbound node connector as separat
 
 The upstream source is `https://github.com/pterodactyl/wings`, tag `v1.13.3`, exact commit `6987d5e6f0612133e031255a99655e822d30579a`.
 
-The release applies `tools/runtime/wings-failed-install-logs.patch`. It contains all required Wings changes currently present in this repository:
+The release applies `tools/runtime/wings-failed-install-logs.patch` and
+`tools/wings/remote-download-headers.patch`, plus their helper/test sources.
+Optional egg headers and node compatibility are documented in
+[REMOTE_DOWNLOAD_HEADERS.md](REMOTE_DOWNLOAD_HEADERS.md). The patch set includes:
 
 - Installer completion checks Docker's actual exit status. Nonzero exits, wait failures, closed result channels and cancellation report installation failure to the Panel.
 - Failed installer logs are captured before removing the installer container. Log failure cannot turn installation failure into success or replace the primary error.

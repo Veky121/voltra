@@ -1,16 +1,23 @@
-import {useId, type ReactNode} from 'react';
+import {useState,useLayoutEffect,useRef, type ReactNode} from 'react';
+import {Dialog,DialogContent,DialogHeader,DialogTitle} from '../components/ui/dialog';
 import {OverlayPortalContext} from './OverlayPortal';
-import {useNativeDialog} from './useNativeDialog';
 import './overlays.css';
 
 export function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:ReactNode}) {
-  const {element,ref,onKeyDown,onKeyDownCapture,cancel} = useNativeDialog();
-  const heading = useId();
-  return <dialog ref={ref} className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby={heading} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}
-    onCancel={event=>cancel(event,onClose)}
-    onClick={event=>{if(event.target===event.currentTarget)onClose();}}>
-    <OverlayPortalContext.Provider value={element}>
-      <section className="modal"><header><h2 id={heading}>{title}</h2><button type="button" className="button secondary" aria-label="Close dialog" onClick={onClose}>×</button></header>{children}</section>
-    </OverlayPortalContext.Provider>
-  </dialog>;
+  const [container,setContainer]=useState<HTMLDivElement|null>(null);
+  const nestedEscape=useRef(false);
+  useLayoutEffect(()=>{
+    const capture=(event:KeyboardEvent)=>{
+      if(event.key!=='Escape')return;
+      nestedEscape.current=!!container?.querySelector('[data-slot="select-trigger"][data-popup-open],[data-slot="dropdown-menu-trigger"][data-popup-open],[data-slot="combobox-trigger"][data-popup-open]');
+    };
+    document.addEventListener('keydown',capture,true);
+    return()=>document.removeEventListener('keydown',capture,true);
+  },[container]);
+  return <Dialog open onOpenChange={(open,details)=>{if(!open){if(details.reason==='escape-key'&&nestedEscape.current){details.cancel();return}onClose()}}}>
+    <DialogContent ref={setContainer} className="voltra-dialog" aria-describedby={undefined}>
+      <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      <OverlayPortalContext.Provider value={container}>{children}</OverlayPortalContext.Provider>
+    </DialogContent>
+  </Dialog>;
 }

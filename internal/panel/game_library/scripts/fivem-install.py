@@ -100,6 +100,8 @@ def extract_zip_runtime(archive,target):
 def install(root,env):
     root=root.resolve()
     if any(not (root/name).resolve().is_relative_to(root) for name in ['.voltra/fivem','.voltra/public-cache','.voltra/gta-seeds']):raise ValueError('FXServer installer state escapes volume')
+    cfg=root/'server.cfg'
+    if cfg.exists():module('fivem-cfg').parse(cfg.read_bytes().decode('utf-8'))
     release=module('native-release');release.extract=extract_runtime
     release.install_release(root,identity(env),'fivem','alpine/opt/cfx-server/FXServer')
     # Seed once. Existing resources, custom recipes and deliberate deletions

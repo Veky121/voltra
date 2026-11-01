@@ -13,7 +13,62 @@ from native_console import run
 from steam_template import Redactor
 
 
-def configure(root,kind,env):
+def stationeers_plan(root, env):
+    """Read-only vanilla preflight. Return argv settings and a seed-only XML patch."""
+    import re
+    import xml.etree.ElementTree as ET
+    from xml.sax.saxutils import escape
+    from stationeers_wurm_starbound_install import confined, validate_tree
+    root=Path(root).resolve()
+    for name in ('.voltra/stationeers', '.steam/sdk64', 'rocketstation_DedicatedServer.x86_64',
+                 'rocketstation_DedicatedServer_Data', 'saves', 'mods', 'modconfig.xml', 'setting.xml'):
+        path=confined(root,name)
+        if path.exists():
+            if path.is_dir():validate_tree(root,path)
+            elif not path.is_file():raise ValueError('Invalid Stationeers path')
+    from stationeers_console_compat import configuration
+    assembly_config=confined(root,'rocketstation_DedicatedServer_Data/Managed/Assembly-CSharp.dll.config')
+    configuration(assembly_config.read_text() if assembly_config.exists() else '')
+    receipt=confined(root,'.voltra/stationeers/installation.json')
+    if receipt.exists():
+        if not receipt.is_file() or receipt.stat().st_size>8*1024**2:raise ValueError('Invalid installation receipt')
+        if not isinstance(json.loads(receipt.read_text()),dict):raise ValueError('Invalid installation receipt')
+    target=confined(root,'setting.xml')
+    previous=target.read_text(encoding='utf-8') if target.exists() else '<SettingData></SettingData>'
+    if len(previous.encode())>8*1024**2 or re.search(r'<!\s*(?:DOCTYPE|ENTITY)',previous,re.I):raise ValueError('Unsupported Stationeers XML')
+    document=ET.fromstring(previous)
+    if document.tag!='SettingData':raise ValueError('Expected SettingData')
+    defaults={'ServerName':('SERVER_NAME','Pterodactyl Hosted Server',100),
+              'ServerPassword':('SERVER_PASSWD','',128),'AutoSave':('AUTOSAVE','true',5),
+              'SaveInterval':('SAVE_INTERVAL','300',10),'ServerMaxPlayers':('MAX_PLAYERS','10',2),
+              'UPNPEnabled':('UPNP','false',5),'ServerVisible':(None,'true',5),
+              'StartLocalHost':(None,'true',5),'AutoPauseServer':(None,'false',5)}
+    values={};missing={}
+    for tag,(key,default,limit) in defaults.items():
+        supplied=env.get(key,default) if key else default
+        def valid(value):
+            if not isinstance(value,str) or len(value)>limit or any(ord(c)<32 or ord(c)==127 for c in value):raise ValueError('Invalid '+tag)
+            if tag in ('AutoSave','UPNPEnabled','ServerVisible','StartLocalHost','AutoPauseServer') and value not in ('true','false'):raise ValueError('Invalid '+tag)
+            if tag in ('SaveInterval','ServerMaxPlayers') and (not re.fullmatch('[0-9]+',value) or not 1<=int(value)<=(30 if tag=='ServerMaxPlayers' else 2147483647)):raise ValueError('Invalid '+tag)
+            return value
+        valid(supplied)
+        matches=[child for child in document if isinstance(child.tag,str) and child.tag.casefold()==tag.casefold()]
+        if len(matches)>1 or any(child.tag!=tag or len(child) or child.attrib for child in matches):raise ValueError('Ambiguous Stationeers setting '+tag)
+        values[tag]=valid((matches[0].text or '') if matches else supplied)
+        if not matches:missing[tag]=values[tag]
+    patch=''.join('<'+key+'>'+escape(value)+'</'+key+'>' for key,value in missing.items())
+    if patch:
+        closing=previous.rfind('</SettingData>')
+        if closing<0:
+            if document and len(document):raise ValueError('Explicit XML closing root required')
+            previous='<SettingData></SettingData>';closing=13
+        updated=previous[:closing]+patch+previous[closing:]
+        ET.fromstring(updated)
+    else:updated=previous
+    return values,target,updated, bool(missing)
+
+
+def configure(root,kind,env,preflight=False):
     root=Path(root).resolve()
     def text(key,default='',maximum=128):
         value=env.get(key,default)
@@ -58,6 +113,18 @@ def configure(root,kind,env):
         argv=[str(binary),'-batchmode','-nographics','-file','start',single('SAVE_NAME','stationeers_1')]
         if world:argv.append(aliases[world.lower()])
         argv+=['-settings','ServerName',text('SERVER_NAME','Pterodactyl Hosted Server',100),'StartLocalHost','true','ServerVisible','true','GamePort',str(port),'UpdatePort',str(secondary('UPDATE_PORT',27014)),'AutoSave',boolean('AUTOSAVE','true'),'SaveInterval',str(number('SAVE_INTERVAL',300,1,2147483647)),'ServerPassword',password,'ServerMaxPlayers',str(number('MAX_PLAYERS',10,1,30)),'UPNPEnabled',boolean('UPNP')]
+        if env.get('VOLTRA_STATIONEERS_VARIANT','vanilla')=='vanilla':
+            values,target,updated,changed=stationeers_plan(root,env)
+            confined('saves/'+single('SAVE_NAME','stationeers_1'))
+            argv=argv[:argv.index('-settings')]+['-settings']
+            for key,value in values.items():argv.extend((key,value))
+            argv.extend(('GamePort',str(port),'UpdatePort',str(secondary('UPDATE_PORT',27014))))
+            credentials.append(values['ServerPassword'])
+            if preflight:return argv,environment,'quit',credentials,{}
+            if not binary.is_file() or not os.access(binary,os.X_OK):raise ValueError('Missing native server executable')
+            if changed:
+                mode=target.stat().st_mode&0o777 if target.exists() else 0o600
+                private_write(target,updated);target.chmod(mode)
         environment['LD_LIBRARY_PATH']=str(root/'rocketstation_DedicatedServer_Data/Plugins/x86_64')+':'+environment['LD_LIBRARY_PATH']
         preload=[]
         if env.get('VOLTRA_STATIONEERS_VARIANT','vanilla')=='bepinex':
@@ -69,6 +136,8 @@ def configure(root,kind,env):
         # The publisher emits "saved world" after completing its save, distinct
         # from the preceding "saving world" request. Quit waits for that event.
         options={'ready_marker':b'World load complete','terminal_input':True,'terminal_query_reply':True,'terminal_enter_carriage_return':True,'stop_sequence':(('save',b"saved world '"),('quit',None))}
+        if env.get('VOLTRA_STATIONEERS_VARIANT','vanilla')=='vanilla':
+            options.update(ready_marker=b'Ready',stop_sequence=(('save',b'Saved '),('quit',None)),stop_sequence_input_delay=.15)
         stop='quit'
     elif kind=='wurm':
         from stationeers_wurm_starbound_install import world_relative
@@ -130,6 +199,7 @@ def signal_run(root,argv,environment,credentials):
 
 def main():
     root=Path.cwd();env=dict(os.environ);kind=env['VOLTRA_NATIVE_FAMILY']
+    if kind=='stationeers' and env.get('VOLTRA_STATIONEERS_VARIANT','vanilla')=='vanilla':configure(root,kind,env,preflight=True)
     if env.get('VOLTRA_STEAM_AUTO_UPDATE','0')=='1':
         from stationeers_wurm_starbound_install import install
         install(root,kind,env)

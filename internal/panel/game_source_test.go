@@ -24,7 +24,14 @@ func TestSourceReviewedSettings(t *testing.T) {
 			if strings.HasPrefix(recipe, "left4dead") {
 				ports = 1
 			}
-			if entry.Profile != "source-native-v1" || entry.RequiredPorts != ports {
+			expectedProfile := "source-native-v1"
+			if recipe == hl2dmSettingsRecipe {
+				expectedProfile = "hl2dm-gameplay-wave10-candidate"
+				if str(entry.Egg["startup"]) != hl2dmSettingsStartup {
+					t.Fatal("HL2DM reviewed launcher missing")
+				}
+			}
+			if entry.Profile != expectedProfile || entry.RequiredPorts != ports {
 				t.Fatal("Source profile or port layout missing")
 			}
 			a, _, _, _, _ := steamGamesFixture(t)
@@ -47,9 +54,18 @@ func TestSourceReviewedSettings(t *testing.T) {
 				t.Fatal("default LAN rejected:", err)
 			}
 			script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
-			for _, source := range []string{"source-runtime.py", "source-install.py", "steam-template.py", "native-console.py", "bundle-debian-python.py"} {
+			sources := []string{"source-runtime.py", "source-install.py", "steam-template.py", "native-console.py", "bundle-debian-python.py"}
+			if recipe == hl2dmSettingsRecipe {
+				sources = append(sources, "hl2dm-runtime.py", "hl2dm-gameplay.py")
+			}
+			for _, source := range sources {
 				content, err := os.ReadFile("game_library/scripts/" + source)
-				if err != nil || !strings.Contains(script, string(content)) {
+				if source == "native-console.py" {
+					content = reviewedConsoleV1(t)
+					err = nil
+				}
+				// Compare the entire helper after normalizing only checkout line endings.
+				if err != nil || !strings.Contains(strings.ReplaceAll(script, "\r\n", "\n"), strings.ReplaceAll(string(content), "\r\n", "\n")) {
 					t.Fatal("installer helper mismatch", source, err)
 				}
 			}

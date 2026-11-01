@@ -23,6 +23,10 @@ func TestSteamGameCreateStartOnCompletion(t *testing.T) {
 			if options["supports_install_only"] != true {
 				t.Fatal("Install-only capability missing")
 			}
+			spec, _ := steamGameSpecFor("palworld")
+			if num(asMap(options["defaults"])["disk"]) != spec.Disk {
+				t.Fatal("Setup storage reservation differs from the provisioned game limit")
+			}
 			input := steamGamesInput("palworld", node)
 			if test.present {
 				input["start_on_completion"] = test.value

@@ -6,8 +6,18 @@ case "$visibility" in
   local|public|invite-only) ;;
   *) echo 'SERVER_VISIBILITY must be auto, local, public or invite-only' >&2; exit 1;;
 esac
+# Native config saves must not broaden credential-file permissions.
+# Validate every known target before changing any config bytes or modes.
+for native_config in openttd.cfg openttd.cfg.new private.cfg private.cfg.new secrets.cfg secrets.cfg.new; do
+  test ! -L "$native_config" || { echo 'Native config symlink refused' >&2; exit 1; }
+  test ! -e "$native_config" || test -f "$native_config" || { echo 'Native config must be a regular file' >&2; exit 1; }
+done
+test -f openttd.cfg
+umask 077
+for native_config in openttd.cfg openttd.cfg.new private.cfg private.cfg.new secrets.cfg secrets.cfg.new; do
+  if test -f "$native_config"; then chmod 600 "$native_config"; fi
+done
 # Atomic managed-key update; retain all other settings, saves and comments.
-test -f openttd.cfg && test ! -L openttd.cfg
 tmp=$(mktemp ./openttd.cfg.XXXXXX)
 trap 'rm -f "$tmp"' EXIT HUP INT TERM
 awk -v value="$visibility" '

@@ -1,0 +1,24 @@
+/* Mira density for forms and management pages. Artwork dashboards, explorer
+   and console retain their existing density. No global root scale changes. */
+.app-content[data-mira-density=compact]{--ui-control-height:34px;--ui-card-padding:16px;--ui-font-scale:1.1;--ui-content-font-size:14px}
+.app-content[data-mira-density=compact] :is(.server-topbar,.server-hero){--ui-control-height:40px;--ui-card-padding:22px;--ui-font-scale:1.25}
+.app-content[data-mira-density=compact] :is(button,a)[data-slot=button]:not(:where(.server-topbar *,.server-hero *,.appearance-preset,.library-card *,.section-tab)){min-height:var(--ui-control-height);height:var(--ui-control-height);padding:5px 11px;font-size:var(--ui-content-font-size);line-height:20px;border-radius:6px}
+.app-content[data-mira-density=compact] input[data-slot=input]:not(:where([type=color],[type=range],[type=file],[type=checkbox],[type=radio])){height:var(--ui-control-height);min-height:var(--ui-control-height);padding:5px 10px;font-size:var(--ui-content-font-size);line-height:20px;border-radius:6px}
+.app-content[data-mira-density=compact] [data-slot=select-trigger]{min-height:var(--ui-control-height);padding:5px 10px;font-size:var(--ui-content-font-size);line-height:20px;border-radius:6px}
+.app-content[data-mira-density=compact] textarea[data-slot=textarea]{min-height:72px;padding:6px 8px;font-size:var(--ui-content-font-size);line-height:1.5;border-radius:6px}
+.app-content[data-mira-density=compact] .field{gap:5px;margin-bottom:12px}
+.app-content[data-mira-density=compact] .field>span{font-size:var(--ui-content-font-size);font-weight:500}
+.app-content[data-mira-density=compact] .settings-row-layout{padding:12px 14px;gap:16px}
+.app-content[data-mira-density=compact] .settings-row-label{font-size:var(--ui-content-font-size);font-weight:500}
+.app-content[data-mira-density=compact] .settings-section{margin-bottom:16px}
+.app-content[data-mira-density=compact] .settings-actions{padding:8px 12px}
+
+/* Readability is independent of control height. Keep compact spacing, not tiny text. */
+.app-content[data-mira-density=compact] :is(.settings-row-description,.settings-field .settings-row-description,.settings-section-note){font-size:13px;line-height:1.5}
+.app-content[data-mira-density=compact] .settings-section-heading h2{font-size:16px;line-height:24px}
+.app-content[data-mira-density=compact] :is(button,a)[data-slot=button][data-size^=icon]:not(:where(.server-topbar *,.server-hero *)){width:34px;padding:7px}
+.app-content[data-mira-density=compact] :is(button,a)[data-slot=button][data-size^=icon] svg{width:16px;height:16px}
+.settings-pending-bar button[data-slot=button]{height:34px;min-height:34px;padding:6px 12px;font-size:14px;line-height:20px}
+.settings-pending-bar{font-size:14px;line-height:20px}
+.schedule-summary{color:var(--text);font-size:14px;line-height:22px}
+.schedule-rule-details{margin:0 0 14px;font-size:13px}

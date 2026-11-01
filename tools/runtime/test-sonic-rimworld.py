@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -56,7 +57,13 @@ class DedicatedConfigTests(unittest.TestCase):
             result=game.selected('openworld','v0.9',Path(directory));self.assertEqual((Path(directory)/result['sha256']).read_bytes(),payload)
         with self.assertRaises(ValueError):game.selected('together','../../invalid')
     def test_profiles_preserve_all_original_variables_and_existing_review_status(self):
-        catalog=json.loads((ROOT/'internal/panel/game_library/upstream/catalog.json').read_text());old=json.loads((ROOT/'internal/panel/game_library/overrides.json').read_text());profiles=json.loads((ROOT/'.local/sonic-rimworld/profiles.json').read_text())
+        catalog=json.loads((ROOT/'internal/panel/game_library/upstream/catalog.json').read_text());old=json.loads((ROOT/'internal/panel/game_library/overrides.json').read_text())
+        # Regenerate from current source and canonical review metadata. The old
+        # .local cache is historical evidence, not the fixture's staging truth.
+        with tempfile.TemporaryDirectory(prefix='srb2-profiles-') as directory:
+            output=Path(directory)/'profiles.json'
+            subprocess.run(['node',str(ROOT/'tools/runtime/stage-sonic-rimworld-profiles.mjs')],cwd=ROOT,env={**os.environ,'VOLTRA_SONIC_PROFILE_OUTPUT':str(output)},check=True,capture_output=True)
+            profiles=json.loads(output.read_text())
         self.assertEqual(len(profiles),3)
         for path,profile in profiles.items():
             entry=next(x for x in catalog['entries'] if x['path']==path);self.assertEqual(profile['upstream_sha256'],entry['sha256']);self.assertEqual(profile['verification'],old.get(path,{}).get('verification','not_verified'))

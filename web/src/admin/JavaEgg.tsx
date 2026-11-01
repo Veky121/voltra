@@ -1,3 +1,4 @@
+import {useErrorState} from '../notifications/useErrorState';
 import { useEffect, useState } from "react";
 import { Button, Field, Input, Select, Textarea, api } from "../lib";
 import { ErrorMessage, Panel } from "./shared";
@@ -33,7 +34,7 @@ export function JavaEgg({ eggID, config, onSaved }: {
 }) {
   const [draft, setDraft] = useState(() => initialConfig(config));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/JavaEgg.tsx');
   const [saved, setSaved] = useState(false);
   useEffect(() => setDraft(initialConfig(config)), [config, eggID]);
   const change = <K extends keyof JavaEggConfig>(key: K, value: JavaEggConfig[K]) => {

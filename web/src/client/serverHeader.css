@@ -4,11 +4,13 @@
 .server-summary .server-state-line{gap:12px;font-size:calc(11px * var(--ui-font-scale,1))}
 .server-state-line .server-state{--state-color:var(--muted);color:var(--state-color);font-size:calc(11px * var(--ui-font-scale,1));font-weight:400;transition:color 160ms}
 .server-state-line .state-running{--state-color:var(--green,#62d9a0)}
-.server-state-line :is(.state-install_failed,.state-reinstall_failed,.state-suspended){--state-color:var(--red)}
+.server-state-line :is(.state-offline,.state-stopped,.state-install_failed,.state-reinstall_failed,.state-suspended){--state-color:var(--red)}
 .server-state-line :is(.state-starting,.state-stopping,.state-installing,.state-restoring_backup){--state-color:var(--amber)}
 .server-state-line .server-state .status-dot{width:5px;height:5px;background:currentColor;box-shadow:none;animation:none}
 .server-state-line .server-uptime{color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));font-variant-numeric:tabular-nums}
-.server-state-line .server-uptime strong{color:var(--text);font-weight:400}
+.server-state-line .server-uptime strong{color:var(--muted);font-weight:400}
+.server-state-line .server-uptime.is-online strong{color:#82b5ff}
+.server-meta-label{color:var(--muted);font-weight:400}
 .server-topbar .server-power{position:relative;flex-shrink:0;align-self:center}
 .server-topbar .server-power .actions{gap:5px}
 .server-topbar .server-power .button{width:30px;height:30px;min-height:30px;padding:0;border-radius:var(--ui-control-radius)}
@@ -23,6 +25,10 @@
 .server-hero.server-hero-with-artwork h1{margin:0;color:var(--text);font-size:calc(21px * var(--ui-font-scale,1));line-height:1.4;font-weight:550;letter-spacing:-.025em;overflow-wrap:anywhere}
 .server-hero-with-artwork .server-description{max-width:760px;margin:10px 0;color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;overflow-wrap:anywhere}
 .server-hero-with-artwork .server-state-line{gap:14px;margin-top:10px;font-size:calc(11px * var(--ui-font-scale,1))}
+.server-hero-meta{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px 28px;margin-top:14px}
+.server-hero-meta .server-state-line{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:0;flex-shrink:0}
+.server-hero-meta .server-state-line>span{min-height:26px;display:flex;align-items:center;gap:6px}
+.server-hero-meta .server-uptime strong{margin-left:0}
 .server-hero-with-artwork .server-power{position:relative;flex-shrink:0;max-width:100%;align-self:center}
 .server-hero-with-artwork .server-power .actions{gap:6px}
 .server-hero-with-artwork .server-power .button{min-height:var(--ui-control-height);padding:6px 10px;border-radius:var(--ui-control-radius);font-size:calc(12px * var(--ui-font-scale,1));font-weight:500;box-shadow:none}
@@ -44,6 +50,7 @@
 .server-power .button.server-power-button[data-power]:hover:not(:disabled){background:var(--power-fill);filter:brightness(1.08)}
 .server-power .button.server-power-button[data-power]:disabled{opacity:.45}
 .server-power .button.server-power-button[data-power][aria-busy=true]{opacity:1;cursor:wait}
+.server-power .button.server-power-button[data-power][data-feedback=success]{opacity:1}
 .server-power .actions>.button:not([data-power]){background:var(--theme-button,var(--accent));color:var(--theme-button-ink,var(--accent-ink,#fff));border-color:transparent}
 .server-power-progress{min-width:160px;margin-top:10px;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));line-height:1.4}
 .server-power-progress-track{height:3px;margin-top:6px;overflow:hidden;border-radius:999px;background:var(--ui-divider)}

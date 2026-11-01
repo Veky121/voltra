@@ -29,6 +29,36 @@ class Frontier(unittest.TestCase):
         before={str(p):p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         with self.assertRaisesRegex(ValueError,'distinct assigned'):f.configure(self.root,'evrima',{**env,'RCON':'true'})
         self.assertEqual(before,{str(p):p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
+
+    def test_vein_existing_native_identity_password_and_bytes_own_repeated_boots(self):
+        path=self.root/'Vein/Saved/Config/LinuxServer/Game.ini';path.parent.mkdir(parents=True)
+        original=b'\xef\xbb\xbf; operator\r\n[/Script/Engine.GameSession]\r\nMaxPlayers=12\r\n[/Script/Vein.VeinGameSession]\r\nservername="Operator server"\r\nPassword="operator-private"\r\nbPublic=False\r\nbShouldAdvertise=True\r\nBindAddr=0.0.0.0\r\n+AdminSteamIDs=one\r\n+AdminSteamIDs=two\r\n[OnlineSubsystemSteam]\r\nGameServerQueryPort=28001\r\n'
+        path.write_bytes(original);before=path.stat().st_mtime_ns
+        env={**self.env,'SERVER_NAME':'Ignored','SERVER_PASSWORD':'ignored','MAX_PLAYERS':'invalid ignored seed','PUBLIC_SERVER':'invalid ignored seed'}
+        with mock.patch.object(f.steam,'_publish') as publish:
+            for _ in range(2):
+                _,secrets=f.configure(self.root,'vein',env)
+                self.assertIn('operator-private',secrets)
+            publish.assert_not_called()
+        self.assertEqual(path.read_bytes(),original);self.assertEqual(path.stat().st_mtime_ns,before)
+
+    def test_vein_missing_keys_seed_without_rewriting_existing_rows(self):
+        path=self.root/'Vein/Saved/Config/LinuxServer/Game.ini';path.parent.mkdir(parents=True)
+        row=b'ServerName=Operator # literal\r\nPassword=private\r\n'
+        path.write_bytes(b'[/Script/Vein.VeinGameSession]\r\n'+row+b'+AdminSteamIDs=one\r\n+AdminSteamIDs=two\r\n')
+        f.configure(self.root,'vein',{**self.env,'SERVER_NAME':'Ignored','SERVER_PASSWORD':'ignored'})
+        self.assertIn(row,path.read_bytes());self.assertIn(b'MaxPlayers = 16',path.read_bytes())
+        f.configure(self.root,'vein',{**self.env,'QUERY_PORT':'28002'})
+        self.assertIn(row,path.read_bytes());self.assertIn(b'GameServerQueryPort = 28002',path.read_bytes())
+
+    def test_vein_invalid_effective_document_refuses_before_acquisition_or_writes(self):
+        path=self.root/'Vein/Saved/Config/LinuxServer/Game.ini';path.parent.mkdir(parents=True)
+        for data in ('[/Script/Vein.VeinGameSession]\nServerName=one\nservername=two\n','[/Script/Vein.VeinGameSession]\n+ServerName=ambiguous\n','[/Script/Engine.GameSession]\nMaxPlayers=0\n','[/Script/Vein.VeinGameSession]\nPassword="unterminated\n'):
+            path.write_text(data)
+            with mock.patch.object(f.steam,'update') as update,mock.patch.object(f.steam,'_publish') as publish:
+                with self.assertRaises(ValueError):f.install(self.root,'vein',self.env)
+                update.assert_not_called();publish.assert_not_called()
+            self.assertEqual(path.read_text(),data)
     def test_evrima_all_controls_lists_map_and_eos_stay_operator_owned(self):
         self.binary('evrima');engine=self.eos('[Core.System]\nPaths=operator\n[EpicOnlineServices]\nDedicatedServerClientId=operator-id\nDedicatedServerClientSecret=operator-secret\n');before=engine.read_bytes()
         path=engine.with_name('Game.ini');path.write_text('[/Script/TheIsle.TIGameSession]\nMapName=OperatorMap\nCustom=1\n[/Script/TheIsle.TIGameStateBase]\nAdminsSteamIDs=111\nAdminsSteamIDs=222\nAllowedClasses=A\nAllowedClasses=B\n')

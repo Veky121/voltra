@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {templateSetupProblems} from '../src/client/templateSetupValidation.ts';
+import {templateSetupProblems,templateSetupDependencyVariables} from '../src/client/templateSetupValidation.ts';
 import {templateVariableProblem} from '../src/client/gameTemplateModel.ts';
 
 const password={name:'Web portal password',env_variable:'WEB_PASSWORD',default_value:'',rules:'required|string|min:12|max:64'};
 const ready=(overrides={})=>({name:'FS25 server',node:{setup_available:true},memory:8192,memoryMaximum:16384,disk:102400,diskMaximum:204800,imageValid:true,portsReady:true,portsLoading:false,portsError:false,steamError:false,privateContent:false,privateSupported:false,fs25:true,savedLicence:false,variables:[password],environment:{WEB_PASSWORD:'valid-fixture-password',GAME_SERIAL:'fixture-serial',AUTO_DOWNLOAD:'true'},...overrides});
+
+test('creation dependency selectors include field references without treating condition values as fields',()=>{
+ const variables=['MODE','USER','TOKEN','anonymous','SECRET'].map(env_variable=>({env_variable,default_value:'',rules:''}));
+ variables[4].rules='required_if:environment.MODE,anonymous|required_unless:MODE,public|required_with_all:environment.USER,TOKEN|required_without:USER,missing';
+ assert.deepEqual([...templateSetupDependencyVariables(variables)].sort(),['MODE','TOKEN','USER']);
+});
 test('short FS25 password explains the disabled button without echoing it',()=>{
  const value='test123';const problems=templateSetupProblems(ready({environment:{WEB_PASSWORD:value,GAME_SERIAL:'fixture',AUTO_DOWNLOAD:'true'}}));
  assert.deepEqual(problems,[{field:'game-template-WEB_PASSWORD',message:'Web portal password: Use at least 12 characters.'}]);assert.ok(!JSON.stringify(problems).includes(value));
@@ -53,6 +59,47 @@ test('resource readiness rejects invalid stored units and enforces rounded save 
  assert.ok(templateSetupProblems(ready({disk:204801})).some(p=>p.field==='game-server-storage'));
  assert.deepEqual(templateSetupProblems(ready({memory:1264,disk:1264})),[]);
 });
+
+test('conditional prerequisites block creation until their dependent inputs are satisfied', () => {
+ const cases = [
+  ['required_unless:environment.MODE,anonymous', {MODE:'private'}, {MODE:'anonymous'}],
+  ['required_with:environment.USER,environment.TOKEN', {USER:'account'}, {}],
+  ['required_with_all:environment.USER,environment.TOKEN', {USER:'account',TOKEN:'0'}, {USER:'account',TOKEN:' '}],
+  ['required_without:environment.USER,environment.TOKEN', {USER:'account'}, {USER:'account',TOKEN:'token'}],
+  ['required_without_all:environment.USER,environment.TOKEN', {}, {USER:'account'}],
+ ];
+ for (const [rule,required,optional] of cases) {
+  const variable={name:'Credential',env_variable:'CREDENTIAL',default_value:'',rules:`${rule}|string`};
+  const input=environment=>ready({fs25:false,variables:[variable],environment});
+  assert.deepEqual(templateSetupProblems(input(required)),[{field:'game-template-CREDENTIAL',message:'Credential: Enter a value.'}],rule);
+  assert.deepEqual(templateSetupProblems(input(optional)),[],rule);
+  assert.deepEqual(templateSetupProblems(input({...required,CREDENTIAL:'fixture-secret'})),[],rule);
+ }
+});
+
+test('declared installation acknowledgements require an explicit true without changing ordinary toggles',()=>{
+ for(const key of ['EULA_ACCEPTED','BEDROCK_TERMS_ACCEPTED','PNX_LICENSE_ACCEPTED','ACCEPT_WINDOWS_RUNTIME_LICENSES','ACKNOWLEDGE_LEGACY_PREREQUISITES']){
+  const variable={name:'Reviewed prerequisite',env_variable:key,default_value:'false',rules:'required|string|in:true,false'};
+  for(const value of [undefined,'false','0','1','']){
+   const environment=value===undefined?{}:{[key]:value};
+   assert.ok(templateSetupProblems(ready({fs25:false,variables:[variable],environment})).some(p=>p.field===`game-template-${key}`));
+  }
+  assert.deepEqual(templateSetupProblems(ready({fs25:false,variables:[variable],environment:{[key]:'true'}})),[]);
+ }
+ const variable={name:'Player combat',env_variable:'PVP_ENABLED',default_value:'false',rules:'required|string|in:true,false'};
+ assert.deepEqual(templateSetupProblems(ready({fs25:false,variables:[variable],environment:{PVP_ENABLED:'false'}})),[]);
+ const optional={name:'Accept SCP:SL EULA',env_variable:'SCPSL_ACCEPT_EULA',default_value:'0',rules:'required|boolean'};
+ assert.deepEqual(templateSetupProblems(ready({fs25:false,variables:[optional],environment:{SCPSL_ACCEPT_EULA:'0'}})),[]);
+});
+
+test('publisher-text agreements keep their hash acceptance contract',()=>{
+ const hash='a'.repeat(64),key='EULA_ACCEPTED';
+ const variable={name:'Publisher terms',env_variable:key,default_value:'0',rules:`required|string|in:0,${hash}`};
+ const agreements=[{environment:key,title:'Terms',text:'Reviewed publisher terms',effective_date:'2026-10-30',accept_value:hash}];
+ assert.deepEqual(templateSetupProblems(ready({fs25:false,variables:[variable],agreements,environment:{[key]:hash}})),[]);
+ assert.ok(templateSetupProblems(ready({fs25:false,variables:[variable],agreements,environment:{[key]:'true'}})).length>0);
+});
+
 
 test('FS25 panel names have their own limit, independent of the public game name',()=>{
  assert.deepEqual(templateSetupProblems(ready({name:'A'.repeat(80)})),[]);

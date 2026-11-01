@@ -38,6 +38,16 @@ func TestXonoticReviewedSettings(t *testing.T) {
 	if _, err = a.validateEggEnvironment(ctx, num(imported["id"]), env, false); err != nil {
 		t.Fatal(err)
 	}
+	for _, value := range []string{"fixture-unsupported-password", "密碼"} {
+		unsupported := M{}
+		for key, value := range env {
+			unsupported[key] = value
+		}
+		unsupported["SERVER_PASSWORD"] = value
+		if _, err := a.validateEggEnvironment(ctx, num(imported["id"]), unsupported, false); err == nil {
+			t.Fatal("Unsupported join-password accepted before acquisition")
+		}
+	}
 	for _, spec := range []struct{ key, value string }{{"GAME_MAP", "../map"}, {"MAX_PLAYERS", "100"}, {"MAX_PLAYERS", "0"}, {"GAME_TYPE", "unknown"}, {"PUBLIC_SERVER", "true"}, {"SERVER_NAME", "bad\nname"}, {"SERVER_NAME", `bad\name`}, {"RCON_PASSWORD", "two passwords"}, {"VERSION", "../package"}, {"UPDATE_CHANNEL", "unknown"}, {"BOT_SKILL", "11"}, {"BOT_JOIN_EMPTY", "true"}, {"MIN_PLAYERS_PER_TEAM", "100"}, {"RCON_PASSWORD", strings.Repeat("x", 128)}} {
 		invalid := M{}
 		for k, v := range env {
@@ -51,7 +61,9 @@ func TestXonoticReviewedSettings(t *testing.T) {
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 	for _, name := range []string{"native-release.py", "native-zip-release.py", "xonotic-install.py", "xonotic-runtime.py"} {
 		source, err := os.ReadFile("game_library/scripts/" + name)
-		if err != nil || !strings.Contains(script, string(source)) {
+		// Linux heredocs intentionally use LF even when the shared Windows
+		// checkout has CRLF. Every other source byte must still match.
+		if err != nil || !strings.Contains(strings.ReplaceAll(script, "\r\n", "\n"), strings.ReplaceAll(string(source), "\r\n", "\n")) {
 			t.Fatal("source mismatch:", name, err)
 		}
 	}

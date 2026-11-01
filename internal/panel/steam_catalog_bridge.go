@@ -67,7 +67,7 @@ func steamCatalogFields(game string) []steamCatalogField {
 		return steamPalworldFields(game)
 	case "7days":
 		return append(common, []steamCatalogField{
-			{Key: "MAX_PLAYERS", Label: "Maximum players", Type: "integer", Default: "8", Min: 1, Max: 2147483647},
+			{Key: "MAX_PLAYERS", Label: "Maximum players", Type: "integer", Default: "8", Min: 1, Max: 32},
 			{Key: "GAME_DIFFICULTY", Label: "Difficulty", Type: "integer", Default: "2", Min: 0, Max: 5},
 			{Key: "SRCDS_APPID", Label: "Steam app ID", Type: "fixed", Default: "294420"},
 			{Key: "LD_LIBRARY_PATH", Label: "Library search path", Type: "text", Default: "."},

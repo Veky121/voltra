@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 from steam_template import Redactor
 
 
@@ -44,7 +45,47 @@ def validated_stop_sequence(sequence):
     return sequence
 
 
-def run(root, argv, environment, stop_command, credentials=(), ready_marker=None, autosave_seconds=0, save_command='save', terminal_input=False, terminal_query_reply=False, terminal_enter_carriage_return=False, stop_sequence=(), stop_sequence_timeout=30, output_observer=None, stop_signal=None, stop_signal_timeout=60):
+def _close_control_transport(transport):
+    try:transport.close()
+    except BaseException:
+        # Cleanup hooks must not replace an already-observed native exit/error.
+        try:print('[ERROR] Native control cleanup failed; original exit retained',flush=True)
+        except OSError:pass
+
+
+def _abort_control_start(child, output, master, transport):
+    # Only the Popen created by run(start_new_session=True) is accepted here.
+    # Kill the group even if its leader exits first and leaves descendants.
+    try:
+        if os.name == 'posix':
+            try:os.killpg(child.pid,signal.SIGTERM)
+            except ProcessLookupError:pass
+            try:child.wait(timeout=2)
+            except subprocess.TimeoutExpired:pass
+            try:os.killpg(child.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+        else:
+            try:child.terminate()
+            except OSError:pass
+            try:child.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                try:child.kill()
+                except OSError:pass
+        try:child.wait(timeout=2)
+        except subprocess.TimeoutExpired:pass
+    finally:
+        try:_close_control_transport(transport)
+        finally:
+            try:output.close()
+            finally:
+                if master is not None:
+                    try:os.close(master)
+                    except OSError:pass
+
+
+def run(root, argv, environment, stop_command, credentials=(), ready_marker=None, autosave_seconds=0, save_command='save', terminal_input=False, terminal_query_reply=False, terminal_enter_carriage_return=False, stop_sequence=(), stop_sequence_timeout=30, output_observer=None, stop_signal=None, stop_signal_timeout=60, control_transport=None, stop_sequence_input_delay=0):
+    if control_transport is not None and not all(callable(getattr(control_transport, name, None)) for name in ('start', 'command', 'stop', 'close')):raise ValueError('Invalid native control transport')
+    if control_transport is not None and stop_sequence:raise ValueError('Transport shutdown and stdin sequence are exclusive')
     if output_observer is not None and not callable(output_observer):raise ValueError('Invalid private output observer')
     if output_observer is not None:credentials=tuple(credentials)
     if any(c in stop_command + save_command for c in '\r\n\x00') or autosave_seconds < 0:
@@ -52,6 +93,9 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
     if terminal_query_reply and not terminal_input:raise ValueError('Terminal query replies require a native PTY')
     if terminal_enter_carriage_return and not terminal_input:raise ValueError('Carriage-return Enter requires a native PTY')
     stop_sequence=validated_stop_sequence(stop_sequence)
+    if not isinstance(stop_sequence_input_delay,(int,float)) or isinstance(stop_sequence_input_delay,bool) or not 0<=stop_sequence_input_delay<=1:
+        raise ValueError('Invalid stop sequence input delay')
+    if stop_sequence_input_delay and not terminal_input:raise ValueError('Paced stop sequence requires a native PTY')
     if stop_signal is not None and (not isinstance(stop_signal,int)or isinstance(stop_signal,bool)or stop_signal not in (signal.SIGINT,signal.SIGTERM)):
         raise ValueError('Native stop signal must be SIGINT or SIGTERM')
     if stop_signal is not None and stop_sequence:raise ValueError('Choose native signal or acknowledged stdin shutdown')
@@ -89,11 +133,12 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
         if slave is not None:os.close(slave)
     output = os.fdopen(os.dup(master), 'rb') if terminal_input else child.stdout
     ready, finished, write_lock = threading.Event(), threading.Event(), threading.Lock()
+    requested_stop = threading.Event()
     if ready_marker is None:
         ready.set()
 
     previous_input_cr=False
-    def send(data,native_input=True):
+    def send(data,native_input=True,sequence_input=False):
         nonlocal previous_input_cr
         try:
             with write_lock:
@@ -102,6 +147,10 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
                         data,previous_input_cr=carriage_return_input(data,previous_input_cr)
                     if master is None:
                         child.stdin.write(data); child.stdin.flush()
+                    elif sequence_input and stop_sequence_input_delay:
+                        for byte in data:
+                            if os.write(master,bytes([byte]))!=1:raise BrokenPipeError('Incomplete native input')
+                            time.sleep(stop_sequence_input_delay)
                     else:
                         remaining = memoryview(data)
                         while remaining:
@@ -110,11 +159,56 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
             pass
 
     def forward():
+        if control_transport is not None:
+            pending=b'';overflow=False
+            try:
+                for block in iter(lambda:os.read(sys.stdin.fileno(),65536),b''):
+                    for byte in block:
+                        if byte in (10,13):
+                            if pending and not overflow and child.poll() is None:
+                                try:line=pending.decode('utf-8',errors='strict')
+                                except UnicodeError:line=''
+                                if line==stop_command:stop()
+                                elif line:
+                                    try:control_transport.command(line)
+                                    except Exception:emit_control('[ERROR] Native control command failed')
+                            elif overflow:emit_control('[WARN] Native control input exceeds limit')
+                            pending=b'';overflow=False
+                        elif not overflow:
+                            pending+=bytes([byte])
+                            if len(pending)>4096:pending=b'';overflow=True
+            except OSError:pass
+            return
+        pending=b'';matched_line=True;skip_lf=False
+        target=stop_command.encode('utf-8')
         try:
-            # Buffered stdin reads in daemon threads can abort interpreter exit
-            # while Wings retains the console pipe. Keep descriptor reads raw.
+            # Keep the raw forwarding path unchanged unless explicitly sequenced.
             for block in iter(lambda: os.read(sys.stdin.fileno(), 65536), b''):
+                if stop_sequence:
+                    for byte in block:
+                        if skip_lf:
+                            skip_lf=False
+                            if byte==10:continue
+                        value=bytes([byte])
+                        if byte in (10,13):
+                            if matched_line and pending==target:
+                                stop();skip_lf=byte==13
+                            else:send(pending+value)
+                            pending=b'';matched_line=True
+                        elif matched_line:
+                            pending+=value
+                            if not target.startswith(pending):
+                                send(pending);pending=b'';matched_line=False
+                        else:send(value)
+                    continue
+                # Keep only a bounded current line; never log console input.
+                for piece in block.replace(b'\r',b'\n').splitlines(keepends=True):
+                    pending=(pending+piece)[-4096:]
+                    if piece.endswith(b'\n'):
+                        if pending.rstrip(b'\n')==stop_command.encode('utf-8'):requested_stop.set()
+                        pending=b''
                 send(block)
+            if stop_sequence and pending:send(pending)
         except OSError:
             pass
 
@@ -124,7 +218,7 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
         def deliver(value):
             try:os.killpg(child.pid,value)
             except ProcessLookupError:pass
-        deliver(stop_signal)
+        deliver(stop_signal if stop_signal is not None else signal.SIGINT)
         if finished.wait(stop_signal_timeout)or child.poll()is not None:return
         print('Native stop signal grace expired; escalating owned process group. Save completion is unconfirmed.',flush=True)
         deliver(signal.SIGTERM)
@@ -136,7 +230,7 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
             # Each step owns its own event. A late output read acknowledging
             # an earlier step can never acknowledge the following command.
             state={'marker':marker,'event':threading.Event(),'tail':b''};stop_state=state
-            send((command+'\n').encode('utf-8'))
+            send((command+'\n').encode('utf-8'),sequence_input=True)
             if marker is not None:
                 deadline=time.monotonic()+stop_sequence_timeout
                 while not state['event'].wait(.05):
@@ -144,7 +238,18 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
                     if time.monotonic()>=deadline:
                         print('Native stop acknowledgment missing; final stop command was not sent.',flush=True);return
         stop_state=None
+    def transport_stop():
+        try:control_transport.stop()
+        except Exception:emit_control('[ERROR] Native control shutdown failed')
+        if finished.wait(stop_signal_timeout)or child.poll()is not None:return
+        emit_control('[WARN] Native protocol shutdown grace expired; using existing signal fallback; save completion unconfirmed')
+        native_signal_stop()
     def stop(*_):
+        requested_stop.set()
+        if control_transport is not None:
+            if not stopping.is_set():
+                stopping.set();threading.Thread(target=transport_stop,daemon=True).start()
+            return
         if stop_signal is not None:
             if not stopping.is_set():
                 stopping.set();threading.Thread(target=native_signal_stop,daemon=True).start()
@@ -162,7 +267,18 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
                 return
             send((save_command + '\n').encode('utf-8'))
 
+    def emit_control(message):
+        if not isinstance(message,str)or len(message)>8192:raise ValueError('Invalid transport message')
+        # A separate redactor avoids racing the streamed native output state.
+        safe=''.join(c for c in message if c=='\t'or 32<=ord(c)<127)
+        print(Redactor(credentials).feed((safe+'\n').encode('utf-8'),final=True).decode('utf-8'),end='',flush=True)
     signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
+    if control_transport is not None:
+        try:control_transport.start(child,emit_control)
+        except BaseException:
+            try:_abort_control_start(child,output,master,control_transport)
+            except BaseException:pass
+            raise RuntimeError('Native control startup failed')from None
     threading.Thread(target=forward, daemon=True).start()
     saver = None
     if autosave_seconds:
@@ -198,9 +314,26 @@ def run(root, argv, environment, stop_command, credentials=(), ready_marker=None
             tail,_,_=terminal_queries(b'',query_pending,final=True)
             sys.stdout.buffer.write(redactor.feed(tail))
         sys.stdout.buffer.write(redactor.feed(b'', final=True)); sys.stdout.buffer.flush()
-        return child.wait()
+        status=child.wait()
+        if status:
+            requested=requested_stop.is_set()
+            # A stop request does not make a subsequent crash successful.
+            # Preserve a warning only for the normal stop signals themselves;
+            # application failures and fatal signals retain error severity.
+            severity='WARN' if requested and status in (-signal.SIGINT,-signal.SIGTERM) else 'ERROR'
+            native_signal=-status if status<0 else None
+            signal_detail=''
+            if native_signal is not None:
+                try:name=signal.Signals(native_signal).name
+                except ValueError:name='unknown'
+                signal_detail='; signal='+str(native_signal)+' ('+name+')'
+            diagnostic=('['+severity+'] Native process exited: raw_status='+str(status)+signal_detail+
+                        '; stop_requested='+str(requested).lower()+'.\n').encode('ascii')
+            sys.stdout.buffer.write(redactor.feed(diagnostic,final=True));sys.stdout.buffer.flush()
+        return status
     finally:
         finished.set(); ready.set()
+        if control_transport is not None:_close_control_transport(control_transport)
         if saver:
             saver.join(timeout=2)
         output.close()

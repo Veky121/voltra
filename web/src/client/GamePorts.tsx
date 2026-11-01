@@ -1,7 +1,8 @@
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import './games-ui.css';
 import {useEffect, useState} from 'react';
 import {api, Button, ErrorBox, rows, unwrap} from '../lib';
-import {gamePortAddress, gamePortLabel, gamePortSummary, refreshInstallationForwarding, type CurrentProxyRoute, type GamePortPlan} from './gamePortsModel';
+import {gamePortAddress, gamePortLabel, gamePortSummary, refreshInstallationForwarding, unknownInstallationForwarding, type CurrentProxyRoute, type GamePortPlan} from './gamePortsModel';
 import './gamePorts.css';
 
 export function useGamePortPlan(path: string, node: string, environment: Record<string, string | boolean> = {}, enabled = true) {
@@ -31,7 +32,7 @@ export function GamePorts({plan, loading = false, error = '', retry}: {plan?: Ga
     {plan && <><dl>{plan.ports.map(port => <div key={`${port.role}:${port.port}`}><dt>{gamePortLabel(port.role)}</dt><dd><code>{gamePortAddress(plan.ip, port.port)}</code>{port.preferred_port !== port.port && <span className="muted"> instead of {port.preferred_port}</span>}</dd></div>)}</dl>
       <p className="muted">{gamePortSummary(plan)}</p>
       {plan.forwarding?.routes?.filter(route=>route.status==='mapped'&&route.public_host&&route.public_port).map((route,index)=><p key={index}><code>{gamePortAddress(route.public_host!,route.public_port!)}</code> {route.protocol?.toUpperCase()}</p>)}
-      <details className="game-ports-details"><summary>Connection details</summary><p>{plan.detail}</p>{plan.ports.filter(port=>port.reason).map(port=><p key={port.port}>{port.reason}</p>)}{plan.forwarding?.detail&&<p>{plan.forwarding.detail}</p>}{plan.forwarding?.routes?.map((route,index)=><p key={index}>{route.detail}</p>)}</details>
+      <Disclosure className="game-ports-details"><DisclosureTrigger>Connection details</DisclosureTrigger><p>{plan.detail}</p>{plan.ports.filter(port=>port.reason).map(port=><p key={port.port}>{port.reason}</p>)}{plan.forwarding?.detail&&<p>{plan.forwarding.detail}</p>}{plan.forwarding?.routes?.map((route,index)=><p key={index}>{route.detail}</p>)}</Disclosure>
     </>}
 
     <ErrorBox>{error}</ErrorBox>{error && retry && <Button variant="secondary" onClick={retry}>Retry ports</Button>}
@@ -45,7 +46,7 @@ export function rememberInstallationPorts(identifier: string, plan?: GamePortPla
 }
 export function InstallationPortsNotice({identifier}: {identifier: string}) {
   const [plan, setPlan] = useState<GamePortPlan | null>(() => {
-    try {const stored = sessionStorage.getItem(noticeKey(identifier)); return stored ? JSON.parse(stored) : null;} catch {return null;}
+    try {const stored = sessionStorage.getItem(noticeKey(identifier)); return stored ? unknownInstallationForwarding(JSON.parse(stored)) : null;} catch {return null;}
   });
   const hasPlan = plan !== null;
   useEffect(() => {
@@ -53,14 +54,16 @@ export function InstallationPortsNotice({identifier}: {identifier: string}) {
     const controller = new AbortController();
     let stored: GamePortPlan | null = null;
     try { const raw = sessionStorage.getItem(noticeKey(identifier)); stored = raw ? JSON.parse(raw) : null; } catch {}
-    setPlan(stored);
+    setPlan(stored ? unknownInstallationForwarding(stored) : null);
     if (!stored) return;
     const refresh = async () => {
       try {
         const data = await api(`/api/client/servers/${encodeURIComponent(identifier)}/proxy-routes`,{signal:controller.signal});
         if (!active) return;
         setPlan(previous => previous ? refreshInstallationForwarding(previous,rows(data) as CurrentProxyRoute[]) : null);
-      } catch { /* Keep the last known port details when status is unavailable. */ }
+      } catch {
+        if (active) setPlan(previous => previous ? unknownInstallationForwarding(previous) : null);
+      }
       if (active) timer = setTimeout(refresh,5000);
     };
     void refresh();

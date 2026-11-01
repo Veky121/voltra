@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import runpy
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
@@ -77,6 +78,9 @@ def build(source, output):
 
 
 def install(root):
+    # Refuse ambiguous native configuration before acquisition or publication.
+    runtime = runpy.run_path(str(root / '.voltra/teeworlds-runtime.py'))
+    runtime['plan_settings'](os.environ, root)
     state = root / '.voltra'
     state.mkdir(exist_ok=True)
     adapter = (state / 'teeworlds-console.cpp.inc').read_text()

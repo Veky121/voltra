@@ -1,0 +1,92 @@
+/* Shared preference layout. Keep labels and controls within one reading column. */
+.settings-section[data-settings-section]{width:100%;max-width:880px;min-width:0;margin-bottom:24px}
+.settings-section[data-settings-section]>.settings-section-heading{padding:0 16px;min-height:24px;margin-bottom:10px}
+.settings-section[data-settings-section]>.settings-section-heading h2{color:var(--text);font-size:15px;font-weight:550;line-height:22px}
+.settings-section>[data-settings-group][data-slot=card]{padding:0;gap:0;border:1px solid var(--ui-border);border-radius:12px;box-shadow:none;overflow:hidden}
+.settings-row[data-settings-row]{display:block;max-width:880px;min-width:0;padding:0;border:0;container-type:inline-size}
+.settings-row[data-settings-row]+.settings-row[data-settings-row]{border-top:1px solid var(--ui-divider)}
+.settings-row[data-settings-row]>.settings-row-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,280px);align-items:center;gap:24px;padding:14px 16px}
+.settings-row[data-settings-row]:has([role=switch])>.settings-row-layout{grid-template-columns:minmax(0,1fr) auto}
+.settings-row[data-settings-row] .settings-row-copy,.settings-field[data-settings-field] .settings-row-copy{display:block;min-width:0;overflow-wrap:anywhere}
+.settings-row[data-settings-row] .settings-row-label,.settings-field[data-settings-field] .settings-row-label{display:block;color:var(--text);font-size:14px;font-weight:500;line-height:21px}
+.settings-row[data-settings-row] .settings-row-description,.settings-field[data-settings-field] .settings-row-description{display:block;color:var(--muted);font-size:13px;line-height:19px;margin:4px 0 0;max-width:62ch;overflow-wrap:anywhere}
+.settings-row[data-settings-row]>.settings-row-layout>.settings-row-control,.settings-field[data-settings-field]>.settings-field-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;width:100%;font-size:14px}
+.settings-row[data-settings-row] .settings-row-control>:is(input,textarea,.ui-select-field),.settings-field[data-settings-field] .settings-field-control>:is(input,textarea,.ui-select-field){width:100%;min-width:0}
+.settings-row[data-settings-row]:has(textarea)>.settings-row-layout{grid-template-columns:minmax(0,1fr);gap:10px}
+.settings-row[data-settings-row] .settings-row-control:has(textarea){max-width:none}
+.settings-row[data-settings-row]>.settings-row-body{padding:0 16px 14px}
+.app-content .settings-fields[data-slot=field-group]{display:block;max-width:880px;width:100%;padding:0;margin:0;gap:0}
+.app-content .settings-field[data-settings-field]{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,280px);align-items:center;gap:24px;min-width:0;margin:0;padding:14px 16px;border:0;border-radius:0}
+.app-content .settings-field[data-settings-field]:has([role=switch]){grid-template-columns:minmax(0,1fr) auto}
+.app-content .settings-field[data-settings-field]+.settings-field[data-settings-field]{border-top:1px solid var(--ui-divider)}
+.app-content .settings-field[data-settings-field]>.settings-row-copy{width:auto}
+.app-content .settings-field[data-settings-field]:has(textarea){grid-template-columns:minmax(0,1fr);gap:10px}
+.settings-field[data-settings-field] .admin-switch-control{justify-content:flex-end;width:auto}
+.settings-editor-panel.card,.admin-panel.card:has(.settings-fields){max-width:880px;width:100%}
+.settings-editor-panel.card{padding:0;overflow:hidden}
+.settings-editor-panel.card>h2{padding:18px 16px;margin:0;border-bottom:1px solid var(--ui-border)}
+.settings-editor-panel .admin-form-actions{margin:0;padding:12px 16px}
+.settings-editor-panel.admin-grouped-editor.card{background:transparent;border:0;box-shadow:none;backdrop-filter:none;padding:0;overflow:visible}
+.settings-editor-panel.admin-grouped-editor.card>h2{padding:0 16px;margin:0 0 20px;border:0}
+.admin-grouped-editor .admin-editor-groups{display:block;padding:0}
+.admin-grouped-editor .admin-editor-group{display:block;padding:0;border:0;margin:0 0 24px}
+.account-credentials,.integrations-form,.server-admin-tools,.game-quick-page{max-width:920px;width:100%}
+.account-credentials.grid,.integrations-form>form{display:block}
+.integrations-form>form>.settings-section{margin-bottom:24px}
+.integrations-form .settings-plain>.settings-group,.startup-settings .java-settings-group{display:block}
+.startup-settings .java-settings-group>.settings-row{border-right:0}
+.game-settings-section .settings-group{margin-top:10px}
+.game-settings-section .game-properties-grid{display:block}
+.game-settings-section .game-setting-row .settings-row-label>label{font:inherit}
+.game-settings-section .startup-variable-key{display:inline-block;margin:4px 0 0;font-size:11px;font-weight:400}
+.game-settings-section .game-setting-managed{margin-left:8px}
+@container(max-width:560px){
+ .settings-row[data-settings-row]>.settings-row-layout{grid-template-columns:minmax(0,1fr);gap:10px}
+ .settings-row[data-settings-row]:has([role=switch])>.settings-row-layout,.settings-row[data-settings-row]:has([role=checkbox])>.settings-row-layout{grid-template-columns:minmax(0,1fr) auto;gap:16px}
+ .settings-row[data-settings-row]>.settings-row-layout>.settings-row-control{justify-content:flex-start}
+}
+@media(max-width:600px){
+ .app-content .settings-field[data-settings-field]{grid-template-columns:minmax(0,1fr);gap:9px}
+ .app-content .settings-field[data-settings-field]:has([role=switch]){grid-template-columns:minmax(0,1fr) auto;gap:16px}
+ .settings-row[data-settings-row] .settings-row-control>div{max-width:100%}
+}
+/* Server configuration is a preferences column; dashboards retain their width. */
+.app-content .game-quick-page,.app-content .server-admin-tools{max-width:920px;width:100%}
+.app-content .game-settings-card.card:has(.game-settings-section){background:transparent;border:0;padding:0;box-shadow:none;backdrop-filter:none}
+.app-content .integrations-form,.app-content .admin-management-page:has(>.settings-editor-panel){max-width:880px;width:100%}
+
+/* Opt-in for configuration pages: up to three bounded columns of options.
+   Query the available content width so a collapsed sidebar works too. */
+.app-content .settings-responsive{container:settings-page / inline-size;width:100%;max-width:2200px;min-width:0;margin-inline:auto}
+.settings-responsive :is(.settings-section[data-settings-section]:has(.game-properties-grid),.settings-editor-panel.card,.admin-panel.card:has(.settings-fields)){max-width:none}
+.app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]){display:grid;grid-template-columns:minmax(0,1fr);gap:0;max-width:none;align-items:stretch}
+.settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row[data-settings-row]{max-width:none;height:100%}
+.settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row>.settings-row-layout{height:100%;align-content:center}
+.settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row,.app-content .settings-responsive .settings-fields>.settings-field{
+ border:0;border-bottom:1px solid var(--ui-divider);transition:background-color 160ms ease;animation:settings-option-enter 180ms ease-out both;
+}
+.settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:last-child,.app-content .settings-responsive .settings-fields>.settings-field:last-child{border-bottom:0}
+.settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:focus-within,.settings-responsive .settings-fields>.settings-field:focus-within{background:var(--ui-hover)}
+.settings-responsive .startup-variable-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.settings-responsive .game-folders{max-width:880px}
+@container settings-page (min-width:960px){
+ .app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]){grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
+ .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:has(textarea),.app-content .settings-responsive .settings-fields>.settings-field:has(textarea){grid-column:1/-1}
+ .app-content .settings-responsive .settings-field[data-settings-field]{grid-template-columns:minmax(0,1fr);gap:10px;align-content:center}
+ .app-content .settings-responsive .settings-field[data-settings-field]:has([role=switch]){grid-template-columns:minmax(0,1fr) auto}
+ .settings-responsive .startup-variable-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@container settings-page (min-width:1200px){
+ .app-content .settings-responsive .settings-field[data-settings-field]:not(:has(textarea,[role=switch])){grid-template-columns:minmax(0,1fr) minmax(160px,280px);gap:24px}
+}
+@container settings-page (min-width:1680px){
+ .app-content .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid,.settings-fields[data-slot=field-group]),.settings-responsive .startup-variable-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .app-content .settings-responsive .settings-field[data-settings-field]:not(:has(textarea,[role=switch])){grid-template-columns:minmax(0,1fr);gap:10px}
+}
+@media(hover:hover){
+ .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row:hover,.settings-responsive .settings-fields>.settings-field:hover{background:var(--ui-hover)}
+}
+@keyframes settings-option-enter{from{opacity:0;translate:0 4px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){
+ .settings-responsive :is(.game-properties-grid,.java-settings-group,.settings-options-grid)>.settings-row,.app-content .settings-responsive .settings-fields>.settings-field{animation:none;transition:none}
+}

@@ -22,9 +22,9 @@ def integer(env,key,default,minimum=0,maximum=2147483647):
     return value
 
 
-def configure(root,env):
-    root=Path(root).resolve();binary=root/'valheim_server.x86_64'
-    if not binary.is_file() or not binary.resolve().is_relative_to(root):raise ValueError('Missing confined native Valheim executable')
+def launch_arguments(root,env):
+    """Validate launch controls without touching files or acquiring game data."""
+    binary=Path(root).resolve()/'valheim_server.x86_64'
     name=text(env,'SERVER_NAME','My Server',60);world=text(env,'WORLD','Dedicated',20);password=text(env,'PASSWORD','secret',20)
     if not name or not world or any(c in world for c in '/\\') or world in ('.','..'):raise ValueError('Choose a single saved world name')
     if len(password)<5 or password.casefold() in name.casefold():raise ValueError('Password needs five characters and must not appear in the server name')
@@ -34,6 +34,14 @@ def configure(root,env):
     for flag,key,default in [('public','PUBLIC_SERVER',1),('saveinterval','BACKUP_INTERVAL',1800),('backups','BACKUP_COUNT',4),('backupshort','BACKUP_SHORTTIME',7200),('backuplong','BACKUP_LONGTIME',43200)]:
         args.extend(['-'+flag,str(integer(env,key,default,0,1 if key=='PUBLIC_SERVER' else 2147483647))])
     if integer(env,'ENABLE_CROSSPLAY',0,0,1):args.append('-crossplay')
+    return args
+
+
+def configure(root,env):
+    root=Path(root).resolve();binary=root/'valheim_server.x86_64'
+    if not binary.is_file() or not binary.resolve().is_relative_to(root):raise ValueError('Missing confined native Valheim executable')
+    args=launch_arguments(root,env)
+    password=text(env,'PASSWORD','secret',20)
     environment=dict(os.environ)
     for key in ('PYTHONHOME','PYTHONPATH','LD_PRELOAD'):environment.pop(key,None)
     environment.update({'HOME':str(root),'SteamAppId':'892970','LD_LIBRARY_PATH':str(root/'.voltra/valheim/lib')+':'+str(root/'linux64')})
@@ -42,6 +50,9 @@ def configure(root,env):
     if variant!='vanilla':
         library=root/'doorstop_libs/libdoorstop_x64.so';assembly=root/'BepInEx/core/BepInEx.Preloader.dll'
         if not all(p.is_file() and p.resolve().is_relative_to(root)for p in (library,assembly)):raise ValueError('Installed Valheim loader is incomplete; reinstall selected recipe')
+        if variant=='plus':
+            plugin=root/'BepInEx/plugins/ValheimPlus.dll'
+            if not plugin.is_file() or not plugin.resolve().is_relative_to(root):raise ValueError('Installed ValheimPlus plugin is missing; reinstall selected recipe')
         environment.update({'DOORSTOP_ENABLED':'1','DOORSTOP_TARGET_ASSEMBLY':str(assembly),'LD_PRELOAD':str(library),'LD_LIBRARY_PATH':str(root/'doorstop_libs')+':'+environment['LD_LIBRARY_PATH']})
     preloads=(str(root/'doorstop_libs/libdoorstop_x64.so'),)if variant!='vanilla'else()
     environment=native_environment(root,environment,binary,'valheim_server.x86_64',existing_preload=preloads)
@@ -75,6 +86,7 @@ def run(root,args,environment,credentials):
 
 def main():
     root=Path.cwd();env=dict(os.environ)
+    if env.get('VOLTRA_VALHEIM_VARIANT','vanilla')=='vanilla':launch_arguments(root,env)
     if integer(env,'VOLTRA_STEAM_AUTO_UPDATE',0,0,1):
         from valheim_vrising_install import install
         install(root,'valheim',env)

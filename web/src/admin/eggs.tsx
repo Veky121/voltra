@@ -1,3 +1,6 @@
+import {useErrorState} from '../notifications/useErrorState';
+import {ActionButton as MiraAction} from '../ui/ActionButton';
+import {Textarea as MiraTextarea} from '../components/ui/textarea';
 import { SidebarSection } from "../Navigation";
 import { JavaEgg } from "./JavaEgg";
 import { useState } from "react";
@@ -22,7 +25,7 @@ const nests = "/api/admin/nests",
 export function Nests() {
   return (
     <ResourceList
-      title="Nests"
+      title="Template groups"
       endpoint={nests}
       base="/admin/nests"
       columns={["name", "author", "description"]}
@@ -36,7 +39,7 @@ export function Nest() {
   );
   return (
     <ResourceEditor
-      title="Nest"
+      title="Template group"
       endpoint={nests}
       base="/admin/nests"
       id={id}
@@ -51,9 +54,9 @@ export function Nest() {
     >
       {() => (
         <>
-          <Panel title="Eggs">
+          <Panel title="Templates">
             <div className="actions admin-list-actions"><Link className="button" to={`/admin/eggs/new?nest=${id}`}>
-              Create egg
+              Create template
             </Link></div>
             <ErrorMessage error={q.error} />
             <DataTable
@@ -88,17 +91,17 @@ function EggImport({
   onSaved: () => void;
 }) {
   const [json, setJSON] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/eggs.tsx');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
   return (
-    <Panel title={eggID ? "Replace from egg file" : "Import egg"} className="admin-egg-import">
+    <Panel title={eggID ? "Replace from egg file" : "Import template"} className="admin-egg-import">
       <p className="muted">
         Import a Voltra-compatible egg JSON file with its installation script,
         configuration, variables, and Docker images.
       </p>
       <label className="field">
-        <span>Egg JSON file</span>
+        <span>Template JSON file</span>
         <input
           type="file"
           accept=".json,application/json"
@@ -109,8 +112,8 @@ function EggImport({
         />
       </label>
       <label className="field">
-        <span>Egg JSON</span>
-        <textarea
+        <span>Template JSON</span>
+        <MiraTextarea
           className="admin-code-input"
           rows={8}
           value={json}
@@ -124,7 +127,7 @@ function EggImport({
           {success}
         </p>
       )}
-      <div className="actions admin-form-actions"><button
+      <div className="actions admin-form-actions"><MiraAction
         disabled={busy || !json}
         onClick={async () => {
           setError("");
@@ -138,7 +141,7 @@ function EggImport({
                 : `${nests}/${nestID}/eggs/import`,
               { method: "POST", body: JSON.stringify({ egg }) }
             );
-            setSuccess("Egg imported.");
+            setSuccess("Template imported.");
             onSaved();
           } catch (err) {
             setError(String(err instanceof Error ? err.message : err));
@@ -147,8 +150,8 @@ function EggImport({
           }
         }}
       >
-        {busy ? "Importing…" : eggID ? "Replace egg" : "Import egg"}
-      </button></div>
+        {busy ? "Importing…" : eggID ? "Replace egg" : "Import template"}
+      </MiraAction></div>
     </Panel>
   );
 }
@@ -159,9 +162,9 @@ export function Egg() {
   const nestsQ = useAPI(nests);
   const record = q.data ? unwrap(q.data) : undefined;
   const [tab, setTab] = useState("details");
-  const [exportError, setExportError] = useState("");
+  const [exportError, setExportError] = useErrorState('admin/eggs.tsx');
   const fields = [
-    f("nest_id", "Nest", "select", {
+    f("nest_id", "Template group", "select", {
       required: true,
       disabled: id !== "new",
       default: new URLSearchParams(window.location.search).get("nest") ?? "",
@@ -179,20 +182,24 @@ export function Egg() {
     }),
     f("features", "Features", "json", { default: [] }),
     f("file_denylist", "File denylist", "json", { default: [] }),
+    f("download_headers", "Remote download headers (optional)", "json", {
+      default: {},
+      hint: 'Public headers for HTTPS downloads. GIANTS CDN example: {"cdn*.giants-software.com":{"Referer":"https://www.farming-simulator.com/"}}. This pattern covers numbered GIANTS CDNs; other hosts must be exact. Empty disables. Requires Voltra Wings download-header support.',
+    }),
     f("force_outgoing_ip", "Force outgoing IP", "checkbox"),
     f("update_url", "Update URL"),
   ];
   return (
     <div className="admin-management-page management-ui">
       <Heading
-        title={id === "new" ? "Create egg" : `Egg · ${record?.name ?? id}`}
+        title={id === "new" ? "Create template" : `Template · ${record?.name ?? id}`}
       >
         <Link to={record ? `/admin/nests/${record.nest_id}` : "/admin/nests"}>
           Back to nest
         </Link>
         {id !== "new" && (
           <>
-            <button
+            <MiraAction
               className="secondary"
               onClick={async () => {
                 try {
@@ -211,8 +218,8 @@ export function Egg() {
                 }
               }}
             >
-              Export egg
-            </button>
+              Export template
+            </MiraAction>
             <Action
               path={`${eggs}/${id}`}
               method="DELETE"
@@ -227,7 +234,7 @@ export function Egg() {
       </Heading>
       <ErrorMessage error={q.error || exportError} />
       {id !== "new" && (
-        <SidebarSection label="Egg settings" detail>
+        <SidebarSection label="Template settings" detail>
           {[
             "details",
             "configuration",
@@ -236,13 +243,13 @@ export function Egg() {
             "installation",
             "import",
           ].map((t) => (
-            <button
+            <MiraAction
               className={tab === t ? "active" : "secondary"}
               key={t}
               onClick={() => setTab(t)}
             >
               {t}
-            </button>
+            </MiraAction>
           ))}
         </SidebarSection>
       )}
@@ -256,7 +263,7 @@ export function Egg() {
               endpoint={id === "new" ? eggs : `${eggs}/${id}`}
               initial={record}
               method={id === "new" ? "POST" : "PATCH"}
-              submit={id === "new" ? "Create egg" : undefined}
+              submit={id === "new" ? "Create template" : undefined}
               onSaved={(r) =>
                 id === "new"
                   ? navigate(`/admin/eggs/${unwrap(r).id}`)

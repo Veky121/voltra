@@ -13,6 +13,7 @@ import ServerDashboard, {ServerWorkspace} from "./client/ServerDashboard";
 import {NavIcon,type IconName} from "./Icons";
 import {managedSteamServer} from "./client/gameSetupModel";
 import {useServerNavigation} from './ServerNavigation';
+import {isLivePathFresh} from './hooks/liveEvents';
 
 const Account = lazy(() => import("./client/Account").then(module => ({default: module.Account})));
 const Activity = lazy(() => import("./client/Account").then(module => ({default: module.Activity})));
@@ -58,7 +59,7 @@ function Server() {
   const lifecycleState=value(r.data)?.status;
   useEffect(()=>{
     if(!['installing','restoring_backup'].includes(lifecycleState))return;
-    const timer=setInterval(r.reload,1000);
+    const timer=setInterval(()=>{if(!document.hidden&&!isLivePathFresh(base))r.reload()},1000);
     return()=>clearInterval(timer);
   },[base,lifecycleState,r.reload]);
   if (r.loading && !r.data)
@@ -81,14 +82,14 @@ function Server() {
       : r.data.meta?.user_permissions || server.permissions || [];
   const groups:{label:string;tabs:[string,string,IconName,string][]}[] = [
     {label:"Overview",tabs:[["","Dashboard","dashboard",""]]},
-    {label:"Configuration",tabs:[["schedules","Schedules","schedules","schedule.read"],["settings","Settings","settings",""]]},
+    {label:"Configuration",tabs:[["schedules","Schedules","schedules","schedule.read"],["settings","Game settings","settings",""]]},
     {label:"Management",tabs:[["files","Files","files","file.read"],["backups","Backups","backups","backup.read"]]},
-    {label:"Access & logs",tabs:[["users","Users","users","user.read"],["activity","Activity","activity","activity.read"]]},
+    {label:"Access & logs",tabs:[["users","Access","users","user.read"],["activity","Activity","activity","activity.read"]]},
   ];
   const managedSteam = managedSteamServer(server);
   if(server.game==="minecraft")groups[2].tabs.unshift(["content","Mods & plugins","eggs","file.read"]);
-  groups[1].tabs.push(["runtime","Runtime & resources","wrench",""]);
-  if(managedSteam||(Array.isArray(server.egg_features)&&server.egg_features.includes('voltra:steam-private-prepared-v1')))groups[2].tabs.unshift(["steam","Steam maintenance","startup","startup.read"]);
+  groups[1].tabs.push(["runtime","Server settings","wrench",""]);
+  if(managedSteam||(Array.isArray(server.egg_features)&&server.egg_features.includes('voltra:steam-private-prepared-v1')))groups[2].tabs.unshift(["steam","Updates & repair","startup","startup.read"]);
   return (
     <ServerContext.Provider
       value={{ server, permissions, base, reload: r.reload }}
@@ -107,7 +108,7 @@ function Server() {
             {server.status === "installing"
               ? "Installation output is available in the console."
               : server.status === "reinstall_failed"
-                ? "Review the installation output in the dashboard console. An owner or administrator can correct the settings and retry Reinstall server under Settings > General."
+                ? "Review the installation output in the dashboard console. An owner or administrator can correct the settings and retry Reinstall server under Server settings > General."
                 : ""}
           </div>
         )}

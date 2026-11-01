@@ -27,7 +27,7 @@ def configure(root, env):
     if not re.fullmatch(r'[A-Za-z0-9_/-]{1,128}', game_map) or any(part in ('', '.', '..') for part in game_map.split('/')): raise ValueError('Choose a native map without traversal or console delimiters')
     name = env.get('SC_NAME' if kind == 'sven' else 'SERVER_NAME', 'Dedicated server')
     password = env.get('SC_PASSWORD' if kind == 'sven' else 'SERVER_PASSWORD', '')
-    values = {'hostname': quoted(name, 40 if kind == 'sven' else 128), 'sv_password': quoted(password), 'rcon_password': quoted(env.get('RCON_PASSWORD', ''))}
+    values = {'hostname': quoted(name, 40 if kind == 'sven' else 128), 'sv_password': quoted(password, 20 if kind == 'sven' else 128), 'rcon_password': quoted(env.get('RCON_PASSWORD', ''))}
     capacity = integer(env, 'SC_PLAYERS' if kind == 'sven' else 'MAX_PLAYERS' if kind == 'cs2' else 'MAXPLAYERS', 12 if kind != 'tf2classic' else 24, 2 if kind == 'sven' else 1, 64 if kind == 'cs2' else 32)
     argv = [str(binary), '-console', '-port', str(main), '-ip', '0.0.0.0', '-strictportbind', '-norestart']
     if kind == 'cs2':
@@ -55,11 +55,18 @@ def configure(root, env):
     managed_name = 'voltra_managed.cfg' if kind == 'sven' else 'voltra-managed.cfg'
     wrapper_name = 'voltra_server.cfg' if kind == 'sven' else 'voltra-server.cfg'
     managed = cfg.with_name(managed_name); wrapper = cfg.with_name(wrapper_name)
-    for path in (cfg, managed, wrapper):
+    bootstrap = cfg.with_name('voltra_bootstrap.cfg') if kind == 'sven' else None
+    for path in (cfg, managed, wrapper) + ((bootstrap,) if bootstrap else ()):
         if not path.resolve().is_relative_to(root): raise ValueError('Native configuration escapes volume')
     private_write(managed, '// Setup controls only; operator server.cfg remains intact.\n' + ''.join(key + ' ' + value + '\n' for key, value in values.items()))
     private_write(wrapper, 'exec server.cfg\nexec ' + managed_name + '\n')
-    argv += ['+servercfgfile', wrapper_name, '+exec', managed_name, '+map', game_map]
+    if kind == 'sven':
+        # Reuse GoldSrc's CFG command buffer path: '-' in a +map value is
+        # reparsed as an option. Only the fixed safe filename enters argv.
+        private_write(bootstrap, 'servercfgfile ' + wrapper_name + '\nmap ' + quoted(game_map) + '\nexec ' + managed_name + '\n')
+        argv += ['+exec', bootstrap.name]
+    else:
+        argv += ['+servercfgfile', wrapper_name, '+exec', managed_name, '+map', game_map]
     environment = dict(os.environ)
     for key in ('PYTHONHOME', 'PYTHONPATH', 'LD_PRELOAD'): environment.pop(key, None)
     environment['LD_LIBRARY_PATH'] = ':'.join(str(root / p) for p in (('game/bin/linuxsteamrt64', 'game/csgo/bin/linuxsteamrt64') if kind == 'cs2' else ('bin',)))

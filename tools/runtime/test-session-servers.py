@@ -89,10 +89,54 @@ class SessionServers(unittest.TestCase):
   self.assertIn('ListenPort = 28002',(self.root/'KFGame/Config/KFWeb.ini').read_text());self.assertIn('AdminPassword = secret?with=chars',(self.root/'KFGame/Config/LinuxServer-KFGame.ini').read_text())
  def test_unreal_unmanaged_repeated_arrays_and_comments_preserved(self):
   path=self.root/'KFGame/Config/KFWeb.ini';path.parent.mkdir(parents=True);path.write_text(';keep\n[IPDRV.WebServer]\nbenabled=false\nListenPort=8080\n[Workshop]\nItem=1\nItem=2\n')
-  runtime.launch(self.root,'kf2',self.env());text=path.read_text();self.assertIn(';keep',text);self.assertIn('Item=1\nItem=2',text);self.assertEqual(text.count('bEnabled'),1)
+  runtime.launch(self.root,'kf2',self.env());text=path.read_text();self.assertIn(';keep',text);self.assertIn('Item=1\nItem=2',text);self.assertEqual(text.count('benabled'),1)
  def test_unsafe_extra_and_map_injection_rejected(self):
   for changes in [{'MAP_NAME':'KF-X?AdminPassword=x'},{'EXTRA_FLAGS':'-Port=9'},{'EXTRA_FLAGS':'$(touch /tmp/no)'},{'SERVER_NAME':'name\nAdminPassword=x'}]:
    with self.subTest(changes=changes),self.assertRaises(ValueError):runtime.launch(self.root,'kf2',self.env(**changes))
+ def test_kf_seed_once_preserves_exact_native_identity_bytes(self):
+  runtime.launch(self.root,'kf2',self.env(ADMIN_PASS='initial'))
+  p=self.root/'KFGame/Config/LinuxServer-KFGame.ini'
+  raw=b'\xef\xbb\xbf;operator\r\n[engine.accesscontrol] ; keep\r\nadminpassword=secret?x=2\r\n[Engine.GameReplicationInfo]\r\nServerName=Operator\r\n[Workshop]\r\nItem=1\r\nItem=2'
+  p.write_bytes(raw);p.chmod(0o640);before=self.identity(p)
+  for _ in range(2):runtime.launch(self.root,'kf2',self.env(ADMIN_PASS='stale',SERVER_NAME='stale'))
+  self.assertEqual(self.identity(p),before)
+ def test_kf_complete_preflight_before_acquisition_or_either_write(self):
+  for bad in [{'DIFFICULTY':'999'},{'MAP_NAME':'bad?Port=1'},{'EXTRA_FLAGS':'-ini=x'}]:
+   with patch.object(install.steam_template,'update') as update,self.assertRaises(ValueError):install.install(self.root,'kf2',self.env(**bad))
+   update.assert_not_called();self.assertEqual(list(self.root.iterdir()),[])
+  p=self.root/'KFGame/Config/KFWeb.ini';p.parent.mkdir(parents=True);p.write_text('[IpDrv.WebServer]\nbEnabled=true\nbEnabled=false\n')
+  with patch.object(install.steam_template,'update') as update,self.assertRaises(ValueError):install.install(self.root,'kf2',self.env())
+  update.assert_not_called()
+  with self.assertRaises(ValueError):runtime.launch(self.root,'kf2',self.env())
+  self.assertFalse((p.parent/'LinuxServer-KFGame.ini').exists())
+ def test_kf_second_destination_nonfile_and_scalar_alias_refuse_without_first_write(self):
+  for content in [None,b'[IpDrv.WebServer]\n+bEnabled=true\n',b'[IPDRV.WebServer]\nbEnabled=false\n[IpDrv.WebServer]\nbEnabled=true\n']:
+   with tempfile.TemporaryDirectory() as d:
+    root=Path(d);p=root/'KFGame/Config/KFWeb.ini';p.parent.mkdir(parents=True)
+    if content is None:p.mkdir()
+    else:p.write_bytes(content)
+    with patch.object(install.steam_template,'update') as update,self.assertRaises((ValueError,OSError)):install.install(root,'kf2',self.env())
+    update.assert_not_called()
+    with self.assertRaises((ValueError,OSError)):runtime.launch(root,'kf2',self.env())
+    self.assertFalse((p.parent/'LinuxServer-KFGame.ini').exists())
+ def test_kf_native_enabled_requires_allocated_port_and_effective_password(self):
+  p=self.root/'KFGame/Config/KFWeb.ini';p.parent.mkdir(parents=True);p.write_text('[IpDrv.WebServer]\nbEnabled=true\nListenPort=8089\n')
+  with self.assertRaises(ValueError):runtime.launch(self.root,'kf2',self.env(ADMIN_PASS='x'))
+  self.assertFalse((p.parent/'LinuxServer-KFGame.ini').exists())
+ def test_kf_actual_main_mocked_success_failure_retention(self):
+  runtime.launch(self.root,'kf2',self.env(ADMIN_PASS='initial'))
+  p=self.root/'KFGame/Config/LinuxServer-KFGame.ini';p.write_bytes(p.read_bytes()+b';operator\n');before=self.identity(p)
+  for failure in [False,True]:
+   def update(*args,**kwargs):
+    p.write_bytes(b'publisher replacement')
+    if failure:raise RuntimeError('mock update failure')
+    return {}
+   with patch.dict(os.environ,self.env(AUTO_UPDATE='1'),clear=True),patch.object(sys,'argv',['runtime','kf2']),patch.object(Path,'cwd',return_value=self.root),patch.object(install.steam_template,'update',side_effect=update),patch.object(runtime.native_console,'run',return_value=0) as console:
+    if failure:
+     with self.assertRaises(RuntimeError):runtime.main()
+     console.assert_not_called()
+    else:self.assertEqual(runtime.main(),0);console.assert_called_once()
+   self.assertEqual(self.identity(p),before)
  def test_exact_pin_does_not_network(self):
   value=install.resolve_exiled('9.15.2','0',lambda *args:self.fail('Unexpected request'));self.assertEqual(value['sha256'],install.EXILED_PIN['assets'][0]['digest'][7:])
  def test_release_selection_and_prerelease_control(self):

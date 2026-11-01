@@ -1,3 +1,7 @@
+import {confirmAction} from '../ui/ConfirmAction';
+import {useErrorState} from '../notifications/useErrorState';
+import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
+import {Input as MiraInput} from '../components/ui/input';
 import { formatMiBGB } from "../resourceUnits";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -64,7 +68,7 @@ function message(error: unknown) {
 // and the scheduled refresh when the wizard/connection view leaves the page.
 function usePolling<T>(path: string, interval: number) {
   const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/node-pairing.tsx');
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [version, setVersion] = useState(0);
@@ -109,7 +113,7 @@ function usePolling<T>(path: string, interval: number) {
 function useMutation() {
   const active = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useErrorState('admin/node-pairing.tsx');
   useEffect(() => () => active.current?.abort(), []);
   async function run<T>(label: string, path: string, body?: unknown): Promise<{ value: T } | null> {
     if (active.current) return null;
@@ -210,14 +214,14 @@ export function NodeConnection({ nodeId, nodeName, compact = false }: { nodeId: 
       {data?.mode === "outbound" && (
         <>
           <p className="muted node-pairing-note">Reconnect to restore this node. Its servers and allocations stay in place.</p>
-          <details className="node-pairing-node-details"><summary>Advanced</summary>
+          <Disclosure className="node-pairing-node-details"><DisclosureTrigger>Advanced</DisclosureTrigger>
           <Button variant="danger" disabled={!!mutation.busy || revoked} onClick={async () => {
-            if (!window.confirm("Revoke management credentials and enable maintenance mode? Running game servers will keep running. Use Reconnect to restore access.")) return;
+            if (!await confirmAction({title:"Revoke access?",description:"Revoke management credentials and enable maintenance mode? Running game servers will keep running. Use Reconnect to restore access.",confirmLabel:"Revoke access",danger:true})) return;
             if (await mutation.run("disconnect", `/api/admin/nodes/${nodeId}/disconnect`)) {
               setRevoked(true);
               connection.reload();
             }
-          }}>{mutation.busy === "disconnect" ? "Disconnecting..." : revoked ? "Credential revoked" : "Disconnect and revoke"}</Button></details>
+          }}>{mutation.busy === "disconnect" ? "Disconnecting..." : revoked ? "Credential revoked" : "Disconnect and revoke"}</Button></Disclosure>
         </>
       )}
       <ErrorMessage error={mutation.error} />
@@ -281,8 +285,8 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
     }
   }
   const advanced = (
-    <details className="node-pairing-advanced" key={session ? "active" : "new"}>
-      <summary>Advanced</summary>
+    <Disclosure className="node-pairing-advanced" key={session ? "active" : "new"}>
+      <DisclosureTrigger>Advanced</DisclosureTrigger>
       {session ? (
         <>
           <dl className="node-pairing-settings">
@@ -294,7 +298,7 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
           <div className="actions">
             {!initialEnrollment && <Button variant="secondary" onClick={() => { setActiveId(null); setSearch(""); }}>New enrollment</Button>}
             {!session.closed && <Button variant="danger" disabled={!!mutation.busy} onClick={async () => {
-              if (!window.confirm("Close this enrollment? Pending requests will expire. Approved nodes remain paired.")) return;
+              if (!await confirmAction({title:"Close enrollment?",description:"Close this enrollment? Pending requests will expire. Approved nodes remain paired.",confirmLabel:"Close enrollment",danger:false})) return;
               if (await mutation.run("close", `${enrollmentsPath}/${session.id}/close`)) {
                 setSecrets((current) => current[session.id] ? { ...current, [session.id]: { ...current[session.id], closed: true } } : current);
                 snapshot.reload();
@@ -305,8 +309,8 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
       ) : (
         <>
           <div className="form-grid">
-            <Field label="Maximum approved nodes" hint="0 means unlimited."><input form="node-pairing-create" required type="number" min="0" max={Number.MAX_SAFE_INTEGER} step="1" value={maxNodes} onChange={(event) => setMaxNodes(event.target.value)} /></Field>
-            <Field label="Expires after, in minutes"><input form="node-pairing-create" required type="number" min="1" max="1440" step="1" value={expiresMinutes} onChange={(event) => setExpiresMinutes(event.target.value)} /></Field>
+            <Field label="Maximum approved nodes" hint="0 means unlimited."><MiraInput form="node-pairing-create" required type="number" min="0" max={Number.MAX_SAFE_INTEGER} step="1" value={maxNodes} onChange={(event) => setMaxNodes(event.target.value)} /></Field>
+            <Field label="Expires after, in minutes"><MiraInput form="node-pairing-create" required type="number" min="1" max="1440" step="1" value={expiresMinutes} onChange={(event) => setExpiresMinutes(event.target.value)} /></Field>
           </div>
           <Field label="Group"><Select form="node-pairing-create" value={locationId} onChange={(event) => setLocationId(event.target.value)}><option value="">Automatic group</option>{(locations.data ? rows(locations.data) : []).map((location) => <option key={location.id} value={location.id}>{location.short}{location.long ? ` · ${location.long}` : ""}</option>)}</Select></Field>
           <ErrorMessage error={locations.error} />
@@ -320,7 +324,7 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
       </div>}
       <p className="muted">Only approve codes you recognize. Game ports and optional SFTP need separate network access.</p>
       <p className="muted">Connection strings disappear when this window closes. Enrollment requests remain available here.</p>
-    </details>
+    </Disclosure>
   );
   return (
     <Modal title={recovery ? `Reconnect ${session?.recovery_node_name || `node #${session?.recovery_node_id}`}` : "Add nodes"} onClose={onClose}>
@@ -348,7 +352,7 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
                 <span role="status">{state === "Open" ? <><span className="spinner" aria-hidden="true" />Waiting for nodes{pendingCount ? ` · ${pendingCount} pending` : ""}</> : state}</span>
                 <Button variant="secondary" aria-label="Refresh requests" onClick={snapshot.reload}><Icon name="restart" width={16} height={16} /></Button>
               </div>
-              {requests.length > 5 && <input className="node-pairing-search" aria-label="Search incoming nodes" placeholder="Search nodes or codes" value={search} onChange={(event) => setSearch(event.target.value)} />}
+              {requests.length > 5 && <MiraInput className="node-pairing-search" aria-label="Search incoming nodes" placeholder="Search nodes or codes" value={search} onChange={(event) => setSearch(event.target.value)} />}
               <div className="node-pairing-requests">{sorted.map((request) => <IncomingNode key={request.id} request={request} session={session} now={now} healthAvailable={!snapshot.error} onChanged={() => { snapshot.reload(); onNodesChanged(); }} />)}</div>
               {!!requests.length && !visible.length && <p className="muted">No matching nodes.</p>}
             </section>
@@ -409,7 +413,7 @@ function CopyValue({ label, value, onChange, disabled = false, sensitive = false
   useEffect(() => setFeedback(""), [value]);
   return (
     <div className="node-pairing-copy">
-      <label><span>{label}</span><span className={hiddenToken ? "node-pairing-secret" : undefined}><input ref={input} aria-label={label} title={hiddenToken ? "Edit the panel address. Copy includes the private pairing token." : undefined} value={displayed} readOnly={!onChange} spellCheck={false} autoComplete="off" onChange={(event) => onChange?.(hiddenToken ? event.target.value.split("#")[0] + value.slice(fragment) : event.target.value)} onFocus={(event) => { if (!onChange) event.target.select(); }} />{hiddenToken && <span aria-hidden="true">#••••••••</span>}</span></label>
+      <label><span>{label}</span><span className={hiddenToken ? "node-pairing-secret" : undefined}><MiraInput ref={input} aria-label={label} title={hiddenToken ? "Edit the panel address. Copy includes the private pairing token." : undefined} value={displayed} readOnly={!onChange} spellCheck={false} autoComplete="off" onChange={(event) => onChange?.(hiddenToken ? event.target.value.split("#")[0] + value.slice(fragment) : event.target.value)} onFocus={(event) => { if (!onChange) event.target.select(); }} />{hiddenToken && <span aria-hidden="true">#••••••••</span>}</span></label>
       <Button variant="secondary" disabled={disabled || !value} aria-label={`Copy ${label.toLowerCase()}`} onClick={async () => {
         try {
           if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
@@ -475,14 +479,14 @@ function IncomingNode({ request, session, now, healthAvailable, onChanged }: { r
           </div>
         </div>
         {paired && !ready && request.detail && <p className="muted node-pairing-detail">{request.detail}</p>}
-        <details className="node-pairing-node-details">
-          <summary>Details</summary>
+        <Disclosure className="node-pairing-node-details">
+          <DisclosureTrigger>Details</DisclosureTrigger>
           <p className="muted">{request.platform} / {request.architecture} · {capacity(request.memory_mib)} RAM · {capacity(request.disk_mib)} disk</p>
           <p className="muted">{request.remote_ip || "IP unavailable"} · {date(request.created_at)} · {status}</p>
-          {pending && !recovery && <Field label="Node name"><input aria-label={`Node name for ${request.hostname}`} maxLength={253} value={name} placeholder={request.hostname} onChange={(event) => setName(event.target.value)} disabled={!!mutation.busy} /></Field>}
+          {pending && !recovery && <Field label="Node name"><MiraInput aria-label={`Node name for ${request.hostname}`} maxLength={253} value={name} placeholder={request.hostname} onChange={(event) => setName(event.target.value)} disabled={!!mutation.busy} /></Field>}
           {nodeId && <Link to={`/admin/nodes/${nodeId}`}>Manage node #{nodeId}</Link>}
           {status === "revoked" && <p className="muted">Choose Reconnect on the existing node to restore access.</p>}
-        </details>
+        </Disclosure>
         <ErrorMessage error={mutation.error} />
       </form>
     </article>

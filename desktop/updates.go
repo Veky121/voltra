@@ -30,6 +30,20 @@ type updateEngine interface {
 	DownloadAndInstall(context.Context) error
 	Restart(context.Context) error
 }
+
+type retainingUpdateEngine struct{ updateEngine }
+
+func (e retainingUpdateEngine) Restart(ctx context.Context) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	if err := stagePreviousExecutable(exe); err != nil {
+		return fmt.Errorf("cannot preserve previous version: %w", err)
+	}
+	return e.updateEngine.Restart(ctx)
+}
+
 type updateStatus struct {
 	Channel          string `json:"channel"`
 	State            string `json:"state"`
@@ -281,7 +295,7 @@ func configureUpdater(app *application.App, host *desktopHost) (result error) {
 	if err = app.Updater.Init(updater.Config{CurrentVersion: version, Providers: []updater.Provider{p}, PublicKey: key, Window: updater.WindowNone}); err != nil {
 		return err
 	}
-	host.updates = &updateController{engine: app.Updater, provider: p, dir: host.dir, status: updateStatus{Channel: channel, State: "idle", Version: version}}
+	host.updates = &updateController{engine: retainingUpdateEngine{app.Updater}, provider: p, dir: host.dir, status: updateStatus{Channel: channel, State: "idle", Version: version}}
 	return nil
 }
 func failedUpdateController(dir string, err error) *updateController {

@@ -1,3 +1,4 @@
+import {ActionButton as MiraAction} from '../ui/ActionButton';
 import { useState } from "react";
 import SFTPPassword from '../client/SFTPPassword';
 import { Link, useParams } from "react-router-dom";
@@ -93,15 +94,15 @@ export function ApplicationKeys() {
           <p className="muted">Copy this token now. It will only be shown once.</p>
           <code className="admin-secret">{secret}</code>
           <div className="actions">
-          <button
+          <MiraAction
             className="secondary"
             onClick={() => navigator.clipboard.writeText(secret)}
           >
             Copy token
-          </button>
-          <button className="secondary" onClick={() => setSecret("")}>
+          </MiraAction>
+          <MiraAction className="secondary" onClick={() => setSecret("")}>
             Dismiss
-          </button>
+          </MiraAction>
           </div>
         </Panel>
       )}

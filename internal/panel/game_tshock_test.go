@@ -14,7 +14,7 @@ func TestTShockReviewedProfile(t *testing.T) {
 			break
 		}
 	}
-	if entry.Profile != "tshock-6.2.1-v1-exact-release-v1" {
+	if entry.Profile != "tshock-6.2.1-v1-exact-release-v1-native-authority-wave7" {
 		t.Fatal("reviewed TShock missing")
 	}
 	_, variables, err := parseEggDocument(entry.Egg)
@@ -52,12 +52,12 @@ func TestTShockReviewedProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	settings := asMap(asMap(files["tshock/config.json"])["find"])
-	if settings["Settings.ServerPassword"] != "{{server.build.env.SERVER_PASSWORD}}" || settings["Settings.ServerPort"] != "{{server.build.default.port}}" {
+	if settings["Settings.ServerPassword"] != nil || settings["Settings.ServerPort"] != "{{server.build.default.port}}" {
 		t.Fatal("native settings or assigned port missing")
 	}
 	startup := str(entry.Egg["startup"])
 	installer := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
-	if startup != "exec python3 .voltra/tshock_runtime.py" || strings.Contains(startup, "{{SERVER_PASSWORD}}") || !strings.Contains(installer, "'-noupnp'") || !strings.Contains(installer, "DOTNET_ROLL_FORWARD") {
+	if startup != "exec python3 .voltra/tshock_parity_native.py run" || strings.Contains(startup, "{{SERVER_PASSWORD}}") || !strings.Contains(installer, "'-noupnp'") || !strings.Contains(installer, "DOTNET_ROLL_FORWARD") {
 		t.Fatal("keep password in JSON and disable router port forwarding")
 	}
 }

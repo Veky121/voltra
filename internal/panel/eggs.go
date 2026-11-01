@@ -68,7 +68,7 @@ func eggSlice(v any) []any {
 	return asSlice(v)
 }
 func eggFields() []string {
-	return []string{"java_config", "name", "description", "features", "docker_images", "file_denylist", "startup", "config_files", "config_startup", "config_logs", "config_stop", "config_from", "script_install", "script_entry", "script_container", "script_is_privileged", "copy_script_from", "force_outgoing_ip", "update_url"}
+	return []string{"download_headers", "java_config", "name", "description", "features", "docker_images", "file_denylist", "startup", "config_files", "config_startup", "config_logs", "config_stop", "config_from", "script_install", "script_entry", "script_container", "script_is_privileged", "copy_script_from", "force_outgoing_ip", "update_url"}
 }
 
 // parseEggDocument deliberately does not validate defaults against rules: many
@@ -109,6 +109,11 @@ func parseEggDocument(d M) (M, []M, error) {
 	if egg["script_container"] == nil {
 		egg["script_container"] = "alpine:latest"
 	}
+	var headerErr error
+	egg["download_headers"], headerErr = normalizeDownloadHeaders(asMap(d["voltra"])["download_headers"])
+	if headerErr != nil {
+		return nil, nil, headerErr
+	}
 	jc := asMap(d["voltra"])["java_config"]
 	if jc == nil {
 		jc = M{}
@@ -143,6 +148,9 @@ func parseEggDocument(d M) (M, []M, error) {
 }
 
 func validateEggRecord(e M) error {
+	if _, err := normalizeDownloadHeaders(e["download_headers"]); err != nil {
+		return err
+	}
 	if v, ok := e["java_config"]; ok {
 		if _, err := javaNormalize(v, true); err != nil {
 			return err
@@ -392,7 +400,7 @@ func (a *App) eggAttributes(r *http.Request, e M) (M, error) {
 	if len(keys) > 0 {
 		first = str(images[keys[0]])
 	}
-	out := M{"id": e["id"], "uuid": e["uuid"], "nest": e["nest_id"], "nest_id": e["nest_id"], "name": e["name"], "author": e["author"], "description": e["description"], "docker_image": first, "docker_images": images, "startup": e["startup"], "features": e["features"], "force_outgoing_ip": e["force_outgoing_ip"], "update_url": e["update_url"], "java_config": asMap(e["java_config"]), "config": M{"files": e["config_files"], "startup": e["config_startup"], "logs": e["config_logs"], "stop": e["config_stop"], "file_denylist": e["file_denylist"], "extends": e["config_from"]}, "script": M{"privileged": e["script_is_privileged"], "install": e["script_install"], "entry": e["script_entry"], "container": e["script_container"], "extends": e["copy_script_from"]}, "created_at": e["created_at"], "updated_at": e["updated_at"]}
+	out := M{"id": e["id"], "uuid": e["uuid"], "nest": e["nest_id"], "nest_id": e["nest_id"], "name": e["name"], "author": e["author"], "description": e["description"], "docker_image": first, "docker_images": images, "startup": e["startup"], "features": e["features"], "force_outgoing_ip": e["force_outgoing_ip"], "update_url": e["update_url"], "download_headers": asMap(e["download_headers"]), "java_config": asMap(e["java_config"]), "config": M{"files": e["config_files"], "startup": e["config_startup"], "logs": e["config_logs"], "stop": e["config_stop"], "file_denylist": e["file_denylist"], "extends": e["config_from"]}, "script": M{"privileged": e["script_is_privileged"], "install": e["script_install"], "entry": e["script_entry"], "container": e["script_container"], "extends": e["copy_script_from"]}, "created_at": e["created_at"], "updated_at": e["updated_at"]}
 	// Flat properties are exposed on the admin API for editing.
 	if strings.HasPrefix(r.URL.Path, "/api/admin/") {
 		for _, k := range eggFields() {
@@ -526,6 +534,13 @@ func (a *App) saveEgg(w http.ResponseWriter, r *http.Request) {
 					v = nil
 				} else {
 					v = num(v)
+				}
+			}
+			if key == "download_headers" {
+				v, err = normalizeDownloadHeaders(v)
+				if err != nil {
+					fail(w, err)
+					return
 				}
 			}
 			if key == "java_config" {
@@ -832,13 +847,18 @@ func (a *App) importEgg(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, item("egg", out))
 }
 func (a *App) importEggRecord(ctx context.Context, id int64, egg M, vars []M) (M, error) {
+	var headerErr error
+	egg["download_headers"], headerErr = normalizeDownloadHeaders(egg["download_headers"])
+	if headerErr != nil {
+		return nil, headerErr
+	}
 	updating := id != 0
 	tx, err := a.DB.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	fields := []string{"java_config", "nest_id", "author", "name", "description", "features", "docker_images", "file_denylist", "startup", "config_files", "config_startup", "config_logs", "config_stop", "script_install", "script_entry", "script_container", "update_url"}
+	fields := []string{"download_headers", "java_config", "nest_id", "author", "name", "description", "features", "docker_images", "file_denylist", "startup", "config_files", "config_startup", "config_logs", "config_stop", "script_install", "script_entry", "script_container", "update_url"}
 	if egg["java_config"] == nil {
 		egg["java_config"] = M{}
 	}
@@ -915,7 +935,7 @@ func (a *App) eggExport(ctx context.Context, id int64) (M, error) {
 		fieldType := eggVariableFieldType(v["field_type"])
 		outVars = append(outVars, M{"name": v["name"], "description": v["description"], "env_variable": v["env_variable"], "default_value": v["default_value"], "user_viewable": v["user_viewable"], "user_editable": v["user_editable"], "rules": v["rules"], "field_type": fieldType})
 	}
-	return M{"voltra": M{"java_config": asMap(e["java_config"])}, "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY VOLTRA", "meta": M{"version": "PTDL_v2", "update_url": e["update_url"]}, "exported_at": time.Now().UTC().Format(time.RFC3339), "name": e["name"], "author": e["author"], "description": e["description"], "features": raw["features"], "docker_images": e["docker_images"], "file_denylist": eggStrings(e["file_denylist"]), "startup": e["startup"], "config": M{"files": eggJSONString(e["config_files"]), "startup": eggJSONString(e["config_startup"]), "logs": eggJSONString(e["config_logs"]), "stop": e["config_stop"]}, "scripts": M{"installation": M{"script": e["script_install"], "container": e["script_container"], "entrypoint": e["script_entry"]}}, "variables": outVars}, nil
+	return M{"voltra": M{"java_config": asMap(e["java_config"]), "download_headers": asMap(e["download_headers"])}, "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY VOLTRA", "meta": M{"version": "PTDL_v2", "update_url": e["update_url"]}, "exported_at": time.Now().UTC().Format(time.RFC3339), "name": e["name"], "author": e["author"], "description": e["description"], "features": raw["features"], "docker_images": e["docker_images"], "file_denylist": eggStrings(e["file_denylist"]), "startup": e["startup"], "config": M{"files": eggJSONString(e["config_files"]), "startup": eggJSONString(e["config_startup"]), "logs": eggJSONString(e["config_logs"]), "stop": e["config_stop"]}, "scripts": M{"installation": M{"script": e["script_install"], "container": e["script_container"], "entrypoint": e["script_entry"]}}, "variables": outVars}, nil
 }
 func (a *App) exportEgg(w http.ResponseWriter, r *http.Request) {
 	if !a.eggAdmin(w, r) {

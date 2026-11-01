@@ -3,7 +3,9 @@
 from pathlib import Path
 import re
 import secrets
-from native_config import configure_ini, private_write
+from native_config import patch_ini, private_write
+import configparser
+import io
 
 
 def line(value, limit):
@@ -17,7 +19,7 @@ def credential_file(path, limit):
     return line(value, limit)
 
 
-def configure(root, env):
+def configure(root, env, dry_run=False):
     root = Path(root).resolve()
     identity = env.get('CLUSTER_ID', 'server')
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', identity):raise ValueError('Invalid persistent cluster ID')
@@ -60,20 +62,47 @@ def configure(root, env):
     key = credential_file(key_file, 64) if key_file.exists() else secrets.token_hex(32)
     if not re.fullmatch('[a-f0-9]{64}', key):raise ValueError('Existing private shard key is invalid')
     internal = next(port for port in range(10889, 10989) if port not in allocated)
-    if not key_file.exists():private_write(key_file, key + '\n')
-    configure_ini(root, cluster / 'cluster.ini', {
+    plans = []
+    native_secrets = []
+    def plan(path, sections, seed_sections=()):
+        if not path.resolve().is_relative_to(root):raise ValueError('Native configuration leaves the server volume')
+        with path.open(encoding='utf-8', newline='') if path.exists() else io.StringIO('') as source:previous = source.read()
+        # Reuse the shared ambiguity validator, then seed only absent native controls.
+        patch_ini(previous, sections, case_insensitive=True)
+        parsed = configparser.ConfigParser(interpolation=None, strict=True)
+        parsed.read_string(previous.lstrip('\ufeff'))
+        for section in parsed.sections():
+            if section.casefold() == 'network':
+                native_secrets.append(parsed[section].get('cluster_password', ''))
+        existing = {name.casefold(): {key.casefold() for key in parsed[name]} for name in parsed.sections()}
+        selected = {name: {key: value for key, value in values.items()
+                    if name not in seed_sections or key in ('offline_cluster', 'lan_only_cluster') or key.casefold() not in existing.get(name.casefold(), set())}
+                    for name, values in sections.items()}
+        updated = patch_ini(previous, selected, case_insensitive=True)
+        plans.append((path, previous, updated))
+    plan(cluster / 'cluster.ini', {
         'GAMEPLAY': {'game_mode': mode, 'max_players': str(maximum), 'pvp': str(pvp == '1').lower(), 'pause_when_empty': str(pause == '1').lower()},
         'NETWORK': {'cluster_name': name, 'cluster_description': description, 'cluster_password': password, 'offline_cluster': str(online == '0').lower(), 'lan_only_cluster': str(online == '0').lower()},
         'MISC': {'console_enabled': 'true'},
         'SHARD': {'shard_enabled': 'true', 'bind_ip': '127.0.0.1', 'master_ip': '127.0.0.1', 'master_port': str(internal), 'cluster_key': key},
-    }, state / 'config-backups')
+    }, ('GAMEPLAY', 'NETWORK'))
     for index, shard in enumerate(('Master', 'Caves')):
-        configure_ini(root, cluster / shard / 'server.ini', {
+        plan(cluster / shard / 'server.ini', {
             'NETWORK': {'server_port': str(ports[index])},
             'SHARD': {'is_master': str(index == 0).lower(), 'name': shard, 'id': str(index + 1)},
             'STEAM': {'master_server_port': str(ports[2 + index * 2]), 'authentication_port': str(ports[3 + index * 2])},
-        }, state / 'config-backups')
+        })
+    backups = state / 'config-backups'
+    if not backups.resolve().is_relative_to(root):raise ValueError('Configuration backups leave the volume')
+    if dry_run:return {'cluster': cluster, 'identity': identity, 'ports': ports}
+    if not key_file.exists():private_write(key_file, key + '\n')
+    import time
+    for path, previous, updated in plans:
+        if previous != updated:
+            if path.exists():private_write(backups / (str(time.time_ns()) + '-' + path.parent.name + '-' + path.name), previous)
+            private_write(path, updated)
+        else:path.chmod(0o600)
     if token:private_write(token_file, token + '\n')
     elif token_file.exists():token_file.chmod(0o600)
     return {'cluster': cluster, 'identity': identity, 'ports': ports, 'internal_shard_port': internal,
-            'credentials': [effective_token, key]}
+            'credentials': [effective_token, key, *native_secrets]}

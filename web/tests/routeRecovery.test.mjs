@@ -16,6 +16,11 @@ async function load(entry) {
  else if(path==='react/jsx-runtime')contents='export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";';
  else if(path==='react-router-dom')contents='export const Link="a";export const useLocation=()=>({pathname:"/"});export const useNavigate=()=>()=>{};';
  else if(path==='./lib')contents='export const api=(...a)=>globalThis.__gate.request(...a);export const queryCacheSessionIdentity=s=>JSON.stringify(s);'+['Select','Button','Card','ErrorBox','Field','Loading'].map(n=>`export const ${n}="${n}";`).join('');
+ else if(path==='./notifications/useErrorState')contents='export const useErrorState=()=>globalThis.__gate.useState("");';
+ else if(path==='./components/ui/checkbox')contents='export const Checkbox="input";';
+ else if(path==='./components/ui/input')contents='export const Input="input";';
+ else if(path==='./ui/ActionButton')contents='export const ActionButton="button";';
+ else if(path==='./notifications/store')contents='export const captureErrorContext=()=>({});export const reportPanelError=()=>{};';
  else if(path==='./desktop')contents='export const DesktopRecoveryActions="recovery";';
  else contents='export default "stub";';
  return {contents,loader:'js'};
@@ -69,8 +74,8 @@ test('account refresh failure retains shell only while account data exists',asyn
  const source=await readFile(new URL('../src/App.tsx',import.meta.url),'utf8');
  const shell=source.slice(source.indexOf('function AuthenticatedShell()'),source.indexOf('function AppShell('));
  const compiled=await transform(shell,{loader:'tsx',jsx:'transform'});
- const render=new Function('React','useAPI','useEffect','unwrap','Loading','ThemeProvider','ServerNavigationProvider','ArtworkProvider','AppShell',compiled.code+';return AuthenticatedShell();');
- const run=data=>render(React,()=>({data,error:'offline',reload(){}}),()=>{},x=>x,'loading','theme','navigation','artwork','shell');
+ const render=new Function('React','useAPI','useEffect','unwrap','Loading','ThemeProvider','ServerNavigationProvider','ArtworkProvider','AppShell','MiraAction',compiled.code+';return AuthenticatedShell();');
+ const run=data=>render(React,()=>({data,error:'offline',reload(){}}),()=>{},x=>x,'loading','theme','navigation','artwork','shell','button');
  assert.equal(run({id:1}).type,'theme');assert.equal(run(null).type,'div');
 });
 test('60 second timer uses the same non-destructive refresh path',async()=>{
