@@ -10,6 +10,7 @@ The existing Wings console WebSocket is unchanged.
 | Event | Subscription path | Delivery |
 | --- | --- | --- |
 | `server.resources` | `/api/client/servers/{server}/resources` | Resource snapshot every second while watched |
+| `console.entries` | `/api/client/servers/{server}/console-history` | Saved console entries in cursor batches; checked every second, backlog drained in smaller intervals |
 | `servers.state` | `/api/client?summary=overview&states=1` | Current authorized membership and lifecycle states every second |
 | `server.updated` | `/api/client/servers/{server}` | Invalidate HTTP detail when the server or permission revision changes |
 | `jobs.updated` | `/api/client/servers/{server}/steam` | Sanitized Steam job status/progress every two seconds |
@@ -73,6 +74,26 @@ can miss intermediate snapshots and receive a later state; they cannot grow an
 unbounded queue. Shutdown cancels collectors and closes connections.
 
 ## Frontend recovery
+
+The console loads saved history once over HTTP, then consumes `console.entries`.
+Batches include `after`, `cursor` and `head` string cursors. IDs are global, so
+they need not be contiguous for one server. A batch starting beyond the client's
+cursor means delivery was missed; the client recovers through paginated HTTP.
+Reset buffers also trigger HTTP recovery. Overlapping entry IDs are ignored.
+New subscriptions start at the current head rather than replaying the whole
+buffer. Each batch has at most eight entries to fit escaped maximum-length
+lines within the frame bound. Installer output remains administrator-only.
+These entries come from the existing persistent Wings collector, including
+panel and installer messages. The direct Wings socket remains for status,
+feature handling and live fallback. Hidden consoles pause HTTP history polling.
+
+The shared fleet CPU summary consumes the same resource subscriptions as server
+cards. It waits briefly for the first snapshot and only reads HTTP resources
+when the topic is stale or unavailable. Node CPU capacity is read on mount and
+cached for five minutes while mounted; failed capacity reads retry sooner.
+Hidden summaries stop polling. This removes duplicate browser requests, but
+does not replace the panel's shared upstream Wings polling. Overview metadata
+still refreshes over HTTP to catch changes made by other accounts.
 
 Overview and dashboard resource polling is suppressed while fresh socket samples
 arrive. Installation and Steam status polling likewise defers to live events.

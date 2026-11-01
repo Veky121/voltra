@@ -10,6 +10,22 @@ Official references:
 - https://github.com/fatedier/frp/blob/v0.68.0/client/http/model/proxy_definition.go
 - https://github.com/fatedier/frp/blob/v0.68.0/client/http/model/types.go
 
+## Connect an existing server
+
+Open **Game settings > Network** on the server. **Public connections** shows whether its primary player port has a route, and lists each public address, internal target and last applied status.
+
+1. Under **Connect a game port**, choose an assigned server port. The primary port is selected initially.
+2. Choose a gateway. Only tested connections for this node whose local range includes the port are selectable. A sole eligible gateway is selected automatically.
+3. Choose TCP or UDP. The built-in Minecraft Java library defaults its primary port to TCP; other ports require an explicit protocol choice. Add a separate route for each protocol if the game needs both.
+4. Leave **Public port** on **Automatic** to prefer the same number and otherwise select a free public port. **Choose a port** accepts a number within the gateway range. Neither choice changes the game's internal port.
+5. Click **Enable proxy** and confirm the target. Voltra saves the route, then applies only that route. A failure retains the route and displays a retry action. Removing a route also applies only its removal, keeping its reservation until removal is confirmed.
+
+**Assign port** adds a node allocation. It does not open a public route or change the game's port configuration. Address aliases are labels, not forwarding rules. Once the primary route is applied on a gateway with DNS configured, use **Connection details > Edit join name** to assign a managed name.
+
+Automatic forwarding runs during supported library installations, using only reviewed gameplay protocols and exactly one tested matching client. It does not retroactively connect existing servers when a gateway is configured later. The Network flow recovers missing routes and lets administrators resolve ambiguous gateway choices explicitly. It does not automatically expose auxiliary or management ports.
+
+The server setup API is administrator-only: `GET/POST /api/admin/servers/{server}/proxy`. Applying a single saved route uses `POST /api/admin/proxy-gateways/{gateway}/routes/{route}/apply`. These reuse the same allocation ownership, operator reservations, gateway locking and Store reconciliation as existing automatic forwarding. Applied status is a saved check result, not continuous reachability monitoring.
+
 ## Guided setup
 
 1. Create a gateway under administrator integrations. Enter the VPS FRPS host/control port, public hostname, token, and public port pool. Save the token through this form. List/detail responses never include it.

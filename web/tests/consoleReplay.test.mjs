@@ -10,7 +10,8 @@ import {consoleStateLine} from '../src/client/consoleLifecycle.ts';
 
 function fixture() {
   const effects=[], timers=new Map(), requests=[], sockets=[];
-  let history=emptyConsoleHistory(), nextTimer=0, cleanup;
+  const doc=Object.assign(new EventTarget(),{hidden:false});
+  let history=emptyConsoleHistory(), nextTimer=0, cleanup, subscriber, fresh=false;
   const react={useEffect:fn=>effects.push(fn),useRef:current=>({current}),useState:initial=>{
     let state=typeof initial==='function'?initial():initial;
     return [state,update=>{state=typeof update==='function'?update(state):update;if(initial===emptyConsoleHistory)history=state;}];
@@ -23,16 +24,16 @@ function fixture() {
     emit(event,line){this.onmessage({data:JSON.stringify({event,args:[line]})});}
   }
   const api=path=>new Promise((resolve,reject)=>requests.push({path,resolve,reject}));
-  const modules={react,'../notifications/useErrorState':{useErrorState:()=>react.useState('')},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib':{api},'./ServerDashboard':{useServerTelemetry:()=>({state:'unknown'})},'./consoleHistory':{emptyConsoleHistory,appendConsoleHistory},'./consoleQueue':{ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS},'./consoleReplay':{ConsoleReplayOverlap},'./consoleOutput':{consoleOutput},'./consoleLifecycle':{consoleStateLine},'./serverPower':{consolePowerEvent:'power'},'./common':{useServer:()=>({base:'/server',server:{},permissions:[]}),useAction:()=>({}),value:r=>r}};
+  const modules={react,'../hooks/liveEvents':{observeLivePath:(_path,fn)=>{subscriber=fn;return()=>{subscriber=undefined}},isLivePathFresh:()=>fresh},'../notifications/useErrorState':{useErrorState:()=>react.useState('')},'react/jsx-runtime':{jsx:()=>null,jsxs:()=>null},'../lib':{api},'./ServerDashboard':{useServerTelemetry:()=>({state:'unknown'})},'./consoleHistory':{emptyConsoleHistory,appendConsoleHistory},'./consoleQueue':{ConsoleLineQueue,CONSOLE_QUEUE_FRAME_MS},'./consoleReplay':{ConsoleReplayOverlap},'./consoleOutput':{consoleOutput},'./consoleLifecycle':{consoleStateLine},'./serverPower':{consolePowerEvent:'power'},'./common':{useServer:()=>({base:'/server',server:{},permissions:[]}),useAction:()=>({}),value:r=>r}};
   const code=ts.transpileModule(readFileSync(new URL('../src/client/Console.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   const exports={};
-  new Function('require','exports','window','document','WebSocket','location','setTimeout','clearTimeout',code)(name=>modules[name]??{},exports,{matchMedia:()=>({matches:true}),addEventListener(){},removeEventListener(){}},{hidden:true,addEventListener(){},removeEventListener(){}},Socket,{href:'http://localhost'},(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},id=>timers.delete(id));
+  new Function('require','exports','window','document','WebSocket','location','setTimeout','clearTimeout',code)(name=>modules[name]??{},exports,{matchMedia:()=>({matches:true}),addEventListener(){},removeEventListener(){}},doc,Socket,{href:'http://localhost'},(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},id=>timers.delete(id));
   exports.default();
   for(const effect of effects){const result=effect();if(result)cleanup=result;}
   const tick=async()=>{await Promise.resolve();await Promise.resolve();};
   const run=async delay=>{for(const [id,timer] of [...timers])if(timer.delay===delay){timers.delete(id);timer.fn();}await tick();};
   const respond=async data=>{const request=requests.find(r=>r.path.includes('console-history'));assert.ok(request);requests.splice(requests.indexOf(request),1);request.resolve(data);await tick();await run(0);};
-  return {requests,sockets,run,respond,tick,text:()=>consoleHistoryText(history),cleanup:()=>cleanup()};
+  return {requests,sockets,run,respond,tick,visibility:hidden=>{doc.hidden=hidden;doc.dispatchEvent(new Event('visibilitychange'))},setFresh:value=>{fresh=value},emit:data=>subscriber?.({status:200,data}),text:()=>consoleHistoryText(history),cleanup:()=>cleanup()};
 }
 const entry=line=>({event:'console output',line});
 
@@ -124,4 +125,43 @@ test('overlap matches collector byte truncation at multibyte boundaries',()=>{
  const h=new ConsoleReplayOverlap();h.record('console output',live);
  assert.equal(h.consume('console output',saved),true);
  h.record('console output',saved);assert.equal(h.consume('console output',live),true);
+});
+
+
+test('healthy saved-log socket suppresses HTTP polling and deduplicates overlapping IDs',async()=>{
+ const f=fixture();try{
+  await f.respond({cursor:'10',capture:{connected:true},data:[{...entry('initial'),id:'10'}]});f.setFresh(true);
+  for(let i=0;i<60;i++)await f.run(1000);
+  assert.equal(f.requests.filter(r=>r.path.includes('console-history')).length,0);
+  f.emit({after:'10',head:'13',cursor:'13',capture:{connected:true},data:[{...entry('same'),id:'12'},{...entry('same'),id:'13'}]});await f.run(0);
+  f.emit({after:'10',head:'13',cursor:'13',capture:{connected:true},data:[{...entry('same'),id:'12'},{...entry('same'),id:'13'}]});await f.run(0);
+  assert.equal(f.text().split('same').length-1,2);
+  f.setFresh(false);await f.run(1000);assert.ok(f.requests.some(r=>r.path.endsWith('after=13')));
+ }finally{f.cleanup()}
+});
+
+test('missed socket batches recover through HTTP and drain pages while socket stays fresh',async()=>{
+ const f=fixture();try{
+  await f.respond({cursor:'10',capture:{connected:true},data:[entry('initial')]});f.setFresh(true);
+  f.emit({after:'15',head:'20',cursor:'20',capture:{connected:true},data:[]});
+  assert.ok(f.requests.some(r=>r.path.endsWith('after=10')));
+  await f.respond({cursor:'16',more:true,capture:{connected:true},data:[entry('recovered')]});
+  await f.run(10);assert.ok(f.requests.some(r=>r.path.endsWith('after=16')));
+  await f.respond({cursor:'20',capture:{connected:true},data:[entry('last page')]});
+  assert.match(f.text(),/recovered/);assert.match(f.text(),/last page/);
+  f.emit({after:'2',head:'2',cursor:'2',capture:{connected:true},data:[]});
+  assert.ok(f.requests.some(r=>r.path.endsWith('after=20')));
+  await f.respond({reset:true,cursor:'2',capture:{connected:true},data:[entry('new history')]});
+  assert.doesNotMatch(f.text(),/initial/);assert.match(f.text(),/new history/);
+ }finally{f.cleanup()}
+});
+
+
+test('hidden console pauses HTTP fallback and recovers on return',async()=>{
+ const f=fixture();try{
+  await f.respond({cursor:'10',capture:{connected:true},data:[]});f.visibility(true);
+  for(let i=0;i<60;i++)await f.run(1000);
+  assert.equal(f.requests.filter(r=>r.path.includes('console-history')).length,0);
+  f.visibility(false);assert.ok(f.requests.some(r=>r.path.endsWith('after=10')));
+ }finally{f.cleanup()}
 });

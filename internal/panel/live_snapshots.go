@@ -16,6 +16,7 @@ import (
 
 type liveTopic struct {
 	path, server, event string
+	consoleAfter        string
 	interval            time.Duration
 	handler             http.HandlerFunc
 }
@@ -81,6 +82,10 @@ func (a *App) liveTopic(path string) (liveTopic, bool) {
 		return t, true
 	}
 	switch parts[1] {
+	case "console-history":
+		t.handler = a.clientConsoleStream
+		t.event = "console.entries"
+		t.interval = time.Second
 	case "resources":
 		t.handler = a.clientResources
 		t.event = "server.resources"
@@ -116,6 +121,8 @@ func (a *App) authorizeLiveTopic(r *http.Request, t liveTopic, user int64) (M, e
 	}
 	permission := ""
 	switch t.event {
+	case "console.entries":
+		permission = "websocket.connect"
 	case "jobs.updated":
 		permission = "startup.read"
 	case "backups.updated":
@@ -195,6 +202,9 @@ func (a *App) loadLiveSample(ctx context.Context, t liveTopic, user int64) (samp
 		}
 	} else {
 		r, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost"+t.path, nil)
+		if t.event == "console.entries" && t.consoleAfter != "" {
+			r.URL.RawQuery = "after=" + url.QueryEscape(t.consoleAfter)
+		}
 		r = WithUser(r, user)
 		r.SetPathValue("server", t.server)
 		t.handler(w, r)
@@ -278,6 +288,18 @@ func (a *App) runLiveSnapshot(ctx context.Context, key string, w *liveSnapshotWo
 		}
 		h.mu.Unlock()
 		delay := w.topic.interval
+		if w.topic.event == "console.entries" && value.status == 200 {
+			var batch struct {
+				Cursor string `json:"cursor"`
+				More   bool   `json:"more"`
+			}
+			if json.Unmarshal(value.data, &batch) == nil {
+				w.topic.consoleAfter = batch.Cursor
+				if batch.More {
+					delay = 10 * time.Millisecond
+				}
+			}
+		}
 		if value.status >= 400 {
 			delay = 10 * time.Second
 		}

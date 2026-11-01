@@ -23,3 +23,37 @@
 .integrations-mapping>summary{cursor:pointer}
 .integrations-mapping .settings-row-layout{padding:14px 0 0}
 .integrations-credential-note a{display:inline-block;padding:4px 0}
+
+/* Integrations compose the same settings sections and responsive fields as servers. */
+.app-content .integrations-layout.settings-responsive{display:grid;gap:24px;max-width:2200px;margin-inline:auto}
+.integrations-layout .settings-section[data-settings-section]{max-width:none;margin:0}
+.integrations-layout .integrations-fieldset{display:grid;gap:24px;border:0;padding:0;margin:0;min-width:0}
+.integrations-layout .settings-group{min-width:0}
+.integrations-layout .settings-group>form,.integrations-layout form{min-width:0;margin:0}
+.integrations-layout .settings-group>form{display:block}
+.integrations-layout .settings-group>p,.integrations-layout .settings-group>form>p,.integrations-layout .settings-note{padding:12px 16px;margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.integrations-layout .settings-group>.actions,.integrations-layout .settings-group>form>.actions,.integrations-layout .settings-group>form>button{margin:12px 16px}
+.integrations-layout .settings-group>form>h3{padding:16px 16px 0;margin:0;font-size:14px;font-weight:550}
+.integrations-layout .settings-group>form+form{border-top:1px solid var(--ui-divider)}
+.integrations-layout .integration-products{margin:0;padding:14px 32px;color:var(--text);font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.integrations-layout .integration-products>h3{font-size:14px;font-weight:550;margin:0 0 8px}
+.integrations-layout .integration-products>ul{margin:0;padding-left:18px}
+.integrations-layout .integrations-credentials.settings-options-grid{align-items:start}
+.integrations-layout .integrations-credential{height:100%;border-bottom:1px solid var(--ui-divider)}
+.integrations-layout .integrations-credential>.settings-row{max-width:none}
+.integrations-layout .integrations-credential:has(.integrations-clear)>.settings-row>.settings-row-layout{grid-template-columns:minmax(0,1fr) minmax(160px,280px)}
+.integrations-layout .proxy-gateways__selector{max-width:880px;width:100%}
+.integrations-layout .proxy-gateways__row{padding:16px;border-bottom:1px solid var(--ui-divider);gap:16px;align-items:center}
+.integrations-layout .proxy-gateways__row .actions{flex-basis:auto;justify-content:flex-end;gap:8px}
+.integrations-layout .settings-group>details{padding:14px 16px}
+.integrations-layout .proxy-gateways__wizard-heading{padding:16px;margin:0;border-bottom:1px solid var(--ui-divider)}
+.integrations-layout .proxy-gateways__wizard-note{padding:12px 16px}
+.integrations-layout .proxy-gateways__wizard .settings-group{overflow:visible}
+.app-content .integrations-layout.game-licences{max-width:1120px}
+.integrations-layout .settings-group .admin-data-toolbar{padding:12px 16px;margin:0}
+.integrations-layout .settings-group .table tr>:first-child{padding-left:16px}
+.integrations-layout .settings-group .table tr>:last-child{padding-right:16px}
+.integrations-layout .settings-group>.empty{margin:12px 16px;border:0;padding:16px}
+.integrations-layout .settings-group>.admin-action{padding:12px 16px}
+@container(max-width:560px){.integrations-layout .integrations-credential:has(.integrations-clear)>.settings-row>.settings-row-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.integrations-layout .proxy-gateways__row .actions{justify-content:flex-start}}

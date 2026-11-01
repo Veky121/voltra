@@ -1,7 +1,9 @@
 import {ResourceMetric} from '../ui/ResourceSummary';
 import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
 import {api} from '../lib';
-import {cpuThreads,cpuUsage,summarizeCPU} from './fleetCPUModel';
+import {summarizeCPU} from './fleetCPUModel';
+import {observeFleetTelemetry} from './fleetTelemetry';
+import {observeLivePath,isLivePathFresh} from '../hooks/liveEvents';
 
 type FleetSources={nodes:{id:number|string}[];servers:{identifier?:string;uuid?:string}[]};
 const CPUContext=createContext<Record<string,number|null>|null>(null);
@@ -10,31 +12,9 @@ const serverPath=(s:FleetSources['servers'][number])=>`/api/client/servers/${enc
 export function FleetCPUProvider({nodes,servers,children}:FleetSources&{children:ReactNode}){
  const paths=JSON.stringify({nodes:nodes.map(nodePath),servers:servers.map(serverPath)});
  const [result,setResult]=useState<{key:string;values:Record<string,number|null>}|null>(null);
- useEffect(()=>{
-  const sources=JSON.parse(paths) as {nodes:string[];servers:string[]};
-  let active=true,pending=false,timer:ReturnType<typeof setTimeout>|undefined,controller:AbortController|undefined;
-  async function poll(){
-   if(!active||pending||document.hidden)return;
-   pending=true;controller=new AbortController();const signal=controller.signal;
-   const jobs=[...sources.nodes,...sources.servers],values:(number|null)[]=Array(jobs.length).fill(null);
-   let next=0;
-   await Promise.all(Array.from({length:Math.min(4,jobs.length)},async()=>{
-    while(next<jobs.length&&!signal.aborted){
-     const index=next++;
-     try{
-      const payload=await api(jobs[index],{signal:AbortSignal.any([signal,AbortSignal.timeout(6000)])});
-      values[index]=index<sources.nodes.length?cpuThreads(payload):cpuUsage(payload);
-     }catch{/* Missing telemetry remains unknown, never zero. */}
-    }
-   }));
-   if(active&&!signal.aborted)setResult({key:paths,values:Object.fromEntries(jobs.map((path,index)=>[path,values[index]]))});
-   pending=false;
-   if(active&&!document.hidden)timer=setTimeout(poll,signal.aborted?0:10000);
-  }
-  function visibility(){clearTimeout(timer);if(document.hidden){controller?.abort();setResult(null)}else void poll()}
-  document.addEventListener('visibilitychange',visibility);void poll();
-  return()=>{active=false;clearTimeout(timer);controller?.abort();document.removeEventListener('visibilitychange',visibility)};
- },[paths]);
+ useEffect(()=>observeFleetTelemetry(JSON.parse(paths),values=>setResult({key:paths,values}),{
+  request:api,observe:observeLivePath,fresh:isLivePathFresh,
+ }),[paths]);
  return <CPUContext.Provider value={result?.key===paths?result.values:null}>{children}</CPUContext.Provider>;
 }
 

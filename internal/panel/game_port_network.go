@@ -143,15 +143,24 @@ func (a *App) forwardGamePorts(ctx context.Context, node M, server M, entry game
 }
 
 func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string, port int64, proto string) (M, error) {
+	return a.createSelectedGameFRPRoute(ctx, node, server, ip, port, proto, 0, 0)
+}
+
+// An explicit client permits recovery when automatic selection was ambiguous.
+// A zero public port selects an available port without changing the game allocation.
+func (a *App) createSelectedGameFRPRoute(ctx context.Context, node, server M, ip string, port int64, proto string, clientID, publicPort int64) (M, error) {
 	parsed := net.ParseIP(ip)
 	if parsed == nil || parsed.IsLoopback() || parsed.IsMulticast() || parsed.IsLinkLocalUnicast() {
 		return nil, fmt.Errorf("FRP needs a reachable node address; this allocation is local-only or invalid")
 	}
-	clients, err := a.query(ctx, `SELECT c.id,c.gateway_id,c.admin_url,g.public_host,g.public_port_start,g.public_port_end FROM proxy_node_clients c JOIN proxy_gateways g ON g.id=c.gateway_id WHERE c.node_id=$1 AND c.setup_complete AND c.test_status='complete' AND $2 BETWEEN c.local_port_start AND c.local_port_end ORDER BY c.id LIMIT 2`, num(node["id"]), port)
+	clients, err := a.query(ctx, `SELECT c.id,c.gateway_id,c.admin_url,g.public_host,g.public_port_start,g.public_port_end FROM proxy_node_clients c JOIN proxy_gateways g ON g.id=c.gateway_id WHERE c.node_id=$1 AND c.setup_complete AND c.test_status='complete' AND $2 BETWEEN c.local_port_start AND c.local_port_end AND ($3::bigint=0 OR c.id=$3) ORDER BY c.id LIMIT 2`, num(node["id"]), port, clientID)
 	if err != nil {
 		return nil, fmt.Errorf("FRP configuration could not be read")
 	}
 	if len(clients) != 1 {
+		if clientID != 0 {
+			return nil, fmt.Errorf("This gateway connection is not tested or does not cover the server port. Check the node connection under Proxy gateways.")
+		}
 		return nil, fmt.Errorf("manual forwarding required: exactly one tested FRP client with a matching local pool is required")
 	}
 	c := clients[0]
@@ -166,6 +175,20 @@ func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string,
 	}
 	defer tx.Rollback(ctx)
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended(current_schema()||$1,0))", "proxy-wizard-"+strconv.FormatInt(gid, 10)); err != nil {
+		return nil, err
+	}
+	var publicHost string
+	var poolStart, poolEnd int64
+	// Revalidate the selected client after serializing with gateway edits and setup tests.
+	if err = tx.QueryRow(ctx, `SELECT c.admin_url,g.public_host,g.public_port_start,g.public_port_end FROM proxy_node_clients c JOIN proxy_gateways g ON g.id=c.gateway_id WHERE c.id=$1 AND c.node_id=$2 AND c.setup_complete AND c.test_status='complete' AND $3 BETWEEN c.local_port_start AND c.local_port_end FOR SHARE OF c,g`, num(c["id"]), num(node["id"]), port).Scan(&target, &publicHost, &poolStart, &poolEnd); err != nil {
+		return nil, fmt.Errorf("Gateway connection changed; reload and choose a tested connection")
+	}
+	c["admin_url"] = target
+	c["public_host"] = publicHost
+	c["public_port_start"] = poolStart
+	c["public_port_end"] = poolEnd
+	target, err = gameFRPTarget(ip, target)
+	if err != nil {
 		return nil, err
 	}
 	reservations, err := readGamePortReservations(ctx, tx, true)
@@ -191,6 +214,9 @@ func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string,
 		if err != nil {
 			return nil, err
 		}
+		if publicPort != 0 && publicPort != public {
+			return nil, proxyConflict("This port already has a route. Remove it before choosing another public port.")
+		}
 		if !desired {
 			return nil, fmt.Errorf("mapping is awaiting removal; reconcile it before retry")
 		}
@@ -201,12 +227,23 @@ func (a *App) createGameFRPRoute(ctx context.Context, node, server M, ip string,
 		existing.Close()
 		start := max(port, num(c["public_port_start"]))
 		end := min(num(c["public_port_end"]), start+127)
+		if clientID != 0 {
+			start = num(c["public_port_start"])
+			end = num(c["public_port_end"])
+		}
+		if publicPort != 0 {
+			if publicPort < num(c["public_port_start"]) || publicPort > num(c["public_port_end"]) {
+				return nil, bad("Public port is outside the gateway's port range")
+			}
+			start = publicPort
+			end = publicPort
+		}
 		if start > end {
 			return nil, fmt.Errorf("manual forwarding required: preferred public port exceeds configured FRP pool")
 		}
-		err = tx.QueryRow(ctx, `SELECT p FROM generate_series($1::int,$2::int) p WHERE NOT (p=ANY($5::bigint[])) AND NOT EXISTS(SELECT 1 FROM proxy_routes WHERE gateway_id=$3 AND protocol=$4 AND public_port=p) AND NOT EXISTS(SELECT 1 FROM proxy_node_clients WHERE gateway_id=$3 AND test_public_port=p) ORDER BY p LIMIT 1`, start, end, gid, proto, reservations.gatewayPorts(gid)).Scan(&public)
+		err = tx.QueryRow(ctx, `SELECT p FROM generate_series($1::int,$2::int) p WHERE NOT (p=ANY($5::bigint[])) AND NOT EXISTS(SELECT 1 FROM proxy_routes WHERE gateway_id=$3 AND protocol=$4 AND public_port=p) AND NOT EXISTS(SELECT 1 FROM proxy_node_clients WHERE gateway_id=$3 AND test_public_port=p) ORDER BY (p=$6) DESC,p LIMIT 1`, start, end, gid, proto, reservations.gatewayPorts(gid), port).Scan(&public)
 		if err != nil {
-			return nil, fmt.Errorf("FRP public port conflict: no free port in bounded upward search of configured pool")
+			return nil, fmt.Errorf("No available public port in the selected range. Choose another port or gateway.")
 		}
 		err = tx.QueryRow(ctx, `INSERT INTO proxy_routes(gateway_id,client_id,server_id,allocation_id,protocol,public_port,local_ip,local_port,proxy_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, gid, num(c["id"]), num(server["id"]), aid, proto, public, target, port, "voltra-"+newUUID()).Scan(&rid)
 		if err != nil {

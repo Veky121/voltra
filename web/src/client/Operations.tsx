@@ -227,101 +227,38 @@ export function Backups() {
 }
 
 export function Network() {
-  const { base, permissions, server } = useServer();
+  const { base, permissions, server, reload } = useServer();
   const r = useAPI(`${base}/network/allocations`);
   const a = useAction();
+  const [revision,setRevision]=useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const perform = (path: string, body?: any, method = "POST") =>
     a.run(
       () => api(`${base}/network/allocations${path}`, json(method, body)),
-      r.reload
+      ()=>{r.reload();reload();setRevision(n=>n+1)}
     );
   const [savingNotes,setSavingNotes]=useState(false);
-  const changedNotes=Object.entries(notes).filter(([id,text])=>text!==(items(r.data).find(n=>String(n.id)===id)?.notes??''));
+  const changedNotes=Object.entries(notes).filter(([id,text])=>{const port=items(r.data).find(n=>String(n.id)===id);return port&&text!==(port.notes??'')});
   async function saveNotes(){
     setSavingNotes(true);a.setError('');
     try{for(const [id,text] of changedNotes){await api(`${base}/network/allocations/${id}`,json('POST',{notes:text}));setNotes(current=>{const next={...current};if(next[id]===text)delete next[id];return next})}}
     catch(error){a.setError(error instanceof Error?error.message:String(error));throw error}finally{setSavingNotes(false)}
   }
   usePendingSetting(`network-notes:${base}`,changedNotes.length>0,{blocked:savingNotes||!can(permissions,'allocation.update'),save:saveNotes,afterSave:r.reload,discard:()=>{setNotes({});a.setError('')}});
-  return (
-    <section className="operations-page network-page" aria-label="Network allocations">
-      <ProxyEndpoints base={base} />
-      <div className="toolbar server-page-toolbar">
-        <span className="server-limit-badge">Limit: {server.feature_limits?.allocations ?? 'Unlimited'}</span>
-        {can(permissions, "allocation.create") && (
-          <Button disabled={a.busy} onClick={() => perform("")}>
-            Assign allocation
-          </Button>
-        )}
-        <Button variant="secondary" onClick={r.reload}>
-          Refresh
-        </Button>
-      </div>
-      <Notice action={a} />
-      <PageError error={r.error} />
-      {r.loading && <p className="operations-loading" role="status">Loading allocations...</p>}
-      <div className="grid grid-2">
-        {items(r.data).map((n) => (
-          <Card key={n.id} className="operations-record">
-            <h3>
-              {n.ip_alias || n.alias || n.ip}:{n.port}{" "}
-              {n.is_default && <span className="badge operations-status-accent">Primary</span>}
-            </h3>
-            {(n.ip_alias || n.alias) && (
-              <p className="muted">
-                {n.ip}:{n.port}
-              </p>
-            )}
-            <form
-              onSubmit={e=>{e.preventDefault();void saveNotes().catch(()=>{})}}
-            >
-              <Field label="Notes">
-                <Input
-                  disabled={!can(permissions, "allocation.update")}
-                  value={notes[n.id] ?? n.notes ?? ""}
-                  maxLength={255}
-                  onChange={(e) =>
-                    setNotes((old) => ({ ...old, [n.id]: e.target.value }))
-                  }
-                />
-              </Field>
-              <div className="actions operations-record-actions">
-                {can(permissions, "allocation.update") && (
-                  <>
-                    {!n.is_default && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={a.busy}
-                        onClick={() => perform(`/${n.id}/primary`)}
-                      >
-                        Make primary
-                      </Button>
-                    )}
-                  </>
-                )}
-                {!n.is_default && can(permissions, "allocation.delete") && (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    disabled={a.busy}
-                    onClick={async () => {
-                      if (await confirmAction({title:"Unassign?",description:`Unassign ${n.ip}:${n.port}?`,confirmLabel:"Unassign",danger:true}))
-                        perform(`/${n.id}`, undefined, "DELETE");
-                    }}
-                  >
-                    Unassign
-                  </Button>
-                )}
-              </div>
-            </form>
-          </Card>
-        ))}
-      </div>
-      {!r.loading && !items(r.data).length && <Card className="operations-empty">No allocations assigned.</Card>}
-    </section>
-  );
+  return <section className="operations-page network-page settings-responsive" aria-label="Network ports">
+    <ProxyEndpoints base={base} revision={revision}/>
+    <SettingsSection title="Server ports" action={can(permissions,'allocation.create')?<Button disabled={a.busy} onClick={()=>perform('')}>Assign port</Button>:undefined}>
+      <p className="server-proxy-note">Ports assigned on the node. Assigning a port does not expose it through a gateway. Limit: {server.feature_limits?.allocations ?? 'Unlimited'}.</p>
+      <Notice action={a}/><PageError error={r.error}/>{r.error&&<Button variant="secondary" onClick={r.reload}>Retry loading ports</Button>}
+      {r.loading&&!r.data&&<p className="server-proxy-note" role="status">Loading server ports...</p>}
+      <div className="settings-options-grid">{items(r.data).map(n=><SettingsRow key={n.id} label={`${n.ip}:${n.port}`} description={n.is_default?'Primary player port':n.ip_alias||n.alias?`Address alias: ${n.ip_alias||n.alias}. Forwarding is configured separately.`:'Additional server port'} control={<div className="network-port-actions">
+       {n.is_default&&<span className="badge">Primary</span>}
+       {!n.is_default&&can(permissions,'allocation.update')&&<Button variant="secondary" disabled={a.busy} onClick={async()=>{if(await confirmAction({title:'Change primary port?',description:`Use ${n.ip}:${n.port} as the primary allocation? Check the game's port settings and proxy routes after changing it.`,confirmLabel:'Make primary'}))perform(`/${n.id}/primary`)}}>Make primary</Button>}
+       {!n.is_default&&can(permissions,'allocation.delete')&&<Button variant="danger" disabled={a.busy} onClick={async()=>{if(await confirmAction({title:'Unassign port?',description:`Unassign ${n.ip}:${n.port}? Remove its proxy routes first.`,confirmLabel:'Unassign',danger:true}))perform(`/${n.id}`,undefined,'DELETE')}}>Unassign</Button>}
+      </div>}><label className="network-port-note">Notes<Input aria-label={`Notes for port ${n.port}`} disabled={!can(permissions,'allocation.update')||savingNotes} value={notes[n.id]??n.notes??''} maxLength={255} onChange={e=>setNotes(old=>({...old,[n.id]:e.target.value}))}/></label></SettingsRow>)}</div>
+      {!r.loading&&!items(r.data).length&&<p className="server-proxy-note">No ports assigned.</p>}
+    </SettingsSection>
+  </section>;
 }
 
 function Variable({

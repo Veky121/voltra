@@ -1,11 +1,11 @@
 import {captureErrorContext,reportPanelError,resolvePanelErrors,type ErrorContext} from '../notifications/store';
 export type LiveSnapshot={status:number;data:any;invalidate?:boolean};
-type Entry={listeners:Set<(sample:LiveSnapshot)=>void>;at:number;context:ErrorContext};
+type Entry={listeners:Set<(sample:LiveSnapshot)=>void>;at:number;context:ErrorContext;sample?:LiveSnapshot};
 const entries=new Map<string,Entry>(),navigation=new Set<()=>void>();
 let socket:WebSocket|undefined,attempt=0,revision=0,ready=false,attached=false;
 let retry:ReturnType<typeof setTimeout>|undefined,refresh:ReturnType<typeof setTimeout>|undefined,subscriptions:ReturnType<typeof setTimeout>|undefined;
 export function livePathAllowed(path:string):boolean {
-  return path==='/api/client?summary=overview&states=1'||/^\/api\/client\/servers\/[^/?#%.\\]+(?:\/(?:resources|steam|backups|schedules|activity))?$/.test(path);
+  return path==='/api/client?summary=overview&states=1'||/^\/api\/client\/servers\/[^/?#%.\\]+(?:\/(?:resources|console-history|steam|backups|schedules|activity))?$/.test(path);
 }
 export function isLivePathFresh(path:string):boolean {const at=entries.get(path)?.at;return !!at&&ready&&Date.now()-at<12000}
 function invalidate(){if(refresh!==undefined)return;refresh=setTimeout(()=>{refresh=undefined;for(const listener of navigation)listener()},75)}
@@ -55,7 +55,8 @@ function connect(){
       if(message.type==='unchanged')return;
       if(message.status>=400)reportPanelError(message.data?.errors?.map((error:any)=>error.detail||error.message).join('\n')||`Live update failed (${message.status}).`,{...entry.context,status:message.status});
       else if(message.status===200)resolvePanelErrors(message.path,'GET',entry.context.epoch);
-      for(const listener of entry.listeners)listener({status:message.status,data:message.data,invalidate:message.type==='invalidated'});
+      entry.sample={status:message.status,data:message.data,invalidate:message.type==='invalidated'};
+      for(const listener of entry.listeners)listener(entry.sample);
     }
   };
   current.onclose=()=>{if(socket===current)reconnect()};current.onerror=()=>current.close();
@@ -67,7 +68,9 @@ function ensureConnected(){
 export function observeLivePath(path:string,onSample:(sample:LiveSnapshot)=>void):(()=>void)|undefined {
   if(!livePathAllowed(path))return undefined;
   let entry=entries.get(path);if(!entry){entry={listeners:new Set(),at:0,context:captureErrorContext('WebSocket',{endpoint:path,method:'GET'})};entries.set(path,entry)}
-  const observed=entry;observed.listeners.add(onSample);ensureConnected();scheduleSubscriptions();
+  const observed=entry;observed.listeners.add(onSample);
+  if(observed.sample&&isLivePathFresh(path))onSample(observed.sample);
+  ensureConnected();scheduleSubscriptions();
   return()=>{observed.listeners.delete(onSample);if(!observed.listeners.size&&entries.get(path)===observed){entries.delete(path);scheduleSubscriptions()}maybeStop()};
 }
 export function observeLiveNavigation(onInvalidate:()=>void):()=>void {

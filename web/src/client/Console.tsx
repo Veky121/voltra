@@ -1,3 +1,4 @@
+import {observeLivePath,isLivePathFresh} from '../hooks/liveEvents';
 import {useErrorState} from '../notifications/useErrorState';
 import { useEffect, useRef, useState } from "react";
 import { api, Button, Input, Select, Field, Modal } from "../lib";
@@ -91,6 +92,8 @@ export default function Console() {
     const visibilityChanged = () => {
       clearTimeout(drainTimer); drainTimer = undefined;
       scheduleDrain();
+      clearTimeout(replayTimer);
+      if (!document.hidden) void replay();
     };
     document.addEventListener('visibilitychange', visibilityChanged);
     let observedState = "unknown";
@@ -110,11 +113,9 @@ export default function Console() {
     // Modern fallback keeps polling from the last successful saved cursor.
     // Only legacy servers request the unnumbered Wings log snapshot.
     const useLiveFallback = () => { historyMode = "live"; requestLiveLogs(); };
-    const replay = async () => {
-      let delay = 1000;
-      try {
-        const saved = await api(`${base}/console-history?after=${cursor}`, {signal: replayAbort.signal});
-        if (!active) return;
+    const historyPath = `${base}/console-history`;
+    let replayPending = false;
+    const consumeSaved = (saved: any) => {
         historyMode = saved.capture?.connected ? "persistent" : "live";
         if (historyMode === 'persistent') savedOverlap.clear();
         if (saved.reset) {
@@ -141,6 +142,21 @@ export default function Console() {
         replayedSaved = true;
         cursor = saved.cursor;
         setHistoryError("");
+    };
+    const replay = async (recover = false) => {
+      if (!active || replayPending) return;
+      clearTimeout(replayTimer);
+      if (document.hidden && replayedSaved) return;
+      if (!recover && replayedSaved && isLivePathFresh(historyPath)) {
+        replayTimer = setTimeout(replay, 1000);
+        return;
+      }
+      replayPending = true;
+      let delay = 1000;
+      try {
+        const saved = await api(`${historyPath}?after=${cursor}`, {signal: replayAbort.signal});
+        if (!active) return;
+        consumeSaved(saved);
         if (saved.more) delay = 10;
       } catch (error) {
         if (!active || replayAbort.signal.aborted) return;
@@ -153,9 +169,18 @@ export default function Console() {
         if (historyMode !== "legacy") useLiveFallback();
         setHistoryError("Saved history is unavailable. Showing live output and retrying.");
         delay = 3000;
-      }
-      if (active) replayTimer = setTimeout(replay, delay);
+      } finally { replayPending = false; }
+      if (active) replayTimer = setTimeout(() => replay(delay === 10), delay);
     };
+    const stopHistory = observeLivePath(historyPath, sample => {
+      if (!active || sample.status !== 200 || !sample.data || replayPending || !replayedSaved) return;
+      const saved = sample.data;
+      // Sequence IDs are global, not contiguous per server. The batch's starting
+      // cursor detects missed frames without mistaking another server's IDs for gaps.
+      if (saved.reset || BigInt(saved.after ?? '0') > BigInt(cursor) || BigInt(saved.head ?? saved.cursor) < BigInt(cursor)) { void replay(true); return; }
+      if (BigInt(saved.cursor) < BigInt(cursor)) return;
+      consumeSaved({...saved, data:(saved.data ?? []).filter((entry:any)=>BigInt(entry.id)>BigInt(cursor))});
+    });
     void replay();
     const observeState = (next: string) => {
       const line = consoleStateLine(observedState, next);
@@ -290,6 +315,7 @@ export default function Console() {
       clearTimeout(timer);
       clearTimeout(replayTimer);
       replayAbort.abort();
+      stopHistory?.();
       current?.close();
       socket.current = null;
     };

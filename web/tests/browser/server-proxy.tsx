@@ -1,0 +1,14 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {createMemoryRouter,RouterProvider} from 'react-router-dom';
+import {ThemeProvider} from '../../src/ThemeProvider';
+import {PendingSettings} from '../../src/client/PendingSettings';
+import {Network} from '../../src/client/Operations';
+import {ServerContext} from '../../src/client/common';
+import {ConfirmActionLayer} from '../../src/ui/ConfirmAction';
+import {GameLicences} from '../../src/admin/GameLicences';
+import {ProxyGateways} from '../../src/admin/ProxyGateways';
+import '../../src/ui/controls.css';import '../../src/styles.css';import '../../src/theme.css';import '../../src/design-system.css';import '../../src/shadcn.css';import '../../src/shadcn-app.css';import '../../src/glass-surfaces.css';import '../../src/ui/density.css';
+const server={uuid:'proxy-test',identifier:'proxytest',feature_limits:{allocations:5}};
+const page=<ThemeProvider account="proxy-fixture"><main className="app-content" data-mira-density="compact" style={{padding:24}}><ServerContext.Provider value={{server,permissions:['*'],base:'/api/client/servers/proxytest',reload:()=>{}}}><PendingSettings><Network/></PendingSettings></ServerContext.Provider><ConfirmActionLayer/></main></ThemeProvider>;
+createRoot(document.getElementById('root')!).render(<RouterProvider router={createMemoryRouter([{path:'*',element:page}])}/>);

@@ -44,9 +44,11 @@ test('topic subscriptions share one socket, fence revisions, pause hidden and fa
  const first=socket.sent.at(-1);assert.deepEqual(first.paths,[path]);
  socket.message({type:'snapshot',path,revision:first.revision-1,status:200,data:{old:true}});assert.equal(seen.length,0);
  socket.message({type:'snapshot',path,revision:first.revision,status:200,data:{fresh:true}});assert.equal(seen.length,1);assert.equal(isLivePathFresh(path),true);
+ const late=[];const stopLate=observeLivePath(path,sample=>late.push(sample));assert.equal(late.length,1);assert.deepEqual(late[0].data,{fresh:true});stopLate();
  document.hidden=true;document.dispatchEvent(new Event('visibilitychange'));t.mock.timers.tick(75);assert.deepEqual(socket.sent.at(-1).paths,[]);assert.equal(isLivePathFresh(path),false);
  document.hidden=false;document.dispatchEvent(new Event('visibilitychange'));t.mock.timers.tick(75);const revision=socket.sent.at(-1).revision;
  socket.message({type:'snapshot',path,revision,status:403,data:{errors:[{detail:'revoked'}]}});assert.equal(isLivePathFresh(path),false);assert.equal(seen.at(-1).status,403);
- socket.close();assert.equal(isLivePathFresh(path),false);
+ socket.close();assert.equal(isLivePathFresh(path),false);const stale=[];const stopStale=observeLivePath(path,sample=>stale.push(sample));assert.equal(stale.length,0);stopStale();
+ assert.equal(livePathAllowed('/api/client/servers/one/console-history'),true);
  assert.equal(livePathAllowed('/api/client/servers/one/files/contents'),false);assert.equal(livePathAllowed('/api/client/servers/one/steam/private'),false);
 });

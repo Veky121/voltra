@@ -1,7 +1,8 @@
 import {CopyButton} from '../ui/CopyButton';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {ServerSubdomain} from './ServerSubdomain';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
+import {Link} from 'react-router-dom';
 import {useTransientMessage} from '../hooks/useTransientMessage';
 import {Button, Modal, useAPI} from '../lib';
 import {can, items, useServer, value} from './common';
@@ -14,6 +15,7 @@ export function ServerConnection(){
   const readable=can(permissions,'allocation.read');
   const query=useAPI(readable?`${base}/proxy-routes`:null);
   const subdomain=useAPI(readable?`${base}/subdomain`:null);
+  useEffect(()=>{const changed=(event:Event)=>{if((event as CustomEvent).detail===base){query.reload();subdomain.reload()}};window.addEventListener('server-proxy-changed',changed);return()=>window.removeEventListener('server-proxy-changed',changed)},[base,query.reload,subdomain.reload]);
   const [details,setDetails]=useState(false),[dns,setDNS]=useState(false);
   const [copyError,setCopyError]=useTransientMessage(5000);
   const allocations=items(server.relationships?.allocations);
@@ -34,10 +36,10 @@ export function ServerConnection(){
     <span className="server-connection-feedback" role="alert">{copyError}</span>
     {details&&<Modal title="Connection details" onClose={()=>setDetails(false)}><div className="server-connection-details">
     <dl>
-      {readable&&<><dt>Proxy</dt><dd>{query.loading?'Checking...':query.error?'Unable to check':routes.length?'Configured':'No primary route'}{query.error&&<MiraAction type="button" onClick={query.reload}>Retry</MiraAction>}</dd></>}
+      {readable&&<><dt>Proxy</dt><dd>{query.loading?'Checking...':query.error?'Unable to check':routes.length?'Configured':'Primary port is not proxied'}{!query.loading&&!query.error&&<Link className="button secondary" to={`/server/${server.identifier||server.uuid}/settings/network`} onClick={()=>setDetails(false)}>Manage connections</Link>}{query.error&&<MiraAction type="button" onClick={query.reload}>Retry</MiraAction>}</dd></>}
       {routes.map(route=><div className="server-connection-row" key={route.id}><dt>Proxy address</dt><dd><CopyButton value={address(route.public_host,route.public_port)} onCopyError={setCopyError} title="Copy proxy address">{address(route.public_host,route.public_port)}</CopyButton><span>{String(route.protocol).toUpperCase()} � {route.status}</span></dd></div>)}
       <dt>Node address</dt><dd>{primary?<CopyButton value={address(primary.ip,primary.port)} onCopyError={setCopyError} title="Copy node allocation address; direct reachability is not verified">{address(primary.ip,primary.port)}</CopyButton>:'Not assigned'}</dd>
-      <dt>Domain</dt><dd>{domain&&<CopyButton value={address(domain,primary.port)} onCopyError={setCopyError} title="Copy configured allocation alias; DNS is not verified">{address(domain,primary.port)}</CopyButton>}{readable&&<MiraAction type="button" onClick={()=>setDNS(true)}>Setup guide</MiraAction>}{!domain&&!readable&&'Not configured'}</dd>
+      <dt>Address alias</dt><dd>{domain&&<CopyButton value={address(domain,primary.port)} onCopyError={setCopyError} title="Copy configured allocation alias; DNS is not verified">{address(domain,primary.port)}</CopyButton>}{readable&&<MiraAction type="button" onClick={()=>setDNS(true)}>Setup guide</MiraAction>}{!domain&&!readable&&'Not configured'}</dd>
       {readable&&<ServerSubdomain onCopyError={setCopyError}/>}
       <dt>Server ID</dt><dd><CopyButton value={server.uuid} onCopyError={setCopyError} title="Copy server UUID">{server.uuid}</CopyButton></dd>
       <dt>Node</dt><dd>{server.node}</dd>

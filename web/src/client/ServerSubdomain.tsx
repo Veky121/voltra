@@ -22,7 +22,7 @@ export function ServerSubdomain({onCopyError}:{onCopyError:(message:string)=>voi
    <p>{data.detail}</p>{data.route&&<p>Public port {data.route.public_port} / {String(data.route.protocol).toUpperCase()} / FRP status: {data.route.status}. DNS verification does not test the game connection.</p>}
    {data.cleanup_pending&&<p role="status">An old DNS record is awaiting removal. Cleanup retries automatically; its name stays reserved until removal is confirmed.</p>}
    {query.error&&<p role="alert">{query.error}</p>}
-   {!query.loading&&!query.error&&!choices.length&&<p>An administrator needs to configure managed DNS under Proxy gateways. This server also needs a primary FRP route.</p>}
+   {!query.loading&&!query.error&&!choices.length&&<p>No eligible proxy route. Under Admin ? Integrations ? Proxy gateways, connect this server's primary allocation to a gateway with DNS configured.</p>}
    {can(permissions,'allocation.update')&&<form onSubmit={e=>{e.preventDefault();void save();}}>
     {choices.length>1&&<Field label="Gateway"><Select value={String(selected?.id||'')} disabled={busy} onChange={e=>setRoute(e.target.value)}>{choices.map((c:any)=><option key={c.id} value={c.id}>{c.domain} / {c.protocol.toUpperCase()} :{c.public_port}</option>)}</Select></Field>}
     <Field label="Join name" hint={label&&selected?`play.${label}.${selected.domain}:${selected.public_port}`:'Optional. Leave empty to keep domains disabled.'}><Input value={label} disabled={busy||query.loading} maxLength={63} placeholder="Choose a join name" onChange={e=>setDraft(e.target.value)}/></Field>

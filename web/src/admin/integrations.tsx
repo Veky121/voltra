@@ -1,10 +1,12 @@
+import {IntegrationLayout} from './IntegrationLayout';
+import {usePendingSetting} from '../client/PendingSettings';
 import {useErrorState} from '../notifications/useErrorState';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Button as MiraButton} from '../components/ui/button';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {Input as MiraInput} from '../components/ui/input';
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import {Select,  Loading } from "../lib";
 import { SettingsRow, SettingsSection, Switch } from "../ui/Settings";
 import {SectionTabs} from '../ui/SectionTabs';
@@ -16,7 +18,7 @@ import { Action, DataTable, ErrorMessage, Heading, Panel, api, rows, unwrap, use
 const endpoint = "/api/admin/integrations";
 type Credential = { key: string; label: string; variables: string };
 const providers: Record<string, { label: string; description: string; fields: Credential[] }> = {
-  cloudflare: { label: "Cloudflare", description: "Save Cloudflare credentials for DNS or tunnel setup.", fields: [
+  cloudflare: { label: "Cloudflare", description: "DNS access for server join names.", fields: [
     { key: "api_token", label: "API token", variables: "" },
     { key: "account_id", label: "Account ID", variables: "" },
     { key: "zone_id", label: "Zone ID", variables: "" },
@@ -53,20 +55,20 @@ export function IntegrationHeader({children,description,title='Integrations'}:{c
 
 export function Integrations() {
   const q = useAPI(endpoint);
-  return <div className="admin-infrastructure integrations-page">
-    <IntegrationHeader description="API keys and logins for new servers."><MiraButton className="button" nativeButton={false} render={<Link to="/admin/integrations/new"/>}>Add integration</MiraButton></IntegrationHeader>
+  return <IntegrationLayout>
+    <IntegrationHeader description="Connect DNS, mod downloads and game accounts."><MiraButton className="button" nativeButton={false} render={<Link to="/admin/integrations/new"/>}>Add integration</MiraButton></IntegrationHeader>
     <ErrorMessage error={q.error} />
     <Panel title="Saved integrations">
       {q.loading ? <Loading /> : <DataTable data={q.data ? rows(q.data).filter(record=>record.provider!=='game_license') : []} empty={q.error ? "Could not load integrations. Refresh to retry." : "No integrations yet."} columns={[
         { label: "Name", render: x => <Link to={`/admin/integrations/${x.id}`}>{x.name}</Link> },
         { label: "Service", render: x => providers[x.provider]?.label ?? x.provider },
-        { label: "Scope", render: x => x.egg_id ? <Link to={`/admin/eggs/${x.egg_id}`}>Egg #{x.egg_id}</Link> : "All matching eggs" },
+        { label: "Applies to", render: x => x.egg_id ? <Link to={`/admin/eggs/${x.egg_id}`}>Egg #{x.egg_id}</Link> : "All matching games" },
         { label: "Credentials", render: x => `${Object.values(x.configured_fields).filter(Boolean).length} saved` },
-        { label: "Use for new servers", render: x => <MiraBadge variant="secondary" className="badge">{x.enabled ? "Enabled" : "Disabled"}</MiraBadge> },
+        { label: "Status", render: x => <MiraBadge variant="secondary" className="badge">{x.enabled ? "Enabled" : "Disabled"}</MiraBadge> },
         { label: "Actions", render: x => <Link to={`/admin/integrations/${x.id}`}>Configure</Link> },
       ]} />}
     </Panel>
-  </div>;
+  </IntegrationLayout>;
 }
 
 export function Integration() {
@@ -104,54 +106,66 @@ function IntegrationForm({ record }: { record: any }) {
   const keyLabel = farming ? keyType === 'dlc' ? 'GIANTS DLC product key' : 'GIANTS game product key' : 'Licence key';
   const keyHelp = farming ? keyType === 'dlc' ? 'Use the GIANTS key for this DLC or season pass, separate from your base-game key.' : 'Use the GIANTS product key from your FS25 purchase email. Steam activation codes are not supported.' : 'Enter the product key supplied by the game publisher.';
   const definition = providers[provider];
-  return <div className="admin-infrastructure integrations-form">
-    <Heading title={record ? record.name : provider==='game_license'?'Add licence':'Add integration'}><Link className="button secondary" to={provider==='game_license'?'/admin/integrations/licences':'/admin/integrations'}>{provider==='game_license'?'All licences':'All integrations'}</Link></Heading>
-    <ErrorMessage error={error || eggsQ.error} />
-    <form autoComplete="off" onSubmit={async e => {
-      e.preventDefault(); setBusy(true); setError("");
-      try {
+  const formRef=useRef<HTMLFormElement>(null);
+  const snapshot=JSON.stringify({name,eggID,enabled,bindings,keyType});
+  const [baseline,setBaseline]=useState(snapshot);
+  const [savedRecord,setSavedRecord]=useState(record);
+  const dirty=snapshot!==baseline||Object.values(credentials).some(Boolean)||Object.values(cleared).some(Boolean);
+  function discard(){const original=JSON.parse(baseline);setName(original.name);setEggID(original.eggID);setEnabled(original.enabled);setBindings(original.bindings);setKeyType(original.keyType);setCredentials({});setCleared({});setError('')}
+  async function save(){
+    if(!formRef.current?.reportValidity())throw new Error('Complete the required integration fields.');
+    setBusy(true);setError('');
+    try{
         const payload = {
           name, provider, enabled, egg_id: eggID ? Number(eggID) : null,
           credentials: Object.fromEntries(definition.fields.flatMap<[string, string | null]>(f => cleared[f.key] ? [[f.key, null]] : credentials[f.key] ? [[f.key, credentials[f.key]]] : [])),
-          bindings: Object.fromEntries(definition.fields.map(f => [f.key, cleared[f.key] || (!credentials[f.key] && !record?.configured_fields[f.key]) ? [] : (provider === 'game_license' && f.key === 'license_key' ? licenceTarget : bindings[f.key] ?? "").split(",").map(x => x.trim()).filter(Boolean)])),
+          bindings: Object.fromEntries(definition.fields.map(f => [f.key, cleared[f.key] || (!credentials[f.key] && !savedRecord?.configured_fields?.[f.key]) ? [] : (provider === 'game_license' && f.key === 'license_key' ? licenceTarget : bindings[f.key] ?? "").split(",").map(x => x.trim()).filter(Boolean)])),
         };
-        await api(record ? `${endpoint}/${record.id}` : endpoint, { method: record ? "PATCH" : "POST", body: JSON.stringify(payload) });
-        setCredentials({}); navigate(provider==='game_license'?'/admin/integrations/licences':'/admin/integrations');
-      } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
-      finally { setBusy(false); }
-    }}>
-      <SettingsSection title="Integration details">
+
+      const response=unwrap(await api(record ? `${endpoint}/${record.id}` : endpoint,{method:record?'PATCH':'POST',body:JSON.stringify(payload)}));
+      setCredentials({});setCleared({});setBaseline(snapshot);if(response)setSavedRecord(response);
+      if(!record)navigate(provider==='game_license'?'/admin/integrations/licences':'/admin/integrations');
+    }catch(err){setError(err instanceof Error?err.message:String(err));throw err}finally{setBusy(false)}
+  }
+  const managed=usePendingSetting(`integration:${record?.id}`,!!record&&dirty,{blocked:busy||!name.trim(),save,discard});
+  return <IntegrationLayout className="integrations-form">
+    <Heading title={record ? record.name : provider==='game_license'?'Add licence':'Add integration'}><Link className="button secondary" to={provider==='game_license'?'/admin/integrations/licences':'/admin/integrations'}>{provider==='game_license'?'All licences':'All integrations'}</Link></Heading>
+    <ErrorMessage error={error || eggsQ.error} />
+    <form ref={formRef} autoComplete="off" onSubmit={e=>{e.preventDefault();void save().catch(()=>{})}}>
+      <fieldset disabled={busy} className="integrations-fieldset">
+      <SettingsSection title="Integration details"><div className="settings-options-grid">
           <SettingsRow label="Service" description={definition.description} control={<Select aria-label="Service" value={provider} disabled={Boolean(record)} onChange={e => {
             const next = e.target.value; setProvider(next); setName(providers[next].label); setCredentials({}); setCleared({});
             setBindings(Object.fromEntries(providers[next].fields.map(f => [f.key, f.variables])));
           }}>{Object.entries(providers).map(([key, p]) => <option key={key} value={key}>{p.label}</option>)}</Select>} />
           <SettingsRow label="Name" control={<MiraInput aria-label="Integration name" required maxLength={191} value={name} onChange={e => setName(e.target.value)} placeholder="Farming Simulator 25" />} />
-          <SettingsRow label={`Game template${provider === "game_license" ? " *" : ""}`} description="New servers using this template can use these credentials." control={<Select aria-label="Game template" required={provider === "game_license"} value={eggID} onChange={e => {setEggID(e.target.value); if (provider === 'game_license') setBindings({license_key:''});}}>
+          {provider!=='cloudflare'&&<SettingsRow label={`Game template${provider === "game_license" ? " *" : ""}`} description="New servers using this template can use these credentials." control={<Select aria-label="Game template" required={provider === "game_license"} value={eggID} onChange={e => {setEggID(e.target.value); if (provider === 'game_license') setBindings({license_key:''});}}>
             <option value="">{provider === "game_license" ? "Select a game template" : "All matching templates"}</option>
             {eggsQ.data && rows(eggsQ.data).map(x => <option key={x.id} value={x.id}>{x.name} (#{x.id})</option>)}
-          </Select>} />
+          </Select>} />}
           {farming && <SettingsRow label="Key for" description="Select the game or DLC this key unlocks." control={<Select aria-label="Key for" value={keyType} onChange={event => setKeyType(event.target.value)}><option value="game">Farming Simulator 25 base game</option><option value="dlc">DLC or season pass</option></Select>}/>}
           {provider === 'game_license' && eggID && !farming && <SettingsRow label="Licence field" description="The template field that receives the key." control={<Select aria-label="Licence field" required value={licenceTarget} onChange={event=>setBindings(previous=>({...previous,license_key:event.target.value}))}><option value="">Choose a licence field</option>{variablesQ.data && rows(variablesQ.data).map(variable=><option key={variable.env_variable} value={variable.env_variable}>{variable.name || variable.env_variable}</option>)}</Select>}/>}
-          <SettingsRow label="Use for new servers" control={<Switch aria-label="Use for new servers" checked={enabled} onCheckedChange={checked => setEnabled(checked)} />} />
-      </SettingsSection>
-      <SettingsSection title={provider === 'game_license' ? 'Product key' : 'Credentials'} plain>
+          <SettingsRow label={provider==='cloudflare'?'Enable connection':'Use for new servers'} control={<Switch aria-label={provider==='cloudflare'?'Enable connection':'Use for new servers'} checked={enabled} onCheckedChange={checked => setEnabled(checked)} />} />
+      </div></SettingsSection>
+      <SettingsSection title={provider === 'game_license' ? 'Product key' : 'Credentials'}>
         <div className="integrations-credential-note">
         <ErrorMessage error={variablesQ.error} />
-        <p className="muted">Leave blank to keep a saved credential. Clear removes it.</p>
+        <p className="muted">Leave blank to keep a saved credential. Clear removes it.</p>{provider==='cloudflare'&&<p>Use Zone Read and DNS Edit for one domain. Then connect it under Proxy gateways. Account ID is optional for DNS.</p>}
         {farming && <><p>{keyHelp}</p><p><a href="https://eshop.giants-software.com/" target="_blank" rel="noreferrer">Find GIANTS downloads</a> · <a href="https://www.farming-simulator.com/support.php?lang=en" target="_blank" rel="noreferrer">Recover a lost key</a></p>{keyType === 'dlc' && <p>Apply keys under Game licences. They take effect on the server's next start.</p>}</>}
         </div>
-        <div className="integrations-credentials settings-group">
+        <div className="integrations-credentials settings-options-grid">
           {definition.fields.map(field => <div className="integrations-credential" key={field.key}>
-            <SettingsRow label={provider === 'game_license' ? keyLabel : field.label} description={record?.configured_fields[field.key] ? "Saved. Leave blank to keep." : "Not saved."} control={<MiraInput aria-label={provider === 'game_license' ? keyLabel : field.label} type="password" autoComplete="new-password" required={provider === 'game_license' && !cleared[field.key] && (!record?.configured_fields[field.key] || !(record.bindings?.license_key || []).includes(licenceTarget))} value={credentials[field.key] ?? ""} disabled={cleared[field.key]} onChange={e => setCredentials({ ...credentials, [field.key]: e.target.value })} placeholder={record?.configured_fields[field.key] ? "Enter a replacement" : provider === 'game_license' ? "Enter your product key" : "Not configured"} />}>
-              {record?.configured_fields[field.key] && <label className="integrations-clear muted"><Switch checked={cleared[field.key] ?? false} onCheckedChange={checked => setCleared({ ...cleared, [field.key]: checked })} /> Clear saved {field.label.toLowerCase()}</label>}
+            <SettingsRow label={provider === 'game_license' ? keyLabel : field.label} description={savedRecord?.configured_fields?.[field.key] ? "Saved. Leave blank to keep." : "Not saved."} control={<MiraInput aria-label={provider === 'game_license' ? keyLabel : field.label} type={["account_id","zone_id","username"].includes(field.key)?"text":"password"} autoComplete="new-password" required={provider === 'game_license' && !cleared[field.key] && (!savedRecord?.configured_fields?.[field.key] || !(savedRecord?.bindings?.license_key || []).includes(licenceTarget))} value={credentials[field.key] ?? ""} disabled={cleared[field.key]} onChange={e => setCredentials({ ...credentials, [field.key]: e.target.value })} placeholder={savedRecord?.configured_fields?.[field.key] ? "Enter a replacement" : provider === 'game_license' ? "Enter your product key" : "Not configured"} />}>
+              {savedRecord?.configured_fields?.[field.key] && <label className="integrations-clear muted"><Switch checked={cleared[field.key] ?? false} onCheckedChange={checked => setCleared({ ...cleared, [field.key]: checked })} /> Clear saved {field.label.toLowerCase()}</label>}
             </SettingsRow>
-            {provider !== 'game_license' && <Disclosure className="integrations-mapping"><DisclosureTrigger>Advanced variable mappings</DisclosureTrigger><SettingsRow label={`${field.label} variables`} description="Template variables, separated by commas. Leave blank to store only." control={<MiraInput aria-label={`${field.label} variables`} value={bindings[field.key] ?? ""} disabled={cleared[field.key]} onChange={e => setBindings({ ...bindings, [field.key]: e.target.value })} placeholder="Leave empty to store only" />} /></Disclosure>}
+            {provider !== 'game_license' && provider !== 'cloudflare' && <Disclosure className="integrations-mapping"><DisclosureTrigger>Advanced variable mappings</DisclosureTrigger><SettingsRow label={`${field.label} variables`} description="Template variables, separated by commas. Leave blank to store only." control={<MiraInput aria-label={`${field.label} variables`} value={bindings[field.key] ?? ""} disabled={cleared[field.key]} onChange={e => setBindings({ ...bindings, [field.key]: e.target.value })} placeholder="Leave empty to store only" />} /></Disclosure>}
           </div>)}
-          <div className="settings-actions"><MiraAction className="button" type="submit" disabled={busy}>{busy ? "Saving..." : "Save integration"}</MiraAction></div>
+          {(!record||!managed)&&<div className="settings-actions"><MiraAction className="button" type="submit" disabled={busy}>{busy ? "Saving..." : record?"Save integration":"Add integration"}</MiraAction></div>}
         </div>
-        <p className="settings-note integrations-credential-note">Used by new servers. For existing FS25 servers, apply keys under Game licences. Saving does not restart servers.</p>
+        <p className="settings-note">{provider==='cloudflare'?'Connect this credential to a gateway under Proxy gateways.':provider==='game_license'?'Apply saved keys to existing servers under Game licences.':'Used when creating servers from matching game templates.'} Saving does not restart servers.</p>
       </SettingsSection>
+      </fieldset>
     </form>
-    {record && <Panel title="Remove integration"><p className="muted">Existing servers keep their saved copies.</p><Action path={`${endpoint}/${record.id}`} method="DELETE" danger confirm="Remove this global integration?" onDone={() => navigate("/admin/integrations")}>Remove integration</Action></Panel>}
-  </div>;
+    {record && <Panel title="Remove integration"><SettingsRow label="Remove integration" description="Existing servers keep their saved copies." control={<Action path={`${endpoint}/${record.id}`} method="DELETE" danger confirm="Remove this global integration?" onDone={() => navigate("/admin/integrations")}>Remove integration</Action>}/></Panel>}
+  </IntegrationLayout>;
 }

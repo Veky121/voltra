@@ -1,0 +1,19 @@
+.network-page.settings-responsive{max-width:2200px;margin-inline:auto}
+.network-page .settings-section[data-settings-section]{max-width:none}
+.server-proxy-manager{display:grid;gap:0;min-width:0}
+.server-proxy-manager form,.server-proxy-manager fieldset{margin:0;padding:0;border:0;min-width:0}
+.server-proxy-note,.server-proxy-error{margin:0;padding:12px 16px;font-size:13px;line-height:1.5;color:var(--muted)}
+.server-proxy-error{padding:0;color:var(--danger)}
+.server-proxy-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
+.server-proxy-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-top:1px solid var(--ui-divider)}
+.server-proxy-footer>span{font-size:13px;color:var(--muted);overflow-wrap:anywhere;min-width:0}
+.server-proxy-footer>button{flex-shrink:0}
+.server-proxy-manager .settings-row-control .server-proxy-actions{width:auto}
+.network-page .network-port-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.network-page .network-port-note{display:block;max-width:460px;margin:8px 0 0}
+@media(max-width:600px){.server-proxy-footer{align-items:stretch;flex-direction:column}.server-proxy-actions{justify-content:flex-start}}
+
+.network-page .settings-options-grid>.settings-row:has(>.settings-row-body){display:flex;flex-direction:column}
+.network-page .settings-options-grid>.settings-row:has(>.settings-row-body)>.settings-row-layout{height:auto}
+.network-page .network-port-note{font-size:13px;color:var(--muted)}
+.network-page .network-port-note input{margin-top:6px}

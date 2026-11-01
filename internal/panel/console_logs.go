@@ -128,6 +128,15 @@ func (a *App) recordConsolePower(ctx context.Context, serverID int64, signal, st
 }
 
 func (a *App) clientConsoleHistory(w http.ResponseWriter, r *http.Request) {
+	a.consoleHistory(w, r, 0)
+}
+
+// Small cursor batches keep even escaped maximum-length lines within the live frame bound.
+func (a *App) clientConsoleStream(w http.ResponseWriter, r *http.Request) {
+	a.consoleHistory(w, r, 8)
+}
+
+func (a *App) consoleHistory(w http.ResponseWriter, r *http.Request, streamLimit int) {
 	w.Header().Set("Cache-Control", "no-store")
 	s, err := a.server(r, "websocket.connect")
 	if err != nil {
@@ -166,6 +175,14 @@ func (a *App) clientConsoleHistory(w http.ResponseWriter, r *http.Request) {
 	if after == 0 {
 		limit = a.consoleLogLimit()
 	}
+	if streamLimit > 0 {
+		limit = streamLimit
+		// History is loaded once over HTTP. New subscribers start at the head;
+		// clients behind this cursor recover through the paginated history route.
+		if after == 0 {
+			after = newest
+		}
+	}
 	rows, err := tx.Query(r.Context(), `SELECT id::text AS id,event,line,created_at FROM console_log_entries
  WHERE server_id=$1 AND id>$2 AND id<=$3 AND ($4 OR event<>'install output') ORDER BY console_log_entries.id LIMIT $5`, s["id"], after, newest, boolean(u["root_admin"]), limit+1)
 	if err != nil {
@@ -196,7 +213,7 @@ func (a *App) clientConsoleHistory(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, 200, M{"data": data, "cursor": strconv.FormatInt(cursor, 10), "more": more, "reset": reset,
+	writeJSON(w, 200, M{"data": data, "after": strconv.FormatInt(after, 10), "head": strconv.FormatInt(newest, 10), "cursor": strconv.FormatInt(cursor, 10), "more": more, "reset": reset,
 		"truncated": after > 0 && oldest > after, "limits": M{"lines": a.consoleLogLimit(), "bytes": consoleLogBytes},
 		"capture": M{"connected": connected, "last_event_at": lastEvent}})
 }

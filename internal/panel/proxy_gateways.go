@@ -50,6 +50,9 @@ func proxySafeGateway(m M) M {
 }
 func (a *App) registerProxyGateways(mux *http.ServeMux) {
  a.registerSubdomains(mux)
+	mux.HandleFunc("GET /api/admin/servers/{server}/proxy", a.serverProxySetup)
+	mux.HandleFunc("POST /api/admin/servers/{server}/proxy", a.serverProxySetup)
+	mux.HandleFunc("POST /api/admin/proxy-gateways/{gateway}/routes/{route}/apply", a.proxyGatewayHTTP)
 	mux.HandleFunc("GET /api/client/servers/{server}/proxy-routes", a.proxyClientRoutes)
 	mux.HandleFunc("GET /api/admin/proxy-gateways/{gateway}/config/frps", a.proxyDownload)
 	mux.HandleFunc("GET /api/admin/proxy-gateways/{gateway}/clients/{client}/config", a.proxyDownload)
@@ -146,8 +149,10 @@ func (a *App) proxyGatewayRequest(r *http.Request) (any, int, error) {
 		}
 		return out, rows.Err()
 	}
-	if strings.HasSuffix(path, "/reconcile") {
-		rows, e := query("SELECT * FROM proxy_routes WHERE gateway_id=$1 ORDER BY id", gid)
+	if strings.HasSuffix(path, "/reconcile") || strings.HasSuffix(path, "/apply") {
+		rid := proxyID(r, "route")
+		rows, e := query("SELECT * FROM proxy_routes WHERE gateway_id=$1 AND ($2::bigint=0 OR id=$2) ORDER BY id", gid, rid)
+		if e == nil && rid != 0 && len(rows) == 0 { return nil, 0, notFound() }
 		if e != nil {
 			return nil, 0, e
 		}
@@ -164,7 +169,7 @@ func (a *App) proxyGatewayRequest(r *http.Request) (any, int, error) {
 				return nil, 0, e
 			}
 		}
-		rows, e = query("SELECT * FROM proxy_routes WHERE gateway_id=$1 ORDER BY id", gid)
+		rows, e = query("SELECT * FROM proxy_routes WHERE gateway_id=$1 AND ($2::bigint=0 OR id=$2) ORDER BY id", gid, rid)
 		return finish(collection("proxy_route", rows), 200, e)
 	}
 	if strings.Contains(path, "/routes") {

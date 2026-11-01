@@ -194,7 +194,9 @@ browser is open. PostgreSQL retains the newest 5,000 lines, capped at 8 MiB
 of console text per server. CONSOLE_HISTORY_LINES changes the line limit
 from 1 to 50,000. Individual lines exceeding 16 KiB are marked as truncated.
 Restart the panel to change the limit. A subsequent log batch applies it.
-The console loads saved history and follows a cursor, polling once per second.
+The console loads saved history once, then follows cursor batches over the panel
+WebSocket. HTTP retrieves missing history after gaps or socket outages; hidden
+consoles pause HTTP recovery polling.
 Clear display only clears this browser view. Reload shows retained history.
 History survives game stops/crashes and panel restarts; deleting a server
 removes its cache. These disposable caches are excluded from portable snapshots.
