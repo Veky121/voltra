@@ -282,6 +282,9 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if r.Method == http.MethodGet {
+		egg = withGameSettingsProfileSnapshot(egg)
+	}
 	// ET's native document requires the reviewed launcher on the actual server.
 	if nativeSettingsIsRecipe(egg, etlegacySettingsRecipe) &&
 		(!etlegacySettingsDocument(egg, etlegacySettingsPath) || str(s["startup"]) != str(egg["startup"])) {

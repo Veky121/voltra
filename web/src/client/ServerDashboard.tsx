@@ -248,8 +248,8 @@ export function ServerResourcePanels({children}:{children?:ReactNode}){
       <UsageChart title="CPU" reading={updated?`${number(r.cpu_absolute).toFixed(2)}%`:'\u2014'} limit={server.limits?.cpu?`${server.limits.cpu}%`:'\u221e'} series={[{name:'CPU',color:'var(--accent)',values:samples.map(s=>s.cpu)}]} maximum={number(server.limits?.cpu)||1} format={n=>`${n<1?n.toFixed(2):n.toFixed(0)}%`}/>
       <UsageChart title="Memory" reading={updated?resourceUsageGB(r.memory_bytes):'\u2014'} limit={limit('memory')} series={[{name:'Memory',color:'var(--theme-accent-b,var(--accent))',values:samples.map(s=>s.memory)}]} maximum={number(server.limits?.memory)*1024**2} format={formatBytesGB}/>
       <UsageChart title="Network" address={address} series={[{name:'In',color:'var(--accent)',values:network.map(s=>s.rx)},{name:'Out',color:'var(--theme-accent-b,var(--muted))',values:network.map(s=>s.tx)}]} maximum={1} format={n=>`${bytes(n)}/s`}/>
+      <ServerStorageSummary compact/>
     </div>
-    <ServerStorageSummary/>
     {children}
   </>;
 }

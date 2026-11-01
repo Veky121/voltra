@@ -11,6 +11,9 @@ import (
 // startup fallback must be unique across the entire catalog, including profiles
 // with no declarations. Display names never establish authority.
 func gameSettingsProfile(egg M) (gameTemplate, bool) {
+	if snapshot, ok := egg[gameSettingsProfileSnapshotKey].(gameSettingsProfileSnapshot); ok && snapshot.uuid == str(egg["uuid"]) && snapshot.startup == str(egg["startup"]) {
+		return snapshot.entry, snapshot.found
+	}
 	return gameSettingsProfileFrom(egg, gameTemplates().Entries)
 }
 func gameSettingsProfileFrom(egg M, entries []gameTemplate) (gameTemplate, bool) {

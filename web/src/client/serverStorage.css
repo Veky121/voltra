@@ -4,3 +4,18 @@
 .server-storage-summary .storage-limit-warning{color:var(--warning,#f4bc72)}
 .server-storage-summary .storage-limit-full{color:var(--danger,#f38ba8)}
 .storage-scope-note{margin:7px 2px 0;color:var(--muted);font-size:12px;line-height:1.5}
+
+.storage-card [data-slot=card-content].storage-card-body{display:grid;align-content:start;gap:8px;padding:9px 14px 5px}
+.storage-card .resource-metric{gap:3px;font-size:calc(12px * var(--ui-font-scale,1));line-height:1.4}
+.storage-card .resource-metric-heading{font-size:calc(13px * var(--ui-font-scale,1))}
+.storage-card .resource-metric-heading strong{font-size:calc(13px * var(--ui-font-scale,1))}
+.storage-card .resource-metric-note>span{display:block}
+.storage-card .storage-limit-warning{color:var(--warning,#f4bc72)}
+.storage-card .storage-limit-full{color:var(--danger,#f38ba8)}
+.storage-card-details{color:var(--muted);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.5}
+.storage-card-details [data-voltra-disclosure-trigger]{height:22px;min-height:22px;padding:0;font-size:inherit}
+.storage-card-details p{margin:5px 0}
+
+.server-dashboard .storage-card{min-height:188px}
+
+.storage-card .resource-metric-note:empty{display:none}
