@@ -18,7 +18,7 @@ import {
 
 const userFields = [
   f("username", "Username", undefined, { required: true }),
-  f("email", "Contact email", "email", { required: true }),
+  f("nickname", "Display name", undefined, { required: true }),
   f("first_name", "First name", undefined, { required: true }),
   f("last_name", "Last name", undefined, { required: true }),
   f("language", "Language", undefined, { default: "en" }),
@@ -30,9 +30,9 @@ export function Users() {
   return (
     <ResourceList
       title="Users"
-      endpoint="/api/application/users"
+      endpoint="/api/admin/users"
       base="/admin/users"
-      columns={["username", "email", "root_admin", "disabled"]}
+      columns={["nickname", "root_admin", "disabled"]}
     />
   );
 }
@@ -45,9 +45,9 @@ export function User() {
     <ResourceEditor
       title="User"
       id={id}
-      endpoint="/api/application/users"
+      endpoint="/api/admin/users"
       base="/admin/users"
-      fields={userFields}
+      fields={id==="new"?[...userFields,f("email", "Contact email", "password", {required:true,hint:"Stored privately. Only visible in this user's own account settings."})]:userFields}
     >
       {() => (<>
         <SFTPPassword key={id} userID={id}/>

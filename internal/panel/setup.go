@@ -399,7 +399,7 @@ func (a *App) browserSession(w http.ResponseWriter, r *http.Request) {
 	if r.Context().Value(cloudflareIdentityKey{}) == true {
 		provider = "cloudflare"
 	}
-	writeJSON(w, 200, M{"authenticated": true, "auth_provider": provider, "user": M{"id": u["id"], "username": u["username"], "email": u["email"], "root_admin": u["root_admin"]}})
+	writeJSON(w, 200, M{"authenticated": true, "auth_provider": provider, "user": M{"id": u["id"], "username": u["username"], "nickname": accountNickname(u), "root_admin": u["root_admin"]}})
 }
 func (a *App) browserLogin(w http.ResponseWriter, r *http.Request) {
 	s, e := a.setupState(r.Context())

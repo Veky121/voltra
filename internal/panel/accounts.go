@@ -319,16 +319,15 @@ func accountAttributes(u M) M {
 }
 
 func accountNickname(u M) string {
-	if nickname := strings.TrimSpace(str(u["nickname"])); nickname != "" {
-		return nickname
+	for _, key := range []string{"nickname", "username"} {
+		if name := strings.TrimSpace(str(u[key])); name != "" && !strings.Contains(name, "@") {
+			return name
+		}
 	}
-	if local, _, ok := strings.Cut(str(u["email"]), "@"); ok && strings.TrimSpace(local) != "" {
-		return local
-	}
-	return str(u["username"])
+	return "User"
 }
 func userAttributes(u M) M {
-	return M{"sftp_password_set": str(u["sftp_password_hash"]) != "", "id": u["id"], "uuid": u["uuid"], "external_id": u["external_id"], "username": u["username"], "email": u["email"], "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "root_admin": u["root_admin"], "disabled": u["disabled"], "created_at": u["created_at"], "updated_at": u["updated_at"]}
+	return M{"sftp_password_set": str(u["sftp_password_hash"]) != "", "id": u["id"], "uuid": u["uuid"], "external_id": u["external_id"], "username": u["username"], "nickname": accountNickname(u), "first_name": u["name_first"], "last_name": u["name_last"], "language": u["language"], "root_admin": u["root_admin"], "disabled": u["disabled"], "created_at": u["created_at"], "updated_at": u["updated_at"]}
 }
 
 func (a *App) accountGet(w http.ResponseWriter, r *http.Request) {

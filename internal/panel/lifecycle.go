@@ -657,7 +657,7 @@ func (a *App) applicationServerIncludes(r *http.Request, s, out M) error {
 			object = "allocation"
 			rows, err = a.query(ctx, "SELECT * FROM allocations WHERE server_id=$1 ORDER BY id", s["id"])
 		case "user":
-			row, err = a.one(ctx, "SELECT id,uuid,external_id,username,email,name_first,name_last,root_admin,language,created_at,updated_at FROM users WHERE id=$1", s["owner_id"])
+			row, err = a.one(ctx, "SELECT id,uuid,external_id,username,nickname,name_first,name_last,root_admin,language,created_at,updated_at FROM users WHERE id=$1", s["owner_id"])
 		case "subusers":
 			object = "subuser"
 			rows, err = a.query(ctx, "SELECT * FROM subusers WHERE server_id=$1 ORDER BY id", s["id"])

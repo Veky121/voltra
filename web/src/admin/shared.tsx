@@ -545,7 +545,7 @@ export function ResourceEditor({
           creating
             ? `Create ${title}`
             : `${title} · ${
-                record?.name ?? record?.username ?? record?.short ?? id
+                record?.name ?? record?.nickname ?? record?.username ?? record?.short ?? id
               }`
         }
       >

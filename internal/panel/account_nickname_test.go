@@ -14,7 +14,7 @@ func TestAccountNicknameDefaultsAndValidation(t *testing.T) {
 		user M
 		want string
 	}{
-		{M{"email": "player.name@example.test", "username": "login-name", "name_first": "Old", "name_last": "Name"}, "player.name"},
+		{M{"email": "player.name@example.test", "username": "login-name", "name_first": "Old", "name_last": "Name"}, "login-name"},
 		{M{"nickname": "Custom name 🦊", "email": "player@example.test"}, "Custom name 🦊"},
 		{M{"username": "login-only"}, "login-only"},
 	} {
@@ -61,8 +61,8 @@ func TestAccountNicknamePersistsAndCannotChangeIdentity(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	json.Unmarshal(w.Body.Bytes(), &first)
-	if asMap(first["attributes"])["nickname"] != "cloudflare.email" {
-		t.Fatal("Default did not use stored account email")
+	if asMap(first["attributes"])["nickname"] != "login-player" {
+		t.Fatal("Default did not use stored account username")
 	}
 	w = request("PATCH", M{"nickname": "  Player One  ", "email": "attacker@example.test", "username": "new-login", "root_admin": true, "id": other["id"]})
 	if w.Code != 200 {

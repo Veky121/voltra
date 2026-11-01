@@ -2,7 +2,6 @@ package panel
 
 import (
 	"context"
-	"crypto/md5"
 	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
@@ -55,8 +54,7 @@ func (a *App) collabSetting(ctx context.Context, key string, fallback any) any {
 	return row["value"]
 }
 func collabUser(u M) M {
-	h := md5.Sum([]byte(strings.ToLower(str(u["email"]))))
-	return M{"id": u["id"], "uuid": u["uuid"], "identifier": u["uuid"], "username": u["username"], "email": u["email"], "image": "https://gravatar.com/avatar/" + hex.EncodeToString(h[:]), "2fa_enabled": false, "created_at": u["created_at"], "permissions": u["permissions"]}
+	return M{"id": u["id"], "uuid": u["uuid"], "identifier": u["uuid"], "username": u["username"], "nickname": accountNickname(u), "2fa_enabled": false, "created_at": u["created_at"], "permissions": u["permissions"]}
 }
 
 func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +161,7 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
-		a.audit(ctx, num(actor["id"]), num(s["id"]), "server:subuser.delete", M{"email": target["email"]})
+		a.audit(ctx, num(actor["id"]), num(s["id"]), "server:subuser.delete", M{"user_id": target["id"], "nickname": accountNickname(target)})
 		w.WriteHeader(204)
 		return
 	}
@@ -179,37 +177,55 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	createdSubuser := target == nil
 	if target == nil {
-		email := strings.ToLower(strings.TrimSpace(str(d["email"])))
-		addr, e := mail.ParseAddress(email)
-		if e != nil || addr.Address != email || len(email) > 191 {
-			fail(w, bad("A valid email address is required to identify the account."))
-			return
-		}
-		rows, e := tx.Query(ctx, "SELECT * FROM users WHERE lower(email)=$1", email)
-		if e != nil {
-			fail(w, e)
-			return
-		}
-		rr, e := pgx.CollectRows(rows, pgx.RowToMap)
-		if e != nil {
-			fail(w, e)
-			return
-		}
-		if len(rr) > 0 {
+		if username := strings.ToLower(strings.TrimSpace(str(d["username"]))); username != "" {
+			rows, e := tx.Query(ctx, "SELECT * FROM users WHERE lower(username)=$1 AND NOT disabled", username)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			rr, e := pgx.CollectRows(rows, pgx.RowToMap)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if len(rr) == 0 {
+				fail(w, bad("No available account has that username."))
+				return
+			}
 			target = M(rr[0])
 		} else {
-			username := "user_" + strings.ToLower(randomToken(6)) + "0"
-			rows, e = tx.Query(ctx, "INSERT INTO users(uuid,username,email,name_first,name_last) VALUES($1,$2,$3,'','') RETURNING *", newUUID(), username, email)
+			email := strings.ToLower(strings.TrimSpace(str(d["email"])))
+			addr, e := mail.ParseAddress(email)
+			if e != nil || addr.Address != email || len(email) > 191 {
+				fail(w, bad("A valid email address is required to identify the account."))
+				return
+			}
+			rows, e := tx.Query(ctx, "SELECT * FROM users WHERE lower(email)=$1", email)
 			if e != nil {
 				fail(w, e)
 				return
 			}
-			rr, e = pgx.CollectRows(rows, pgx.RowToMap)
+			rr, e := pgx.CollectRows(rows, pgx.RowToMap)
 			if e != nil {
 				fail(w, e)
 				return
 			}
-			target = M(rr[0])
+			if len(rr) > 0 {
+				target = M(rr[0])
+			} else {
+				username := "user_" + strings.ToLower(randomToken(6)) + "0"
+				rows, e = tx.Query(ctx, "INSERT INTO users(uuid,username,email,name_first,name_last) VALUES($1,$2,$3,'','') RETURNING *", newUUID(), username, email)
+				if e != nil {
+					fail(w, e)
+					return
+				}
+				rr, e = pgx.CollectRows(rows, pgx.RowToMap)
+				if e != nil {
+					fail(w, e)
+					return
+				}
+				target = M(rr[0])
+			}
 		}
 		if num(target["id"]) == num(s["owner_id"]) || num(target["id"]) == num(actor["id"]) {
 			fail(w, bad("The server owner and current user cannot be invited as subusers."))
@@ -248,7 +264,7 @@ func (a *App) collabUsers(w http.ResponseWriter, r *http.Request) {
 	if createdSubuser {
 		event = "server:subuser.create"
 	}
-	a.audit(ctx, num(actor["id"]), num(s["id"]), event, M{"email": target["email"], "permissions": permissions})
+	a.audit(ctx, num(actor["id"]), num(s["id"]), event, M{"user_id": target["id"], "nickname": accountNickname(target), "permissions": permissions})
 	writeJSON(w, 200, item("server_subuser", collabUser(target)))
 }
 
@@ -1620,11 +1636,44 @@ func (a *App) deleteServerDatabases(ctx context.Context, server M) error {
 	return nil
 }
 
+var activityEmailPattern = regexp.MustCompile(`(?i)[a-z0-9.!#$%&'*+/=?^_` + "`" + `{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?`)
+
+func redactActivityEmails(value any) any {
+	switch v := value.(type) {
+	case string:
+		return activityEmailPattern.ReplaceAllString(v, "[hidden]")
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = redactActivityEmails(item)
+		}
+		return out
+	case []string:
+		out := make([]string, len(v))
+		for i, item := range v {
+			out[i] = activityEmailPattern.ReplaceAllString(item, "[hidden]")
+		}
+		return out
+	case M:
+		out := M{}
+		for key, item := range v {
+			if strings.Contains(strings.ToLower(key), "email") {
+				out[key] = "[hidden]"
+			} else {
+				out[key] = redactActivityEmails(item)
+			}
+		}
+		return out
+	default:
+		return value
+	}
+}
+
 func collabRedactProperties(properties M, hideIP bool) M {
 	out := M{}
 	for key, value := range properties {
 		lower := strings.ToLower(key)
-		if strings.Contains(lower, "password") || strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "authorization") {
+		if strings.Contains(lower, "email") || strings.Contains(lower, "password") || strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "authorization") {
 			out[key] = "[hidden]"
 			continue
 		}
@@ -1641,13 +1690,13 @@ func collabRedactProperties(properties M, hideIP bool) M {
 				if m, ok := entry.(map[string]any); ok {
 					values[i] = collabRedactProperties(m, hideIP)
 				} else {
-					values[i] = entry
+					values[i] = redactActivityEmails(entry)
 				}
 			}
 			out[key] = values
 			out[key+"_count"] = len(v)
 		default:
-			out[key] = value
+			out[key] = redactActivityEmails(value)
 		}
 	}
 	return out
@@ -1713,9 +1762,9 @@ func (a *App) collabActivity(w http.ResponseWriter, r *http.Request) {
 		}
 		hash := sha1.Sum([]byte(str(log["id"])))
 		props := collabRedactProperties(asMap(log["properties"]), !own)
-		out := M{"id": hex.EncodeToString(hash[:]), "batch": log["batch"], "event": log["event"], "is_api": false, "ip": ip, "description": log["description"], "properties": props, "has_additional_metadata": len(props) > 0, "timestamp": log["created_at"]}
+		out := M{"id": hex.EncodeToString(hash[:]), "batch": log["batch"], "event": log["event"], "is_api": false, "ip": ip, "description": redactActivityEmails(log["description"]), "properties": props, "has_additional_metadata": len(props) > 0, "timestamp": log["created_at"]}
 		if strings.Contains(r.URL.Query().Get("include"), "actor") {
-			actor, e := a.one(ctx, "SELECT id,uuid,username,email,created_at FROM users WHERE id=$1", log["actor_id"])
+			actor, e := a.one(ctx, "SELECT id,uuid,username,nickname,created_at FROM users WHERE id=$1", log["actor_id"])
 			if e == nil {
 				out["relationships"] = M{"actor": item("user", collabUser(actor))}
 			}

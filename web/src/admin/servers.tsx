@@ -1,3 +1,4 @@
+import {accountNickname} from '../client/accountProfile';
 import {confirmAction} from '../ui/ConfirmAction';
 import {useErrorState} from '../notifications/useErrorState';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
@@ -128,7 +129,7 @@ function CreateServer() {
       options: usersQ.data
         ? rows(usersQ.data).map((x) => ({
             value: x.id,
-            label: `${x.username} · ${x.email}`,
+            label: accountNickname(x),
           }))
         : [],
     }),
@@ -293,7 +294,7 @@ export function Details({ record, onSaved }: { record: any; onSaved: () => void 
           options: q.data
             ? rows(q.data).map((x) => ({
                 value: x.id,
-                label: `${x.username} · ${x.email}`,
+                label: accountNickname(x),
               }))
             : [],
         }),

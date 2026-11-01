@@ -92,7 +92,7 @@ export function Activity({ path }: { path: string }) {
                   <div>
                     {t(
                       a.event.replace(":", "."),
-                      a.properties || {},
+                      {...a.properties,email:a.properties?.nickname||"User"},
                       a.description || a.event
                     )}
                   </div>
@@ -101,10 +101,7 @@ export function Activity({ path }: { path: string }) {
                   </small>
                 </MiraTableCell>
                 <MiraTableCell>
-                  {value(a.relationships?.actor)?.username ||
-                    a.actor?.username ||
-                    a.actor_id ||
-                    "System"}
+                  {(value(a.relationships?.actor)||a.actor)?accountNickname(value(a.relationships?.actor)||a.actor):"System"}
                 </MiraTableCell>
                 <MiraTableCell>{a.ip}</MiraTableCell>
                 <MiraTableCell>{date(a.timestamp || a.created_at)}</MiraTableCell>

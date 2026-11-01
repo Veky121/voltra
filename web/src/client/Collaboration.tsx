@@ -1,3 +1,4 @@
+import {accountNickname} from './accountProfile';
 import {describeSchedule} from './scheduleTimingModel';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {confirmAction} from '../ui/ConfirmAction';
@@ -569,7 +570,7 @@ export function Users() {
       <div className="toolbar server-page-toolbar">
         <h2>Server users</h2>
         {can(permissions, "user.create") && (
-          <Button onClick={() => setEditing({ email: "", permissions: [] })}>
+          <Button onClick={() => setEditing({ username: "", permissions: [] })}>
             Add user
           </Button>
         )}
@@ -584,8 +585,7 @@ export function Users() {
       <div className="grid grid-2">
         {items(r.data).map((u) => (
           <Card key={u.uuid || u.id} className="operations-record">
-            <h3>{u.username || u.email}{u.is_current_user && ' (you)'}</h3>
-            <p>{u.email}</p>
+            <h3>{accountNickname(u)}{u.is_current_user && ' (you)'}</h3>
             <p className="muted">
               {u.inherited_access ? `${u.is_owner ? 'Server owner' : 'Administrator'} · Full access` : `${u.permissions?.length || 0} permissions`} · Created{" "}
               {date(u.created_at)}
@@ -607,7 +607,7 @@ export function Users() {
                   disabled={a.busy}
                   onClick={async () => {
                     if (
-                      await confirmAction({title:"Remove?",description:`Remove ${u.email || u.username} from this server?`,confirmLabel:"Remove",danger:true})
+                      await confirmAction({title:"Remove?",description:`Remove ${accountNickname(u)} from this server?`,confirmLabel:"Remove",danger:true})
                     )
                       a.run(
                         () =>
@@ -653,7 +653,7 @@ export function Users() {
                         : ""
                     }`,
                     json("POST", {
-                      email: editing.email,
+                      username: editing.username,
                       permissions: editing.permissions,
                     })
                   ),
@@ -664,17 +664,7 @@ export function Users() {
               );
             }}
           >
-            <Field label="Account email">
-              <Input
-                type="email"
-                required
-                disabled={!!(editing.uuid || editing.id)}
-                value={editing.email || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, email: e.target.value })
-                }
-              />
-            </Field>
+            {editing.uuid||editing.id?<p>{accountNickname(editing)}</p>:<Field label="Account username"><Input required autoComplete="off" value={editing.username||""} onChange={e=>setEditing({...editing,username:e.target.value})}/></Field>}
             <p className="muted">
               Select the actions this account can perform on this server.
               Enable file.sftp to let them connect using their own SFTP password or SSH key.

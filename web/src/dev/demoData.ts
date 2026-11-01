@@ -53,7 +53,7 @@ export function demoResponse(url:URL,method:string,body?:BodyInit|null):Response
  }
  if(method!=='GET')return unavailable('Demo preview is read-only. No changes were made.',405);
  if(path==='/api/setup/status')return json({needs_setup:false,setup_allowed:false,auth_enabled:true,public_url:'http://localhost:5180',access_mode:'local',tls_mode:'proxy',restart_required:false,dev_mode:true});
- if(path==='/api/auth/session')return json({authenticated:true,user:demoAccount});
+ if(path==='/api/auth/session')return json({authenticated:true,user:{...demoAccount,email:undefined}});
  if(path==='/api/client/account')return json(item(demoAccount));
  if(path==='/api/client/account/activity')return json(collection([]));
  if(path==='/api/client/settings')return json(item({name:'Voltra'}));
@@ -63,7 +63,8 @@ export function demoResponse(url:URL,method:string,body?:BodyInit|null):Response
  if(path==='/api/application/nodes')return json(collection(demoCapacityNodes()));
  const system=path.match(/^\/api\/admin\/nodes\/(\d+)\/system-information$/);
  if(system){const node=demoNodes.find(n=>String(n.id)===system[1]);return node?json({cpu_count:node.id===9001?16:8,architecture:'amd64',os:'linux',version:'demo'}):unavailable('Demo node not found.')}
- if(path==='/api/application/users')return json(collection([demoAccount]));
+ if(path==='/api/application/users'||path==='/api/admin/users')return json(collection([{...demoAccount,email:undefined}]));
+ if(path==='/api/application/users/9001'||path==='/api/admin/users/9001')return json(item({...demoAccount,email:undefined}));
  if(path==='/api/application/locations')return json(collection([{id:9001,short:'Demo',long:'Development preview'}]));
  if(path==='/api/admin/eggs/9001')return json(item(minecraftEgg));
  if(path==='/api/admin/database-hosts')return json(collection([]));
