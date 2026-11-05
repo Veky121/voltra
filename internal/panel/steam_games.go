@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 	"voltra/internal/palworldloader"
 )
 
@@ -205,10 +205,10 @@ func (a *App) steamGameOptions(w http.ResponseWriter, r *http.Request) {
 
 type steamGameInput struct {
 	Name, RequestID, Password string
-	GameName string `json:",omitempty"`
-	NodeID, Memory, Players             int64
-	Catalog                             *steamCatalogConfiguration
-	StartOnCompletion                   bool `json:"-"`
+	GameName                  string `json:",omitempty"`
+	NodeID, Memory, Players   int64
+	Catalog                   *steamCatalogConfiguration
+	StartOnCompletion         bool `json:"-"`
 }
 
 var steamRequestID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
@@ -307,11 +307,17 @@ func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
 
 // The dedicated connection owns session locks across createServer's own transaction.
 // No allocation is marked reserved outside createServer's atomic assignment.
-func steamSessionLock(ctx context.Context, conn *pgxpool.Conn, key string) error {
+type steamSessionConnection interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Conn() *pgx.Conn
+	Release()
+}
+
+func steamSessionLock(ctx context.Context, conn steamSessionConnection, key string) error {
 	_, err := conn.Exec(ctx, "SELECT pg_advisory_lock(hashtextextended($1,0))", key)
 	return err
 }
-func steamUnlock(conn *pgxpool.Conn) {
+func steamUnlock(conn steamSessionConnection) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_unlock_all()"); err != nil {
@@ -363,7 +369,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	conn, err := a.DB.Acquire(ctx)
+	conn, err := a.acquireSteamProvisionConnection(ctx)
 	if err != nil {
 		fail(w, err)
 		return

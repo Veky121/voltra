@@ -683,7 +683,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ctx := r.Context()
-	conn, err := a.DB.Acquire(ctx)
+	conn, err := a.acquireSteamProvisionConnection(ctx)
 	if err != nil {
 		fail(w, err)
 		return
@@ -862,7 +862,7 @@ func (a *App) ensureGameTemplateEgg(ctx context.Context, entry gameTemplate, egg
 	// Pin identity to recipe content so a later catalog update cannot silently
 	// replace an installed egg or change an existing server's behavior.
 	uuid := gameTemplateEggUUID(entry)
-	conn, err := a.DB.Acquire(ctx)
+	conn, err := a.acquireSteamProvisionConnection(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -351,7 +351,7 @@ func (a *App) gameLibraryInstallMinecraft(w http.ResponseWriter, r *http.Request
 		fail(w, bad("A valid installation request ID is required."))
 		return
 	}
-	conn, err := a.DB.Acquire(r.Context())
+	conn, err := a.acquireSteamProvisionConnection(r.Context())
 	if err != nil {
 		fail(w, err)
 		return
