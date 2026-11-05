@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {useEffect,useRef,useState} from 'react';
 import {api,Button,Modal,useAPI} from '../lib';
 import {can,Check,Notice,json,useAction,value} from './common';
@@ -26,8 +27,8 @@ export function ReinstallServerButton({server:record,permissions=['*'],onDone}:{
         {r.loading ? <p role="status">Loading backup options...</p> : <><p>{fs25 ? 'Stops the server, updates FS25 first, then enabled DLCs. Starts the server automatically after the updates finish.' : 'Stops the server and runs its installation script, which may overwrite files.'}</p>
         <Check label={fs25 ? "Back up saves, settings and licences" : "Create a backup before reinstalling"} checked={backupFirst} onChange={setBackupFirst} disabled={a.busy}/>
         {backupFirst && <p className="settings-note">{fs25 ? "Includes current saves, player data, settings and licences. Excludes game files, mods, DLCs, caches and old save backups." : "Backs up server files using the existing backup exclusions."} Saved in Backups as Reinstall Backup with the date and time.</p>}
-        {backupFirst && !can(permissions, 'backup.create') && <p role="alert">You do not have permission to create backups. Ask the server owner, or switch off the backup option to continue without one.</p>}
-        {backupFirst && can(permissions, 'backup.create') && !can(permissions, 'backup.read') && <p role="alert">You need permission to view backups so Voltra can confirm the backup succeeded.</p>}
+        {backupFirst && !can(permissions, 'backup.create') && <Feedback tone="error" message={<>You do not have permission to create backups. Ask the server owner, or switch off the backup option to continue without one.</>}/>}
+        {backupFirst && can(permissions, 'backup.create') && !can(permissions, 'backup.read') && <Feedback tone="error" message={<>You need permission to view backups so Voltra can confirm the backup succeeded.</>}/>}
         </>}
         {reinstallStage && <p role="status" aria-live="polite">{reinstallStage}</p>}
         <div className="settings-actions">

@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {Capacity,FleetSummary} from './FleetSummary';
 import FleetCPU,{FleetCPUProvider} from './FleetCPU';
 import {useState} from 'react';
@@ -37,7 +38,7 @@ export default function Overview() {
   }
   return <FleetCPUProvider nodes={hosts as {id:number|string}[]} servers={list}><div className="admin-fleet">
     <ErrorMessage error={servers.error || nodes.error}/>
-    {!ready ? (servers.error || nodes.error ? <p role="status">Unavailable</p> : <Skeleton className="scn:h-24 scn:w-full" aria-label="Loading infrastructure" role="status"/>) : <>
+    {!ready ? (servers.error || nodes.error ? <><Feedback tone="error" message={<>Unavailable</>}/></> : <Skeleton className="scn:h-24 scn:w-full" aria-label="Loading infrastructure" role="status"/>) : <>
       <FleetSummary nodes={hosts} servers={list}/>
       <div className="fleet-toolbar"><h2>Nodes & servers</h2><Input type="search" aria-label="Search servers" placeholder="Find a server" value={search} onChange={e=>setSearch(e.target.value)}/></div>
       {!hosts.length && <p className="muted">No nodes. <Button variant="link" render={<Link to="/admin/nodes"/>}>Manage nodes</Button></p>}

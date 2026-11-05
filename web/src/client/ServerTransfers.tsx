@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {useEffect,useState,type ReactNode} from 'react';
 import {Link} from 'react-router-dom';
 import {Button} from '../lib';
@@ -36,7 +37,7 @@ function TransferDock({base,queue}:{base:string;queue:ReturnType<typeof useRemot
     </div>
     {expanded&&<div id="server-transfer-list" className="server-transfer-list">
       <p className="server-transfer-help">Transfers and reported game tasks for this server, including other users. Server downloads continue when you change pages.</p>
-      {queue.error&&<div className="server-transfer-refresh" role="status">Progress could not be refreshed. Values below may be out of date. <Button variant="secondary" onClick={()=>void queue.reload()}>Check again</Button></div>}
+      {queue.error&&<><Feedback tone="error" message={<>Progress could not be refreshed. Values below may be out of date. </>}/><Button variant="secondary" onClick={()=>void queue.reload()}>Check again</Button></>}
       {visible.map(entry=><TransferRow key={entry.identifier} entry={entry} clock={Math.max(clock,Date.now())} filesPath={filesPath} dismiss={()=>setDismissed(current=>new Set([...current,entry.identifier]))}/>)}
       <OperationReports events={operations} onDismiss={id=>setDismissed(current=>new Set([...current,`operation:${id}`]))}/>
     </div>}

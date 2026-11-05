@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {IntegrationLayout} from './IntegrationLayout';
 import {SettingsSection,SettingsRow} from '../ui/Settings';
 import {useState} from 'react';
@@ -20,7 +21,7 @@ export function GameLicences() {
  const targets=servers.data?rows(servers.data).filter(server=>templates.some(egg=>egg.id===(server.egg??server.egg_id)&&egg.features?.includes('voltra_fs25'))):[];
  return <IntegrationLayout className="game-licences">
   <IntegrationHeader title="Game licences" description="Game and DLC keys for your servers."><Link className="button secondary" to="/admin/integrations/new?provider=game_license">Add another game licence</Link></IntegrationHeader>
-  <ErrorBox>{error||records.error||eggs.error||servers.error}</ErrorBox>{success&&<p role="status">{success}</p>}
+  <ErrorBox>{error||records.error||eggs.error||servers.error}</ErrorBox>{success&&<><Feedback tone="success" message={<>{success}</>}/></>}
   <SettingsSection title="Add a GIANTS key" className="fs25-licences">
    <form autoComplete="off" onSubmit={async event=>{
     event.preventDefault();if(busy||!inspection)return;setBusy(true);setError('');setSuccess('');

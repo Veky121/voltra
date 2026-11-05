@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {SettingsSection,SettingsRow} from '../ui/Settings';
 import {useState} from 'react';
 import {api,Button,ErrorBox,unwrap,useAPI} from '../lib';
@@ -9,7 +10,7 @@ export function FS25Licences({serverID}:{serverID:number}) {
  const data=query.data?unwrap(query.data):null;
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
  return <SettingsSection title="Assigned licences" className="fs25-licences">
-  <ErrorBox>{error||query.error}</ErrorBox>{success&&<p role="status">{success}</p>}
+  <ErrorBox>{error||query.error}</ErrorBox>{success&&<><Feedback tone="success" message={<>{success}</>}/></>}
   {!data&&!query.error&&<p>Loading assigned licences...</p>}
   {data&&<><div className="settings-options-grid"><SettingsRow label="Game licence" control={<span>{data.game_configured?'Configured':'Not configured'}</span>}/><SettingsRow label="DLC licences" control={<span>{data.dlcs.length} assigned</span>}/></div>
    {data.dlcs.length>0&&<ul className="integration-products">{data.dlcs.map((entry:{id:string;name:string})=><li key={entry.id}>{entry.name}</li>)}</ul>}

@@ -1,3 +1,4 @@
+import {Feedback} from './notifications';
 import {confirmAction} from './ui/ConfirmAction';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {useEffect,useState,type ReactNode} from 'react';
@@ -70,7 +71,7 @@ function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaxim
   },[onMaximizedChange]);
   async function act(action:string){setError('');try{const state=await local<{maximized:boolean}>(`window/${action}`,{});onMaximizedChange(state.maximized);}catch(failure){setError((failure as Error).message);}}
   return <div className="desktop-window-controls" aria-label="Window controls" title={error||undefined}>
-    {error&&<span className="desktop-update-error" role="alert">Window control failed</span>}
+    {error&&<Feedback tone="error" message={<>Window control failed</>}/>}
     <MiraAction type="button" aria-label="Minimize window" title="Minimize" onClick={()=>void act('minimize')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></MiraAction>
     <MiraAction type="button" aria-label={maximized?'Restore window':'Maximize window'} title={maximized?'Restore':'Maximize'} onClick={()=>void act('maximize')}><svg viewBox="0 0 16 16" aria-hidden="true">{maximized?<><path d="M5 5V3h8v8h-2"/><rect x="3" y="5" width="8" height="8"/></>:<rect x="3" y="3" width="10" height="10"/>}</svg></MiraAction>
     <MiraAction type="button" className="desktop-window-close" aria-label="Close window" title="Close" onClick={()=>void act('close')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3 3 10 10M13 3 3 13"/></svg></MiraAction>

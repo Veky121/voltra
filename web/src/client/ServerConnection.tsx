@@ -1,4 +1,5 @@
-import {useEffect} from 'react';
+import {Feedback} from '../notifications';
+import {useEffect,type ReactNode} from 'react';
 import {RefreshCw} from 'lucide-react';
 import {CopyButton} from '../ui/CopyButton';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
@@ -31,23 +32,24 @@ export function ConnectionOverview({domainQuery}:{domainQuery:ReturnType<typeof 
  const failed=info.query.error||info.subdomain.error;
  return <SettingsSection title="Join address" action={<Button variant="secondary" className="connection-check" aria-label="Refresh connection records" title="Refresh saved connection records" disabled={loading} onClick={()=>{info.query.reload();info.subdomain.reload()}}><ButtonFeedback state={loading?'pending':'idle'}><RefreshCw/></ButtonFeedback></Button>}>
   <div className="connection-join-row" aria-busy={loading}>
-   {failed?<span role="alert">Connection details unavailable. Retry above.</span>:loading&&!info.query.data?<span role="status">Loading address...</span>:info.connection?<CopyButton className="button secondary" value={info.dnsAddress||info.connection} onCopyError={setCopyError}/>:<span>No port assigned</span>}
+   {failed?<Feedback tone="error" message={<>Connection details unavailable. Retry above.</>}/>:loading&&!info.query.data?<span role="status">Loading address...</span>:info.connection?<CopyButton className="button secondary" value={info.dnsAddress||info.connection} onCopyError={setCopyError}/>:<span>No port assigned</span>}
    {!failed&&<span className="badge">{loading&&!info.query.data?'Checking':info.routes.length?info.routes.some(r=>r.status==='applied')?'Gateway applied':'Gateway pending':'Direct'}</span>}
   </div>
-  {copyError&&<p className="server-proxy-error" role="alert">{copyError}</p>}
+  {copyError&&<Feedback tone="error" message={<>{copyError}</>}/>}
   <Disclosure className="connection-details"><DisclosureTrigger>Details</DisclosureTrigger><p>A saved address does not confirm the game is reachable.</p><dl><dt>Node address</dt><dd>{info.primary?address(info.primary.ip,info.primary.port):'Not assigned'}</dd><dt>Public connection</dt><dd>{info.routes.length?info.connection:'Direct access needs a reachable node address and open game ports.'}</dd><dt>Game reachability</dt><dd>Not checked</dd></dl></Disclosure>
  </SettingsSection>;
 }
 
-export function ServerConnection(){
+export function ServerConnection({leading}:{leading?:ReactNode}){
  const {routes,connection,dnsAddress}=useConnectionInfo();
  const [copyError,setCopyError]=useTransientMessage(5000);
  return <div className="server-connection">
   <div className="server-connection-summary"><div className="server-connection-addresses">
+   {leading&&<div>{leading}</div>}
    <div><span className="server-meta-label">{routes.length?'Proxy:':'IP:'}</span>{connection?<CopyButton value={connection} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy address; reachability is not verified"/>:<span>Not assigned</span>}</div>
    <div><span className="server-meta-label">DNS:</span>{dnsAddress?<CopyButton value={dnsAddress} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy DNS address"/>:<span className="muted">Not configured</span>}</div>
   </div></div>
-  {copyError&&<span className="server-connection-feedback" role="alert">{copyError}</span>}
+  {copyError&&<Feedback tone="error" message={<>{copyError}</>}/>}
 
  </div>;
 }

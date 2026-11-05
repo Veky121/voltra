@@ -1,3 +1,4 @@
+import {Feedback} from './notifications';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {ArtworkProvider} from './client/ArtworkProvider';
 import {Suspense,lazy,useEffect,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
@@ -26,7 +27,7 @@ function AuthenticatedShell(){
  const {data,error,reload}=useAPI('/api/client/account');
  useEffect(()=>{window.addEventListener('account-profile-updated',reload);return()=>window.removeEventListener('account-profile-updated',reload)},[reload]);
  const account=data?unwrap(data):null;
- if(error&&!account)return <div className="page"><p role="alert">{error}</p><MiraAction onClick={reload}>Retry</MiraAction></div>;
+ if(error&&!account)return <div className="page"><Feedback tone="error" message={<>{error}</>}/><MiraAction onClick={reload}>Retry</MiraAction></div>;
  if(!account)return <Loading/>;
  return <ThemeProvider key={account.uuid||account.id} account={String(account.uuid||account.id)}><ServerNavigationProvider><ArtworkProvider><AppShell account={account}/></ArtworkProvider></ServerNavigationProvider></ThemeProvider>;
 }

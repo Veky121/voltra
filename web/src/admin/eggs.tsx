@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {Textarea as MiraTextarea} from '../components/ui/textarea';
 import { SidebarSection } from "../Navigation";
@@ -122,9 +123,9 @@ function EggImport({
       </label>
       <ErrorMessage error={error} />
       {success && (
-        <p className="success" role="status">
+        <Feedback tone="success" message={<>
           {success}
-        </p>
+        </>}/>
       )}
       <div className="actions admin-form-actions"><MiraAction
         disabled={busy || !json}

@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
 import {RefreshCw,Link2} from 'lucide-react';
 import {useState} from 'react';
@@ -22,7 +23,7 @@ export function ProxyEndpoints({base,revision=0}:{base:string;revision?:number})
 }
 export function RouteTable({routes,actions}:{routes:any[];actions?:(route:any)=>React.ReactNode}) {
  if(!routes.length)return <p className="server-proxy-note">No public connections configured.</p>;
- return <><div className="network-table-scroll"><table className="network-route-table"><thead><tr><th>Public address</th><th>Protocol</th><th>Server address</th><th>Gateway status</th>{actions&&<th><span className="sr-only">Actions</span></th>}</tr></thead><tbody>{routes.map(route=><tr key={route.id}><td><CopyButton value={address(route.public_host,route.public_port)}/><small>{route.gateway_name}</small></td><td><span className="network-protocol">{String(route.protocol).toUpperCase()}</span></td><td>{address(route.local_ip,route.local_port)}</td><td><span className="badge" data-status={route.status}>{status(route)}</span>{route.last_error&&<small className="server-proxy-error" role="alert">{route.last_error}</small>}</td>{actions&&<td>{actions(route)}</td>}</tr>)}</tbody></table></div><p className="network-status-note">Configured = accepted by gateway. Game reachability is unverified.</p></>;
+ return <><div className="network-table-scroll"><table className="network-route-table"><thead><tr><th>Public address</th><th>Protocol</th><th>Server address</th><th>Gateway status</th>{actions&&<th><span className="sr-only">Actions</span></th>}</tr></thead><tbody>{routes.map(route=><tr key={route.id}><td><CopyButton value={address(route.public_host,route.public_port)}/><small>{route.gateway_name}</small></td><td><span className="network-protocol">{String(route.protocol).toUpperCase()}</span></td><td>{address(route.local_ip,route.local_port)}</td><td><span className="badge" data-status={route.status}>{status(route)}</span>{route.last_error&&<Feedback tone="error" message={<>{route.last_error}</>}/>}</td>{actions&&<td>{actions(route)}</td>}</tr>)}</tbody></table></div><p className="network-status-note">Configured = accepted by gateway. Game reachability is unverified.</p></>;
 }
 
 function ServerProxyManager({base}:{base:string}) {

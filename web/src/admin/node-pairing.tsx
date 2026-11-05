@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {confirmAction} from '../ui/ConfirmAction';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {Input as MiraInput} from '../components/ui/input';
@@ -224,7 +225,7 @@ export function NodeConnection({ nodeId, nodeName, compact = false }: { nodeId: 
         </>
       )}
       <ErrorMessage error={mutation.error} />
-      {revoked && <p className="muted" role="status">Credentials revoked. Choose Reconnect to restore this node.</p>}
+      {revoked && <><Feedback tone="warning" message={<>Credentials revoked. Choose Reconnect to restore this node.</>}/></>}
     </Panel>
   );
 }
@@ -334,7 +335,7 @@ function NodePairingWizard({ onClose, onNodesChanged, initialEnrollment }: { onC
         </div>
         {recovery && <p className="muted node-pairing-intro">Restore this node on its original machine. Servers and allocations stay in place.</p>}
         <ErrorMessage error={mutation.error} />
-        {snapshot.error && <div className="node-pairing-error" role="alert"><span>{snapshot.error} Retrying...</span><Button variant="secondary" onClick={snapshot.reload}>Retry</Button></div>}
+        {snapshot.error && <><Feedback tone="error" message={<><span>{snapshot.error} Retrying...</span></>}/><Button variant="secondary" onClick={snapshot.reload}>Retry</Button></>}
         {!session ? (
           <>
             <p className="muted node-pairing-intro">Install on each Linux machine, then approve it here.</p>
@@ -436,7 +437,7 @@ function CopyValue({ label, value, onChange, disabled = false, sensitive = false
           }
         }
       }}><Icon name="copy" width={16} height={16} /><span className="node-pairing-copy-label">Copy</span></Button>
-      {feedback && <small className="muted" role="status">{feedback}</small>}
+      {feedback && <><Feedback tone="warning" message={<>{feedback}</>}/></>}
     </div>
   );
 }

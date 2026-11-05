@@ -25,7 +25,7 @@
 .integrations-credential-note a{display:inline-block;padding:4px 0}
 
 /* Integrations compose the same settings sections and responsive fields as servers. */
-.app-content .integrations-layout.settings-responsive{display:grid;gap:24px;max-width:2200px;margin-inline:auto}
+.app-content .integrations-layout.settings-responsive{display:grid;gap:24px;max-width:1120px;margin-inline:auto}
 .integrations-layout .settings-section[data-settings-section]{max-width:none;margin:0}
 .integrations-layout .integrations-fieldset{display:grid;gap:24px;border:0;padding:0;margin:0;min-width:0}
 .integrations-layout .settings-group{min-width:0}
@@ -49,7 +49,6 @@
 .integrations-layout .proxy-gateways__wizard-heading{padding:16px;margin:0;border-bottom:1px solid var(--ui-divider)}
 .integrations-layout .proxy-gateways__wizard-note{padding:12px 16px}
 .integrations-layout .proxy-gateways__wizard .settings-group{overflow:visible}
-.app-content .integrations-layout.game-licences{max-width:1120px}
 .integrations-layout .settings-group .admin-data-toolbar{padding:12px 16px;margin:0}
 .integrations-layout .settings-group .table tr>:first-child{padding-left:16px}
 .integrations-layout .settings-group .table tr>:last-child{padding-right:16px}

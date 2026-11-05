@@ -18,6 +18,7 @@ async function load(entry) {
  else if(path==='./lib')contents='export const api=(...a)=>globalThis.__gate.request(...a);export const queryCacheSessionIdentity=s=>JSON.stringify(s);'+['Select','Button','Card','ErrorBox','Field','Loading'].map(n=>`export const ${n}="${n}";`).join('');
  else if(path==='./components/ui/checkbox')contents='export const Checkbox="input";';
  else if(path==='./components/ui/input')contents='export const Input="input";';
+ else if(path==='./notifications')contents='export const Feedback="Feedback";';
  else if(path==='./ui/ActionButton')contents='export const ActionButton="button";';
  else if(path==='./desktop')contents='export const DesktopRecoveryActions="recovery";';
  else contents='export default "stub";';
@@ -63,8 +64,8 @@ test('rejected lazy import renders explicit reload recovery without automatic re
  try{Lazy._init(Lazy._payload);}catch(error){thrown=error;}
  assert.match(thrown.message,/chunk unavailable/);
  const boundary=new RouteRecovery({children:'route'});boundary.state=RouteRecovery.getDerivedStateFromError(thrown);
- const view=boundary.render();assert.equal(view.props.role,'alert');assert.equal(reloads,0);
- view.props.children[2].props.onClick();assert.equal(reloads,1);
+ const view=boundary.render();assert.equal(view.props.children[0].type,'Feedback');assert.equal(view.props.children[0].props.tone,'error');assert.equal(reloads,0);
+ view.props.children[1].props.onClick();assert.equal(reloads,1);
  assert.throws(()=>Lazy._init(Lazy._payload),/chunk unavailable/);
 });
 
@@ -72,8 +73,8 @@ test('account refresh failure retains shell only while account data exists',asyn
  const source=await readFile(new URL('../src/App.tsx',import.meta.url),'utf8');
  const shell=source.slice(source.indexOf('function AuthenticatedShell()'),source.indexOf('function AppShell('));
  const compiled=await transform(shell,{loader:'tsx',jsx:'transform'});
- const render=new Function('React','useAPI','useEffect','unwrap','Loading','ThemeProvider','ServerNavigationProvider','ArtworkProvider','AppShell','MiraAction',compiled.code+';return AuthenticatedShell();');
- const run=data=>render(React,()=>({data,error:'offline',reload(){}}),()=>{},x=>x,'loading','theme','navigation','artwork','shell','button');
+ const render=new Function('React','useAPI','useEffect','unwrap','Loading','ThemeProvider','ServerNavigationProvider','ArtworkProvider','AppShell','MiraAction','Feedback',compiled.code+';return AuthenticatedShell();');
+ const run=data=>render(React,()=>({data,error:'offline',reload(){}}),()=>{},x=>x,'loading','theme','navigation','artwork','shell','button','feedback');
  assert.equal(run({id:1}).type,'theme');assert.equal(run(null).type,'div');
 });
 test('60 second timer uses the same non-destructive refresh path',async()=>{

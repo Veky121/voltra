@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {confirmAction} from '../ui/ConfirmAction';
 import {transferDestination} from './fileTransferPaths';
 import './gameSwitch.css';
@@ -116,7 +117,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
       <input ref={folderInput} type="file" multiple hidden {...{webkitdirectory:'',directory:''}} aria-label="Choose folder to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),true,uploadDirectory.current);e.target.value=''}}/>
     </div>
     </header>
-    <PageError error={error}/>{notice&&<p className="fm-notice" role="status">{notice}</p>}
+    <PageError error={error}/>{notice&&<><Feedback tone="warning" message={<>{notice}</>}/></>}
     <div className={`fm-file-layout${opened?' is-editing':''}`} onDragOverCapture={event=>{if(allowed('file.create')&&event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(true)}}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false)}} onDropCapture={event=>{if(event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(false);if(allowed('file.create'))void dropFiles(event.dataTransfer)}}}>
       <FileExplorer base={base} activeFile={opened||''} activeDirectory={directory} dirty={documentDirty} permissions={permissions} onOpen={open} onBrowse={browse} onDirectory={navigate} refreshKey={epoch} onEntries={rememberEntries} controls={explorerControls}/>
       <div className="fm-file-content" aria-hidden={!opened||undefined} inert={!opened}>
@@ -135,7 +136,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
       {selected.length===1&&<Button variant="secondary" disabled={busy} onClick={()=>show('details')}>Details</Button>}
       <Button variant="secondary" onClick={()=>setSelected([])}>Clear selection</Button>
     </div>}
-    {pendingTransfers&&!documentDirty&&navigationGuard.attention>0&&<div ref={navigationGuard.bar} tabIndex={-1} role="alert" className="fm-notice">Finish or cancel your queued transfers before leaving Files. Folder navigation remains available.</div>}
+    {pendingTransfers&&!documentDirty&&navigationGuard.attention>0&&<div ref={navigationGuard.bar} tabIndex={-1}><Feedback eventKey={`transfer-navigation:${navigationGuard.attention}`} tone="warning" message="Finish or cancel your queued transfers before leaving Files. Folder navigation remains available."/></div>}
     {allowed('file.create')&&<FileTransfers ref={transfers} base={base} directory={destination()} permissions={permissions} onComplete={refresh} onPendingChange={setPendingTransfers}/>}
     {rowMenu&&menuFile&&<FileMenu anchor={rowMenu.anchor} label={`Options for ${menuFile.name}`} onClose={restore=>{if(restore)rowMenu.anchor.focus();setRowMenu(null)}}>
       {(!menuFile.is_file||allowed('file.read-content'))&&menuAction(menuFile.is_file?'Open / preview':'Open folder',menuFile.is_file?'file':'files',()=>openEntry(rowMenu.id))}

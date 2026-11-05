@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import { useId, useState } from "react";
@@ -43,7 +44,7 @@ export function ScheduleTiming({ value, onChange }: { value: ScheduleCron; onCha
         }}><option value="minute">minutes</option><option value="hour">hours</option></Select>
       </div>}
       {simple.unit==='hour'&&<div className="schedule-start-time"><label htmlFor={startTimeId}>{simple.every===24?'Run at':'Starting at'}</label><Input id={startTimeId} aria-label="Start time" type="time" step={60} required value={simple.startTime??'00:00'} onInput={event=>{if(event.currentTarget.value)update({...simple,startTime:event.currentTarget.value})}}/></div>}
-      {!simple.days.length && <p className="error" role="alert">Select at least one day.</p>}
+      {!simple.days.length && <Feedback tone="error" message={<>Select at least one day.</>}/>}
     </> : <div className="schedule-custom"><p>This schedule uses custom cron rules. Open Advanced to edit them.</p>
       <Button type="button" variant="secondary" onClick={() => update({ every: 1, unit: "hour", days: weekDays.map(day => day.value) })}>Use a simple interval</Button>
     </div>)}

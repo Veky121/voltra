@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import useRemoteTransfers,{type RemoteOptions} from './useRemoteTransfers';
 import {forwardRef,useEffect,useImperativeHandle,useRef,useState} from 'react';
 import Uppy from '@uppy/core';
@@ -96,11 +97,11 @@ const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function 
   if(!can(props.permissions,'file.create')&&!count&&!pending.length)return null;
   return <section className="file-transfers" aria-label="File transfers">
     <button type="button" className="file-transfers-toggle" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}><span>Uploads{count?` (${count})`:''}</span><span>{pending.length?`${pending.length} awaiting save`:'Files from this browser'} {expanded?'Hide':'Show'}</span></button>
-    {error&&<div role="alert" className="file-transfers-error">{error}</div>}
+    {error&&<Feedback tone="error" message={<>{error}</>}/>}
     <div hidden={!expanded}>
       <p className="file-transfers-help">Files go to the folder open when you add them. Keep this page open to preserve your queue. Paused uploads resume from their last uploaded chunk. Uploaded files appear after saving to the server finishes.</p>
       {uppy&&<Dashboard uppy={uppy} theme="dark" height={320} width="100%" proudlyDisplayPoweredByUppy={false} hideProgressDetails={false} hideRetryButton={false} hidePauseResumeButton={false} hideCancelButton={false} disabled={!can(props.permissions,'file.create')} note={`Add files to ${props.directory}`} />}
-      {Object.values(finalizations).map(entry=><div key={entry.id} className={`file-transfer-result is-${entry.state}`}><span><strong>{entry.name}</strong><small>{entry.directory}</small></span><span>{entry.state==='saving'?'Saving to server':entry.state==='complete'?'Saved to server':entry.error}</span>{entry.state==='failed'&&<><button type="button" onClick={()=>void finalizeRef.current(entry)}>Retry save</button><button type="button" onClick={()=>void discard(entry)}>Discard</button></>}</div>)}
+      {Object.values(finalizations).map(entry=><div key={entry.id} className={`file-transfer-result is-${entry.state}`}><span><strong>{entry.name}</strong><small>{entry.directory}</small></span><span>{entry.state==='saving'?'Saving to server':entry.state==='complete'?'Saved to server':<Feedback title={entry.name} message={entry.error} tone="error"/>}</span>{entry.state==='failed'&&<><button type="button" onClick={()=>void finalizeRef.current(entry)}>Retry save</button><button type="button" onClick={()=>void discard(entry)}>Discard</button></>}</div>)}
     </div>
   </section>;
 });

@@ -13,9 +13,9 @@
 .server-state-line :is(.state-offline,.state-stopped,.state-install_failed,.state-reinstall_failed,.state-suspended){--state-color:var(--red)}
 .server-state-line :is(.state-starting,.state-stopping,.state-installing,.state-restoring_backup){--state-color:var(--amber)}
 .server-state-line .server-state .status-dot{width:5px;height:5px;background:currentColor;box-shadow:none;animation:none}
-.server-state-line .server-uptime{color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));font-variant-numeric:tabular-nums}
-.server-state-line .server-uptime strong{color:var(--muted);font-weight:400}
-.server-state-line .server-uptime.is-online strong{color:#82b5ff}
+:is(.server-state-line,.server-hero-meta) .server-uptime{color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));font-variant-numeric:tabular-nums}
+:is(.server-state-line,.server-hero-meta) .server-uptime strong{color:var(--muted);font-weight:400}
+:is(.server-state-line,.server-hero-meta) .server-uptime.is-online strong{color:#82b5ff}
 .server-meta-label{color:var(--muted);font-weight:400}
 .server-topbar .server-power{position:relative;flex-shrink:0;align-self:center}
 .server-topbar .server-power .actions{gap:5px}
@@ -32,6 +32,7 @@
 .server-hero-meta{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px 28px;margin-top:14px}
 .server-hero-meta .server-state-line{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:0;flex-shrink:0}
 .server-hero-meta .server-state-line>span{min-height:26px;display:flex;align-items:center;gap:6px}
+.server-hero-meta .server-uptime{display:flex;align-items:center;gap:8px}
 .server-hero-meta .server-uptime strong{margin-left:0}
 .server-hero-with-artwork .server-power{position:relative;flex-shrink:0;max-width:100%;align-self:center}
 .server-hero-with-artwork .server-power .actions{gap:6px}

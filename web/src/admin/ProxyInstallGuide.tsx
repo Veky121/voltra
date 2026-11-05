@@ -1,10 +1,11 @@
+import {Feedback} from '../notifications';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import { useState } from "react";
 import { Button } from "../lib";
 import "./proxy-gateways.css";
 function Command({label,command}: {label:string;command:string}) {
   const [copied,setCopied] = useState(false), [error,setError] = useState('');
-  return <div className="proxy-gateways__command"><div className="actions"><strong>{label}</strong><Button type="button" variant="secondary" aria-label={`Copy ${label.toLowerCase()}`} onClick={() => {void navigator.clipboard.writeText(command).then(() => {setCopied(true); setError("");},() => setError("Copy unavailable. Select and copy the command below."));}}>{copied ? "Copied" : "Copy"}</Button></div><pre><code>{command}</code></pre>{error && <p className="error" role="alert">{error}</p>}</div>;
+  return <div className="proxy-gateways__command"><div className="actions"><strong>{label}</strong><Button type="button" variant="secondary" aria-label={`Copy ${label.toLowerCase()}`} onClick={() => {void navigator.clipboard.writeText(command).then(() => {setCopied(true); setError("");},() => setError("Copy unavailable. Select and copy the command below."));}}>{copied ? "Copied" : "Copy"}</Button></div><pre><code>{command}</code></pre>{error && <Feedback tone="error" message={<>{error}</>}/>}</div>;
 }
 export function ProxyInstallGuide() {
   const install = (binary:string) => `set -eu

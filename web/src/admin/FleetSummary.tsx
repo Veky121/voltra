@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {ResourceSummary,ResourceMetric} from '../ui/ResourceSummary';
 import {formatMiBGB} from '../resourceUnits';
 import {useAPI,rows,ErrorBox} from '../lib';
@@ -7,7 +8,7 @@ type RecordData=Record<string,any>;
 export function Capacity({label,capacity,allocated,unlimited}:{label:string;capacity:number;allocated:number;unlimited:boolean}){
   return <ResourceMetric label={label} value={<>{formatMiBGB(Math.max(0,capacity-allocated))} <small>free</small></>} percent={allocated/Math.max(capacity,1)*100}
     title="Configured capacity minus allocations; not live usage. Excludes over-allocation."
-    note={<>{formatMiBGB(allocated)} allocated / {formatMiBGB(capacity)}{allocated>capacity&&<span className="fleet-warning"> {"\u00b7"} {formatMiBGB(allocated-capacity)} over capacity</span>}{unlimited&&<span className="fleet-warning"> {"\u00b7"} Unlimited limits</span>}</>}/>;
+    note={<>{formatMiBGB(allocated)} allocated / {formatMiBGB(capacity)}{allocated>capacity&&<Feedback tone="warning" message={<> {"\u00b7"} {formatMiBGB(allocated-capacity)} over capacity</>}/>}{unlimited&&<Feedback tone="warning" message={<> {"\u00b7"} Unlimited limits</>}/>}</>}/>;
 }
 export function FleetSummary({nodes,servers}:{nodes:RecordData[];servers:RecordData[]}){
   return <ResourceSummary label="CPU usage and node capacity"><FleetCPU nodes={nodes as {id:number|string}[]} servers={servers}/>{(['memory','disk'] as const).map(key=><Capacity key={key} label={key==='memory'?'Memory':'Storage'}

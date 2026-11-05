@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import type {ReactNode} from 'react';
 import {useAPI} from '../lib';
 import {Card,CardHeader,CardTitle,CardContent} from '../components/ui/card';
@@ -29,7 +30,7 @@ export default function ServerStorageSummary({backupResponse,backupError='',comp
   const totalMeter=<div className="resource-meter storage-total-meter" role="img" aria-label={totalLabel} title={totalLabel}>{totals.recorded!==null&&totals.recorded>0&&<><span className="storage-total-files" style={{width:`${files!/totals.recorded*100}%`}}/><span className="storage-total-backups" style={{flex:1}}/></>}</div>;
 
   if(strip)return <section className="file-storage-strip" aria-label="Storage usage"><ResourceSummary label="File storage">
-    <ResourceMetric label="Files" value={<>{size(files)}{fileLimit!==undefined&&fileLimit>0&&<small> / {formatBytesGB(fileLimit)}</small>}</>} percent={fileState.percent} note={['warning','full'].includes(fileState.level)?<span className={`storage-limit storage-limit-${fileState.level}`}>{fileState.message}</span>:null}/>
+    <ResourceMetric label="Files" value={<>{size(files)}{fileLimit!==undefined&&fileLimit>0&&<small> / {formatBytesGB(fileLimit)}</small>}</>} percent={fileState.percent} note={['warning','full'].includes(fileState.level)?<Feedback title="File storage" tone="warning" message={fileState.message}/>:null}/>
     <ResourceMetric label="Backups" value={size(backups?.total_bytes??null)} percent={backupState.percent} note={<span className={`storage-limit storage-limit-${backupState.level}`}>{backups?`${count??'?'} / ${countLimit??'?'} slots${backupState.message?` \u00b7 ${backupState.message}`:''}`:!readable?'Access required':'Unavailable'}</span>}/>
     <ResourceMetric label="Total" value={size(totals.recorded)} meter={totalMeter} note={totals.incomplete?'Incomplete backup sizes':null}/>
   </ResourceSummary></section>;
@@ -37,7 +38,7 @@ export default function ServerStorageSummary({backupResponse,backupError='',comp
     <CardHeader className="dashboard-panel-heading"><CardTitle><div className="chart-heading"><h2>Storage</h2><p className="chart-reading"><strong>{size(totals.recorded)}</strong><span> total</span></p></div></CardTitle></CardHeader>
     <CardContent className="storage-card-body">
       <ResourceMetric label="Game files" value={<>{size(files)}{fileLimit!==undefined&&fileLimit>0&&<small> / {formatBytesGB(fileLimit)}</small>}</>} percent={fileState.percent}
-        note={fileState.level==='normal'?null:<span className={`storage-limit storage-limit-${fileState.level}`}>{fileState.message}</span>}/>
+        note={fileState.level==='normal'?null:<Feedback title="File storage" tone="warning" message={fileState.message}/>}/>
       <ResourceMetric label="Backups" value={size(backups?.total_bytes??null)} percent={backupState.percent}
         note={backups?<><span className={`storage-limit storage-limit-${backupState.level}`}>{count??'?'} / {countLimit??'?'} slots{backupState.message?` · ${backupState.message}`:''}</span></>:<span>{!readable?'Backup access required.':error||response?'Backup sizes unavailable.':'Waiting for backup sizes.'}</span>}/>
     </CardContent>
@@ -45,9 +46,9 @@ export default function ServerStorageSummary({backupResponse,backupError='',comp
   return <section className="server-storage-summary" aria-label="Storage breakdown">
     <ResourceSummary label="Server storage and backups">
       <ResourceMetric label="Game files" value={<>{size(files)}{fileLimit!==undefined&&fileLimit>0&&<small> / {formatBytesGB(fileLimit)}</small>}</>} percent={fileState.percent}
-        note={<><span className={`storage-limit storage-limit-${fileState.level}`}>{fileState.message}</span></>}/>
+        note={<><Feedback title="File storage" tone="warning" message={fileState.message}/></>}/>
       <ResourceMetric label="Backups" value={size(backups?.total_bytes??null)} percent={backupState.percent}
-        note={backups?<><span>{formatBytesGB(backups.local_bytes)} local · {formatBytesGB(backups.remote_bytes)} remote{backups.other_bytes>0?` · ${formatBytesGB(backups.other_bytes)} other`:''}</span><span>{count??'Unknown'} / {countLimit??'unknown'} slots</span><span className={`storage-limit storage-limit-${backupState.level}`}>{backupState.message}</span>{totals.incomplete&&<span>Sizes incomplete: {backups.pending_count} in progress, {backups.failed_count} failed.</span>}</>:<span>{!readable?'Backup access required.':error||response?'Backup sizes unavailable.':'Waiting for backup sizes.'}</span>}/>
+        note={backups?<><span>{formatBytesGB(backups.local_bytes)} local · {formatBytesGB(backups.remote_bytes)} remote{backups.other_bytes>0?` · ${formatBytesGB(backups.other_bytes)} other`:''}</span><span>{count??'Unknown'} / {countLimit??'unknown'} slots</span><Feedback title="Backup storage" tone="warning" message={backupState.message}/>{totals.incomplete&&<span>Sizes incomplete: {backups.pending_count} in progress, {backups.failed_count} failed.</span>}</>:<span>{!readable?'Backup access required.':error||response?'Backup sizes unavailable.':'Waiting for backup sizes.'}</span>}/>
       <ResourceMetric label="Total" value={size(totals.recorded)} meter={totalMeter}
         note={totals.incomplete?'Partial total ? some backup sizes unavailable':'Files + backups'}/>
 

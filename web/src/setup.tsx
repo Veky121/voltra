@@ -1,3 +1,4 @@
+import {Feedback} from './notifications';
 import {Checkbox} from './components/ui/checkbox';
 import {Input as MiraInput} from './components/ui/input';
 import { createContext, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -104,14 +105,14 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   // Only the server's explicit development mode preserves the existing local
   // workflow. Production never falls through to the application anonymously.
   if (!session.authenticated && !development) return <Login session={session} onAuthenticated={reload} />;
-  return <AccountSessionContext.Provider key={queryCacheSessionIdentity(session)} value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{error && <div role="status" className="error">Session check unavailable. Your current page is still open. <Button onClick={reload}>Retry session check</Button></div>}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
+  return <AccountSessionContext.Provider key={queryCacheSessionIdentity(session)} value={{canSignOut:session.authenticated&&(status.auth_enabled||import.meta.env.VITE_DESKTOP==='true'),signOut:async()=>{if(await logoutSession(session))reload();}}}>{children}{error && <><Feedback tone="error" message={<>Session check unavailable. Your current page is still open. </>}/><Button onClick={reload}>Retry session check</Button></>}{development && <Link className="setup-entry" to="/setup">Setup</Link>}</AccountSessionContext.Provider>;
 }
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return <div className="setup-session-controls">
-    {error && <span role="alert">{error}</span>}
+    {error && <Feedback tone="error" message={<>{error}</>}/>}
     {session.user?.root_admin && <Link to="/setup">Setup</Link>}
     <Button variant="secondary" disabled={busy} onClick={async () => {
       if (busy) return;
@@ -253,7 +254,7 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
         <p className="setup-address">{publicURL}</p>
         {busy === "check" && <p role="status" className="muted">Checking panel reachability and HTTPS...</p>}
         {validation && <SetupChecks validation={validation} />}
-        {validation?.restart_required && <p role="status" className="muted">A panel service restart is required to apply HTTPS.</p>}
+        {validation?.restart_required && <><Feedback tone="warning" message={<>A panel service restart is required to apply HTTPS.</>}/></>}
         {canStage && !checksOK && <p className="muted">Save to request certificates. HTTPS remains pending until the backend verifies it.</p>}
       </>}
     </fieldset>

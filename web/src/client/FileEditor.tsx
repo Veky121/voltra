@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {Button} from '../components/ui/button';
 import {Combobox,ComboboxTrigger,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '../components/ui/combobox';
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
@@ -97,7 +98,7 @@ export default function FileEditor({path,storageKey,content,readOnly,onChange,on
     </ComboboxContent>
   </Combobox>;
   return <>
-    {(loadingLanguage||languageError)&&<p className={`editor-language-notice${languageError?' is-error':''}`} role="status">{languageError||`Loading ${languageName} highlighting…`}</p>}
+    <Feedback message={languageError} tone="warning"/>
     <div ref={host} className="file-code-editor" data-language={languageName}/>
     <div className="file-editor-hints"><span>{readOnly?'Read only':<><kbd>Ctrl/Cmd + S</kbd> Save</>}</span><Button variant="ghost" type="button" onClick={()=>{if(view.current)openSearchPanel(view.current)}}><kbd>Ctrl/Cmd + F</kbd> Find</Button>{languagePicker}</div>
   </>;

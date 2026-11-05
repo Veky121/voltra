@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {usePendingSetting} from '../client/PendingSettings';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
@@ -77,7 +78,7 @@ export function JavaRuntimes() {
       {query.loading ? <p role="status">Loading Java runtimes...</p> : query.data && (
         <form onSubmit={event=>{event.preventDefault();void saveCatalog().catch(()=>{})}}>
           <ErrorMessage error={error} />
-          {saved && <p className="success" role="status">Java runtime catalog saved.</p>}
+          {saved && <Feedback tone="success" message={<>Java runtime catalog saved.</>}/>}
           <fieldset disabled={busy} className="admin-fieldset">
             {runtimes.map((runtime, index) => (
               <Disclosure className="card admin-disclosure admin-runtime" key={index} open={openIndex === index} onOpenChange={open=>setOpenIndex(open?index:null)}>

@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {Navigate, Route, Routes, useParams, useLocation} from 'react-router-dom';
 import {SectionTabs} from '../ui/SectionTabs';
 import type {ReactNode} from 'react';
@@ -8,7 +9,7 @@ import GameQuickSetup from './GameQuickSetup';
 
 function Permitted({permission,children}:{permission:string;children:ReactNode}) {
   const {permissions}=useServer();
-  return can(permissions,permission)?children:<p role="alert">You do not have permission to view these settings.</p>;
+  return can(permissions,permission)?children:<Feedback tone="error" message={<>You do not have permission to view these settings.</>}/>;
 }
 
 export default function ServerSettings() {

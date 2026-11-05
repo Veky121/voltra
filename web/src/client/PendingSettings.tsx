@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {saveSettingChanges} from './saveSettingChanges';
 import {createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Button} from '../lib';
@@ -70,7 +71,7 @@ function PendingSettingsOwner({children}: {children: ReactNode}) {
   }, [pending.length,busy]);
   const completed=!pending.length&&!busy&&!!saved;
   return <PendingContext.Provider value={register}><GuardContext.Provider value={discard}>{children}{(pending.length > 0||busy||saved) && <div className="settings-pending-bar" role="region" aria-label={completed?'Settings saved':'Unsaved settings'} aria-busy={busy} data-complete={completed}>
-    <span role="status">{error || (completed?'Changes saved':'Unsaved changes')}</span>
+    <Feedback message={error} tone="error"/><span role="status">{(completed?'Changes saved':'Unsaved changes')}</span>
     {!!pending.length&&<Disclosure className="settings-pending-details"><DisclosureTrigger aria-label="Review changes">Details</DisclosureTrigger><ul>{Object.entries(changes).map(([key,change])=><li key={key}><span>{change.summary||'Settings'}</span>{change.applies&&<small>{change.applies}</small>}</li>)}</ul></Disclosure>}
     <Button className="settings-save-button" disabled={busy || completed || pending.some(change => change.blocked)} onClick={async () => {
       if (locked.current) return; const currentSession=session.current; locked.current = true; setBusy(true); setError('');setSaved('');

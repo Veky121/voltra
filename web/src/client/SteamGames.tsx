@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {PageHeading} from '../ui/PageHeading';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {miBToGB} from "../resourceUnits.ts";
@@ -89,9 +90,9 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
       <div className="steam-form-grid"><GameNodeField value={node} onChange={setNode} nodes={options.nodes}/><GameMemoryField value={memory} onChange={setMemory} minimum={options.minimum_memory} maximum={Math.max(options.minimum_memory,memoryMaximum)} describedBy={memoryWarning ? "steam-memory-warning" : undefined}/></div>
       {typeof options.defaults.disk === 'number' && Number.isFinite(options.defaults.disk) && options.defaults.disk > 0 && <p className="muted">Storage reserved: {miBToGB(options.defaults.disk)} GB.</p>}
       
-      {selectedNode?.unavailable_reason && <p className="game-stop-note" role="status">{selectedNode.unavailable_reason}</p>}
-      {memoryValue !== null && memoryValue > memoryMaximum && <p className="game-stop-note" role="status">This node has {miBToGB(memoryMaximum)} GB available for allocation. Lower the limit or choose another node.</p>}
-      {memoryWarning && <p id="steam-memory-warning" className="game-stop-note" role="status">{memoryWarning}</p>}
+      {selectedNode?.unavailable_reason && <><Feedback tone="error" message={<>{selectedNode.unavailable_reason}</>}/></>}
+      {memoryValue !== null && memoryValue > memoryMaximum && <><Feedback tone="warning" message={<>This node has  {miBToGB(memoryMaximum)} GB available for allocation. Lower the limit or choose another node.</>}/></>}
+      {memoryWarning && <Feedback tone="warning" id="steam-memory-warning" message={<>{memoryWarning}</>}/>}
       <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload}/>
       {passwordRules.enabled && passwordRules.required && <Field label="Server password" hint={passwordRules.required ? `Required, ${passwordRules.min_length} to ${passwordRules.max_length} characters.` : 'Optional. Players use this when joining.'}><Input type="password" autoComplete="new-password" required={passwordRules.required} minLength={passwordRules.min_length} maxLength={passwordRules.max_length} value={password} onChange={event => setPassword(event.target.value)}/></Field>}
       <p className="muted">Game defaults are ready to use. Edit player limits, optional passwords and gameplay options in Settings after creation.</p>

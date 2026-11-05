@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {SectionTabs} from "../ui/SectionTabs";
 import './games-ui.css';
@@ -64,7 +65,7 @@ function MinecraftContentView({ server }: { server: string }) {
   return <div className="minecraft-content games-ui">
     <header className="page-header mc-content-header"><h2>{noun === "plugins" ? "Plugins" : "Mods"}</h2>{data?.supported && <div className="mc-content-context"><span className="badge">Minecraft {data.minecraft_version}</span><span className="badge">{data.loader}{data.loader_version ? ` ${data.loader_version}` : ""}</span></div>}<Button variant="secondary" disabled={catalog.loading || busy} onClick={catalog.reload}>Refresh</Button></header>
     <ErrorBox>{catalog.error || error}</ErrorBox>
-    {notice && <p className="success" role="status">{notice}</p>}
+    {notice && <Feedback tone="success" message={<>{notice}</>}/>}
     {!data && catalog.loading && <CollectionSkeleton label="Loading mods and plugins"/>}
     {data && !data.supported && <Card><h2>Catalog unavailable</h2><p>{data.reason}</p></Card>}
     {data?.supported && <>
@@ -120,7 +121,7 @@ function ContentVersions({ base, provider, compatibility, includeUnverified, pro
         {chosen?.blocked_reason && <ErrorBox>{chosen.blocked_reason}</ErrorBox>}
         {project.project_url && <p><a href={project.project_url} target="_blank" rel="noopener noreferrer">Read the author's instructions</a></p>}
         <p className="muted">Includes required dependencies. Existing files are preserved.</p>
-        {data.server_compatibility_unknown && <div className="mc-content-warning"><p>{data.provider_message || "Server compatibility is unverified. Check the author's instructions."}</p><label className="mc-content-ack"><GameSwitch checked={confirmed} disabled={busy} onCheckedChange={checked => setConfirmed(checked)}/><span>I checked that this release supports my server.</span></label></div>}
+        {data.server_compatibility_unknown && <Feedback tone="warning" message={<><p>{data.provider_message || "Server compatibility is unverified. Check the author's instructions."}</p><label className="mc-content-ack"><GameSwitch checked={confirmed} disabled={busy} onCheckedChange={checked => setConfirmed(checked)}/><span>I checked that this release supports my server.</span></label></>}/>}
         <div className="actions"><Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || !canInstall || !chosen || !!chosen.blocked_reason || (data.server_compatibility_unknown && !confirmed)} onClick={install}>{busy ? "Installing and checking dependencies..." : "Install"}</Button></div>
       </>}
     </>}

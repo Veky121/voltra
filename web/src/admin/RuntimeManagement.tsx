@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {useEffect, useState} from 'react';
 import {api, Button, Field, Select, rows, useAPI} from '../lib';
 import {Heading, ErrorMessage} from './shared';
@@ -79,9 +80,9 @@ function NodeRuntime({node, name, maintenance}:{node:string; name:string; mainte
 
   const disabled = maintenance || !!pending;
   return <>
-    {maintenance && <p role="status">This node is in maintenance mode. Runtime changes are unavailable.</p>}
+    {maintenance && <><Feedback tone="error" message={<>This node is in maintenance mode. Runtime changes are unavailable.</>}/></>}
     <ErrorMessage error={error} />
-    {notice && <p role="status">{notice}</p>}
+    {notice && <><Feedback tone="warning" message={<>{notice}</>}/></>}
     <SettingsSection title="Container images" action={<Button variant="secondary" aria-label="Refresh images" title="Refresh images" disabled={images.loading} onClick={images.reload}><RefreshCw size={14} aria-hidden="true" /></Button>}>
       {images.error && <SettingsRow label="Images unavailable" control={null}><ErrorMessage error={images.error} /></SettingsRow>}
       {!images.data && images.loading && <SettingsRow label={<span role="status">Loading images…</span>} control={null} />}

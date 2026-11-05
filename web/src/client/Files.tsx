@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {ServerPageSkeleton} from '../ui/ServerPageSkeleton';
 import {Component,lazy,Suspense,type ReactNode} from 'react';
 import {useSearchParams} from 'react-router-dom';
@@ -7,7 +8,7 @@ const FilesV0=lazy(()=>import('./FilesV0'));
 class ManagerBoundary extends Component<{children:ReactNode;onV0:()=>void},{failed:boolean}>{
   state={failed:false};
   static getDerivedStateFromError(){return {failed:true}}
-  render(){return this.state.failed?<div role="alert" className="files-ui-state is-error"><p>The file manager could not open.</p><button type="button" className="button secondary" onClick={this.props.onV0}>Open file manager v0</button><button type="button" className="button secondary" onClick={()=>location.reload()}>Reload</button></div>:this.props.children}
+  render(){return this.state.failed?<><Feedback tone="error" message={<><p>The file manager could not open.</p></>}/><button type="button" className="button secondary" onClick={this.props.onV0}>Open file manager v0</button><button type="button" className="button secondary" onClick={()=>location.reload()}>Reload</button></>:this.props.children}
 }
 export default function Files(){
   const [query,setQuery]=useSearchParams();

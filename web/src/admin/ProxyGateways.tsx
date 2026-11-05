@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {usePendingSetting,useDiscardSettings} from '../client/PendingSettings';
 import {IntegrationLayout,IntegrationField as Field} from './IntegrationLayout';
 import {confirmAction} from '../ui/ConfirmAction';
@@ -62,7 +63,7 @@ function Gateway({gateway, onChanged, onDeleted}: {gateway: RecordItem; onChange
   }
   const managed=usePendingSetting(`gateway:${gateway.id}`,JSON.stringify(draft)!==baseline,{blocked:!!busy||hasRoutes||routes.loading||!!routes.error,save:saveGateway,discard:()=>{setDraft(JSON.parse(baseline));setError('')},afterSave:onChanged});
 
-  return <><ErrorMessage error={error || clients.error || routes.error || nodes.error || servers.error || allocations.error} />{notice && <p role="status" className="success">{notice}</p>}
+  return <><ErrorMessage error={error || clients.error || routes.error || nodes.error || servers.error || allocations.error} />{notice && <Feedback tone="success" message={<>{notice}</>}/>}
     <fieldset disabled={!!busy} className="proxy-gateways__fieldset">
       <Panel title="Gateway details"><form ref={gatewayForm} onSubmit={e=>{e.preventDefault();void saveGateway().then(onChanged).catch(()=>{})}}>
         <fieldset className="integrations-fieldset" disabled={hasRoutes||routes.loading||!!routes.error}>

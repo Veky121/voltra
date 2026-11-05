@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {Component,type ReactNode} from 'react';
 import {Textarea} from '../lib';
 
@@ -10,6 +11,6 @@ export default class FileEditorBoundary extends Component<Props,{failed:boolean}
 
  render(){
   if(!this.state.failed)return this.props.children;
-  return <div className="file-basic-editor"><p role="alert">The code editor could not load. Your text is available in the basic editor below.</p><Textarea aria-label={`Edit ${this.props.path}`} value={this.props.content} readOnly={this.props.readOnly} spellCheck={false} onChange={event=>this.props.onChange(event.target.value)} onKeyDown={event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();this.props.onSave()}}}/></div>;
+  return <div className="file-basic-editor"><Feedback tone="error" message={<>The code editor could not load. Your text is available in the basic editor below.</>}/><Textarea aria-label={`Edit ${this.props.path}`} value={this.props.content} readOnly={this.props.readOnly} spellCheck={false} onChange={event=>this.props.onChange(event.target.value)} onKeyDown={event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();this.props.onSave()}}}/></div>;
  }
 }

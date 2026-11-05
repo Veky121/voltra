@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {SettingsSkeleton} from '../ui/SettingsSkeleton';
 import {Checkbox} from '../components/ui/checkbox';
 import {SettingsSection as PreferenceSection, SettingsRow} from '../ui/Settings';
@@ -95,9 +96,9 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
     {(reset || clear || problem || error || success) ? <>
     {reset && <p role="status" className="startup-field-help">Reset pending. Save to use the template default.</p>}
     {clear && <p role="status" className="startup-field-help">Saved value will be cleared on save.</p>}
-    {problem && <p id={`${id}-help`} className="startup-validation" role="alert">{problem}</p>}
-    {error && <p role="alert" className="error">{error}</p>}
-    {success && <p role="status" className="success">{success}</p>}
+    {problem && <Feedback tone="error" id={`${id}-help`} message={<>{problem}</>}/>}
+    {error && <Feedback tone="error" message={<>{error}</>}/>}
+    {success && <Feedback tone="success" message={<>{success}</>}/>}
     </> : null}
   </SettingsRow>;
 
@@ -135,7 +136,7 @@ function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyCh
       </label>
 
     </form>
-    <PageError error={error} />{success && <p className="success" role="status">{success}</p>}
+    <PageError error={error} />{success && <Feedback tone="success" message={<>{success}</>}/>}
   </PreferenceSection>;
 }
 

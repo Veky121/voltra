@@ -1,4 +1,4 @@
-import {Alert,AlertDescription} from '../components/ui/alert';
+import {Feedback} from '../notifications';
 import {formatBytesGB,formatMiBGB} from '../resourceUnits';
 import './gameSwitch.css';
 import { createContext, useContext, useState } from "react";
@@ -63,6 +63,7 @@ export function useAction() {
 export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
   return (
     <>
+      <Feedback message={action.success} tone="success"/>
       {action.error && (
         <PageError error={action.error} onDismiss={()=>action.setError('')}/>
       )}
@@ -71,9 +72,7 @@ export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
   );
 }
 export function PageError({ error,onDismiss }: { error: string;onDismiss?:()=>void }) {
-  return error ? (
-    <Alert variant="destructive" className="error"><AlertDescription className="scn:flex scn:items-start scn:justify-between scn:gap-3"><span>{error}</span>{onDismiss&&<Button variant="secondary" onClick={onDismiss} aria-label="Dismiss error">Dismiss</Button>}</AlertDescription></Alert>
-  ) : null;
+  return <Feedback message={error} tone="error"/>;
 }
 export function Pager({
   data,

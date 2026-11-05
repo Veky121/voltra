@@ -1,3 +1,4 @@
+import {Notifications} from './notifications';
 import {PendingSettings} from './client/PendingSettings';
 import {ConfirmActionLayer} from './ui/ConfirmAction';
 import React from 'react';
@@ -19,7 +20,7 @@ import './ui/density.css';
 const desktop=import.meta.env.VITE_DESKTOP==='true';
 if(desktop)document.body.classList.add('voltra-desktop');
 function mount(){
- const router=createBrowserRouter([{path:'*',element:<><ConfirmActionLayer/><PendingSettings>{desktop?<DesktopGate><App/></DesktopGate>:<App/>}</PendingSettings></>}]);
+ const router=createBrowserRouter([{path:'*',element:<><Notifications/><ConfirmActionLayer/><PendingSettings>{desktop?<DesktopGate><App/></DesktopGate>:<App/>}</PendingSettings></>}]);
  ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><RouterProvider router={router}/></React.StrictMode>);
 }
 mount();

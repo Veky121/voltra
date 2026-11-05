@@ -1,7 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import {checkHealth,sessionState} from '../../internal/panel/game_library/fs25/lib/health.mjs';
+import {checkHealth,sessionState,logGameState,reconcileGameState} from '../../internal/panel/game_library/fs25/lib/health.mjs';
+
+test('lifecycle logs require ready marker and match the current process, independent of host timezone',()=>{
+ const started=Date.UTC(2026,10,4,18,35,34);
+ const ready=logGameState('[04/Nov/2026:18:35:35] Game server started');
+ assert.equal(ready.at,started+1000);
+ assert.equal(reconcileGameState(ready,started),'online');
+ assert.equal(reconcileGameState(ready,null),'offline');
+ assert.equal(reconcileGameState(ready,started+60000),'unknown');
+ assert.equal(logGameState('[04/Nov/2026:18:35:35] Game server process started').state,'unknown');
+ assert.equal(logGameState('[04/Nov/2026:18:35:35] Game server started\n[04/Nov/2026:18:40:00] Game server process stopped').state,'offline');
+});
 
 test('session controls distinguish stopped, running and ambiguous pages',()=>{
  assert.equal(sessionState('<input name="start_server">'),'offline');

@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {IconButton} from '../ui/IconButton';
 import {Checkbox} from '../components/ui/checkbox';
@@ -60,10 +61,10 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
       {path!=='/'&&<EntryMenu path={path} controls={shared.controls}/>}
     </div>
     {expanded&&<ul>
-      {listing.loading&&!listing.data?<li><CollectionSkeleton layout="files" label="Loading folder" count={5}/></li>:!listing.data&&listing.error?<li className="explorer-message is-error">Could not load this folder.<button type="button" onClick={listing.reload}>Retry</button></li>:<>
+      {listing.loading&&!listing.data?<li><CollectionSkeleton layout="files" label="Loading folder" count={5}/></li>:!listing.data&&listing.error?<><Feedback tone="error" message={<>Could not load this folder.</>}/><button type="button" onClick={listing.reload}>Retry</button></>:<>
           {listing.loading&&<li className="button-feedback-sr" role="status">Refreshing folder…</li>}
 
-        {listing.error&&<li className="explorer-message is-error">Could not refresh this folder.<button type="button" onClick={listing.reload}>Retry</button></li>}
+        {listing.error&&<><Feedback tone="error" message={<>Could not refresh this folder.</>}/><button type="button" onClick={listing.reload}>Retry</button></>}
         {visible.map(entry=>{
           const entryPath=`${path==='/'?'':path}/${entry.name}`;
           return entry.is_file||depth>=32?<FileRow key={entry.name} entry={entry as FileEntry} path={entryPath} depth={depth+1} selected={shared.controls?.membership.has(entryPath)||false} active={shared.activeFile===entryPath} dirty={shared.activeFile===entryPath&&shared.dirty} compact={!!shared.activeFile} readable={can(shared.permissions,'file.read-content')} onOpen={shared.onOpen} onSelect={shared.controls?.onSelect} onMenu={shared.controls?.onMenu}/>:<Folder key={entry.name} {...shared} path={entryPath} label={entry.name} entry={entry as FileEntry} depth={depth+1}/>;

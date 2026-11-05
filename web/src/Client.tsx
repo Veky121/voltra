@@ -1,3 +1,4 @@
+import {Feedback} from './notifications';
 import RouteRecovery from "./RouteRecovery";
 import { SidebarSection } from "./Navigation";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
@@ -103,9 +104,9 @@ function Server() {
         <ServerWorkspace key={server.uuid}>
         <PageError error={r.error} />
         {server.is_node_under_maintenance && (
-          <div className="error">
+          <Feedback tone="error" message={<>
             This node is under maintenance. Some actions may be unavailable.
-          </div>
+          </>}/>
         )}
         <ServerOperationNotice/>
         {groups.map(group=>{

@@ -1,3 +1,4 @@
+import {Feedback} from './notifications';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {Component, type ReactNode} from 'react';
 import './routeEntry.css';
@@ -15,10 +16,6 @@ export default class RouteRecovery extends Component<{children:ReactNode; resetK
     // Keep route content at its existing DOM depth and preserve every child key.
     // A hidden marker scopes entry motion without remounting drafts or editors.
     if (!this.state.failed) return <><span className="route-entry-marker" hidden aria-hidden="true"/>{this.props.children}</>;
-    return <section className="page" role="alert" aria-labelledby="route-recovery-title">
-      <h1 id="route-recovery-title">This page could not open</h1>
-      <p>Use navigation to open another page, or reload to try this page again. Reloading discards unsaved changes.</p>
-      <MiraAction type="button" className="button" onClick={()=>window.location.reload()}>Reload page</MiraAction>
-    </section>;
+    return <><Feedback tone="error" message={<><h1 id="route-recovery-title">This page could not open</h1> <p>Use navigation to open another page, or reload to try this page again. Reloading discards unsaved changes.</p></>}/><MiraAction type="button" className="button" onClick={()=>window.location.reload()}>Reload page</MiraAction></>;
   }
 }

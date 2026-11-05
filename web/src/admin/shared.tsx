@@ -1,8 +1,8 @@
+import {Feedback} from '../notifications';
 import {usePendingSetting} from '../client/PendingSettings';
 import {confirmAction} from '../ui/ConfirmAction';
 import {FieldGroup} from '../components/ui/field';
 import {PageHeading} from '../ui/PageHeading';
-import {Alert,AlertDescription} from '../components/ui/alert';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {Input as MiraInput} from '../components/ui/input';
 import {Textarea as MiraTextarea} from '../components/ui/textarea';
@@ -117,16 +117,10 @@ export function defaults(fields: FieldSpec[]) {
   ));
 }
 export function ErrorMessage({ error }: { error?: string }) {
-  return error ? (
-    <Alert variant="destructive" className="error admin-feedback management-ui"><AlertDescription>{error}</AlertDescription></Alert>
-  ) : null;
+  return <Feedback message={error} tone="error"/>;
 }
 export function Notice({ children }: { children: ReactNode }) {
-  return (
-    <div className="success admin-feedback management-ui" role="status">
-      {children}
-    </div>
-  );
+  return <Feedback message={children} tone="success"/>;
 }
 export function Heading({
   title,
@@ -453,9 +447,9 @@ export function Action({
       </MiraAction>
       <ErrorMessage error={error} />
       {done && (
-        <small className="success admin-action-status" role="status">
+        <Feedback tone="success" message={<>
           Completed.
-        </small>
+        </>}/>
       )}
     </div>
   );

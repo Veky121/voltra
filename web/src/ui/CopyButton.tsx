@@ -1,3 +1,4 @@
+import {notify} from '../notifications';
 import {useEffect,useRef,useState,type ComponentProps} from 'react';
 import {Copy} from 'lucide-react';
 import {ActionButton} from './ActionButton';
@@ -14,7 +15,7 @@ export function CopyButton({value,onCopyError,children=value,className='',disabl
 
   inFlight.current=true;setBusy(true);setCopied('');
   try{await navigator.clipboard.writeText(value);if(active.current){setCopied('Copied');onCopyError?.('')}}
-  catch{const message='Copy unavailable. Select and copy the address manually.';if(active.current)onCopyError?.(message)}
+  catch{const message='Copy unavailable. Select and copy the address manually.';if(active.current){if(onCopyError)onCopyError(message);else notify(message,'error')}}
   finally{inFlight.current=false;if(active.current)setBusy(false)}
  }
  const state=busy?'pending':copied?'success':'idle';

@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {usePendingSetting} from './PendingSettings';
 import {Input as MiraInput} from '../components/ui/input';
 import {Textarea as MiraTextarea} from '../components/ui/textarea';
@@ -241,9 +242,9 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
   };
   return <form className="server-configuration-editor" onSubmit={event=>{event.preventDefault();void saveConfiguration().catch(()=>{})}}>
     <div className="server-configuration-notice">
-      {!configuration.can_update && <p role="status" className="muted">{configuration.update_unavailable_reason || "Stop the server, then reopen this tab to edit."}</p>}
+      {!configuration.can_update && <><Feedback tone="error" message={<>{configuration.update_unavailable_reason || "Stop the server, then reopen this tab to edit."}</>}/></>}
       <ErrorBox>{error || query.error}</ErrorBox>
-      {success && <p className="success" role="status">{success}</p>}
+      {success && <Feedback tone="success" message={<>{success}</>}/>}
     </div>
     <SettingsSection title="Process configuration" className="server-configuration-section"><div className="server-configuration-grid">
       {configurationFields.filter(field => field.group === "process").map(renderField)}

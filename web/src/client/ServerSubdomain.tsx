@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {RefreshCw} from 'lucide-react';
@@ -31,14 +32,14 @@ export function ServerSubdomain({query}:{query:ReturnType<typeof useAPI>}){
  async function retry(){setBusy(true);setError('');try{await api(`${base}/subdomain/retry`,{method:'POST'});changed()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  if(!query.loading&&!query.error&&!error&&!choices.length&&!data.hostname&&!data.cleanup_pending)return null;
  return <SettingsSection title="Domain" action={<Button variant="secondary" className="connection-check" aria-label="Check DNS" title="Check DNS records" disabled={busy||query.loading} onClick={query.reload}><ButtonFeedback state={query.loading?'pending':'idle'}><RefreshCw/></ButtonFeedback></Button>}>
-  {(query.error||error)&&<p className="server-proxy-error" role="alert">{query.error||error}</p>}
+  {(query.error||error)&&<Feedback tone="error" message={<>{query.error||error}</>}/>}
   {!query.loading&&!query.error&&!choices.length&&!data.hostname ? <p className="server-proxy-note">{admin?<>Connect a gateway with <Link to="/admin/integrations/proxy-gateways">managed DNS</Link> first.</>:'Ask an administrator to enable a domain for this server.'}</p> : <>
    <SettingsRow label="Join name" description={!valid?'Use letters, numbers and hyphens.':label&&selected?`play.${label}.${selected.domain}:${selected.public_port}`:'Optional'} control={<Input aria-label="Join name" aria-invalid={!valid} value={label} disabled={!writable||busy||query.loading} maxLength={63} placeholder="friends" onChange={e=>setDraft(e.target.value)}/>}/>
    {choices.length>1&&<SettingsRow label="Gateway" control={<div className="network-choice"><div>{choices.map(c=><Button key={c.id} variant="secondary" aria-pressed={selected?.id===c.id} disabled={!writable||busy} onClick={()=>setRoute(String(c.id))}>{c.domain} / {c.protocol.toUpperCase()} :{c.public_port}</Button>)}</div></div>}/>}
 
    {data.hostname&&<div className="connection-domain-status"><span>{data.dns_status==='error'?'DNS needs attention':data.dns_matches?'DNS matches':'DNS pending'}</span>{data.dns_status==='error'&&writable&&<Button variant="secondary" disabled={busy||dirty} onClick={()=>void retry()}>Retry</Button>}{writable&&<Button variant="secondary" disabled={busy||query.loading} onClick={()=>setDraft('')}>Clear</Button>}</div>}
   </>}
-  {data.cleanup_pending&&<p className="server-proxy-note" role="status">Previous DNS record removal is pending.</p>}
+  {data.cleanup_pending&&<><Feedback tone="warning" message={<>Previous DNS record removal is pending.</>}/></>}
   {data.hostname&&<p className="network-status-note">{data.detail||'DNS points to the gateway. Keep the public port when joining.'}</p>}
 
  </SettingsSection>;

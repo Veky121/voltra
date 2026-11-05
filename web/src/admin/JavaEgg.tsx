@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import { useEffect, useState } from "react";
 import { Button, Field, Input, Select, Textarea, api } from "../lib";
 import { ErrorMessage, Panel } from "./shared";
@@ -62,7 +63,7 @@ export function JavaEgg({ eggID, config, onSaved }: {
         }
       }}>
         <ErrorMessage error={error} />
-        {saved && <p className="success" role="status">Java settings saved.</p>}
+        {saved && <Feedback tone="success" message={<>Java settings saved.</>}/>}
         <fieldset disabled={busy} className="admin-fieldset">
           <SettingsRow className="admin-toggle-row" label="Enable Java controls" control={
             <Switch aria-label="Enable Java controls" checked={draft.enabled} onCheckedChange={checked => change("enabled", checked)} />

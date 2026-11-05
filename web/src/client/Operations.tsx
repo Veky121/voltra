@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {ReinstallServerButton} from './ReinstallServerButton';
 import PortConnections from './PortConnections';
@@ -200,10 +201,10 @@ export function Backups() {
           onClose={() => setRestore(null)}
         >
           <Notice action={a} />
-          <p className="operations-warning">
+          <Feedback tone="warning" message={<>
             The server will stop. Existing files may be overwritten by this
             backup.
-          </p>
+          </>}/>
           <Check
             label="Delete all existing files before restoring"
             checked={truncate}

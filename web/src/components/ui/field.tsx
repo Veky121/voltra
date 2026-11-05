@@ -1,3 +1,4 @@
+import {Feedback} from '../../notifications';
 "use client"
 
 import { useMemo } from "react"
@@ -213,16 +214,7 @@ function FieldError({
     return null
   }
 
-  return (
-    <div
-      role="alert"
-      data-slot="field-error"
-      className={cn("scn:text-xs/relaxed scn:font-normal scn:text-destructive", className)}
-      {...props}
-    >
-      {content}
-    </div>
-  )
+  return <Feedback id={props.id} message={content} tone="error"/>;
 }
 
 export {

@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {usePendingSetting} from '../client/PendingSettings';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
@@ -34,7 +35,7 @@ export function MinecraftRuntimeRules(){
   usePendingSetting('minecraft-runtime-rules',dirty,{blocked:busy||query.loading||!!query.error,save,discard:()=>{setRules(baseline);setError('');setSaved(false)}});
   return <Card className="admin-panel admin-runtime-rules management-ui">
     <div className="page-header admin-section-header"><div><h2>Minecraft runtime rules</h2><p className="muted">Set Java requirements for a pack, loader or game version. Rules apply to new installations.</p></div><Button variant="secondary" disabled={busy||query.loading||!!query.error} onClick={()=>{const rule=emptyRule();setRules(old=>[...old,rule]);setOpenRules(old=>({...old,[rule.id]:true}));setSaved(false)}}>Add rule</Button></div>
-    {(query.error||error)&&<p className="error" role="alert">{query.error||error}</p>}
+    {(query.error||error)&&<Feedback tone="error" message={<>{query.error||error}</>}/>}
     {query.loading&&<p role="status">Loading runtime rules...</p>}
     {!query.loading&&!query.error&&rules.length===0&&<p className="muted">No overrides. Minecraft and loader metadata choose Java automatically.</p>}
     <fieldset disabled={busy||query.loading||!!query.error} className="admin-fieldset">
@@ -55,6 +56,6 @@ export function MinecraftRuntimeRules(){
         <div className="actions admin-form-actions admin-form-actions-split"><label className="admin-inline-switch"><Switch checked={rule.enabled} onCheckedChange={checked => update(rule.id,{enabled:checked})}/>Enabled</label><Button variant="danger" onClick={()=>{setRules(old=>old.filter(x=>x.id!==rule.id));setSaved(false)}}>Remove rule</Button></div>
       </Disclosure>)}
     </fieldset>
-    <div className="actions admin-form-actions">{saved&&<span className="success" role="status">Runtime rules saved.</span>}</div>
+    <div className="actions admin-form-actions">{saved&&<Feedback tone="success" message={<>Runtime rules saved.</>}/>}</div>
   </Card>;
 }

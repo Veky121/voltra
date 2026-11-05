@@ -1,3 +1,4 @@
+import {Feedback} from './notifications';
 import {Field as MiraField} from './components/ui/field';
 import {Skeleton} from './components/ui/skeleton';
 import {Empty as MiraEmpty,EmptyDescription} from './components/ui/empty';
@@ -9,7 +10,6 @@ import type {ButtonHTMLAttributes,InputHTMLAttributes,SelectHTMLAttributes,Texta
 import {Button as ShadcnButton} from './components/ui/button';
 import {Input as ShadcnInput} from './components/ui/input';
 import {Textarea as ShadcnTextarea} from './components/ui/textarea';
-import {Alert,AlertDescription} from './components/ui/alert';
 import {Card as ShadcnCard} from './components/ui/card';
 export function queryCacheSessionIdentity(session:any):string{return JSON.stringify([!!session?.authenticated,session?.user?.id??null,!!session?.user?.root_admin]);}
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
@@ -50,7 +50,7 @@ export {Select} from './ui/Select';
 export function Textarea(props:TextareaHTMLAttributes<HTMLTextAreaElement>){return <ShadcnTextarea {...props}/>}
 export function Field({label,hint,children}: {label:string,hint?:string,children:ReactNode}){return <MiraField as="label" className="field"><span>{label}</span>{children}{hint&&<small className="muted">{hint}</small>}</MiraField>}
 export function Card({children,className='',...props}:HTMLAttributes<HTMLElement>){return <ShadcnCard as="section" data-ui="card" className={`card legacy-card scn:gap-0 scn:[--card-spacing:var(--ui-card-padding)] ${className}`} {...props}>{children}</ShadcnCard>}
-export function ErrorBox({children}: {children?:ReactNode}){return children?<Alert variant="destructive" className="error"><AlertDescription>{children}</AlertDescription></Alert>:null}
+export function ErrorBox({children}: {children?:ReactNode}){return <Feedback message={children} tone="error"/>}
 export function Loading(){return <div className="loading" role="status"><Skeleton className="loading-skeleton"/>Loading…</div>}
 export function Empty({children}: {children?:ReactNode}){return <MiraEmpty className="empty"><EmptyDescription>{children||'Nothing here yet.'}</EmptyDescription></MiraEmpty>}
 export {Modal} from './ui/Modal';

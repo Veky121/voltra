@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {useContext,useEffect,useState} from 'react';
 import {Link,useLocation} from 'react-router-dom';
@@ -53,7 +54,7 @@ function AccountMenu({account}:{account:Record<string,any>}){
    <DropdownMenuGroup><DropdownMenuLabel>Your account</DropdownMenuLabel><DropdownMenuItem render={<Link to="/account"/>}><Icon name="settings"/>Settings</DropdownMenuItem></DropdownMenuGroup><DropdownMenuSeparator/>
    <DropdownMenuItem variant="destructive" disabled={busy||!session.canSignOut} onClick={async()=>{if(busy||!session.canSignOut)return;setBusy(true);setError('');try{await session.signOut()}catch(failure){setError(failure instanceof Error?failure.message:String(failure))}finally{setBusy(false)}}}><Icon name="logout"/>{busy?'Logging out…':'Logout'}</DropdownMenuItem>
   </DropdownMenuContent>
- </DropdownMenu></SidebarMenuItem></SidebarMenu>{error&&<p className="voltra-account-error" role="alert">{error}</p>}</>;
+ </DropdownMenu></SidebarMenuItem></SidebarMenu>{error&&<Feedback tone="error" message={<>{error}</>}/>}</>;
 }
 
 export function SidebarRouteEffects(){
@@ -74,7 +75,7 @@ export default function AppSidebar({account,name,setTarget}:{account:Record<stri
    {admin?administrator&&<AdminNavigation/>:serverPage?<SidebarMenu className="voltra-sidebar-back"><SidebarMenuItem><SidebarMenuButton render={<Link to="/"/>} tooltip="All servers"><ArrowLeft/><span>All servers</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>:<NavigationGroup label="Workspace"><Link to="/" title="Overview"><NavIcon name="dashboard"/><span>Overview</span><span className="voltra-sidebar-count">{nav.servers.length}</span></Link><Link to="/game-library" title="Game Library"><NavIcon name="eggs"/><span>Game Library</span></Link></NavigationGroup>}
    <div className="voltra-sidebar-sections" ref={setTarget}/>
    {!admin&&!serverPage&&<><Shortcuts label="Favorites" servers={favorites} view="favorites"/><Shortcuts label="Recents" servers={recents} view="recent"/></>}
-   {nav.error&&<div className="voltra-navigation-error" role="alert"><span>{nav.error}</span><MiraAction type="button" onClick={nav.reload}><Icon name="restart"/>Retry</MiraAction></div>}
+   {nav.error&&<><Feedback tone="error" message={<><span>{nav.error}</span></>}/><MiraAction type="button" onClick={nav.reload}><Icon name="restart"/>Retry</MiraAction></>}
   </SidebarContent>
   <SidebarFooter className="voltra-sidebar-footer"><AccountMenu account={account}/></SidebarFooter>
  </Sidebar>;

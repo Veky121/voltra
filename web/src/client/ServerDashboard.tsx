@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {confirmAction} from '../ui/ConfirmAction';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
 import ServerStorageSummary from './ServerStorageSummary';
@@ -40,9 +41,9 @@ export function ServerOperationNotice(){
   if(server.status==='reinstall_failed'){
     // A failed attempt remains recorded, but does not describe a recovered runtime.
     if(telemetry.state==='running'&&!telemetry.error&&!pathname.endsWith('/runtime'))return null;
-    return <div className="card" role="status">The last reinstall attempt failed. {telemetry.state==='running'&&!telemetry.error?'The existing installation is running. ':''}Review the installation output before retrying Reinstall server under Server settings &gt; General.</div>;
+    return <><Feedback tone="error" message={<>The last reinstall attempt failed.  {telemetry.state==='running'&&!telemetry.error?'The existing installation is running. ':''} Review the installation output before retrying Reinstall server under Server settings &gt; General.</>}/></>;
   }
-  return <div className="card">Server state: {server.status.replaceAll('_',' ')}. {server.status==='installing'?'Installation output is available in the console.':''}</div>;
+  return <Feedback title={server.name} eventKey={`server-state:${server.uuid}`} tone={server.status.includes("failed")?"error":"info"} message={`Server state: ${server.status.replaceAll("_"," ")}. ${server.status==="installing"?"Installation output is available in the console.":""}`}/>;
 }
 
 
@@ -155,9 +156,17 @@ function PowerControls({compact=false}:{compact?:boolean}){
     })}{!compact&&<FavoriteButton id={server.uuid} name={server.name}/>}</div>
     <span className="button-feedback-sr" role="status">{pending?powerOperationLabel(pending):action.success}</span>
     {!compact&&pending&&(elapsed>=30||telemetry.error)&&<Button variant="secondary" title={powerOperationDetail(pending,elapsed,!!telemetry.error)} onClick={telemetry.refresh}>Check status</Button>}
-    {!compact&&action.error&&<div className="error server-power-error" role="alert"><span>{action.error}</span><Button variant="secondary" aria-label="Dismiss power action error" onClick={action.dismissError}>Dismiss</Button></div>}
+    {action.error&&<><Feedback tone="error" message={<><span>{action.error}</span></>}/></>}
 
   </div>;
+}
+
+function ServerUptime(){
+  const {server}=useServer(),telemetry=useServerTelemetry();
+  const state=server.status&&server.status!=='reinstall_failed'?server.status:telemetry.state;
+  const online=state==='running'&&!telemetry.error;
+  const elapsed=online?number(telemetry.resources.uptime):0;
+  return <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}><span className="server-meta-label">Uptime:</span> <strong>{telemetry.error?'\u2014':formatUptime(elapsed)}</strong></span>;
 }
 
 export function ServerStateLine({compact=false}:{compact?:boolean}){
@@ -165,10 +174,8 @@ export function ServerStateLine({compact=false}:{compact?:boolean}){
   const action=useContext(PowerContext);
   const pending=compact?action.pending:null;
   const operationElapsed=usePowerElapsed(pending);
-  const operationError=compact?action.error:'';
+  const operationError='';
   const state=server.status&&server.status!=='reinstall_failed'?server.status:telemetry.state;
-  const online=state==='running'&&!telemetry.error;
-  const elapsed=online?number(telemetry.resources.uptime):0;
   const label:Record<string,string>={running:'Online',offline:'Offline',stopped:'Offline',starting:'Starting',stopping:'Stopping',unknown:'Connecting',installing:'Installing',install_failed:'Installation failed',reinstall_failed:'Reinstallation failed',suspended:'Suspended',restoring_backup:'Restoring backup'};
   const stateText=telemetry.error&&!server.status?'Connection unavailable':label[state]||state.replaceAll('_',' ');
   const statusText=operationError?'Action failed':stateText;
@@ -178,12 +185,12 @@ export function ServerStateLine({compact=false}:{compact?:boolean}){
   const services=telemetry.error?undefined:telemetry.services;
   const serviceLabels:Record<string,string>={online:'Online',offline:'Offline',starting:'Starting',stopping:'Stopping',unknown:'Unknown'};
   return <div className="server-state-line">
-    <span className={`server-state state-${statusState}`} title={statusDetail} role={operationError?'alert':compact?'status':undefined} aria-live={compact?'polite':undefined}>
-      <span className="server-meta-label">{fs25?'Container:':'Status:'}</span><span className="status-dot"/>
+    <span className={`server-state state-${statusState}`} title={statusDetail} role={compact?'status':undefined} aria-live={compact?'polite':undefined}>
+      <span className="server-meta-label">Status:</span><span className="status-dot"/>
       <span className="server-state-text">{statusText}</span>
     </span>
-    {fs25&&(['portal','game'] as const).map(key=>{const service=services?.[key]||'unknown';return <span key={key} className={`server-state state-${service==='online'?'running':service}`} title={service==='unknown'?'No recent service check. The monitoring helper may need updating.':key==='game'?'Game session state reported by the GIANTS portal.':'Local web portal response. Public access is checked separately.'}><span className="server-meta-label">{key==='portal'?'Web portal:':'Game server:'}</span><span className="status-dot"/><span>{serviceLabels[service]||'Unknown'}</span></span>})}
-    <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}>Uptime: <strong>{telemetry.error?'\u2014':formatUptime(elapsed)}</strong></span>
+    {fs25&&(['game'] as const).map(key=>{const service=services?.[key]||'unknown';return <span key={key} className={`server-state state-${service==='online'?'running':service}`} title={service==='unknown'?'No recent service check. The monitoring helper may need updating.':'Game lifecycle log confirmed against the running process. Public reachability is checked separately.'}><span className="server-meta-label">Game server:</span><span className="status-dot"/><span>{serviceLabels[service]||'Unknown'}</span></span>})}
+    {compact&&<ServerUptime/>}
   </div>;
 }
 
@@ -207,7 +214,7 @@ export function ServerWorkspace({children}:{children:ReactNode}){
       <CardHeader className="server-hero-info">
         <div className="server-hero-title"><CardTitle><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div></CardTitle></div>
         {server.description&&<CardDescription className="server-description">{server.description}</CardDescription>}
-        <div className="server-hero-meta"><ServerStateLine/><ServerConnection key={base}/></div>
+        <div className="server-hero-meta"><ServerStateLine/><ServerConnection key={base} leading={<ServerUptime/>}/></div>
       </CardHeader>
       <CardAction className="server-hero-controls"><PowerControls/></CardAction>
     </Card></header>}

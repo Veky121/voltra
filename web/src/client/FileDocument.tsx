@@ -1,3 +1,4 @@
+import {Feedback} from '../notifications';
 import {TextPanelSkeleton} from '../ui/ServerPageSkeleton';
 import {confirmAction} from '../ui/ConfirmAction';
 import {IconButton} from '../ui/IconButton';
@@ -110,11 +111,11 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
       <IconButton type="button" className="file-document-close" aria-label="Close file" title="Close file" onClick={close}><Icon name="close"/></IconButton>
     </div></header>
     <div className="file-document-content">
-    {error&&<div role="alert" className="error">{error}<Button variant="secondary" disabled={dirty||busy} onClick={()=>setReload(n=>n+1)}>Retry opening</Button></div>}
-    {notice&&<p role="status" className="file-document-notice">{notice}</p>}
+    {error&&<><Feedback tone="error" message={<>{error}</>}/><Button variant="secondary" disabled={dirty||busy} onClick={()=>setReload(n=>n+1)}>Retry opening</Button></>}
+    {notice&&<><Feedback tone="warning" message={<>{notice}</>}/></>}
     {loading?<TextPanelSkeleton label="Opening file"/>:opened&&readable&&<>
       {kind==='text'&&<>
-        {mixed&&<p className="file-document-notice">This file mixes newline formats. Preview is read only to preserve its bytes. Download it to edit without converting line endings.</p>}
+        {mixed&&<><Feedback tone="warning" message={<>This file mixes newline formats. Preview is read only to preserve its bytes. Download it to edit without converting line endings.</>}/></>}
         <FileEditorBoundary key={draft.revision} path={path} content={draft.content} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}><Suspense fallback={<TextPanelSkeleton label="Loading editor"/>}><FileEditor key={draft.revision} path={path} storageKey={base} content={draft.content} dirty={dirty} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense></FileEditorBoundary>
       </>}
       {kind==='image'&&<div className="file-document-media"><img src={preview} alt={path.split('/').at(-1)} onError={()=>setNotice('Your browser could not display this image. Download it to open it in another application.')}/></div>}
@@ -132,10 +133,10 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
         <pre className="file-document-log" aria-busy={chunkBusy} tabIndex={0}>{chunk}</pre>
       </>}
     </>}
-    {conflict!==null&&<div className="file-document-conflict" role="alert"><h2>The file changed on the server</h2><p>Your draft is still here. Download the current server file before replacing it, or reload to use the server version.</p><div>
+    {conflict!==null&&<><Feedback tone="error" message={<><h2>The file changed on the server</h2> <p>Your draft is still here. Download the current server file before replacing it, or reload to use the server version.</p></>}/><div>
       <Button variant="secondary" disabled={busy} onClick={async ()=>{if(await confirmAction({title:"Discard changes?",description:'Discard your draft and load the current server file?',confirmLabel:"Discard changes",danger:false})){setDraft(current=>({...loadedDraft(path,conflict),revision:current.revision+1}));setConflict(null)}}}>Use server version</Button>
       <Button variant="danger" disabled={busy} onClick={()=>void save(conflict)}>Replace server version with my draft</Button>
-    </div></div>}
+    </div></>}
     </div>
     {dirty&&<div ref={bar} tabIndex={-1} className="file-document-draft" role="region" aria-label="Unsaved file changes" data-attention={attention}>
       <span>{attention?'Save or discard your changes before leaving.':'You have unsaved changes.'}</span><div>
