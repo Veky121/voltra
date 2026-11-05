@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+const recipe='cryofall/egg-cryo-fall.json';
+const baseline=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe];
+const profile=structuredClone(baseline);
+const source=fs.readFileSync('internal/panel/game_library/scripts/native-console.py','utf8').replaceAll('\r\n','\n');
+const pattern=/(cat > \.voltra\/native_console\.py <<'([^']+)'\n)([\s\S]*?)(\n\2\n)/g;
+let count=0;
+profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.replace(pattern,(_,start,marker,old,end)=>{count++;assert.ok(!source.includes('\n'+marker+'\n'));return start+source.trimEnd()+end;});
+assert.equal(count,1);
+assert.deepEqual(profile.egg.variables,baseline.egg.variables);
+const changed=structuredClone(profile);changed.egg.scripts.installation.script=baseline.egg.scripts.installation.script;assert.deepEqual(changed,baseline);
+const target='artifacts/game-parity-20261029/cryofall-wave4-console-profile.json';
+fs.writeFileSync(target,JSON.stringify({[recipe]:profile},null,2)+'\n');
+console.log(JSON.stringify({target,embedded:count,controls:profile.egg.variables.length,shared_sha256:crypto.createHash('sha256').update(source).digest('hex'),metadata_unchanged:true}));

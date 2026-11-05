@@ -25,3 +25,14 @@ desktop/build
 **/*.sqlite3
 **/*.db
 coverage.out
+
+# Agent documents and working logs are not application assets.
+**/AGENTS.md
+**/CONTRACT.md
+**/*_CONTRACT.md
+**/*memory*.md
+**/*MEMORY*.md
+**/*HANDOFF*.md
+**/*handoff*.md
+**/*-notes.md
+**/*.log

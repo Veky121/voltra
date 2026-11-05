@@ -1,3 +1,4 @@
+import {captureErrorContext,reportPanelSuccess} from '../notifications/store';
 import {useErrorState} from '../notifications/useErrorState';
 import {Alert,AlertDescription} from '../components/ui/alert';
 import {formatBytesGB,formatMiBGB} from '../resourceUnits';
@@ -38,7 +39,12 @@ export const json = (method: string, body?: any): RequestInit => ({
 export function useAction() {
   const [error, setError] = useErrorState('client/common.tsx');
   const [busy, setBusy] = useState(false);
-  const [success, setSuccess] = useState("");
+  const [success, setSuccessState] = useState("");
+  const context = captureErrorContext('Server action');
+  const setSuccess = (message: string) => {
+    setSuccessState(message);
+    if (message) reportPanelSuccess(message, context);
+  };
   async function run<T>(
     fn: () => Promise<T>,
     done?: (result: T) => void
@@ -65,11 +71,7 @@ export function Notice({ action }: { action: ReturnType<typeof useAction> }) {
       {action.error && (
         <PageError error={action.error} onDismiss={()=>action.setError('')}/>
       )}
-      {action.success && (
-        <div role="status" className="success">
-          {action.success}
-        </div>
-      )}
+
     </>
   );
 }

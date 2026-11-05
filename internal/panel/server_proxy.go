@@ -2,6 +2,7 @@ package panel
 
 import (
 	"errors"
+	"net"
 	"net/http"
 )
 
@@ -69,6 +70,14 @@ func (a *App) serverProxySetup(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	reservations, err := readGamePortReservations(ctx, a.DB, false)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	for _, allocation := range allocations {
+		allocation["forward_client_ids"] = serverPortForwardClients(allocation, clients, reservations.nodePorts(num(server["node_id"])))
+	}
 	protocol := ""
 	egg, err := a.one(ctx, "SELECT uuid FROM eggs WHERE id=$1", server["egg_id"])
 	if err != nil {
@@ -79,4 +88,21 @@ func (a *App) serverProxySetup(w http.ResponseWriter, r *http.Request) {
 		protocol = "tcp"
 	}
 	writeJSON(w, 200, item("server_proxy_setup", M{"allocations": allocations, "clients": clients, "routes": routes, "primary_protocol": protocol}))
+}
+
+// Presentation capabilities use the same tested connection, IP and reserved-port
+// rules as route creation. Mutation endpoints still enforce these independently.
+func serverPortForwardClients(allocation M, clients []M, reserved []int64) []int64 {
+	ids := []int64{}
+	ip := net.ParseIP(str(allocation["ip"]))
+	port := num(allocation["port"])
+	if ip == nil || ip.IsLoopback() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || reservedGamePort(reserved, port) {
+		return ids
+	}
+	for _, client := range clients {
+		if boolean(client["setup_complete"]) && str(client["test_status"]) == "complete" && port >= num(client["local_port_start"]) && port <= num(client["local_port_end"]) {
+			ids = append(ids, num(client["id"]))
+		}
+	}
+	return ids
 }

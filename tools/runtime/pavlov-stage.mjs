@@ -1,0 +1,32 @@
+﻿import fs from 'node:fs';
+import crypto from 'node:crypto';
+const recipe='pavlov_vr/egg-pavlov-v-r.json';
+const base='internal/panel/game_library/scripts/';
+const current=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe];
+if(!current)throw Error('Missing exact integrated Pavlov profile');
+const profile=structuredClone(current);
+const wrapper=fs.readFileSync(base+'pavlov-native.py','utf8');
+let script=profile.egg.scripts.installation.script;
+// Refresh every existing embedded helper from current source, Pavlov fragment only.
+const embeds={};
+script=script.replace(/cat > \.voltra\/([^ ]+) <<'([^']+)'\n[\s\S]*?\n\2\n/g,(block,name,delimiter)=>{
+ const source=base+name.replaceAll('_','-');
+ if(!fs.existsSync(source))throw Error('Missing current embedded source '+source);
+ const data=fs.readFileSync(source,'utf8');embeds[source]=crypto.createHash('sha256').update(data).digest('hex');
+ return `cat > .voltra/${name} <<'${delimiter}'\n${data}\n${delimiter}\n`;
+});
+const marker='python3 .voltra/bundle_debian_python.py';
+if(!script.includes(marker))throw Error('Unrecognized installer');
+script=script.replace(marker,`cat > .voltra/pavlov_native.py <<'VOLTRA_PAVLOV_SOURCE'\n${wrapper}\nVOLTRA_PAVLOV_SOURCE\npython3 .voltra/pavlov_native.py preflight\n${marker}`);
+script=script.replace('python3 .voltra/vr_tower_ohd.py install pavlov','python3 .voltra/pavlov_native.py install');
+profile.egg.scripts.installation.script=script;
+profile.egg.startup=profile.egg.startup.replace('.voltra/vr_tower_ohd.py run pavlov','.voltra/pavlov_native.py run');
+profile.revision='pavlov-native-authority-v3';
+profile.verification='not_verified';
+profile.detail='Pavlov-only source fragment. Native credentials authoritative; conservative parser and pre-acquisition allocation checks. Unserved; no native receipt.';
+profile.setup_steps.push('Native Game.ini ApiKey and RconSettings Password override startup environment after first seed. Port remains allocation-owned. Ambiguous managed scalars refuse before update. Existing Files editor remains authoritative; no new UI editor. Installer OS packages precede Python preflight; game acquisition does not.');
+embeds[base+'pavlov-native.py']=crypto.createHash('sha256').update(wrapper).digest('hex');
+const out='artifacts/pavlov-deferred-review';fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(out+'/fragment.json',JSON.stringify({[recipe]:profile},null,2)+'\n');
+fs.writeFileSync(out+'/embeds.json',JSON.stringify(embeds,null,2)+'\n');
+console.log('Staged exact Pavlov fragment with '+Object.keys(embeds).length+' current embedded helpers; canonical overrides untouched.');

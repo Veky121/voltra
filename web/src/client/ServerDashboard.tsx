@@ -32,6 +32,21 @@ type Sample={at:number;cpu:number;memory:number;rx:number;tx:number;uptime:numbe
 type Telemetry={state:string;resources:Record<string,any>;samples:Sample[];updated:number;error:string;refresh:()=>void};
 const TelemetryContext=createContext<Telemetry>({state:'unknown',resources:{},samples:[],updated:0,error:'',refresh:()=>{}});
 export const useServerTelemetry=()=>useContext(TelemetryContext);
+
+export function ServerOperationNotice(){
+  const {server}=useServer();
+  const telemetry=useServerTelemetry();
+  const pathname=useLocation().pathname;
+  if(!server.status)return null;
+  if(server.status==='reinstall_failed'){
+    // A failed attempt remains recorded, but does not describe a recovered runtime.
+    if(telemetry.state==='running'&&!telemetry.error&&!pathname.endsWith('/runtime'))return null;
+    return <div className="card" role="status">The last reinstall attempt failed. {telemetry.state==='running'&&!telemetry.error?'The existing installation is running. ':''}Review the installation output before retrying Reinstall server under Server settings &gt; General.</div>;
+  }
+  return <div className="card">Server state: {server.status.replaceAll('_',' ')}. {server.status==='installing'?'Installation output is available in the console.':''}</div>;
+}
+
+
 const number=(v:unknown)=>Math.max(0,Number.isFinite(Number(v))?Number(v):0);
 const emptyTelemetry=():Omit<Telemetry,'refresh'>=>({state:'unknown',resources:{},samples:[],updated:0,error:''});
 
@@ -124,14 +139,15 @@ function PowerControls({compact=false}:{compact?:boolean}){
   const telemetry=useContext(TelemetryContext),action=useContext(PowerContext),pending=action.pending;
   const elapsed=usePowerElapsed(compact?null:pending);
   const running=telemetry.state==='running',starting=telemetry.state==='starting';
-  const blocked=!!server.status||!!server.is_installing||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
+  const operationBlocksPower=!!server.status||!!server.is_installing;
+  const blocked=operationBlocksPower||!!server.is_node_under_maintenance||!telemetry.updated||!!telemetry.error;
   const controls:[PowerSignal,string,IconName,string,boolean][]=[
     ['start','Start','play','control.start',running||starting||telemetry.state==='stopping'],
     ['restart','Restart','restart','control.restart',!running],
     ['stop','Stop','stop','control.stop',!running],
     ['kill','Force stop','close','control.stop',!running&&!starting&&telemetry.state!=='stopping'&&!pending],
   ];
-  const unavailableReason=server.is_node_under_maintenance?'The node is under maintenance.':server.status?`Server controls are unavailable while ${String(server.status).replaceAll('_',' ')}.`:telemetry.error?'Server status is unavailable. Check the connection before sending another action.':!telemetry.updated?'Waiting for the first server status update.':'';
+  const unavailableReason=server.is_node_under_maintenance?'The node is under maintenance.':operationBlocksPower?`Server controls are unavailable while ${String(server.status).replaceAll('_',' ')}.`:telemetry.error?'Server status is unavailable. Check the connection before sending another action.':!telemetry.updated?'Waiting for the first server status update.':'';
   return <div className="server-power">
     <div className="actions" role="group" aria-label="Server controls">{controls.filter(([, , ,permission])=>can(permissions,permission)).map(([signal,label,icon,,disabled])=>{
       const working=pending?pending.signal===signal:!telemetry.error&&(signal==='start'&&starting||signal==='stop'&&telemetry.state==='stopping');
@@ -151,7 +167,7 @@ export function ServerStateLine({compact=false}:{compact?:boolean}){
   const pending=compact?action.pending:null;
   const operationElapsed=usePowerElapsed(pending);
   const operationError=compact?action.error:'';
-  const state=server.status||telemetry.state;
+  const state=server.status&&server.status!=='reinstall_failed'?server.status:telemetry.state;
   const online=state==='running'&&!telemetry.error;
   const elapsed=online?number(telemetry.resources.uptime):0;
   const label:Record<string,string>={running:'Online',offline:'Offline',stopped:'Offline',starting:'Starting',stopping:'Stopping',unknown:'Connecting',installing:'Installing',install_failed:'Installation failed',reinstall_failed:'Reinstallation failed',suspended:'Suspended',restoring_backup:'Restoring backup'};
@@ -179,7 +195,7 @@ export function ServerWorkspace({children}:{children:ReactNode}){
   const art=getServerArtwork({...server,name:server.name});
   const pathname=useLocation().pathname;
   const dashboardPage=/^\/server\/[^/]+\/?$/.test(pathname);
-  const telemetry=useTelemetry(base,!server.status&&!server.is_installing);
+  const telemetry=useTelemetry(base,(!server.status||server.status==='reinstall_failed')&&!server.is_installing);
   const power=usePowerOperation(base,telemetry);
   const transition=power.pending?.signal||(!telemetry.error?(telemetry.state==='starting'?'start':telemetry.state==='stopping'?'stop':undefined):undefined);
   return <TelemetryContext.Provider value={telemetry}><PowerContext.Provider value={power}>
@@ -203,34 +219,37 @@ function UsageChart({title,series,maximum,format,reading,limit,address}:{title:s
   const chartRef=useRef<HTMLDivElement>(null),[chartWidth,setChartWidth]=useState(480);
   useEffect(()=>{
     const node=chartRef.current;if(!node)return;
-    const measure=()=>{const style=getComputedStyle(node);setChartWidth(Math.max(180,node.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)))};
+    const measure=()=>{const style=getComputedStyle(node);setChartWidth(Math.max(1,node.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)))};
     measure();window.addEventListener('resize',measure);
     const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(measure);
     observer?.observe(node);return()=>{observer?.disconnect();window.removeEventListener('resize',measure)};
   },[]);
   const observed=series.flatMap(s=>s.values);
   const scale=Math.max(maximum,...observed,1);
-  const chartHeight=144;
-  const left=72,right=chartWidth-20,top=16,bottom=chartHeight-28;
+  const chartHeight=128;
+  const left=3,right=chartWidth-3,top=8,bottom=chartHeight-8;
   const hasSamples=observed.length>0;
   const x=(index:number,length:number)=>length===1?right:left+(index/(length-1))*(right-left);
   const y=(v:number)=>bottom-(v/scale)*(bottom-top);
   return <Card className="usage-chart dashboard-panel shadcn-card" role="region" aria-label={`${title} chart`}>
     <CardHeader className="dashboard-panel-heading"><CardTitle><div className="chart-heading"><h2>{title}</h2>{address&&<span className="chart-address" aria-label={`Server address: ${address}`} title={address}>{address}</span>}{reading!==undefined&&<p className="chart-reading"><strong>{reading}</strong>{limit&&<span> / {limit}</span>}</p>}</div></CardTitle><CardAction>{reading!==undefined?null:series.length>1?<div className="chart-legend">{series.map(s=><span key={s.name} style={{color:s.color}}><span/>{s.name}</span>)}</div>:<span className="chart-latest">{hasSamples?format(series[0].values.at(-1)||0):'Waiting'}</span>}</CardAction></CardHeader>
-    <CardContent className="usage-chart-body" ref={chartRef}>
+    <CardContent className="usage-chart-body">
+      <div className="chart-scale" aria-hidden="true">{[1,.5,0].map(f=><span key={f}>{format(scale*f)}</span>)}</div>
+      <div className="usage-chart-plot" ref={chartRef}>
       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" role="img" aria-label={`${title}: ${hasSamples?series.map(s=>`${s.name} ${format(s.values.at(-1)||0)}`).join(', '):'waiting for live samples'}`}>
         <title>{`${title}, live samples from this session`}</title>
-        {[1,.5,0].map(f=><g key={f}><line x1={left} x2={right} y1={y(scale*f)} y2={y(scale*f)} className="chart-grid"/><text x={left-12} y={y(scale*f)+4} textAnchor="end" className="chart-axis">{format(scale*f)}</text></g>)}
+        {[1,.5,0].map(f=><g key={f}><line x1={left} x2={right} y1={y(scale*f)} y2={y(scale*f)} className="chart-grid"/></g>)}
         {series.map(s=>{
           if(!s.values.length)return null;
           const points=s.values.map((v,i)=>`${x(i,s.values.length)},${y(v)}`).join(' ');
           return <g key={s.name}>
             {series.length===1&&s.values.length>1&&<polygon points={`${left},${bottom} ${points} ${right},${bottom}`} fill={s.color} fillOpacity=".06"/>}
-            <polyline points={points} fill="none" stroke={s.color} strokeWidth="2" vectorEffect="non-scaling-stroke"/>
+            <polyline points={points} fill="none" stroke={s.color} strokeDasharray={series.length>1&&s.name==='Out'?'5 3':undefined} strokeWidth="2" vectorEffect="non-scaling-stroke"/>
             <circle cx={x(s.values.length-1,s.values.length)} cy={y(s.values.at(-1)||0)} r="3" fill={s.color}/>
           </g>;
         })}
       </svg>
+      </div>
       {!hasSamples&&<p className="chart-waiting">Collecting live samples…</p>}
     </CardContent>
     {reading===undefined&&!address&&<CardFooter className="chart-footer"><Item size="xs" className="shadcn-compact-item"><ItemMedia variant="icon"><Icon name="activity"/></ItemMedia><ItemContent><ItemDescription>Samples from this session</ItemDescription></ItemContent></Item></CardFooter>}

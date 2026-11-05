@@ -1,0 +1,13 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {RouteTable} from '../../src/client/ProxyEndpoints';
+import {SettingsSection} from '../../src/ui/Settings';
+import {Button} from '../../src/lib';
+import '../../src/styles.css';
+import '../../src/theme.css';
+import '../../src/design-system.css';
+import '../../src/shadcn.css';
+import '../../src/shadcn-app.css';
+import '../../src/ui/controls.css';
+const routes=[{id:1,public_host:'njimgang.org',public_port:1024,protocol:'tcp',local_ip:'192.168.178.89',local_port:25567,gateway_name:'Voltra VPS',status:'applied',desired_present:true},{id:2,public_host:'njimgang.org',public_port:25567,protocol:'udp',local_ip:'192.168.178.89',local_port:25567,gateway_name:'Voltra VPS',status:'applied',desired_present:true}];
+createRoot(document.getElementById('root')!).render(<main className="network-page settings-responsive" style={{padding:32,maxWidth:1300,margin:'auto'}}><p style={{color:'var(--muted)',fontSize:12,marginBottom:24}}>Layout example using screenshot values. This is not a live gateway check.</p><SettingsSection title="Public connections"><RouteTable routes={routes} actions={()=> <Button variant="danger" disabled>Remove</Button>}/></SettingsSection><SettingsSection title="Server port"><div style={{display:'flex',alignItems:'center',gap:16,padding:16,fontSize:13}}><span>192.168.178.89:25567</span><span className="badge">Primary</span></div></SettingsSection></main>);

@@ -1,0 +1,5 @@
+import fs from 'node:fs';import crypto from 'node:crypto';import assert from 'node:assert/strict';
+const out='artifacts/game-parity-20261029/wave35-helper-integration';const h=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const c=JSON.parse(fs.readFileSync('artifacts/game-parity-20261029/root-candidate-build-wave32/candidate.json'));let files=['artifacts/game-parity-20261029/LATEST-CANDIDATE.json','artifacts/game-parity-20261029/root-candidate-build-wave32/candidate.json',c.backend.binary];
+function walk(p){for(let d of fs.readdirSync(p,{withFileTypes:true})){let n=p+'/'+d.name;if(d.isDirectory())walk(n);else files.push(n)}}walk(c.backend.snapshot);
+const before=out+'/protected-before.json';const now=Object.fromEntries(files.map(p=>[p,h(p)]));if(fs.existsSync(before)){assert.deepEqual(now,JSON.parse(fs.readFileSync(before)));fs.writeFileSync(out+'/protected-after.json',JSON.stringify(now,null,2));}else fs.writeFileSync(before,JSON.stringify(now,null,2));console.log('Protected files verified:',files.length);

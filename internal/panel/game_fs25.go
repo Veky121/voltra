@@ -13,6 +13,8 @@ import (
 const fs25Path = "farming-simulator/egg-farming-simulator-25.json"
 const fs25Revision = "3ad302f2a67726567a534c964cc423c76d2d1d88"
 const fs25Source = "https://github.com/nn-home-com/farming-simulator-25-egg/blob/" + fs25Revision + "/egg-farming-simulator-25.json"
+const fs25InstallerImage = "debian:bookworm-slim"
+const fs25Image = "ghcr.io/nn-home-com/farming-simulator-25-egg@sha256:10073fd00ab197e36c45dd8af94ca297c04ae2a4288d4b3bd65c16aa468b8dc8"
 
 const fs25ReadyPattern = `regex:^\[Server\]\s+\[\d{2}/[A-Za-z]{3}/\d{4}:\d{2}:\d{2}:\d{2}\]\s+Game server started\s*$`
 
@@ -52,10 +54,10 @@ func farmingSimulatorTemplate() gameTemplate {
 	reporterDigest := sha256.Sum256([]byte(gameOperationReporter))
 	reporterDelimiter := "VOLTRA_" + hex.EncodeToString(reporterDigest[:])
 	script += fmt.Sprintf("mkdir -p '.voltra/scripts'\ncat > '.voltra/scripts/operation-report.mjs' <<'%s'\n%s\n%s\n", reporterDelimiter, gameOperationReporter, reporterDelimiter)
-	script += "echo 'FS25 prepared. Start from Console to download and activate your licensed game.'\n"
+	script += "bash .voltra/fs25/reinstall.sh\n"
 	egg["startup"] = "bash .voltra/fs25/start.sh"
-	egg["docker_images"] = M{"WineHQ 11 (pinned)": "ghcr.io/nn-home-com/farming-simulator-25-egg@sha256:10073fd00ab197e36c45dd8af94ca297c04ae2a4288d4b3bd65c16aa468b8dc8"}
-	egg["scripts"] = M{"installation": M{"script": script, "container": "debian:bookworm-slim", "entrypoint": "bash"}}
+	egg["docker_images"] = M{"WineHQ 11 (pinned)": fs25Image}
+	egg["scripts"] = M{"installation": M{"script": script, "container": fs25InstallerImage, "entrypoint": "bash"}}
 	egg["features"] = []any{"voltra_fs25"}
 	egg["voltra"] = M{"download_headers": M{giantsDownloadHostPattern: M{"Referer": "https://www.farming-simulator.com/"}}}
 	egg["config"] = M{"files": "{}", "startup": M{"done": fs25ReadyPattern, "strip_ansi": true}, "logs": "{}", "stop": "^C"}
@@ -97,9 +99,34 @@ func farmingSimulatorTemplate() gameTemplate {
 	return gameTemplate{ID: hex.EncodeToString(id[:8]), Path: fs25Path, SHA256: hex.EncodeToString(sum[:]), Profile: "fs25-reviewed-v1", Egg: egg, Defaults: M{"memory": 6144, "disk": 102400}, Platforms: []string{"linux/amd64"}, RequiredPorts: 2,
 		PortRules:    []templatePortRule{{Environment: "WEB_PORT", Minimum: 1024, Maximum: 65535, Count: 2, Condition: "nonzero", AllocatedValue: true, ExcludePrimary: true, AutoAllocate: true}},
 		Verification: "runtime_unverified", Detail: "Reviewed source and hardened installer. Licensed game activation and DLC gameplay have not been verified by Voltra.",
-		SetupSteps: []string{"Use a separate GIANTS server licence. Steam player purchases do not supply the required server serial.", "Start from Console after preparation. GIANTS downloads, Wine installation and activation run on first start. Allow at least 100 GiB for temporary files.", "Administrators save game and DLC licences in Admin integrations, then apply them under server Runtime. Each pack downloads and activates with its matching key.", "Check game logs for loaded DLCs and test joining with matching client content. A file or web-manager colour alone does not prove a DLC works."}}
+		SetupSteps: []string{"Use a separate GIANTS server licence. Steam player purchases do not supply the required server serial.", "Installation downloads and activates the game. Start the server when installation finishes. Allow at least 100 GiB for temporary files.", "Use Reinstall server to update the base game before enabled DLCs. Saves, mods, settings and licences are retained.", "Administrators save game and DLC licences in Admin integrations, then apply them under server Runtime. Each pack downloads and activates with its matching key.", "Check game logs for loaded DLCs and test joining with matching client content. A file or web-manager colour alone does not prove a DLC works."}}
 }
 
 func fs25Secret(name string) bool {
 	return name == "GAME_SERIAL" || name == "DLC_PRODUCT_KEY" || name == "WEB_PASSWORD" || name == "ADMIN_PASSWORD" || name == "GAME_PASSWORD"
+}
+
+// Reinstall must use the current bundled installer even for previously imported
+// managed FS25 eggs. Explicit server installation overrides remain authoritative.
+func fs25ReinstallEgg(server, egg M) M {
+	if !fs25Egg(egg) {
+		return egg
+	}
+	for _, key := range []string{"script_install", "script_container", "script_entry"} {
+		if _, overridden := asMap(server["configuration_overrides"])[key]; overridden {
+			return egg
+		}
+	}
+	current, _, err := parseEggDocument(farmingSimulatorTemplate().Egg)
+	if err != nil {
+		panic(err)
+	}
+	out := M{}
+	for key, value := range egg {
+		out[key] = value
+	}
+	for _, key := range []string{"script_install", "script_container", "script_entry"} {
+		out[key] = current[key]
+	}
+	return out
 }

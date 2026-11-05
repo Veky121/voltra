@@ -1,0 +1,18 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+import {refreshHelpers} from './refresh-profile-helpers.mjs';
+const recipe='empyrion/egg-empyrion--galactic-survival.json',original=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe],next=structuredClone(original);
+const source=fs.readFileSync('internal/panel/game_library/scripts/empyrion-parity.py','utf8').replaceAll('\r\n','\n').trimEnd(),command='python3 .voltra/space-survival.py install empyrion';
+assert.equal(next.egg.scripts.installation.script.split(command).length,2);
+next.egg.scripts.installation.script=next.egg.scripts.installation.script.replace(command,`cat > .voltra/empyrion-parity.py <<'VOLTRA_EMPYRION_PARITY_SOURCE'\n${source}\nVOLTRA_EMPYRION_PARITY_SOURCE\npython3 .voltra/empyrion-parity.py install`);
+next.egg.startup='exec /usr/bin/python3 .voltra/empyrion-parity.py';next.revision+='-native-file-authority-proposal-v1';next.verification='not_verified';
+next.detail='Empyrion-only native YAML authority and early prerequisite validation prepared offline. Anonymous entitlement/capacity and all five native gates remain pending.';
+next.settings_documents=[...new Set([...(next.settings_documents??[]),'dedicated.yaml'])];
+next.setup_steps.push('First installation seeds the original creation controls into publisher YAML. Later startup/update/reinstall retain native YAML values and operator comments/scenarios/world settings. Only allocated game port and private Telnet transport remain managed. All original ordered variable records/defaults/permissions are retained.');
+next.setup_steps.push('Five consecutive game allocations are required. Hidden Telnet1030 must stay unallocated/unpublished; its native password is retained or generated privately when blank. Actual listener bind/auth, current native ready log, saves/restart/EAC/player compatibility require native acceptance. No license gate or Wine warning is used as readiness.');
+assert.deepEqual(next.egg.variables,original.egg.variables);assert.deepEqual(next.egg.config,original.egg.config);
+const out='artifacts/game-parity-20261029/empyrion-parity-profile.json';fs.writeFileSync(out,JSON.stringify({[recipe]:next},null,2)+'\n');console.log(JSON.stringify({fragment:out,ordered_rows:next.egg.variables.length,readiness_unchanged:true,global_apply:false}));
+const consoleSource=fs.readFileSync('artifacts/game-parity-20261029/empyrion-console-proposal.py.pending','utf8');
+const consoleNext=refreshHelpers({[recipe]:next},new Map([['space_survival_console',consoleSource]])).profiles[recipe];
+consoleNext.revision+='-raw-admin-input-proposal-v1';consoleNext.setup_steps.push('Shared admin-channel input uses bounded raw descriptor reads. A real Linux child-process fixture reproduced buffered stdin abort -6 on otherwise successful native-fixture shutdown; proposed raw framing preserves actual exit0 and discards whole oversized/NUL lines. Native game acceptance remains separate.');
+assert.deepEqual(consoleNext.egg.variables,original.egg.variables);assert.deepEqual(consoleNext.egg.config,original.egg.config);
+fs.writeFileSync('artifacts/game-parity-20261029/empyrion-parity-console-profile.json',JSON.stringify({[recipe]:consoleNext},null,2)+'\n');

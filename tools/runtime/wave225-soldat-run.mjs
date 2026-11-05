@@ -1,0 +1,13 @@
+import fs from 'node:fs';import path from 'node:path';import {spawn} from 'node:child_process';import * as g from './campaign-native-20261029.mjs';
+const dir=path.join(g.root,'artifacts/game-parity-20261029/wave225-soldat-live'),save=(n,v)=>fs.writeFileSync(path.join(dir,n),JSON.stringify(v,null,2)+'\n');
+const r=await g.verifyRuntime(),q=JSON.parse(fs.readFileSync(path.join(g.runtime,'queue.json')));if(q.activation_pause)throw Error('Activation paused');
+const lease=JSON.parse(fs.readFileSync(path.join(dir,'lease.json')));g.activeLease(lease.lease_id,lease.owner);
+if(fs.existsSync(path.join(dir,'state.json')))throw Error('Existing fixture; inspect rather than recreate');
+let slot;const deadline=Date.now()+180000;while(!slot){await g.verifyRuntime();if(JSON.parse(fs.readFileSync(path.join(g.runtime,'queue.json'))).activation_pause)throw Error('Activation pause');try{slot=g.acquireInstaller(lease.lease_id,lease.owner,{supplement_mib:512});}catch(e){if(!/Serialized installer slot occupied|Host headroom/.test(e.message))throw e;save('queue-wait.json',{at:new Date().toISOString(),reason:e.message,game_failure:false});if(Date.now()>deadline){save('report.json',{outcome:'queued',reason:e.message,game_failure:false,lifecycle:'not_run',settings_consumption:'not_run',persistence:'not_run'});console.log('Bounded installer queue wait exhausted');process.exit(0);}await new Promise(r=>setTimeout(r,15000));}}save('slot.json',slot);
+const profile=g.profileFromRuntime(lease.game,r);save('recipe-before.json',{sha256:g.digest(JSON.stringify(profile)),installer_sha256:g.digest(profile.egg.scripts.installation.script),helper_diff:[]});
+const s=await g.createNativeFixture({lease,slot,profile,environment:{SRV_NAME:'Wave225 Soldat',MAX_PLAYERS:'8',PUBLIC_SERVER:'0'},name:'Wave225 Soldat live',onStep:s=>save('state.json',s)});
+const p=await g.waitNativeInstaller(s);save('installer-proof.json',p.proof);
+const logs=spawn('docker',['--context','desktop-linux','logs','-f',p.container.Id],{windowsHide:true});const log=fs.createWriteStream(path.join(dir,'installer.log'));logs.stdout.pipe(log);logs.stderr.pipe(log);
+const wait=spawn('docker',['--context','desktop-linux','wait',p.container.Id],{windowsHide:true});let exit='';wait.stdout.on('data',b=>exit+=b);wait.on('exit',code=>save('installer-exit.json',{code,exit:exit.trim()}));
+g.releaseGate(p.container,lease,slot.token);save('gate-released.json',{at:new Date().toISOString()});
+try{const outcome=await g.waitInstallOutcome(s,{timeoutMs:600000});save('installer-outcome.json',outcome);g.releaseInstaller(slot);save('slot-released.json',{at:new Date().toISOString()});console.log(JSON.stringify(outcome));}finally{logs.kill();wait.kill();log.end();}

@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const recipe = 'battalion_legacy/egg-b-a-t-t-a-l-i-o-n--legacy.json';
+const current = JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe];
+const profile = structuredClone(current);
+const canonical = 'internal/panel/game_library/scripts/battalion-preflight.py';
+const source = fs.readFileSync(canonical, 'utf8').replaceAll('\r\n', '\n');
+assert(!source.includes('VOLTRA_BATTALION_PREFLIGHT'));
+const old = '.voltra/tactical_next_runtime.py';
+assert(profile.egg.startup.endsWith(old));
+profile.egg.startup = profile.egg.startup.slice(0, -old.length) + '.voltra/battalion_preflight.py';
+const marker = 'python3 .voltra/bundle_debian_python.py\n';
+assert.equal(profile.egg.scripts.installation.script.split(marker).length, 2);
+profile.egg.scripts.installation.script = profile.egg.scripts.installation.script.replace(marker,
+  `cat > .voltra/battalion_preflight.py <<'VOLTRA_BATTALION_PREFLIGHT'\n${source}\nVOLTRA_BATTALION_PREFLIGHT\n${marker}`);
+assert.deepEqual(profile.egg.variables, current.egg.variables);
+const restored = structuredClone(profile);
+restored.egg.startup = current.egg.startup;
+restored.egg.scripts.installation.script = current.egg.scripts.installation.script;
+assert.deepEqual(restored, current, 'Unrelated metadata changed');
+const output = 'artifacts/game-parity-20261029/battalion-wave4-profile.json';
+fs.writeFileSync(output, JSON.stringify({[recipe]: profile}, null, 2) + '\n');
+console.log(JSON.stringify({output, original_controls:profile.egg.variables.length, native_acceptance:false}));

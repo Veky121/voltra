@@ -1,0 +1,8 @@
+import fs from 'node:fs';import path from 'node:path';import {spawnSync} from 'node:child_process';
+import {digest} from './campaign-native-20261029.mjs';
+const canonical='artifacts/game-parity-20261029/xonotic-wave8-runtime.pending.py',before=digest(fs.readFileSync(canonical));
+const proof="import pathlib,json,subprocess,sys;v={k:pathlib.Path('/sys/fs/cgroup/'+k).read_text().strip() for k in ['memory.max','memory.swap.max','cpu.max']};assert v=={'memory.max':'268435456','memory.swap.max':'0','cpu.max':'100000 100000'};print(json.dumps(v),flush=True);subprocess.run([sys.executable,'-B','tools/runtime/xonotic-parity-wave8-test.py'],check=True)";
+const r=spawnSync('docker',['--context','desktop-linux','run','--rm','--pull','never','--network','none','--read-only','--memory','256m','--memory-swap','256m','--cpus','1','--tmpfs','/tmp:rw,exec,size=64m','--mount',`type=bind,source=${path.resolve('.')},target=/work,readonly`,'-w','/work','-e','PYTHONDONTWRITEBYTECODE=1','python:3.12-slim','python3','-B','-c',proof],{windowsHide:true,encoding:'utf8',timeout:60000});
+fs.writeFileSync('artifacts/game-parity-20261029/xonotic-wave8-offline.log',(r.stdout||'')+(r.stderr||''));
+if(digest(fs.readFileSync(canonical))!==before)throw Error('Canonical source drift');
+fs.writeFileSync('artifacts/game-parity-20261029/xonotic-wave8-offline.json',JSON.stringify({at:new Date().toISOString(),canonical,sha256:before,exit:r.status,tests:16,scope:'Existing Xonotic package/config fixtures plus new refusal and preservation checks',resources:{memory_mib:256,swap_mib:0,cpu:1,network:'none',source:'readonly'},canonical_changed:false,native_game:false},null,2)+'\n');console.log((r.stdout||'')+(r.stderr||''));if(r.status!==0)process.exitCode=1;

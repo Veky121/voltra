@@ -1,0 +1,4 @@
+﻿import test from 'node:test';import assert from 'node:assert/strict';import {decodeSoldatDownload} from './soldat-wave10-download.mjs';
+const path='maps/ctf_Ash.PMS',body=Buffer.from('native map fixture');function fixture(){const size=Buffer.alloc(4);size.writeUInt32LE(body.length);return Buffer.concat([Buffer.from('STARTFILES\r\n'),size,Buffer.from(path+'\r\n'),size,body,Buffer.from('\r\nENDFILES\r\n')]);}
+test('native download frame yields exact bytes',()=>{const x=decodeSoldatDownload(fixture(),path);assert(x.body.equals(body));assert.equal(x.file_bytes,body.length);});
+test('truncated data, wrong path and traversal refuse',()=>{assert.throws(()=>decodeSoldatDownload(fixture().subarray(0,30),path));assert.throws(()=>decodeSoldatDownload(fixture(),'maps/Other.PMS'));assert.throws(()=>decodeSoldatDownload(fixture(),'../soldat.ini'));});

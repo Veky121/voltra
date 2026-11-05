@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """MIT. Typed Source2/Sven/legacy TF2C launchers using shared native console."""
 import os
+import hashlib
 from pathlib import Path
 import re
 import threading
@@ -8,6 +9,33 @@ import source_l4d
 from native_console import run
 from source_runtime import quoted, private_write
 from source_third_install import selection, install
+
+
+SVEN_ORIGINAL_SHA256 = 'ea85064073709d24bae8abcc29d4bff7bf70b5cf82aeeb3a4372a17bcaee9b2c'
+SVEN_PATCHED_SHA256 = 'ce155394e8043334f97d5e9439c2c114ee4f69470f32086ffd1016615fa20148'
+SVEN_BRANCH = b'# debug not requested we can exec\n\t\t\t$GAME_BIN_CMD'
+
+
+def sven_launcher(root, binary):
+    """Preserve publisher bytes; accept only our exact owned launcher copy."""
+    if binary != root / 'svends_run': raise ValueError('Unexpected Sven launcher path')
+    for path in (root, binary, root / '.voltra', root / '.voltra-svends-run-exec'):
+        if path.is_symlink() or not path.resolve().is_relative_to(root):
+            raise ValueError('Sven launcher symlink or traversal refused')
+    if not (root / '.voltra').is_dir(): raise ValueError('Missing owned runtime directory')
+    original = binary.read_bytes()
+    if hashlib.sha256(original).hexdigest() != SVEN_ORIGINAL_SHA256 or original.count(SVEN_BRANCH) != 1:
+        raise ValueError('Sven publisher launcher hash or branch drift')
+    patched = original.replace(SVEN_BRANCH, SVEN_BRANCH.replace(b'\t\t\t$GAME_BIN_CMD', b'\t\t\texec $GAME_BIN_CMD'))
+    if hashlib.sha256(patched).hexdigest() != SVEN_PATCHED_SHA256: raise ValueError('Sven patched launcher drift')
+    target = root / '.voltra-svends-run-exec'
+    if target.exists():
+        if not target.is_file() or target.read_bytes() != patched or target.stat().st_nlink != 1:
+            raise ValueError('Foreign existing Sven launcher refused')
+    else:
+        with target.open('xb') as output: output.write(patched)
+        target.chmod(0o700)
+    return target
 
 
 def integer(env, key, default, minimum, maximum):
@@ -44,9 +72,8 @@ def configure(root, env):
         if token and not re.fullmatch(r'[A-Za-z0-9]{32}', token): raise ValueError('Invalid game server token')
         values['sv_setsteamaccount'] = quoted(token)
     elif kind == 'sven':
-        region = integer(env, 'SC_REGION', 255, -1, 255)
-        if region not in (-1, 0, 1, 2, 3, 4, 5, 6, 7, 255): raise ValueError('Choose a documented Sven server region')
-        values['sv_region'] = str(region)
+        argv[0] = str(sven_launcher(root, binary))
+        if '-norestart' not in argv or '-debug' in argv: raise ValueError('Sven requires no restart and no debug')
         argv += ['+maxplayers', str(capacity)]
     else: argv += ['-game', game, '-debug', '+maxplayers', str(capacity)]
     cfg = root / game / ('server.cfg' if kind == 'sven' else 'cfg/server.cfg')
@@ -89,7 +116,10 @@ def main(root, env):
         nonlocal started
         if data and not started and not cancel.is_set():
             started = True; observer.start()
-    try: return run(root, argv, environment, 'quit', credentials, terminal_input=True, output_observer=output)
+    try:
+        status = run(root, argv, environment, 'quit', credentials, terminal_input=True, output_observer=output)
+        if env.get('VOLTRA_SOURCE_THIRD') == 'sven': print('VOLTRA_SVEN_NATIVE_CHILD_RETURN ' + str(status), flush=True)
+        return status
     finally:
         cancel.set()
         if started: observer.join(timeout=1)

@@ -1,0 +1,26 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const recipe = 'dead_matter/egg-dead-matter.json';
+const canonicalFile = 'internal/panel/game_library/overrides.json';
+const canonicalBytes = fs.readFileSync(canonicalFile);
+const original = JSON.parse(canonicalBytes)[recipe], profile = structuredClone(original);
+const sourcePath = 'internal/panel/game_library/scripts/deadmatter-preflight.py';
+const source = fs.readFileSync(sourcePath, 'utf8').replaceAll('\r\n', '\n');
+assert.ok(!source.includes('VOLTRA_DEADMATTER_PREFLIGHT_WAVE5'));
+const before = '.voltra/zombie-native.py run dead-matter';
+assert.ok(profile.egg.startup.endsWith(before));
+profile.egg.startup = profile.egg.startup.replace(before, '.voltra/deadmatter-preflight.py');
+const marker = 'python3 .voltra/bundle-debian-python.py';
+assert.equal(profile.egg.scripts.installation.script.split(marker).length, 2);
+profile.egg.scripts.installation.script = profile.egg.scripts.installation.script.replace(marker,
+  `cat > .voltra/deadmatter-preflight.py <<'VOLTRA_DEADMATTER_PREFLIGHT_WAVE5'\n${source}\nVOLTRA_DEADMATTER_PREFLIGHT_WAVE5\n${marker}`);
+profile.revision += '-startup-preflight-wave5';
+profile.detail += ' Startup preflight and original AUTO_UPDATE fallback are offline source fixtures only; no added native or entitlement acceptance.';
+profile.setup_steps.push('Original AUTO_UPDATE is honored when no explicit VOLTRA updater override exists. Startup validates original name, allocations, app/platform and confined payload/log/compatibility paths before automatic acquisition; a legitimate update may repair missing payloads. Private Steam remains explicitly unsupported.');
+assert.deepEqual(profile.egg.variables, original.egg.variables);
+for (const key of ['upstream_sha256','verification','platforms','defaults','port_rules','required_ports','settings_documents']) assert.deepEqual(profile[key], original[key]);
+for (const key of ['config','docker_images','features']) assert.deepEqual(profile.egg[key], original.egg[key]);
+assert.ok(fs.readFileSync(canonicalFile).equals(canonicalBytes));
+const target = 'artifacts/game-parity-20261029/deadmatter-wave5-profile.json';
+fs.writeFileSync(target, JSON.stringify({[recipe]:profile}, null, 2) + '\n');
+console.log(JSON.stringify({target, controls_preserved:profile.egg.variables.length, native_acceptance:false}));

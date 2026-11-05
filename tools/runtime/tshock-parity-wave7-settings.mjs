@@ -1,0 +1,34 @@
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
+import {runtime,verifyRuntime,activeLease,api,observePower,createReaderFixture,readerRequest,removeReaderFixture} from './campaign-native-20261029.mjs';
+const dir=path.join(runtime,'tshock-wave7'),read=p=>JSON.parse(fs.readFileSync(p)),write=(p,v)=>fs.writeFileSync(p,JSON.stringify(v,null,2)+'\n'),s=read(path.join(dir,'state.json'));
+await verifyRuntime();activeLease(s.lease.lease_id,'tshock_native');const a=(await api('/api/application/servers/'+s.server.id)).attributes;if(a.uuid!==s.server.uuid||a.egg!==s.egg.id)throw Error('Owned TShock required');
+const base='/api/client/servers/'+s.server.uuid,file='/tshock/config.json',endpoint=base+'/game-settings?file='+encodeURIComponent(file),command=process.argv[2];
+const nameKey='/Settings/ServerName';
+async function raw(){const r=await fetch('http://127.0.0.1:18099'+base+'/files/contents?file='+encodeURIComponent(file));if(!r.ok)throw Error('Raw config read failed');return await r.text();}
+async function rawWrite(file,body){const r=await fetch('http://127.0.0.1:18099'+base+'/files/write?file='+encodeURIComponent(file),{method:'POST',headers:{'Content-Type':'text/plain'},body});await r.text();if(!r.ok)throw Error('Operator file write failed');}
+if(command==='edit'){
+ if((await observePower(s)).current_state!=='offline')throw Error('Stop first');
+ const initial=await raw();fs.writeFileSync(path.join(dir,'operator-config-original.json'),initial);const operator=JSON.parse(initial);operator.OperatorParity={Keep:'literal unknown # ; $()',Values:[1,2,3]};await rawWrite(file,JSON.stringify(operator,null,2)+'\n');
+ await rawWrite('/tshock/operator-retention.txt','operator bytes\r\nexact # ; $()\r\n');
+ const before=await api(endpoint),prior=JSON.parse(await raw()),changes={[nameKey]:'Voltra TShock native verified','/Settings/SpawnProtectionRadius':'17','/Settings/AnnounceSave':false};
+ await api(endpoint,'PUT',{revision:before.attributes.revision,settings:changes});const after=await api(endpoint),current=JSON.parse(await raw());
+ const expected=structuredClone(prior);expected.Settings.ServerName=changes[nameKey];expected.Settings.SpawnProtectionRadius=17;expected.Settings.AnnounceSave=false;assert.deepEqual(current,expected);
+ assert(current.Settings.ServerPassword===read(path.join(dir,'credentials.json')).password,'Join password changed');
+ const stale=await fetch('http://127.0.0.1:18099'+endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:before.attributes.revision,settings:{[nameKey]:'Rejected stale'}})});await stale.text();assert.equal(stale.status,409);
+ const proof={at:new Date().toISOString(),changes,other_values_preserved:true,unknown_object_preserved:true,secret_preserved:true,stale_status:stale.status,before_revision:before.attributes.revision,after_revision:after.attributes.revision};write(path.join(dir,'settings-roundtrip.json'),proof);fs.writeFileSync(path.join(dir,'operator-config-edited.json'),await raw());console.log(JSON.stringify(proof));
+}else if(command==='verify'){
+ const view=await api(endpoint),actual=JSON.parse(await raw()),expected=read(path.join(dir,'operator-config-edited.json'));
+ const proof={at:new Date().toISOString(),phase:process.argv[3]||'postboot',known_values_preserved:actual.Settings.ServerName===expected.Settings.ServerName&&actual.Settings.SpawnProtectionRadius===17&&actual.Settings.AnnounceSave===false,unknown_object_preserved:JSON.stringify(actual.OperatorParity)===JSON.stringify(expected.OperatorParity),password_preserved:actual.Settings.ServerPassword===read(path.join(dir,'credentials.json')).password,fields:view.attributes.fields.length,secrets_masked:view.attributes.fields.filter(f=>f.secret).every(f=>!f.value)};
+ write(path.join(dir,'settings-verify-'+proof.phase+'.json'),proof);console.log(JSON.stringify(proof));assert(proof.known_values_preserved&&proof.unknown_object_preserved&&proof.password_preserved&&proof.secrets_masked);
+}else if(command==='guards'){
+ const view=await api(endpoint),offline=(await observePower(s)).current_state==='offline';const cases=offline?[{name:'managed allocated port',settings:{'/Settings/ServerPort':'29151'},status:422},{name:'wrong boolean type',settings:{'/Settings/AnnounceSave':'invalid'},status:422},{name:'unknown setting',settings:{'/Settings/NoSuchKey':'unknown'},status:422}]:[{name:'running mutation',settings:{[nameKey]:'Rejected running'},status:409}];const checks=[];
+ for(const c of cases){const r=await fetch('http://127.0.0.1:18099'+endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:view.attributes.revision,settings:c.settings})});await r.text();checks.push({name:c.name,status:r.status,expected:c.status});}
+ const proof={at:new Date().toISOString(),checks,revision_unchanged:(await api(endpoint)).attributes.revision===view.attributes.revision};write(path.join(dir,'guards-'+Date.now()+'.json'),proof);console.log(JSON.stringify(proof));assert(proof.revision_unchanged&&checks.every(c=>c.status===c.expected));
+}else if(command==='permissions'){
+ if((await observePower(s)).current_state!=='offline')throw Error('Stop first');let fixture;const statePath=path.join(dir,'reader.json');if(fs.existsSync(statePath)&&!read(statePath).user_removed)throw Error('Reader cleanup first');const save=f=>{fixture=f;write(statePath,f);};const proof={at:new Date().toISOString(),checks:[]};
+ try{fixture=await createReaderFixture(s,save);proof.identity_boundary=fixture.identity_boundary;const before=await api(endpoint),name=before.attributes.fields.find(f=>f.key===nameKey).value;
+ const check=async(label,method,expect)=>{const r=await readerRequest(fixture,endpoint,method,method==='PUT'?{revision:before.attributes.revision,settings:{[nameKey]:name}}:undefined);await r.text();proof.checks.push({label,status:r.status,expected:expect});assert.equal(r.status,expect);};
+ await check('read-only GET','GET',200);await check('read-only PUT','PUT',403);await api(base+'/users/'+fixture.user.uuid,'POST',{permissions:[]});await check('no-read GET','GET',403);await api(base+'/users/'+fixture.user.uuid,'POST',{permissions:['file.read','file.read-content','file.update']});await check('granted idempotent PUT','PUT',200);proof.revision_unchanged=(await api(endpoint)).attributes.revision===before.attributes.revision;
+ }finally{if(fixture?.user&&!fixture.user_removed)await removeReaderFixture(fixture,save);proof.account_removed=fixture?.user_removed===true;proof.subuser_removed=fixture?.subuser_removed===true;write(path.join(dir,'permissions.json'),proof);}
+ console.log(JSON.stringify(proof));assert(proof.revision_unchanged&&proof.account_removed&&proof.subuser_removed);
+}else throw Error('Use edit|verify phase|guards|permissions');

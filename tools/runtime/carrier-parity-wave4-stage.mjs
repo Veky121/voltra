@@ -1,0 +1,31 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+
+const recipe = 'carrier_command_2/egg-carrier-command2.json';
+const file = 'internal/panel/game_library/overrides.json';
+const before = fs.readFileSync(file);
+const current = JSON.parse(before)[recipe];
+const profile = structuredClone(current);
+const canonical = 'internal/panel/game_library/scripts/carrier-file-authority.py';
+const source = canonical;
+const helper = fs.readFileSync(source, 'utf8').replaceAll('\r\n', '\n');
+assert(!helper.includes('VOLTRA_CARRIER_FILE_AUTHORITY_WAVE4'));
+const command = 'python3 .voltra/vehicle-sims.py install carrier';
+assert.equal(profile.egg.scripts.installation.script.split(command).length, 2);
+assert(profile.egg.startup.endsWith('.voltra/vehicle-sims.py run carrier'));
+profile.egg.startup = profile.egg.startup.replace('.voltra/vehicle-sims.py run carrier', '.voltra/carrier-file-authority.py run carrier');
+profile.egg.scripts.installation.script = profile.egg.scripts.installation.script.replace(command,
+  `cat > .voltra/carrier-file-authority.py <<'VOLTRA_CARRIER_FILE_AUTHORITY_WAVE4'\n${helper}\nVOLTRA_CARRIER_FILE_AUTHORITY_WAVE4\n${command}`);
+profile.revision += '-native-authority-wave4';
+profile.detail += ' Carrier-only source preparation preserves native XML match, save selection, identity and password values across boots; original licensed-content and publisher no-save limitations remain. Native acceptance is pending.';
+profile.setup_steps.push('Startup controls seed missing server_config.xml attributes only; later native XML values take precedence. Allocated port remains runtime-owned. Typed root-attribute XML settings require the scoped Carrier parser. Publisher save-writing limitations are unchanged.');
+profile.settings_documents = ['server_config.xml'];
+assert.deepEqual(profile.egg.variables, current.egg.variables);
+for (const key of ['upstream_sha256','platforms','required_ports','consecutive_ports','defaults','verification']) assert.deepEqual(profile[key], current[key]);
+for (const key of ['config','docker_images','features']) assert.deepEqual(profile.egg[key], current.egg[key]);
+assert.deepEqual(profile.settings_documents, ['server_config.xml'], 'Use a literal document path only; root must integrate exact Carrier XML dispatch');
+assert(fs.readFileSync(file).equals(before), 'Canonical source drift while staging');
+const output = 'artifacts/game-parity-20261029/carrier-wave4-profile.json';
+fs.writeFileSync(output, JSON.stringify({[recipe]: profile}, null, 2) + '\n');
+console.log(JSON.stringify({output, controls_preserved: profile.egg.variables.length, helper_sha256: crypto.createHash('sha256').update(helper).digest('hex'), native_acceptance: false}));

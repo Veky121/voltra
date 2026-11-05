@@ -1,0 +1,58 @@
+{
+  "owner": "shared-runtime-resource-gate",
+  "outcome": "partial: source fixture tests pass; native supplement unproved",
+  "changed_files": [
+    {
+      "path": "tools/runtime/campaign-native-20261029.mjs",
+      "sha256": "a7b4ed130544fa74c7609ff937f9e1aa2e740eeb7084122151b85317d657e013"
+    },
+    {
+      "path": "tools/runtime/campaign-native-20261029.test.mjs",
+      "sha256": "1e09e5c54515c7470a3a06bb01e4e9f8d94c7480efdcc5dd9fb8442dcda2065a"
+    },
+    {
+      "path": "tools/runtime/batch-queue.mjs",
+      "sha256": "5c3e6a75fc67d917600f703fa63d7e12b2abbf90901db3dd8514d28cebc8f2ea"
+    },
+    {
+      "path": "tools/runtime/campaign-native-20261029.md",
+      "sha256": "bc7f5279793a7dd3e652af1e3b0b767684391bcbd66cdfa03d023756de2ed296"
+    },
+    {
+      "path": ".local/game-parity-20261029/runtime/native-plan.json",
+      "sha256": "32fd2fa301d9c68f799caec00364b0cfbe2fba00dc02ea796efb1b92ab98bdcb"
+    }
+  ],
+  "tests": {
+    "command": "node --test tools/runtime/campaign-native-20261029.test.mjs tools/runtime/campaign-resource-guard-20261029.test.mjs tools/runtime/batch-queue.test.mjs",
+    "pass": 27,
+    "fail": 0,
+    "scope": "source fixtures only"
+  },
+  "historical_evidence": {
+    "status": "reused as scope constraints, not new native acceptance",
+    "sources": [
+      "artifacts/game-parity-20261029/HISTORY-RECONCILIATION-20261030.json",
+      "artifacts/game-parity-20261029/soldat-resume-wave1-shared-request.md",
+      "artifacts/game-parity-20261029/soldat2-resume/shared-patch-request.md"
+    ],
+    "preserved": "build5004116 baseline acquisition/query/listener/stop; Soldat2 historical install/query/flush; no historical receipts edited"
+  },
+  "remaining_gaps": [
+    "Integrated served Soldat profile required. Rejected activation not retried.",
+    "Installer supplement native gated proof, terminal removal and 512 MiB runtime proof pending.",
+    "Soldat watcher owner must pass current queue phase to direct proveInstaller calls, or use shared waitNativeInstaller.",
+    "Gate script path must be present in authorized fixture; missing path refuses configuration.",
+    "MCGalaxy reserve calculation is conservative but no concrete false-positive accounting bug established; reserves unchanged."
+  ],
+  "cleanup": {
+    "leases_acquired": 0,
+    "containers_created": 0,
+    "downloads": 0,
+    "registry_inspections": 0,
+    "native_operations": 0,
+    "panel_activation": false,
+    "home_server_operations": 0
+  },
+  "plan": "Exact soldat_2/egg-soldat2.json queued for soldat2_resume_owner with original 1024 MiB/4096 MiB defaults; original catalog ports untouched; no utility bypass."
+}

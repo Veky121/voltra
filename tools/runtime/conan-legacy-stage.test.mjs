@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const recipe='conan_exiles/egg-conan-exiles.json';
+const hash=p=>createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const canonical='internal/panel/game_library/overrides.json', before=hash(canonical);
+execFileSync(process.execPath,['tools/runtime/stage-conan-legacy.mjs']);
+const output='artifacts/game-parity-20261029/conan-legacy-owner/profile.json', first=hash(output);
+execFileSync(process.execPath,['tools/runtime/stage-conan-legacy.mjs']);
+assert.equal(hash(output),first);assert.equal(hash(canonical),before);
+const profiles=JSON.parse(fs.readFileSync(output)), current=JSON.parse(fs.readFileSync(canonical))[recipe], profile=profiles[recipe];
+assert.deepEqual(Object.keys(profiles),[recipe]);
+assert.deepEqual(profile.egg.variables,current.egg.variables);
+assert.deepEqual(profile.egg.config,current.egg.config);
+assert.deepEqual(profile.egg.docker_images,current.egg.docker_images);
+for(const name of ['conan-empires','ark-family','native-config','steam-template','bundle-debian-python','conan-legacy']) assert(profile.egg.scripts.installation.script.includes(fs.readFileSync('internal/panel/game_library/scripts/'+name+'.py','utf8')),'Stale embed '+name);
+console.log('PASS: exact scope, idempotence, canonical unchanged, ordered defaults/permissions, stop/readiness/image metadata, six current source embeds');

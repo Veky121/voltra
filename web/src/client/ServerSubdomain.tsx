@@ -2,9 +2,8 @@
 import {Link} from 'react-router-dom';
 import {RefreshCw} from 'lucide-react';
 import {useErrorState} from '../notifications/useErrorState';
-import {api,Button,Input,Select,useAPI} from '../lib';
+import {api,Button,Input,useAPI} from '../lib';
 import {SettingsRow,SettingsSection} from '../ui/Settings';
-import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
 import {usePendingSetting} from './PendingSettings';
 import {can,useServer,value} from './common';
@@ -31,14 +30,17 @@ export function ServerSubdomain({query}:{query:ReturnType<typeof useAPI>}){
  }
  usePendingSetting(`subdomain:${base}`,dirty,{summary:'Join domain',applies:'DNS may take time to update',blocked:busy||query.loading||!!query.error||!writable||!valid||!!label&&!selected,save,afterSave:changed,discard:()=>{setDraft(null);setRoute('');setError('')}});
  async function retry(){setBusy(true);setError('');try{await api(`${base}/subdomain/retry`,{method:'POST'});changed()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+ if(!query.loading&&!query.error&&!error&&!choices.length&&!data.hostname&&!data.cleanup_pending)return null;
  return <SettingsSection title="Domain" action={<Button variant="secondary" className="connection-check" aria-label="Check DNS" title="Check DNS records" disabled={busy||query.loading} onClick={query.reload}><ButtonFeedback state={query.loading?'pending':'idle'}><RefreshCw/></ButtonFeedback></Button>}>
   {(query.error||error)&&<p className="server-proxy-error" role="alert">{query.error||error}</p>}
   {!query.loading&&!query.error&&!choices.length&&!data.hostname ? <p className="server-proxy-note">{admin?<>Connect a gateway with <Link to="/admin/integrations/proxy-gateways">managed DNS</Link> first.</>:'Ask an administrator to enable a domain for this server.'}</p> : <>
    <SettingsRow label="Join name" description={!valid?'Use letters, numbers and hyphens.':label&&selected?`play.${label}.${selected.domain}:${selected.public_port}`:'Optional'} control={<Input aria-label="Join name" aria-invalid={!valid} value={label} disabled={!writable||busy||query.loading} maxLength={63} placeholder="friends" onChange={e=>setDraft(e.target.value)}/>}/>
-   {choices.length>1&&<SettingsRow label="Gateway" control={<Select aria-label="Domain gateway" value={String(selected?.id||'')} disabled={!writable||busy} onChange={e=>setRoute(e.target.value)}>{choices.map(c=><option key={c.id} value={c.id}>{c.domain} / {c.protocol.toUpperCase()} :{c.public_port}</option>)}</Select>}/>}
+   {choices.length>1&&<SettingsRow label="Gateway" control={<div className="network-choice"><div>{choices.map(c=><Button key={c.id} variant="secondary" aria-pressed={selected?.id===c.id} disabled={!writable||busy} onClick={()=>setRoute(String(c.id))}>{c.domain} / {c.protocol.toUpperCase()} :{c.public_port}</Button>)}</div></div>}/>}
+
    {data.hostname&&<div className="connection-domain-status"><span>{data.dns_status==='error'?'DNS needs attention':data.dns_matches?'DNS matches':'DNS pending'}</span>{data.dns_status==='error'&&writable&&<Button variant="secondary" disabled={busy||dirty} onClick={()=>void retry()}>Retry</Button>}{writable&&<Button variant="secondary" disabled={busy||query.loading} onClick={()=>setDraft('')}>Clear</Button>}</div>}
   </>}
   {data.cleanup_pending&&<p className="server-proxy-note" role="status">Previous DNS record removal is pending.</p>}
-  <Disclosure className="connection-details"><DisclosureTrigger>Details</DisclosureTrigger><p>{data.detail||'DNS points a name to the gateway. It does not test whether the game can be joined.'}</p><p>Keep the public port when joining. Clearing the name removes its managed DNS record after saving.</p></Disclosure>
+  {data.hostname&&<p className="network-status-note">{data.detail||'DNS points to the gateway. Keep the public port when joining.'}</p>}
+
  </SettingsSection>;
 }

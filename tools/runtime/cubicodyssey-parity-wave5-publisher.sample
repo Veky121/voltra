@@ -1,0 +1,30 @@
+GameParams
+{
+	m_server ServerParams
+	{
+		startingPort 0
+		endingPort 0
+		serverName "Cubic Odyssey Dedicated Server"
+		serverPassword ""
+		maxPlayers 48
+		galaxySeed 0
+		allowRelaying FALSE
+		privateServer FALSE
+		enableCrashDumps FALSE
+		enableLogging FALSE
+	}
+
+	m_difficulty DifficultySettings
+	{
+		damagePlayerScale 1
+		damagePirateScale 1
+		damageCreatureScale 1
+		damageDarknessScale 1
+		damagePlayerShipScale 1
+		damagePirateShipScale 1
+		craftingCostScale 1
+		tradingCostScale 1
+		damageGearOnDeath true
+		loseQbitsOnDeath true
+	}
+}

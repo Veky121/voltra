@@ -737,7 +737,7 @@ func (a *App) signedWingsProxy(w http.ResponseWriter, r *http.Request) {
 
 func opBackupTransform(b M) M {
 	out := M{}
-	for _, k := range []string{"uuid", "is_successful", "is_locked", "name", "ignored_files", "checksum", "bytes", "created_at", "completed_at"} {
+	for _, k := range []string{"uuid", "is_successful", "is_locked", "name", "ignored_files", "checksum", "bytes", "created_at", "completed_at", "disk", "origin"} {
 		out[k] = b[k]
 	}
 	return out
@@ -766,6 +766,7 @@ func (a *App) clientBackups(w http.ResponseWriter, r *http.Request) {
 		if !a.can(r.Context(), u, s, "backup.delete") {
 			d["is_locked"] = false
 		}
+		if err := a.applyReinstallBackupScope(r, s, d); err != nil {fail(w, err);return}
 		b, err := a.createBackup(r.Context(), s, d)
 		if err != nil {
 			fail(w, err)
@@ -775,7 +776,7 @@ func (a *App) clientBackups(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, item("backup", opBackupTransform(b)))
 		return
 	}
-	rows, e := a.query(r.Context(), `SELECT * FROM backups WHERE server_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC`, num(s["id"]))
+	rows, e := a.listBackups(r.Context(), num(s["id"]), r.URL.Query().Get("sort"))
 	if e != nil {
 		fail(w, e)
 		return
@@ -783,7 +784,9 @@ func (a *App) clientBackups(w http.ResponseWriter, r *http.Request) {
 	out := []M{}
 	count := 0
 	for _, b := range rows {
-		out = append(out, opBackupTransform(b))
+		if backupMatchesOrigin(b, r.URL.Query().Get("origin")) {
+			out = append(out, opBackupTransform(b))
+		}
 		if boolean(b["is_successful"]) || b["completed_at"] == nil {
 			count++
 		}
@@ -1112,9 +1115,15 @@ func (a *App) clientAllocations(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
+		egg, err := a.one(r.Context(), "SELECT uuid,startup FROM eggs WHERE id=$1", s["egg_id"])
+		if err != nil { fail(w, err); return }
+		routes, err := a.query(r.Context(), "SELECT allocation_id,protocol FROM proxy_routes WHERE server_id=$1 AND desired_present=true", s["id"])
+		if err != nil { fail(w, err); return }
 		out := []M{}
 		for _, m := range rows {
-			out = append(out, opAllocation(m, s))
+			allocation := opAllocation(m, s)
+			allocation["protocols"], allocation["protocol_source"] = allocationProtocols(egg, boolean(allocation["is_default"]), num(m["id"]), routes)
+			out = append(out, allocation)
 		}
 		writeJSON(w, 200, collection("allocation", out))
 		return
@@ -1447,6 +1456,19 @@ func (a *App) clientSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if op == "reinstall" {
+		d := M{}
+		if r.ContentLength != 0 {
+			var err error
+			d, err = decode(r)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+		}
+		if err := a.validateReinstallBackup(r, s, d); err != nil {
+			fail(w, err)
+			return
+		}
 		if a.managedSteamReinstall(w, r, s, http.StatusAccepted) {
 			return
 		}

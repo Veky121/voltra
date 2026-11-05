@@ -9,7 +9,7 @@ import {
   ServerContext,
   value,
 } from "./client/common";
-import ServerDashboard, {ServerWorkspace} from "./client/ServerDashboard";
+import ServerDashboard, {ServerWorkspace,ServerOperationNotice} from "./client/ServerDashboard";
 import {NavIcon,type IconName} from "./Icons";
 import {managedSteamServer} from "./client/gameSetupModel";
 import {useServerNavigation} from './ServerNavigation';
@@ -84,13 +84,13 @@ function Server() {
       : r.data.meta?.user_permissions || server.permissions || [];
   const groups:{label:string;tabs:[string,string,IconName,string][]}[] = [
     {label:"Overview",tabs:[["","Dashboard","dashboard",""]]},
-    {label:"Configuration",tabs:[["schedules","Schedules","schedules","schedule.read"],["settings","Game settings","settings",""]]},
-    {label:"Management",tabs:[["files","Files","files","file.read"],["backups","Backups","backups","backup.read"]]},
+    {label:"Configuration",tabs:[["files","Files","files","file.read"],["settings","Game Config","settings",""]]},
+    {label:"Management",tabs:[["schedules","Schedules","schedules","schedule.read"],["backups","Backups","backups","backup.read"],["runtime","Server settings","wrench",""]]},
     {label:"Access & logs",tabs:[["users","Access","users","user.read"],["activity","Activity","activity","activity.read"]]},
   ];
   const managedSteam = managedSteamServer(server);
-  if(server.game==="minecraft")groups[2].tabs.unshift(["content","Mods & plugins","eggs","file.read"]);
-  groups[1].tabs.push(["runtime","Server settings","wrench",""]);
+  const contentSupported=server.game==="minecraft"&&server.minecraft_content_supported===true;
+  if(contentSupported)groups[1].tabs.push(["content","Mods & plugins","eggs","file.read"]);
   if(managedSteam||(Array.isArray(server.egg_features)&&server.egg_features.includes('voltra:steam-private-prepared-v1')))groups[2].tabs.unshift(["steam","Updates & repair","startup","startup.read"]);
   return (
     <ServerContext.Provider
@@ -105,16 +105,7 @@ function Server() {
             This node is under maintenance. Some actions may be unavailable.
           </div>
         )}
-        {server.status && (
-          <div className="card">
-            Server state: {server.status.replaceAll("_", " ")}.{" "}
-            {server.status === "installing"
-              ? "Installation output is available in the console."
-              : server.status === "reinstall_failed"
-                ? "Review the installation output in the dashboard console. An owner or administrator can correct the settings and retry Reinstall server under Server settings > General."
-                : ""}
-          </div>
-        )}
+        <ServerOperationNotice/>
         {groups.map(group=>{
           const tabs=group.tabs.filter(([, , ,permission])=>!permission||can(permissions,permission));
           return tabs.length>0&&<SidebarSection key={group.label} label={group.label}>{tabs.map(([path,label,icon])=><NavLink key={path} title={label} end={!path} to={`/server/${id}${path?`/${path}`:''}`}><NavIcon name={icon}/><span>{label}</span></NavLink>)}</SidebarSection>;
@@ -133,7 +124,7 @@ function Server() {
           <Route path="admin-tools" element={<Navigate to={`/server/${id}/runtime`} replace/>} />
           <Route path="quick-setup" element={<Navigate to={`/server/${id}/settings`} replace/>} />
           <Route path="steam" element={routePage(<SteamMaintenance />)} />
-          <Route path="content" element={routePage(<MinecraftContent server={id??server.uuid} />)} />
+          <Route path="content" element={contentSupported?routePage(<MinecraftContent server={id??server.uuid} />):<Navigate to={`/server/${id}/settings`} replace/>} />
           <Route path="settings/*" element={routePage(<ServerSettings />)} />
           <Route
             path="activity"

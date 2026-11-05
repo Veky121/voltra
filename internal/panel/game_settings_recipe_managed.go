@@ -6,6 +6,12 @@ import "strings"
 // case-sensitive and scoped to the exact adapter and document, rather than a
 // global denial of ordinary gameplay fields named port or ListenIp.
 func gameSettingsRecipeManaged(egg M, file, key string) bool {
+	if nativeSettingsIsRecipe(egg, fofSettingsRecipe) && file == fofSettingsPath {
+		return !strings.EqualFold(key, "mp_timelimit")
+	}
+	if nativeSettingsIsRecipe(egg, zandronumSettingsRecipe) && file == zandronumSettingsPath {
+		return zandronumStartupManaged(key)
+	}
 	if among165Recipe(egg) != "" && campaignParserPathAllowed(egg, file) && !among165Editable(file, key) {
 		return true
 	}

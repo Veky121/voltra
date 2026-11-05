@@ -1,0 +1,6 @@
+import fs from 'node:fs';import path from 'node:path';import * as h from './campaign-native-20261029.mjs';const d='artifacts/game-parity-20261029/wave484-id-family-native',s=JSON.parse(fs.readFileSync(d+'/nzp-state.json')),input=path.resolve('.local/id-games/cache');const result=h.docker(['run','--name','wave484-nzp-cache-seed','--rm','--pull','never','--network','none','--memory','128m','--memory-swap','128m','--cpus','1','-v','/var/lib/voltra-parity-20261029:/campaign','-v',input+':/cache:ro','python:3.12-slim','python','-B','-c',`import pathlib,hashlib,shutil,json
+r=pathlib.Path('/campaign/volumes/${s.server.uuid}/.voltra/public-cache');r.mkdir(exist_ok=True);out=[]
+for name,sha,size in [('nzportable-linux64.zip','6b07a8622e400d01d13e42ee0f9f28ceaded86860601759a0c6c89ed295bcfea',74097683),('vril-source.tar.gz','8a6cfae84158c630cc7a077b4ec5bac4be3e7ed0832bd365d0469540acfaf57f',11828437)]:
+ p=pathlib.Path('/cache')/name;assert p.stat().st_size==size and hashlib.file_digest(p.open('rb'),'sha256').hexdigest()==sha
+ shutil.copy2(p,r/sha);assert hashlib.file_digest((r/sha).open('rb'),'sha256').hexdigest()==sha;out.append({'name':name,'sha256':sha,'bytes':size})
+print(json.dumps(out))`]);fs.writeFileSync(d+'/nzp-verified-cache-seed.json',result);console.log(result);

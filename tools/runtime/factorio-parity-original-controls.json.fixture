@@ -1,0 +1,142 @@
+{
+  "variables": [
+    {
+      "name": "Factorio Version",
+      "description": "Default 2.0.77. Choose a literal X.Y.Z, stable, latest (stable), or experimental. Installer requires an exact official headless checksum. Back up saves/config before changing versions; downgrades are refused. Clients need the same version/mods.",
+      "env_variable": "FACTORIO_VERSION",
+      "default_value": "2.0.77",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|regex:/\\A(?:latest|stable|experimental|(?:0|[1-9][0-9]{0,3})\\.(?:0|[1-9][0-9]{0,3})\\.(?:0|[1-9][0-9]{0,3}))\\z/",
+      "field_type": "text"
+    },
+    {
+      "name": "Maximum Slots",
+      "description": "Maximum players. 0 means unlimited; practical capacity depends on the map and hardware.",
+      "env_variable": "MAX_SLOTS",
+      "default_value": "20",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:0,999",
+      "field_type": "text"
+    },
+    {
+      "name": "Save Name",
+      "description": "File name under saves, without .zip. A missing save is generated on first start. Select an existing autosave basename to recover it.",
+      "env_variable": "SAVE_NAME",
+      "default_value": "gamesave",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|alpha_dash|between:1,100",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Token",
+      "description": "Factorio.com authentication token, needed only for public listing. Keep it private.",
+      "env_variable": "SERVER_TOKEN",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|required_if:environment.PUBLIC_SERVER,1|alpha_num|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Name",
+      "description": "Name of the game as it will appear in the game listing",
+      "env_variable": "SERVER_NAME",
+      "default_value": "Factorio Server",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Description",
+      "description": "Description of the game that will appear in the listing.",
+      "env_variable": "SERVER_DESC",
+      "default_value": "Description",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:200",
+      "field_type": "text"
+    },
+    {
+      "name": "Server Username",
+      "description": "Factorio.com account name, needed only for public listing. Private/LAN servers can leave this empty.",
+      "env_variable": "SERVER_USERNAME",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|required_if:environment.PUBLIC_SERVER,1|string|max:40",
+      "field_type": "text"
+    },
+    {
+      "name": "Auto Save Interval",
+      "description": "Time between auto saves specified in minutes",
+      "env_variable": "SAVE_INTERVAL",
+      "default_value": "10",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:0,999",
+      "field_type": "text"
+    },
+    {
+      "name": "Auto Save Slots",
+      "description": "The number of auto saves to keep.",
+      "env_variable": "SAVE_SLOTS",
+      "default_value": "5",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:1,999",
+      "field_type": "text"
+    },
+    {
+      "name": "AFK Kick",
+      "description": "Time specified in minutes to kick AFK players.\r\n0 is off",
+      "env_variable": "AFK_KICK",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer|between:0,999",
+      "field_type": "text"
+    },
+    {
+      "name": "Join password",
+      "env_variable": "GAME_PASSWORD",
+      "description": "Optional password players enter when joining. Stored as literal JSON text.",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Public listing",
+      "env_variable": "PUBLIC_SERVER",
+      "description": "0 keeps the server off the public list; 1 requires Factorio account credentials.",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:0,1",
+      "field_type": "text"
+    },
+    {
+      "name": "LAN discovery",
+      "env_variable": "LAN_SERVER",
+      "description": "1 advertises on the local network. Direct connections use the allocated game address.",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:0,1",
+      "field_type": "text"
+    }
+  ],
+  "defaults": {
+    "memory": 2048,
+    "disk": 8192
+  },
+  "docker_images": {
+    "ghcr.io/ptero-eggs/yolks:debian": "ghcr.io/ptero-eggs/yolks:debian"
+  },
+  "startup": "exec bash .voltra/factorio-start.sh"
+}

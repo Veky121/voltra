@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+const recipe='starrupture/egg-star-rupture-wine.json';
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe]);
+if(!profile?.egg)throw Error('Missing exact profile');
+const egg=profile.egg, aliases={'steam_template.py':'steam-template.py','additional_survival_install.py':'additional-survival-install.py','ocean_space_servers.py':'ocean-space-servers.py','bundle_debian_python.py':'bundle-debian-python.py'};
+let script=egg.scripts.installation.script.replace(/(cat > .voltra\/([^ ]+) <<'VOLTRA_SOURCE'\n)([\s\S]*?)(\nVOLTRA_SOURCE\n)/g,(_,head,name,body,tail)=>head+fs.readFileSync('internal/panel/game_library/scripts/'+(aliases[name]||name),'utf8')+tail);
+script=script.replace(/cat > .voltra\/starrupture_wine_owner.py <<'VOLTRA_STAR_WINE'\n[\s\S]*?\nVOLTRA_STAR_WINE\n/g,'').replace('python3 .voltra/starrupture_wine_owner.py install','python3 .voltra/ocean_space_servers.py install starrupture');
+const call='python3 .voltra/ocean_space_servers.py install starrupture';
+if(!script.includes(call))throw Error('Installer shape changed');
+script=script.replace(call,"cat > .voltra/starrupture_wine_owner.py <<'VOLTRA_STAR_WINE'\n"+fs.readFileSync('tools/runtime/starrupture-wine-owner.py','utf8')+"\nVOLTRA_STAR_WINE\npython3 .voltra/starrupture_wine_owner.py install");
+egg.scripts.installation.script=script;
+egg.startup=egg.startup.replace('.voltra/ocean_space_servers.py run starrupture','.voltra/starrupture_wine_owner.py run');
+profile.revision='starrupture-wine-native-authority-source-v1';
+profile.setup_steps=profile.setup_steps.filter(step=>!step.startsWith('Wine-only source proposal:'));
+profile.setup_steps.push('Wine-only source proposal: DSSettings.txt is seeded once with original defaults, then remains file-authoritative. Runtime consent, password-file prerequisites and invalid controls refuse before game acquisition. Native stdout owns console output; duplicate log tail and warning suppression are removed. No readiness, save, password conversion or gameplay acceptance inferred.');
+const out='artifacts/game-parity-20261029/starrupture-wine-owner';fs.mkdirSync(out,{recursive:true});fs.writeFileSync(out+'/profile.pending.json',JSON.stringify({[recipe]:profile},null,2)+'\n');

@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const out='artifacts/game-parity-20261029/wave60-goldsrc-admission/';
+const go='C:/Users/Veky/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.3.windows-amd64/bin/go.exe';
+const secret=JSON.parse(fs.readFileSync('.local/game-parity-20261029/runtime/panel-private-env.json'));
+const u=new URL(secret.DATABASE_URL);if(u.hostname!=='127.0.0.1'||u.port!=='55439')throw Error('isolated database required');
+const env={...process.env,GOTOOLCHAIN:'local',GOPROXY:'off',TEST_DATABASE_URL:secret.DATABASE_URL};
+const result=spawnSync(go,['test','./internal/panel','-run','^(TestGoldSrcWave60|TestGoldSrc|TestDSTInstallerAssignedEnvironment)','-count=1','-json'],{env,encoding:'utf8',timeout:180000,windowsHide:true});
+let log=(result.stdout||'')+(result.stderr||'');log=log.replaceAll(secret.DATABASE_URL,'[REDACTED]');fs.writeFileSync(out+'go-tests.log',log);
+const events=log.split('\n').flatMap(l=>{try{return [JSON.parse(l)]}catch{return []}});
+const report=JSON.parse(fs.readFileSync(out+'report.json'));report.go_tests={exit:result.status,toolchain:'cached Go1.27.3 windows-amd64 invoked from isolated WSL subprocess',counts:Object.fromEntries(['pass','fail','skip'].map(a=>[a,events.filter(e=>e.Test&&e.Action===a).length])),log:out+'go-tests.log'};fs.writeFileSync(out+'report.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report.go_tests));process.exitCode=result.status||0;

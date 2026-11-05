@@ -11,6 +11,7 @@ import {DropdownMenuItem} from '../components/ui/dropdown-menu';
 import FileExplorer from './FileExplorer';
 import useFileNavigationGuard from './useFileNavigationGuard';
 import {commitDraft,discardDraft,isDraftDirty,loadedDraft} from './fileDraft';
+import FileEditorBoundary from './FileEditorBoundary';
 import './files.css';
 import './fileWorkspace.css';
 import './files-ui.css';
@@ -186,7 +187,7 @@ export default function Files(){
       <div className="file-editor-panel">
         <div className="file-editor-title"><span><Icon name="file"/>{file.split('/').at(-1)}{dirty&&<i className="explorer-draft-dot" aria-label="Unsaved changes"/>}</span><button type="button" className="file-icon-button" aria-label="Close file editor" title="Close editor" onClick={()=>openDir(directory)}><Icon name="close"/></button></div>
         <PageError error={fileError}/>
-        {editing||(!fileError&&draft.path!==file)?<p role="status">Loading file…</p>:draft.path===file&&!fileError?<Suspense fallback={<p role="status">Loading code editor…</p>}><FileEditor key={`${base}:${file}:${draft.revision}`} storageKey={base} path={file} content={draft.content} dirty={dirty} readOnly={!editable} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense>:<p className="muted">This file could not be loaded. Choose another file or return to the file browser.</p>}
+        {editing||(!fileError&&draft.path!==file)?<p role="status">Loading file…</p>:draft.path===file&&!fileError?<FileEditorBoundary key={`${base}:${file}:${draft.revision}`} path={file} content={draft.content} readOnly={!editable} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}><Suspense fallback={<p role="status">Loading code editor…</p>}><FileEditor key={`${base}:${file}:${draft.revision}`} storageKey={base} path={file} content={draft.content} dirty={dirty} readOnly={!editable} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense></FileEditorBoundary>:<p className="muted">This file could not be loaded. Choose another file or return to the file browser.</p>}
       </div>
       {dirty&&<div key={attention} ref={bar} tabIndex={-1} className={`file-draft-bar${attention?' is-attention':''}`} role="region" aria-label="Unsaved file changes" data-attention={attention}>
         <div><Icon name="info"/><p role="status">{attention?'Save or discard your changes before leaving.':'You have unsaved changes.'}</p></div>

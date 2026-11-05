@@ -1,0 +1,9 @@
+# The base is pinned; the patched binary and provenance are built by prepare-wings.ps1.
+FROM alpine:3.23@sha256:132c5416901054a60a6c1f9f5073fd16dc91c8f3de1693f6be93b5912cf3ee71
+RUN apk add --no-cache ca-certificates tzdata mailcap
+COPY wings /usr/bin/wings
+COPY WINGS-LICENSE wings-provenance.json /usr/local/share/voltra/
+RUN chmod 0755 /usr/bin/wings
+ENTRYPOINT ["/usr/bin/wings"]
+CMD ["--config", "/etc/pterodactyl/config.yml"]
+EXPOSE 8080 2022

@@ -1,0 +1,5 @@
+﻿import test from 'node:test';import assert from 'node:assert/strict';import {decodeRefreshX} from './soldat-wave10-protocol.mjs';
+function fixture(){const p=Buffer.alloc(1992);p[1944]=7;p.write('ctf_Ash',1945);p[1971]=3;p[1972]=8;p[1974]=1;p[1975]=7;p.write('ctf_Run',1976);p.writeUInt32LE(60000,1961);p.writeUInt32LE(50000,1965);p.writeUInt16LE(30,1969);return p;}
+test('publisher REFRESHX offsets decode real typed fields',()=>{assert.deepEqual(decodeRefreshX(fixture()),{packet_bytes:1992,map:'ctf_Ash',next_map:'ctf_Run',mode:3,max_players:8,max_spectators:0,passworded:true,players:0,time_limit_ticks:60000,time_left_ticks:50000,score_limit:30});});
+test('truncated or overlong packets refuse',()=>{for(const n of [0,1188,1991,1993])assert.throws(()=>decodeRefreshX(Buffer.alloc(n)));});
+test('impossible string lengths, missing map, mode and password values refuse',()=>{for(const [offset,value] of [[1944,17],[1944,0],[1975,17],[1971,7],[1974,2]]){const p=fixture();p[offset]=value;assert.throws(()=>decodeRefreshX(p));}});

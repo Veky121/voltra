@@ -38,7 +38,7 @@ function GameQuickSetupContent() {
     return()=>{window.removeEventListener('focus',refreshClean);document.removeEventListener('visibilitychange',refreshClean)};
   },[base,file,request.reload]);
   return <div className="game-quick-page games-ui settings-responsive">
-    <header className="page-header game-settings-page-header" aria-label="Game settings controls">
+    <header className="page-header game-settings-page-header" aria-label="Game Config controls">
       {!!documents.length && <Select className="game-settings-document" aria-label="Configuration" value={file || request.data?.file || ''} disabled={request.loading} onChange={event => {const next=new URLSearchParams(params);next.set('file',event.target.value);setParams(next,{preventScrollReset:true});}}>{documents.map(doc => <option key={doc.path} value={doc.path}>{doc.label}</option>)}</Select>}
       {request.data && request.data.fields.length > 12 && <Input className="game-settings-search" type="search" aria-label="Find a setting" placeholder="Find a setting..." value={search} onChange={event => setSearch(event.target.value)}/>}
       </header>

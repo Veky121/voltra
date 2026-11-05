@@ -1,0 +1,23 @@
+{
+  "build": "REPLACE_WITH_VERIFIED_SERVED_BUILD_HASH",
+  "output": ".local/validator",
+  "monitor": "tools/runtime/validator/local-monitor.mjs",
+  "policy": { "maxParallel": 10, "reserveMiB": 8192, "reserveDiskMiB": 16384, "maxCpuBusy": 0.9 },
+  "games": [
+    {
+      "id": "example",
+      "adapter": "tools/runtime/validator/api-adapter.mjs",
+      "checksModule": "tools/runtime/validator/example-checks.mjs",
+      "base": "http://127.0.0.1:18099",
+      "tokenEnv": "VALIDATOR_API_TOKEN",
+      "serverId": 0,
+      "serverUUID": "REPLACE_WITH_OWNED_FIXTURE_UUID",
+      "nodeId": 0,
+      "expectedName": "validator-example",
+      "peakMiB": 2048,
+      "diskMiB": 4096,
+      "timeoutMs": 900000,
+      "inputs": []
+    }
+  ]
+}

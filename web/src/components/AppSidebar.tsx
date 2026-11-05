@@ -25,13 +25,15 @@ function ServerPicker({servers}:{servers:NavigationServer[]}){
  const {pathname}=useLocation(),{isMobile}=useSidebar();
  const identifier=pathname.split('/')[2];
  const current=servers.find(server=>server.identifier===identifier||server.uuid===identifier);
+ const favorites=servers.filter(server=>server.favorite);
+ const switchableServers=favorites.length?favorites:servers;
  return <SidebarMenu className="voltra-server-menu"><SidebarMenuItem><DropdownMenu>
   <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip="Switch server" className="voltra-server-picker"/>} aria-label="Switch server">
    <span className="voltra-server-picker-icon">{current?<ServerPickerArtwork server={current}/>:<Icon name="server"/>}</span><span className="voltra-server-picker-copy"><strong>{current?.name||'Server workspace'}</strong><small>{current?.egg_name||'Servers'}</small></span><ChevronsUpDown className="voltra-picker-chevron"/>
   </DropdownMenuTrigger>
   <DropdownMenuContent side={isMobile?'bottom':'right'} align="start" sideOffset={8} className="voltra-dropdown voltra-server-dropdown">
-   <DropdownMenuGroup><DropdownMenuLabel>Servers</DropdownMenuLabel><DropdownMenuItem render={<Link to="/"/>}><ArrowLeft/>All servers</DropdownMenuItem></DropdownMenuGroup>
-   {servers.length>0&&<><DropdownMenuSeparator/><DropdownMenuGroup>{servers.map(server=><DropdownMenuItem key={server.uuid} render={<Link to={`/server/${server.identifier||server.uuid}`}/> }><ServerPickerArtwork server={server}/><span className="voltra-picker-name">{server.name}</span>{current?.uuid===server.uuid&&<Check/>}</DropdownMenuItem>)}</DropdownMenuGroup></>}
+   <DropdownMenuGroup><DropdownMenuLabel>{favorites.length?'Favorites':'Servers'}</DropdownMenuLabel><DropdownMenuItem render={<Link to="/"/>}><ArrowLeft/>All servers</DropdownMenuItem></DropdownMenuGroup>
+   {switchableServers.length>0&&<><DropdownMenuSeparator/><DropdownMenuGroup>{switchableServers.map(server=><DropdownMenuItem key={server.uuid} render={<Link to={`/server/${server.identifier||server.uuid}`}/> }><ServerPickerArtwork server={server}/><span className="voltra-picker-name">{server.name}</span>{current?.uuid===server.uuid&&<Check/>}</DropdownMenuItem>)}</DropdownMenuGroup></>}
   </DropdownMenuContent>
  </DropdownMenu></SidebarMenuItem></SidebarMenu>;
 }

@@ -1,5 +1,5 @@
 export type ErrorContext={source:string;page?:string;endpoint?:string;method?:string;status?:number;epoch?:number;quiet?:boolean;requestId?:string};
-export type PanelNotification={id:string;title:string;message:string;source:string;page:string;endpoint:string;method:string;status?:number;firstAt:number;lastAt:number;count:number;read:boolean;resolved:boolean;requestId?:string;code?:string};
+export type PanelNotification={kind?:'success'|'error';id:string;title:string;message:string;source:string;page:string;endpoint:string;method:string;status?:number;firstAt:number;lastAt:number;count:number;read:boolean;resolved:boolean;requestId?:string;code?:string};
 type Event={kind:'add'|'update';entry:PanelNotification}|{kind:'clear'};
 let entries:PanelNotification[]=[],epoch=0,sequence=0,scope:unknown;
 const listeners=new Set<()=>void>(),events=new Set<(event:Event)=>void>();
@@ -79,3 +79,11 @@ export function clearNotifications(){entries=[];emit({kind:'clear'})}
 export function resetNotificationSession(){epoch++;scope=undefined;reported=new WeakSet();clearNotifications()}
 export function setNotificationScope(value:unknown){if(scope===undefined){scope=value;return}if(!Object.is(scope,value)){resetNotificationSession();scope=value}}
 export function exportNotificationLog(){return JSON.stringify({exportedAt:new Date().toISOString(),errors:entries},null,2)}
+
+export function reportPanelSuccess(message:string,context:ErrorContext){
+ if(!message.trim() || context.epoch!==undefined && context.epoch!==epoch)return;
+ const now=Date.now();
+ const entry:PanelNotification={id:`panel-${++sequence}`,kind:'success',title:'Action confirmed',message:redactMessage(message),source:context.source,page:safePath(context.page),endpoint:'',method:'',firstAt:now,lastAt:now,count:1,read:false,resolved:false};
+ entries=[entry,...entries].slice(0,200);
+ emit({kind:'add',entry});
+}

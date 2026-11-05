@@ -1,0 +1,31 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const recipe='windrose/egg-windrose.json';
+const out='artifacts/game-parity-20261029/windrose-owner';
+const profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json','utf8'));
+const profile=structuredClone(profiles[recipe]);
+if(!profile?.egg) throw Error('Missing canonical Windrose profile');
+const scriptDir='internal/panel/game_library/scripts';
+const pairs=[['steam-template.py','steam_template.py'],['additional-survival-install.py','additional_survival_install.py'],['native-config.py','native-config.py'],['native-console.py','native-console.py'],['native-release.py','native-release.py'],['steam-native-next.py','steam-native-next.py'],['private-wine-prerequisites.py','private-wine-prerequisites.py'],['bundle-debian-python.py','bundle_debian_python.py'],['ocean-space-servers.py','ocean_space_servers.py'],['ocean-space-pins.json','ocean-space-pins.json']];
+const sources=pairs.map(([source,target])=>[path.join(scriptDir,source),target]);
+sources.push(['tools/runtime/windrose-owner.py','windrose_owner.py']);
+const hashes={};
+let script='#!/bin/bash\nset -euo pipefail\ncd /mnt/server\nmkdir -p .voltra\n';
+for(const [source,target] of sources){
+ const body=fs.readFileSync(source,'utf8');
+ hashes[source]=crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+ script+=`cat > .voltra/${target} <<'VOLTRA_SOURCE'\n${body}\nVOLTRA_SOURCE\n`;
+}
+script+='python3 -B -c \'import sys; sys.path.insert(0,".voltra"); import windrose_owner; from pathlib import Path; import os; windrose_owner.plan(Path.cwd(),dict(os.environ))\'\n';
+script+='export DEBIAN_FRONTEND=noninteractive\napt-get update\napt-get install -y --no-install-recommends python3 ca-certificates lib32gcc-s1 lib32stdc++6\npython3 .voltra/bundle_debian_python.py\npython3 .voltra/windrose_owner.py install\n';
+profile.egg.scripts.installation.script=script;
+profile.egg.startup=profile.egg.startup.replace('.voltra/ocean_space_servers.py run windrose','.voltra/windrose_owner.py run');
+if(!profile.egg.startup.includes('windrose_owner.py')) throw Error('Unrecognized canonical startup');
+profile.revision='windrose-native-authority-owner-v1';
+profile.verification='not_verified';
+profile.detail='Pending scoped source proposal; no native/browser/gameplay acceptance. Publisher identity file required before acquisition. Native settings authoritative; missing keys seeded once.';
+fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(out+'/profile-proposal.json',JSON.stringify({[recipe]:profile},null,2)+'\n');
+fs.writeFileSync(out+'/helper-hashes.json',JSON.stringify(hashes,null,2)+'\n');
+console.log('Staged exact Windrose proposal only.');

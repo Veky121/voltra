@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Editor recovery regression</title></head><body><div id="root"></div><script type="module">
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import Boundary from '../../src/client/FileEditorBoundary.tsx';
+import '../../src/styles.css';
+import '../../src/theme.css';
+import '../../src/shadcn.css';
+import '../../src/client/fileEditor.css';
+const h=React.createElement;
+function FailingEditor(){throw new Error('Intentional editor failure for recovery regression')}
+function Recovery(){const [content,setContent]=useState('reactorExplosions: false\n'),[saved,setSaved]=useState('');return h('main',{},h('h1',{},'Controlled editor failure'),h(Boundary,{path:'/rules.hjson',content,readOnly:false,onChange:setContent,onSave:()=>setSaved(content)},h(FailingEditor)),h('output',{'aria-label':'Current test draft'},content),h('button',{onClick:()=>setSaved(content)},'Capture draft'),h('output',{'aria-label':'Saved test draft'},saved),h(Boundary,{path:'/readonly.hjson',content:'read only',readOnly:true,onChange:()=>{throw new Error('Readonly changed')},onSave:()=>{}},h(FailingEditor)))}
+createRoot(document.getElementById('root')).render(h(Recovery));
+</script></body></html>

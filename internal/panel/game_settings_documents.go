@@ -902,6 +902,7 @@ func (a *App) gameSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		carrierSettingPresentation(egg, file, field)
 		hl2dmSettingPresentation(egg, file, field)
+		fofSettingPresentation(egg, file, field)
 		sonsSettingPresentation(egg, file, field)
 		sonsGameplaySettingPresentation(egg, file, field)
 		resoniteSessionSettingPresentation(egg, file, field)
@@ -1554,33 +1555,10 @@ func (a *App) gameSettingsFolders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	commonFolders := []string{"config", "saves", "worlds", "logs", "mods", "plugins"}
-	if nativeSettingsIsRecipe(egg, soldatClassicRecipe) {
-		commonFolders = append(commonFolders, "maps", "scripts", "textures", "scenery-gfx", "bots")
-	}
-	if nativeSettingsIsRecipe(egg, soldat2Recipe) {
-		commonFolders = append(commonFolders, "Levels", "Rules", "Modifiers", "Cycles", "Scripts")
-	}
-	if nativeSettingsIsRecipe(egg, "beamng/kissmp/egg-kissmp.json") {
-		commonFolders = append(commonFolders, "addons")
-	}
-	for _, folder := range commonFolders {
-		exists, e := a.quickSetupFolderExists(ctx, s, "/"+folder)
-		if e != nil {
-			fail(w, e)
-			return
-		}
-		if exists {
-			found := false
-			for _, old := range folders {
-				if old["path"] == "/"+folder {
-					found = true
-				}
-			}
-			if !found {
-				folders = append(folders, M{"label": folder, "path": "/" + folder})
-			}
-		}
+	folders, err = a.appendGameFolderShortcuts(ctx, s, egg, folders)
+	if err != nil {
+		fail(w, err)
+		return
 	}
 	writeJSON(w, 200, item("game_settings_folders", M{"folders": folders}))
 }

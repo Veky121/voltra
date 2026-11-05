@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {stageTerrariaProfiles} from './stage-terraria-release-profiles.mjs';
+const out='artifacts/game-parity-20261029/wave63-tshock-legacy';
+const key='terraria/tshock/egg-tshock-legacy.json';
+const source=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const helper=fs.readFileSync('internal/panel/game_library/scripts/terraria-release-install.py','utf8');
+const profiles=stageTerrariaProfiles(source,helper,undefined,[key]);
+profiles[key].revision+='-native-authority-wave63';
+const egg=profiles[key].egg;
+egg.config.files=JSON.stringify({'serverconfig.txt':{parser:'properties',find:{port:'{{server.build.default.port}}'}},'tshock/config.json':{parser:'json',find:{'Settings.ServerPort':'{{server.build.default.port}}'}}});
+fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(path.join(out,'profiles.unapplied.json'),JSON.stringify(profiles,null,2)+'\n');
+const script=egg.scripts.installation.script;
+const emitted=script.split("<<'VOLTRA_TERRARIA_RELEASE'\n")[1].split('\nVOLTRA_TERRARIA_RELEASE\n')[0];
+if(emitted!==helper)throw Error('helper bytes differ');
+fs.writeFileSync(path.join(out,'terraria_release_install.py'),emitted);
+fs.writeFileSync(path.join(out,'start.txt'),egg.startup+'\n');

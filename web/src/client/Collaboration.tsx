@@ -1,3 +1,7 @@
+import {ButtonFeedback} from '../ui/ButtonFeedback';
+import {Archive, Terminal, Power, ChevronRight} from "lucide-react";
+import {Collapsible, CollapsibleTrigger, CollapsibleContent} from "../components/ui/collapsible";
+import "./scheduleRows.css";
 import {accountNickname} from './accountProfile';
 import {describeSchedule} from './scheduleTimingModel';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
@@ -205,6 +209,12 @@ export function Schedules() {
   }, [base]);
   const [editing, setEditing] = useState<RecordData | null>(null),
     [task, setTask] = useState<RecordData | null>(null);
+  const [runFeedback, setRunFeedback] = useState<{id: number; state: 'pending' | 'success'} | null>(null);
+  useEffect(() => {
+    if (runFeedback?.state !== 'success') return;
+    const timer = setTimeout(() => setRunFeedback(null), 2500);
+    return () => clearTimeout(timer);
+  }, [runFeedback]);
   const saveSchedule = () =>
     a.run(
       () =>
@@ -255,19 +265,45 @@ export function Schedules() {
       <Notice action={a} />
       <PageError error={r.error} />
       {r.loading && <p className="operations-loading" role="status">Loading schedules...</p>}
-      {items(r.data).map((s) => (
-        <Card key={s.id} className="operations-record schedule-record">
-          <div className="toolbar operations-record-heading">
-            <h3>{s.name}</h3>
-            <span className={`badge ${s.is_processing ? 'operations-status-pending' : s.is_active ? 'operations-status-success' : ''}`}>
-              {s.is_processing
-                ? "Processing"
-                : s.is_active
-                ? "Active"
-                : "Disabled"}
-            </span>
-            <span className="schedule-summary">{describeSchedule(Object.fromEntries(['minute','hour','day_of_month','month','day_of_week'].map(key=>[key,s.cron?.[key]??s['cron_'+key]??'*'])) as ScheduleCron)}</span>
-            <div className="actions">
+      <div className="schedule-list">
+      {items(r.data).map((s) => {
+        const tasks = items(s.relationships?.tasks || s.tasks);
+        const first = tasks[0];
+        const Icon = first?.action === "backup" ? Archive : first?.action === "power" ? Power : Terminal;
+        const action = first?.action === "backup" ? "Backup" : first?.action === "power" ? `${String(first.payload).charAt(0).toUpperCase()}${String(first.payload).slice(1)}` : first?.action === "command" ? "Command" : "No tasks";
+        const timing = describeSchedule(Object.fromEntries(['minute','hour','day_of_month','month','day_of_week'].map(key=>[key,s.cron?.[key]??s['cron_'+key]??'*'])) as ScheduleCron);
+        return <Collapsible key={s.id} className="schedule-entry">
+          <div className="schedule-line">
+            <CollapsibleTrigger className="schedule-open" aria-label={`Manage ${s.name}`}>
+              <span className="schedule-icon"><Icon size={18} strokeWidth={1.6} /></span>
+              <span className="schedule-identity"><strong>{s.name}</strong><span>{action}{tasks.length > 1 ? ` + ${tasks.length - 1} more` : ""}</span></span>
+              <span className="schedule-when">{timing}</span>
+              <span className={`schedule-state ${s.is_active ? "is-active" : ""}`}><i />{s.is_processing ? "Running" : s.is_active ? "Active" : "Paused"}</span>
+              <ChevronRight size={16} className="schedule-arrow" />
+            </CollapsibleTrigger>
+                <div className="actions schedule-row-actions">
+              {can(permissions, "schedule.update") && (
+                <Button
+                  variant="secondary"
+                  disabled={a.busy || s.is_processing}
+                  aria-busy={runFeedback?.id === s.id && runFeedback?.state === 'pending'}
+                  onClick={async () => {
+                    setRunFeedback({id:s.id,state:'pending'});
+                    let accepted = false;
+                    await a.run(() => api(`${base}/schedules/${s.id}/execute`, json("POST")), () => {
+                      accepted = true;
+                      r.reload();
+                      a.setSuccess(`${s.name}: execution requested.`);
+                      setRunFeedback({id:s.id,state:'success'});
+                    });
+                    if (!accepted) setRunFeedback(null);
+                  }}
+                >
+                  {runFeedback?.id === s.id && <ButtonFeedback state={runFeedback?.state ?? 'idle'}><span /></ButtonFeedback>}
+                  {runFeedback?.id === s.id ? runFeedback?.state === 'pending' ? 'Requesting...' : 'Requested' : 'Run now'}
+                </Button>
+              )}
+
               {can(permissions, "schedule.update") && (
                 <Button
                   variant="secondary"
@@ -289,25 +325,7 @@ export function Schedules() {
                     })
                   }
                 >
-                  Edit schedule
-                </Button>
-              )}
-              {can(permissions, "schedule.update") && (
-                <Button
-                  variant="secondary"
-                  disabled={a.busy || s.is_processing}
-                  onClick={() =>
-                    a.run(
-                      () =>
-                        api(`${base}/schedules/${s.id}/execute`, json("POST")),
-                      () => {
-                        r.reload();
-                        a.setSuccess("Schedule execution requested.");
-                      }
-                    )
-                  }
-                >
-                  Run now
+                  Edit
                 </Button>
               )}
               {can(permissions, "schedule.delete") && (
@@ -325,79 +343,9 @@ export function Schedules() {
                   Delete
                 </Button>
               )}
-            </div>
-          </div>
-          <p className="muted">
-            Last run: {date(s.last_run_at)} · Next run: {date(s.next_run_at)}
-            {s.only_when_online ? " · Only when online" : ""}
-          </p>
-          <Disclosure className="schedule-rule-details"><DisclosureTrigger>Advanced timing</DisclosureTrigger><code>{['minute','hour','day_of_month','month','day_of_week'].map(key=>s.cron?.[key]??s['cron_'+key]??'*').join(' ')}</code><span className="muted"> {"\u00b7"} Panel timezone</span></Disclosure>
-          <div className="table-wrap operations-table schedule-tasks">
-            <MiraTable className="table">
-              <MiraTableHeader>
-                <MiraTableRow>
-                  <MiraTableHead>Order</MiraTableHead>
-                  <MiraTableHead>Action</MiraTableHead>
-                  <MiraTableHead>Payload</MiraTableHead>
-                  <MiraTableHead>Delay</MiraTableHead>
-                  <MiraTableHead>Failure behavior</MiraTableHead>
-                  <MiraTableHead>Actions</MiraTableHead>
-                </MiraTableRow>
-              </MiraTableHeader>
-              <MiraTableBody>
-                {items(s.relationships?.tasks || s.tasks)
-                  .sort((a, b) => a.sequence_id - b.sequence_id)
-                  .map((t) => (
-                    <MiraTableRow key={t.id}>
-                      <MiraTableCell>{t.sequence_id}</MiraTableCell>
-                      <MiraTableCell>
-                        {t.action}
-                        {t.is_queued && <span className="badge">Queued</span>}
-                      </MiraTableCell>
-                      <MiraTableCell>
-                        <pre>{t.payload}</pre>
-                      </MiraTableCell>
-                      <MiraTableCell>{t.time_offset}s</MiraTableCell>
-                      <MiraTableCell>
-                        {t.continue_on_failure ? "Continue" : "Stop schedule"}
-                      </MiraTableCell>
-                      <MiraTableCell>
-                        {can(permissions, "schedule.update") && (
-                          <div className="actions">
-                            <Button
-                              variant="secondary"
-                              onClick={() =>
-                                setTask({ ...t, schedule_id: s.id })
-                              }
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="danger"
-                              disabled={a.busy}
-                              onClick={async () => {
-                                if (await confirmAction({title:"Delete task?",description:"This task will be removed from the schedule.",confirmLabel:"Delete task",danger:true}))
-                                  a.run(
-                                    () =>
-                                      api(
-                                        `${base}/schedules/${s.id}/tasks/${t.id}`,
-                                        json("DELETE")
-                                      ),
-                                    r.reload
-                                  );
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        )}
-                      </MiraTableCell>
-                    </MiraTableRow>
-                  ))}
-              </MiraTableBody>
-            </MiraTable>
-          </div>
-          {can(permissions, "schedule.update") && (
+                </div>          </div>
+          <CollapsibleContent className="schedule-editor">
+            <div className="schedule-editor-heading"><strong>Tasks in this schedule</strong>          {can(permissions, "schedule.update") && (
             <Button
               variant="secondary"
               onClick={() =>
@@ -413,8 +361,45 @@ export function Schedules() {
               Add task
             </Button>
           )}
-        </Card>
-      ))}
+</div>
+          <div className="schedule-compact-tasks">
+            {items(s.relationships?.tasks || s.tasks).sort((a,b)=>a.sequence_id-b.sequence_id).map(t=>(
+              <div className="schedule-compact-task" key={t.id}>
+                <span className="muted">{t.sequence_id}</span>
+                <div className="schedule-compact-task-label">
+                  <span>{t.action === "backup" ? "Create backup" : t.action === "power" ? `${String(t.payload).charAt(0).toUpperCase()}${String(t.payload).slice(1)} server` : "Send command"}</span>
+                  {t.payload && t.action !== "power" && <pre>{t.payload}</pre>}
+                  {Number(t.time_offset)>0 && <span className="muted">After {t.time_offset}s</span>}
+                  {t.continue_on_failure && <span className="muted">Continue on failure</span>}
+                  {t.is_queued && <span className="badge">Queued</span>}
+                </div>
+                        {can(permissions, "schedule.update") && (
+                          <div className="actions">
+                            <Button
+                              variant="secondary"
+                              onClick={() =>
+                                setTask({ ...t, schedule_id: s.id })
+                              }
+                            >
+                              Edit
+                            </Button>
+
+                          </div>
+                        )}
+              </div>
+            ))}
+          </div>
+              <div className="schedule-compact-settings">
+                <div className="schedule-run-info">
+                  <span>{s.last_run_at ? `Last run: ${date(s.last_run_at)}` : "This schedule has never run"}</span>
+                  {s.only_when_online && <span>Only runs while the server is online</span>}
+                </div>
+
+              </div>
+          </CollapsibleContent>
+        </Collapsible>;
+      })}
+      </div>
       {!r.loading && !items(r.data).length && (
         <Card className="operations-empty">
           No schedules configured. Add a schedule to automate commands, power
@@ -545,9 +530,16 @@ export function Schedules() {
               checked={task.continue_on_failure}
               onChange={(v) => setTask({ ...task, continue_on_failure: v })}
             />
+            <div className="actions schedule-task-form-actions">
             <Button type="submit" disabled={a.busy}>
               Save task
             </Button>
+              {task.id && <Button variant="danger" disabled={a.busy} onClick={async () => {
+                if (await confirmAction({title:"Delete task?", description:"This task will be removed from the schedule.", confirmLabel:"Delete task", danger:true})) {
+                  a.run(() => api(`${base}/schedules/${task.schedule_id}/tasks/${task.id}`, json("DELETE")), () => { r.reload(); setTask(null); });
+                }
+              }}>Delete task</Button>}
+            </div>
           </form>
         </Modal>
       )}

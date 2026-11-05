@@ -11,14 +11,14 @@ import {
 } from "../admin/servers";
 import {useSearchParams} from 'react-router-dom';
 import {settingsTab,settingsTabSearch} from './settingsNavigation';
-import {Settings} from './Operations';
+import {Settings,Network} from './Operations';
 import ServerStartup from "./ServerStartup";
 import { can, useServer } from "./common";
 import {Switch,SettingsRow,SettingsSection,SettingsLayout} from '../ui/Settings';
 import "./serverAdminTools.css";
 
 const tabs = [
-  ["general", "General"], ["runtime", "Startup"], ["limits", "Resources"], ["mounts", "Mounts"],
+  ["general", "General"], ["network", "Network"], ["runtime", "Startup"], ["limits", "Resources"], ["mounts", "Mounts"],
   ["configuration", "Advanced"], ["manage", "Transfer"],
 ] as const;
 
@@ -109,32 +109,34 @@ export default function ServerAdminTools() {
 function ClientRuntimeTools() {
   const {permissions} = useServer();
   const [search,setSearch] = useSearchParams();
-  const allowed=can(permissions,'startup.read')?['general','runtime']:['general'];
+  const clientTabs: [string,string][]=[['general','General'],...(can(permissions,'allocation.read')?[["network","Network"] as [string,string]]:[]),...(can(permissions,'startup.read')?[["runtime","Startup"] as [string,string]]:[])];
+  const allowed=clientTabs.map(([id])=>id);
   const active=settingsTab(search,allowed);
   return <section className="server-admin-tools settings-responsive" aria-label="Server settings">
-    <ServerSettingsTabs scope="client-runtime" tabs={[["general", "General"], ...(can(permissions,'startup.read')?[["runtime", "Startup"] as [string,string]]:[])]} active={active} onChange={tab=>{if(tab!==active)setSearch(settingsTabSearch(search,tab),{preventScrollReset:true})}}/>
+    <ServerSettingsTabs scope="client-runtime" tabs={clientTabs} active={active} onChange={tab=>{if(tab!==active)setSearch(settingsTabSearch(search,tab),{preventScrollReset:true})}}/>
     <section role="tabpanel" id={`client-runtime-panel-${active}`} aria-labelledby={`client-runtime-tab-${active}`} tabIndex={0}>
-      {active === 'general' ? <Settings/> : <ServerStartup section="runtime"/>}
+      {active === 'general' ? <Settings/> : active === 'network' ? <Network/> : <ServerStartup section="runtime"/>}
     </section>
   </section>;
 }
 
 function AuthorizedServerTools({ serverID }: { serverID: number }) {
-  const { reload } = useServer();
-  const query = useAPI(`/api/application/servers/${serverID}?include=allocations,variables,user,node,egg`);
+  const { reload, permissions } = useServer();
   const [search,setSearch] = useSearchParams();
-  const active=settingsTab(search,tabs.map(([id])=>id));
+  const visibleTabs=tabs.filter(([id])=>id!=='network'||can(permissions,'allocation.read'));
+  const active=settingsTab(search,visibleTabs.map(([id])=>id));
+  const query = useAPI(active==='network'?null:`/api/application/servers/${serverID}?include=allocations,variables,user,node,egg`);
   const record = query.data ? unwrap(query.data) : null;
   const scope = `server-admin-${serverID}`;
   const saved = () => { query.reload(); reload(); };
   return <section className="server-admin-tools settings-responsive" aria-label="Server settings">
     <ErrorBox>{query.error}</ErrorBox>
     {query.error && <Button variant="secondary" onClick={()=>{query.reload();reload();}}>Retry</Button>}
-    <ServerSettingsTabs scope={scope} tabs={tabs} active={active} onChange={tab => {
+    <ServerSettingsTabs scope={scope} tabs={visibleTabs} active={active} onChange={tab => {
       // The shared route blocker handles dirty drafts for clicks and Back/Forward.
       if(tab!==active)setSearch(settingsTabSearch(search,tab),{preventScrollReset:true});
     }} />
-    {query.loading && !record ? <Loading /> : query.error ? null : record && serverAdminID(record.id) !== serverID
+    {active==='network' ? <section key={active} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}><Network/></section> : query.loading && !record ? <Loading /> : query.error ? null : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
       : record && <section key={active} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
         {active === "general" && <>

@@ -142,16 +142,26 @@ func (a *App) mcContentInfo(ctx context.Context, s M) (mcContentInfo, string, er
 	if err != nil {
 		return mcContentInfo{}, "", err
 	}
+	info, reason := mcContentEnvironmentRows(rows, "value")
+	return info, reason, nil
+}
+
+// Use the same environment rules for catalog requests and server navigation.
+func mcContentEnvironmentRows(rows []M, valueKey string) (mcContentInfo, string) {
 	env := M{}
 	for _, row := range rows {
 		name := str(row["env_variable"])
-		if old, ok := env[name]; ok && old != row["value"] {
-			return mcContentInfo{}, "This egg has conflicting Minecraft variables.", nil
+		switch name {
+		case "MINECRAFT_VERSION", "MINECRAFT_LOADER", "MINECRAFT_LOADER_VERSION", "MC_VERSION", "DL_VERSION", "LOADER_VERSION", "FORGE_VERSION", "NEOFORGE_VERSION", "ARCLIGHT_LOADER":
+		default:
+			continue
 		}
-		env[name] = row["value"]
+		if old, ok := env[name]; ok && old != row[valueKey] {
+			return mcContentInfo{}, "This egg has conflicting Minecraft variables."
+		}
+		env[name] = row[valueKey]
 	}
-	info, reason := mcContentEnvironment(env)
-	return info, reason, nil
+	return mcContentEnvironment(env)
 }
 
 func (a *App) mcContentProvider(ctx context.Context, name string) (mcContentProvider, error) {

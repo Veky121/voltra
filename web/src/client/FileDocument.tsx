@@ -10,6 +10,7 @@ import {decodeEditorFile,isBinaryText} from './editorLanguages';
 import {commitDraft,discardDraft,isDraftDirty,loadedDraft} from './fileDraft';
 import {EDIT_LIMIT,VIEW_CHUNK,mixedNewlines,previewKind,readBounded,responseSize} from './fileDocumentSupport';
 import './fileDocument.css';
+import FileEditorBoundary from './FileEditorBoundary';
 const FileEditor=lazy(()=>import('./FileEditor'));
 type Props={base:string;path:string;permissions:string[];onClose:()=>void;onDelete?:()=>void;deleting?:boolean;onDirtyChange?:(dirty:boolean)=>void;navigationGuard:{attention:number;bar:RefObject<HTMLDivElement|null>}};
 
@@ -115,7 +116,7 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
     {loading?<p role="status">Opening file...</p>:opened&&readable&&<>
       {kind==='text'&&<>
         {mixed&&<p className="file-document-notice">This file mixes newline formats. Preview is read only to preserve its bytes. Download it to edit without converting line endings.</p>}
-        <Suspense fallback={<p role="status">Loading editor...</p>}><FileEditor key={draft.revision} path={path} storageKey={base} content={draft.content} dirty={dirty} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense>
+        <FileEditorBoundary key={draft.revision} path={path} content={draft.content} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}><Suspense fallback={<p role="status">Loading editor...</p>}><FileEditor key={draft.revision} path={path} storageKey={base} content={draft.content} dirty={dirty} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense></FileEditorBoundary>
       </>}
       {kind==='image'&&<div className="file-document-media"><img src={preview} alt={path.split('/').at(-1)} onError={()=>setNotice('Your browser could not display this image. Download it to open it in another application.')}/></div>}
       {kind==='audio'&&<audio className="file-document-player" controls preload="metadata" src={preview} onError={()=>setNotice('Your browser does not support this audio format. Download it to use another player.')}/>}

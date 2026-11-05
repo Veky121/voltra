@@ -18,6 +18,7 @@ export function configSyntax(kind:string):StreamParser<{blockComment:boolean;quo
       if(stream.match('/*')){state.blockComment=true;return 'comment'}
       if(stream.match('//')||stream.match('#')){stream.skipToEnd();return 'comment'}
       if(stream.match('"""')){state.quote='"""';return 'string'}
+      if(kind==='hjson'&&stream.match("'''")){state.quote="'''";return 'string'}
       const quote=stream.peek();
       if(quote==='"'||quote==="'"){
         stream.next();

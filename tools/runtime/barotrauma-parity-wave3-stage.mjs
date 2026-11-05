@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+const recipe = 'barotrauma/egg-barotrauma.json';
+const canonical = JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const profile = structuredClone(canonical[recipe]);
+const wrapper = fs.readFileSync('internal/panel/game_library/scripts/barotrauma-file-authority.py', 'utf8');
+if (!profile.egg.startup.includes('.voltra/barotrauma_runtime.py')) throw Error('Unexpected startup');
+profile.egg.startup = profile.egg.startup.replace('.voltra/barotrauma_runtime.py', '.voltra/barotrauma_file_authority.py');
+profile.egg.scripts.installation.script += `\ncat > .voltra/barotrauma_file_authority.py <<'VOLTRA_BAROTRAUMA_AUTHORITY'\n${wrapper}\nVOLTRA_BAROTRAUMA_AUTHORITY\n`;
+profile.revision += '-file-authority-wave3';
+profile.verification = 'not_verified';
+profile.detail = 'Offline native file-authority preparation only; current-campaign native and player acceptance incomplete.';
+profile.settings_documents = {...profile.settings_documents, '/serversettings.xml': 'xml'};
+profile.setup_steps.push('Native XML name, player limit, listing and password take precedence after initial creation. Allocated ports remain runtime-owned. Typed XML editor integration is pending.');
+if (JSON.stringify(profile.egg.variables) !== JSON.stringify(canonical[recipe].egg.variables)) throw Error('Variable rows changed');
+const output = 'artifacts/game-parity-20261029/barotrauma-wave3-profile.json';
+fs.writeFileSync(output, JSON.stringify({[recipe]: profile}, null, 2) + '\n');
+console.log(JSON.stringify({output, variables: profile.egg.variables.length}));

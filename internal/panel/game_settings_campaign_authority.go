@@ -87,7 +87,7 @@ func integratedScalarDocument(egg M, file string) bool {
 // Admission uses supported Wings parent/leaf checks and reads. It does not
 // attest the interpreter or serialize independent SFTP/file writers.
 func campaignParserRecipe(egg M) string {
-	for _, r := range []string{starmadeSettingsRecipe, coreKeeperSettingsRecipe, necesseSettingsRecipe, valheimPlusSettingsRecipe, bepinexLoggingRecipe, urbanTerrorSettingsRecipe, srb2SettingsRecipe, "brickadia/egg-brickadia.json", "among_us/bettercrewlink_server/egg-better-crewlink-server.json", "among_us/impostor_server/egg-among-us--impostor-server.json", archeanRepairRecipe, "beamng/beammp/egg-beam-m-p-server.json", "beamng/kissmp/egg-kissmp.json", assettoVanillaRecipe, assettoAIRecipe, tshockAuthorityRecipe, tshockLegacyAuthorityRecipe, conanAuthorityRecipe, cs2AuthorityRecipe, hl2dmSettingsRecipe, fiveMRecipe, "arma/arma3/egg-arma3.json", reforgerSettingsRecipe, "gta/openmp/egg-open-m-p.json", "gta/mtasa/egg-multi-theft-auto.json", "rimworld/open_world/egg-rimworld-open-world.json", "rimworld/together/egg-rimworld-together.json", kspLMPRecipe, nuclearRecipe, solaceSettingsRecipe, nzPortableSettingsRecipe, vrisingSettingsRecipe, gtacSettingsRecipe, clusterioSettingsRecipe, kspDMPRecipe, dstSettingsRecipe, "openrct2/egg-openrct2.json", ragecoopRecipe, romesteadSettingsRecipe, enshroudedSettingsRecipe, projectZomboidSettingsRecipe, groundBranchSettingsRecipe, mordhauLinuxSettingsRecipe, kf2SettingsRecipe, veinSettingsRecipe, jc3SettingsRecipe, plainsSettingsRecipe, frozenflameSettingsRecipe, iosoccerSettingsRecipe, onsetSettingsRecipe, wurmSettingsRecipe, ohdSettingsRecipe, "renown/egg-renown.json", "holdfast/egg-holdfast-na-w.json", hurtworldSettingsRecipe, "longvinter/egg-longvinter.json", aapgSettingsRecipe, sandstormSettingsRecipe, "humanitz/egg-humanit-z.json", abioticSettingsRecipe, astrocolonySettingsRecipe, "Aska/egg-aska.json", avorionSettingsRecipe, carrierAuthorityRecipe, "puck/egg-puck.json", rustStagingSettingsRecipe, unturnedSettingsRecipe, tf2SettingsRecipe, gmodSettingsRecipe, nmrihSettingsRecipe, ss14SettingsRecipe, stationeersBepinexRecipe, stationeersVanillaRecipe, bedrockVanillaRecipe, risingUnityRecipe, "the_isle/evrima/egg-the-isle.json", "the_forest/egg-the-forest.json", "subnautica_nitrox_mod/egg-subnautica.json", "voyagers_of_nera/egg-voyagers-of-nera.json", "squad/egg-squad.json", starboundAuthorityRecipe, "truck-simulator/american-truck-simulator/egg-american-truck-simulator-dedicated-server.json", "truck-simulator/euro-truck-simulator2/egg-euro-truck-simulator2-dedicated-server.json"} {
+	for _, r := range []string{zandronumSettingsRecipe, starmadeSettingsRecipe, coreKeeperSettingsRecipe, necesseSettingsRecipe, valheimPlusSettingsRecipe, bepinexLoggingRecipe, urbanTerrorSettingsRecipe, srb2SettingsRecipe, "brickadia/egg-brickadia.json", "among_us/bettercrewlink_server/egg-better-crewlink-server.json", "among_us/impostor_server/egg-among-us--impostor-server.json", archeanRepairRecipe, "beamng/beammp/egg-beam-m-p-server.json", "beamng/kissmp/egg-kissmp.json", assettoVanillaRecipe, assettoAIRecipe, tshockAuthorityRecipe, tshockLegacyAuthorityRecipe, conanAuthorityRecipe, cs2AuthorityRecipe, hl2dmSettingsRecipe, fofSettingsRecipe, fiveMRecipe, "arma/arma3/egg-arma3.json", reforgerSettingsRecipe, "gta/openmp/egg-open-m-p.json", "gta/mtasa/egg-multi-theft-auto.json", "rimworld/open_world/egg-rimworld-open-world.json", "rimworld/together/egg-rimworld-together.json", kspLMPRecipe, nuclearRecipe, solaceSettingsRecipe, nzPortableSettingsRecipe, vrisingSettingsRecipe, gtacSettingsRecipe, clusterioSettingsRecipe, kspDMPRecipe, dstSettingsRecipe, "openrct2/egg-openrct2.json", ragecoopRecipe, romesteadSettingsRecipe, enshroudedSettingsRecipe, projectZomboidSettingsRecipe, groundBranchSettingsRecipe, mordhauLinuxSettingsRecipe, kf2SettingsRecipe, veinSettingsRecipe, jc3SettingsRecipe, plainsSettingsRecipe, frozenflameSettingsRecipe, iosoccerSettingsRecipe, onsetSettingsRecipe, wurmSettingsRecipe, ohdSettingsRecipe, "renown/egg-renown.json", "holdfast/egg-holdfast-na-w.json", hurtworldSettingsRecipe, "longvinter/egg-longvinter.json", aapgSettingsRecipe, sandstormSettingsRecipe, "humanitz/egg-humanit-z.json", abioticSettingsRecipe, astrocolonySettingsRecipe, "Aska/egg-aska.json", avorionSettingsRecipe, carrierAuthorityRecipe, "puck/egg-puck.json", rustStagingSettingsRecipe, unturnedSettingsRecipe, tf2SettingsRecipe, gmodSettingsRecipe, nmrihSettingsRecipe, ss14SettingsRecipe, stationeersBepinexRecipe, stationeersVanillaRecipe, bedrockVanillaRecipe, risingUnityRecipe, "the_isle/evrima/egg-the-isle.json", "the_forest/egg-the-forest.json", "subnautica_nitrox_mod/egg-subnautica.json", "voyagers_of_nera/egg-voyagers-of-nera.json", "squad/egg-squad.json", starboundAuthorityRecipe, "truck-simulator/american-truck-simulator/egg-american-truck-simulator-dedicated-server.json", "truck-simulator/euro-truck-simulator2/egg-euro-truck-simulator2-dedicated-server.json"} {
 		if nativeSettingsIsRecipe(egg, r) {
 			return r
 		}
@@ -180,6 +180,16 @@ func (a *App) prepareCampaignParserAuthority(ctx context.Context, s, egg M) erro
 	in := settingsAuthorityInput{Startup: str(s["startup"]), Env: env, Files: semanticFiles}
 	var authority settingsPathAuthority
 	switch recipe {
+	case zandronumSettingsRecipe:
+		if in.Startup != zandronumSettingsStartup || str(egg["startup"]) != zandronumSettingsStartup || !zandronumSourceHelpers(files) {
+			return notFound()
+		}
+		for _, key := range []string{"VOLTRA_SERVER_ROOT", "HOME", "PYTHONHOME", "LD_LIBRARY_PATH", "OTHER_ARGS", "SERVER_ARGS", "STARTUP_ARGS"} {
+			if env[key] != "" {
+				return notFound()
+			}
+		}
+		authority = settingsAuthorityResult(zandronumSettingsPath, in.Startup)
 	case starmadeSettingsRecipe:
 		data, exists, e := a.quickSetupRead(ctx, s, starmadeSettingsPath)
 		if e != nil {
@@ -887,7 +897,7 @@ func (a *App) prepareCampaignParserAuthority(ctx context.Context, s, egg M) erro
 		authority = settingsAuthorityResult(hl2dmSettingsPath, in.Startup)
 	case cs2AuthorityRecipe:
 		authority, err = cs2CurrentSettingsAuthority(in)
-	case tf2SettingsRecipe, gmodSettingsRecipe, nmrihSettingsRecipe:
+	case tf2SettingsRecipe, gmodSettingsRecipe, nmrihSettingsRecipe, fofSettingsRecipe:
 		file, app, game := tf2SettingsPath, "232250", "tf"
 		if recipe == gmodSettingsRecipe {
 			file, app, game = gmodSettingsPath, "4020", "garrysmod"
@@ -895,8 +905,36 @@ func (a *App) prepareCampaignParserAuthority(ctx context.Context, s, egg M) erro
 				return notFound()
 			}
 		}
-		if recipe == nmrihSettingsRecipe {
-			file, app, game = nmrihSettingsPath, "317670", "nmrih"
+		if recipe == fofSettingsRecipe {
+			if in.Startup != fofSettingsStartup || !fofSourceHelpers(files) {
+				return notFound()
+			}
+			for _, key := range []string{"VOLTRA_SERVER_ROOT", "HOME", "PYTHONHOME", "LD_LIBRARY_PATH", "OTHER_ARGS", "SERVER_ARGS", "STARTUP_ARGS"} {
+				if env[key] != "" {
+					return notFound()
+				}
+			}
+			for _, name := range []string{"banned_user.cfg", "banned_ip.cfg"} {
+				file := "/fof/cfg/" + name
+				body, exists, readErr := a.quickSetupRead(ctx, s, file)
+				if readErr != nil {
+					return readErr
+				}
+				if exists && !fofBanDataSafe(body, name == "banned_ip.cfg") {
+					return notFound()
+				}
+				if exists {
+					files[file] = body
+				} else {
+					files[file] = []byte("missing")
+				}
+			}
+			file, app, game = fofSettingsPath, "295230", "fof"
+		}
+		if recipe == nmrihSettingsRecipe || recipe == fofSettingsRecipe {
+			if recipe == nmrihSettingsRecipe {
+				file, app, game = nmrihSettingsPath, "317670", "nmrih"
+			}
 			// The installed wave413 helper reserves explicit roles first, then
 			// fills zero-valued client/TV roles from remaining allocated ports.
 			used := map[string]bool{}
@@ -909,7 +947,7 @@ func (a *App) prepareCampaignParserAuthority(ctx context.Context, s, egg M) erro
 				used[port] = true
 			}
 			primary := strconv.FormatInt(num(asMap(asMap(config["allocations"])["default"])["port"]), 10)
-			if len(ports) < 3 || !used[primary] {
+			if len(ports) < 3 || !used[primary] || recipe == fofSettingsRecipe && !fofPrimaryPortMatches(env, primary) {
 				return notFound()
 			}
 			roles := map[string]bool{primary: true}
@@ -929,7 +967,11 @@ func (a *App) prepareCampaignParserAuthority(ctx context.Context, s, egg M) erro
 				}
 			}
 			binding, _ := json.Marshal([]any{primary, ports, env["SRCDS_CPORT"], env["SRCDS_STV"]})
-			files["nmrih-allocation-binding"] = binding
+			if recipe == fofSettingsRecipe {
+				files["fof-allocation-binding"] = binding
+			} else {
+				files["nmrih-allocation-binding"] = binding
+			}
 		}
 		if env["SRCDS_APPID"] != app || env["SRCDS_GAME"] != "" && env["SRCDS_GAME"] != game {
 			return notFound()

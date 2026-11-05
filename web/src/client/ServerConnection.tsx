@@ -1,15 +1,13 @@
-import {useEffect,useState} from 'react';
-import {Link} from 'react-router-dom';
+import {useEffect} from 'react';
 import {RefreshCw} from 'lucide-react';
 import {CopyButton} from '../ui/CopyButton';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {SettingsSection} from '../ui/Settings';
 import {useTransientMessage} from '../hooks/useTransientMessage';
-import {Button,Modal,useAPI} from '../lib';
+import {Button,useAPI} from '../lib';
 import {can,items,useServer,value} from './common';
 import {connectionAddress as address,connectionDNS} from './connectionAddress';
-import {useServerTelemetry} from './ServerDashboard';
 import './serverConnection.css';
 
 function useConnectionInfo(domainQuery?:ReturnType<typeof useAPI>){
@@ -42,25 +40,14 @@ export function ConnectionOverview({domainQuery}:{domainQuery:ReturnType<typeof 
 }
 
 export function ServerConnection(){
- const info=useConnectionInfo(),telemetry=useServerTelemetry();
- const {server,permissions,query,subdomain,primary,routes,connection,dnsAddress}=info;
- const [details,setDetails]=useState(false),[copyError,setCopyError]=useTransientMessage(5000);
+ const {routes,connection,dnsAddress}=useConnectionInfo();
+ const [copyError,setCopyError]=useTransientMessage(5000);
  return <div className="server-connection">
   <div className="server-connection-summary"><div className="server-connection-addresses">
    <div><span className="server-meta-label">{routes.length?'Proxy:':'IP:'}</span>{connection?<CopyButton value={connection} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy address; reachability is not verified"/>:<span>Not assigned</span>}</div>
    <div><span className="server-meta-label">DNS:</span>{dnsAddress?<CopyButton value={dnsAddress} onCopyError={setCopyError} className="button secondary server-connection-address" title="Copy DNS address"/>:<span className="muted">Not configured</span>}</div>
-  </div><Button variant="secondary" className="server-connection-more" onClick={()=>setDetails(true)}>Connections</Button></div>
+  </div></div>
   {copyError&&<span className="server-connection-feedback" role="alert">{copyError}</span>}
-  {details&&<Modal title="Connections" onClose={()=>setDetails(false)}><div className="server-connection-details">
-   <dl><dt>Game process</dt><dd>{!can(permissions,'control.console')?'Unavailable':telemetry.error?'Unavailable':!telemetry.updated?'Checking':telemetry.state==='running'?'Running':telemetry.state.replaceAll('_',' ')}</dd>
-   <dt>Forwarding</dt><dd>{!info.readable?'Unavailable':query.error?'Unavailable':query.loading?'Checking':routes.some(r=>r.status==='applied')?'Applied':routes.length?'Pending':'Direct'}</dd>
-   <dt>Game reachability</dt><dd>Not checked</dd></dl>
-   {info.readable&&<Link className="button secondary" to={`/server/${server.identifier||server.uuid}/settings/network`} onClick={()=>setDetails(false)}>Configure connections</Link>}
-   <Disclosure className="connection-details"><DisclosureTrigger>Details</DisclosureTrigger>
-    <p>Process status and saved routes do not prove that players can join.</p>
-    <dl><dt>Node address</dt><dd>{primary?address(primary.ip,primary.port):'Not assigned'}</dd>{routes.map(route=><div className="server-connection-row" key={route.id}><dt>{String(route.protocol).toUpperCase()}</dt><dd><CopyButton value={address(route.public_host,route.public_port)} onCopyError={setCopyError}/></dd></div>)}<dt>Server ID</dt><dd><CopyButton value={server.uuid} onCopyError={setCopyError}/></dd><dt>Node</dt><dd>{server.node}</dd></dl>
-    <Button variant="secondary" disabled={query.loading||subdomain.loading} onClick={()=>{if(info.readable){query.reload();subdomain.reload()}if(can(permissions,'control.console'))telemetry.refresh()}}>Refresh records</Button>
-   </Disclosure>
-  </div></Modal>}
+
  </div>;
 }

@@ -265,6 +265,12 @@ func gameSettingsDiscoveryFormat(egg M, file string) string {
 	return gameSettingsFormat(file)
 }
 func parseDiscoveredGameSettings(egg M, file string, data []byte) (gameSettingsParsed, error) {
+	if nativeSettingsIsRecipe(egg, zandronumSettingsRecipe) {
+		if file != zandronumSettingsPath || !campaignParserPathAllowed(egg, file) {
+			return gameSettingsParsed{}, notFound()
+		}
+		return parseZandronumSettings(data)
+	}
 	if nativeSettingsIsRecipe(egg, starmadeSettingsRecipe) {
 		if file != starmadeSettingsPath || !campaignParserPathAllowed(egg, file) {
 			return gameSettingsParsed{}, notFound()
@@ -521,7 +527,7 @@ func parseDiscoveredGameSettings(egg M, file string, data []byte) (gameSettingsP
 		}
 	}
 
-	if recipe := campaignParserRecipe(egg); recipe == tf2SettingsRecipe || recipe == gmodSettingsRecipe || recipe == nmrihSettingsRecipe {
+	if recipe := campaignParserRecipe(egg); recipe == tf2SettingsRecipe || recipe == gmodSettingsRecipe || recipe == nmrihSettingsRecipe || recipe == fofSettingsRecipe {
 		if file == "" || file != str(egg["_campaign_parser_path"]) {
 			return gameSettingsParsed{}, notFound()
 		}
@@ -529,6 +535,8 @@ func parseDiscoveredGameSettings(egg M, file string, data []byte) (gameSettingsP
 		var err error
 		if recipe == tf2SettingsRecipe {
 			parsed, err = parseTF2Settings(data)
+		} else if recipe == fofSettingsRecipe {
+			parsed, err = parseFoFSettings(data)
 		} else if recipe == nmrihSettingsRecipe {
 			parsed, err = parseNMRiHSettings(data)
 		} else {

@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+const recipe='minecraft/bedrock/bedrock/egg-vanilla-bedrock-ARM64.json';
+const profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+let profile=structuredClone(profiles[recipe]);
+if(profile?.revision?.startsWith('wave15-')) profile=JSON.parse(fs.readFileSync('artifacts/game-parity-20261029/root-wave15-source-integration/baseline-overrides.json','utf8'))[recipe];
+if(!profile)throw Error('Exact integrated profile missing');
+const source=fs.readFileSync('internal/panel/game_library/scripts/bedrock-arm-owner.py','utf8');
+const marker='python3 .voltra/bundle_debian_python.py';
+if(!profile.egg.scripts.installation.script.includes(marker))throw Error('Installer integration point changed');
+profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.replace(marker,`cat > .voltra/bedrock_arm_owner.py <<'VOLTRA_ARM_OWNER'\n${source}\nVOLTRA_ARM_OWNER\n${marker}`).replace('bedrock_family.py install bds_arm','bedrock_arm_owner.py install');
+profile.egg.startup=profile.egg.startup.replace('bedrock_family.py run bds_arm','bedrock_arm_owner.py run');
+profile.revision='bedrock-arm-owner-source-v1';
+const output='artifacts/game-parity-20261029/bedrock-arm-owner/profile.pending.json';
+fs.writeFileSync(output,JSON.stringify({[recipe]:profile},null,2)+'\n');
+console.log(output);

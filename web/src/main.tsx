@@ -22,10 +22,8 @@ const stopErrorObserver=observeBrowserErrors();
 if(import.meta.hot)import.meta.hot.dispose(stopErrorObserver);
 const desktop=import.meta.env.VITE_DESKTOP==='true';
 if(desktop)document.body.classList.add('voltra-desktop');
-async function mount(){
- // Vite removes this branch and its dynamic import from production builds.
- if(import.meta.env.DEV&&!desktop)await (await import('./dev/demo')).initializeDevPreview();
+function mount(){
  const router=createBrowserRouter([{path:'*',element:<NotificationLayer><ConfirmActionLayer/><PendingSettings>{desktop?<DesktopGate><App/></DesktopGate>:<App/>}</PendingSettings></NotificationLayer>}]);
  ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><RouterProvider router={router}/></React.StrictMode>);
 }
-void mount();
+mount();

@@ -16,9 +16,9 @@
 .server-topbar[data-power-transition]{position:relative}
 :is(.server-topbar,.server-hero)[data-power-transition]{--power-line:#69dba5}
 :is(.server-topbar,.server-hero)[data-power-transition=restart]{--power-line:#82b5ff}
-:is(.server-topbar,.server-hero)[data-power-transition=stop]{--power-line:#f0bc62}
-:is(.server-topbar,.server-hero)[data-power-transition=kill]{--power-line:#f17b88}
-:is(.server-topbar,.server-hero)[data-power-transition]::after{content:"";position:absolute;pointer-events:none;z-index:2;bottom:0;left:12px;right:12px;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--power-line),transparent) -50% 0/35% 100% no-repeat;background-color:color-mix(in srgb,var(--power-line) 12%,transparent);animation:server-power-sweep 1.8s linear infinite}
+:is(.server-topbar,.server-hero)[data-power-transition=stop]{--power-line:#f17b88}
+:is(.server-topbar,.server-hero)[data-power-transition=kill]{--power-line:#ef4444}
+:is(.server-topbar,.server-hero)[data-power-transition]::after{content:"";position:absolute;pointer-events:none;z-index:2;bottom:0;left:0;right:0;height:3px;border-radius:0;background:linear-gradient(90deg,transparent,var(--power-line),transparent) -50% 0/35% 100% no-repeat;background-color:color-mix(in srgb,var(--power-line) 12%,transparent);animation:server-power-sweep 1.8s linear infinite}
 :is(.server-topbar,.server-hero)[data-power-paused=true]::after{animation-play-state:paused;opacity:.45}
 @keyframes server-power-sweep{from{background-position:-55% 0}to{background-position:155% 0}}
 @media(prefers-reduced-motion:reduce){:is(.server-topbar,.server-hero)[data-power-transition]::after{animation:none;background:var(--power-line);opacity:.7}}

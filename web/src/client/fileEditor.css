@@ -65,3 +65,7 @@
   .editor-find-field{flex-basis:100%}
   .editor-find-actions{flex-wrap:wrap;justify-content:flex-end}
 }
+
+.file-basic-editor{display:grid;gap:12px;padding:16px}
+.file-basic-editor p{margin:0;font-size:13px;color:var(--muted)}
+.file-basic-editor textarea{min-height:360px;height:calc(100dvh - 300px);resize:vertical;white-space:pre;font:13px/1.7 'IBM Plex Mono',monospace}

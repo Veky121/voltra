@@ -30,3 +30,15 @@ coverage.out
 coverage/
 .DS_Store
 Thumbs.db
+
+# Agent instructions and working notes stay local.
+AGENTS.md
+CONTRACT.md
+*_CONTRACT.md
+**/memory*.md
+**/MEMORY*.md
+**/*HANDOFF*.md
+**/*handoff*.md
+**/*-notes.md
+**/*.log
+*.pending

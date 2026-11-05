@@ -1,0 +1,34 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+const recipe='myth_of_empires/egg-myth-of-empires.json';
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe]);
+const original=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json')).entries.find(e=>e.path===recipe);
+assert.equal(profile.upstream_sha256,original.sha256);
+const base='internal/panel/game_library/scripts/', hashes={};
+let script=profile.egg.scripts.installation.script;
+for(const source of ['conan-empires.py','ark-family.py','native-config.py','steam-template.py','bundle-debian-python.py','enshrouded-proton.py']) {
+ const content=fs.readFileSync(base+source,'utf8');
+ const marker=`cat > .voltra/${source.replaceAll('-','_')} <<'VOLTRA_CONAN_EMPIRES_SOURCE'\n`;
+ const begin=script.indexOf(marker), end=script.indexOf('\nVOLTRA_CONAN_EMPIRES_SOURCE\n',begin+marker.length);
+ assert(begin>=0 && end>begin,`Missing embed ${source}`);
+ script=script.slice(0,begin+marker.length)+content+script.slice(end);
+ hashes[base+source]=crypto.createHash('sha256').update(content).digest('hex');
+}
+const source='myth-of-empires.py', wrapper=fs.readFileSync(base+source,'utf8');
+hashes[base+source]=crypto.createHash('sha256').update(wrapper).digest('hex');
+assert(script.includes('python3 .voltra/conan_empires.py install empires'));
+profile.egg.scripts.installation.script=script.replace('python3 .voltra/conan_empires.py install empires',`cat > .voltra/myth_of_empires.py <<'VOLTRA_MOE_WRAPPER'\n${wrapper}\nVOLTRA_MOE_WRAPPER\npython3 .voltra/myth_of_empires.py install empires`);
+assert(profile.egg.startup.endsWith('.voltra/conan_empires.py run empires'));
+profile.egg.startup=profile.egg.startup.replace('.voltra/conan_empires.py run empires','.voltra/myth_of_empires.py run empires');
+profile.egg.variables.push({name:'Accept Myth of Empires EULA',env_variable:'MOE_EULA_ACCEPTED',default_value:'0',rules:'required|boolean',field_type:'text',user_viewable:true,user_editable:true,description:'Explicit operator consent required before game acquisition/startup. Review https://store.steampowered.com/eula/1371580_eula_0 . No consent is inferred from creating a server.'});
+profile.revision='myth-of-empires-preflight-retention-v2';
+profile.verification='not_verified';
+profile.detail='MoE-only pre-acquisition validation, explicit consent and native Saved/PrivateServerTool retention. Source-tested candidate; unserved. Activation rejected; no retry.';
+const out='artifacts/game-parity-20261029/myth-of-empires-owner';
+fs.mkdirSync(out,{recursive:true});
+const fragment=JSON.stringify({[recipe]:profile},null,2)+'\n';
+fs.writeFileSync(out+'/profile.json',fragment);
+hashes[out+'/profile.json']=crypto.createHash('sha256').update(fragment).digest('hex');
+fs.writeFileSync(out+'/hashes.json',JSON.stringify(hashes,null,2)+'\n');
+console.log('Staged exact MoE fragment and current helper hashes; canonical overrides untouched.');

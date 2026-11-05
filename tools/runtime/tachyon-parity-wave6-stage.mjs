@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const recipe='ftl_tachyon/egg-tachyon.json',current=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe],profile=structuredClone(current);
+const source=fs.readFileSync('internal/panel/game_library/scripts/tachyon-preflight.py','utf8').replaceAll('\r\n','\n');
+assert(!source.includes('VOLTRA_TACHYON_PREFLIGHT'));
+assert.equal(profile.egg.startup,'exec python3 .voltra/small_games_family_runtime.py tachyon');
+profile.egg.startup='exec python3 .voltra/tachyon_preflight.py';
+const anchor='python3 .voltra/small_games_family_install.py tachyon\n';
+assert.equal(profile.egg.scripts.installation.script.split(anchor).length,2);
+profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.replace(anchor,`cat > .voltra/tachyon_preflight.py <<'VOLTRA_TACHYON_PREFLIGHT'\n${source}\nVOLTRA_TACHYON_PREFLIGHT\n${anchor}`);
+assert.deepEqual(profile.egg.variables,current.egg.variables);
+const restored=structuredClone(profile);restored.egg.startup=current.egg.startup;restored.egg.scripts.installation.script=current.egg.scripts.installation.script;assert.deepEqual(restored,current);
+fs.writeFileSync('artifacts/game-parity-20261029/tachyon-wave6-profile.json',JSON.stringify({[recipe]:profile},null,2)+'\n');
+console.log(JSON.stringify({staged:true,recipe,original_controls:profile.egg.variables.length}));

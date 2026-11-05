@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+cd /home/container
+installed=$(.voltra/jq -er '.version' .voltra/factorio-installed.json) || { echo 'Missing installed-version receipt. Reinstall this profile.'; exit 2; }
+case "$FACTORIO_VERSION" in latest|stable|experimental) ;; "$installed") ;; *) echo 'Requested Factorio version differs from installed version. Back up saves/config and reinstall before starting.'; exit 2 ;; esac
+base_version=$(.voltra/jq -er '.version' data/base/info.json)
+[ "$installed" = "$base_version" ] || { echo 'Installed Factorio metadata differs from receipt. Reinstall before starting.'; exit 2; }
+case "$SAVE_NAME" in ""|*/*|.|..) echo 'Invalid save name.'; exit 2 ;; esac
+if [ "$PUBLIC_SERVER" = 1 ] && { [ -z "$SERVER_USERNAME" ] || [ -z "$SERVER_TOKEN" ]; }; then echo 'Public listing requires a Factorio username and token.'; exit 2; fi
+temp=$(mktemp data/.server-settings.XXXXXX)
+trap 'rm -f -- "$temp"' EXIT
+.voltra/jq '. + {name:env.SERVER_NAME,description:env.SERVER_DESC,max_players:(env.MAX_SLOTS|tonumber),username:env.SERVER_USERNAME,token:env.SERVER_TOKEN,game_password:env.GAME_PASSWORD,autosave_interval:(env.SAVE_INTERVAL|tonumber),autosave_slots:(env.SAVE_SLOTS|tonumber),afk_autokick_interval:(env.AFK_KICK|tonumber)} | .visibility = ((.visibility // {}) + {public:(env.PUBLIC_SERVER == "1"),lan:(env.LAN_SERVER == "1")})' data/server-settings.json > "$temp"
+mv "$temp" data/server-settings.json
+if [ ! -f "saves/$SAVE_NAME.zip" ]; then
+ ./bin/x64/factorio --config config/config.ini --mod-directory mods --create "saves/$SAVE_NAME.zip" --map-gen-settings data/map-gen-settings.json --map-settings data/map-settings.json
+fi
+exec ./bin/x64/factorio --config config/config.ini --mod-directory mods --port "$SERVER_PORT" --server-settings data/server-settings.json --start-server "saves/$SAVE_NAME.zip"

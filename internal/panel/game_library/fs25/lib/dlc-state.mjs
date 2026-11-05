@@ -1,6 +1,8 @@
+import {realpathSync} from 'node:fs';
 import {readdirSync,readFileSync,statSync,renameSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {commit} from './dlc-update.mjs';
 
 export function pendingDLCs(directory) {
   const entries=[];
@@ -12,19 +14,31 @@ export function pendingDLCs(directory) {
   return entries;
 }
 
-export function verifyPendingDLCs(directory,log,write=line=>console.log(line)) {
+export function verifyPendingDLCs(directory,log,write=line=>console.log(line),docsDir=process.env.DOCS_DIR) {
   if(!/^\d{4}-\d\d-\d\d [\d:.]+\s+Info:\s+Entered Gameplay\s*$/m.test(log))return 0;
   if(/^.*Error.*(?:dlc|activat|licen).*$/im.test(log))return 0;
   let verified=0;
   for(const entry of pendingDLCs(directory)) {
     if(!entry.payloads.every(file=>new RegExp('^\\d{4}-\\d\\d-\\d\\d [\\d:.]+\\s+Load dlc:\\s+pdlc_'+file.slice(0,-4)+'(?:\\s|$)','mi').test(log)))continue;
+    const metadata=join(directory,entry.marker+'.json');
+    let update;
+    try {update=JSON.parse(readFileSync(metadata,'utf8'));}catch(error){if(error.code!=='ENOENT')continue;}
+    if(update) {
+      if(!/^[A-Za-z0-9]+$/.test(update.product)||!/^\d+\.\d+\.\d+\.\d+$/.test(update.version))continue;
+      const available=new RegExp('Available dlc:.*\\(Version: '+update.version.replaceAll('.','\\.')+'\\)\\s+pdlc_'+update.product+'(?:\\s|$)');
+      if(!available.test(log))continue;
+      // Keep the recovery copy unless this invocation knows the real data path.
+      if(!docsDir)continue;
+      commit(update.product,docsDir,update.version);
+      renameSync(metadata,join(directory,entry.marker.replace('.pending-','.installed-')+'.json'));
+    }
     renameSync(join(directory,entry.marker),join(directory,entry.marker.replace('.pending-','.installed-')));
     write('[fs25/install] Verified DLC loaded by the game: '+entry.payloads.join(', ')+'.');verified++;
   }
   return verified;
 }
 
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
+if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href) {
   // Started before requesting the session. Previous session logs cannot verify a new install.
   const initial=new Set(readdirSync(process.env.DOCS_DIR).filter(name=>/^log_.*\.txt$/.test(name)));
   const deadline=Date.now()+300000;

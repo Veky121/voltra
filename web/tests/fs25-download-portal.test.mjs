@@ -70,3 +70,17 @@ test('DLC-only mode requests the Windows DLC without issuing a base-game ticket'
   assert.equal(downloads[0][1],join(dir,'dlc'));
  } finally {rmSync(dir,{recursive:true,force:true});}
 });
+
+test('Node 18 combined cookies retain sessions without splitting an Expires date',async()=>{
+ let count=0;
+ const session=portalSession(async(_url,options)=>{
+  if(count++) {assert.equal(options.headers.Cookie,'session=test; other=second');return new Response('ok')}
+  const response=new Response('ok',{headers:{'set-cookie':'session=test; Expires=Wed, 04 Nov 2026 12:00:00 GMT, other=second; Secure'}});
+  Object.defineProperty(response.headers,'getSetCookie',{value:undefined});return response;
+ });
+ await session(portal+'/downloads.php');await session(portal+'/downloads.php');
+});
+test('publisher quota rejection is surfaced without retrying or leaking the key',()=>{
+ assert.throws(()=>portalDownloads('<div>Download limit exceeded for this key!</div>'),e=>e.downloadCode==='quota');
+ assert.match(safeDownloadError({downloadCode:'quota'}),/exceeded its download limit/);
+});

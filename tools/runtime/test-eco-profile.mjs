@@ -1,0 +1,17 @@
+﻿import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {stageEco} from './stage-eco-profile.mjs';
+const original=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))['eco/egg-eco.json'];
+const read=name=>fs.readFileSync('internal/panel/game_library/scripts/'+name,'utf8');
+const before=JSON.stringify(original);
+const first=stageEco(original,read);
+assert.equal(JSON.stringify(original),before);
+const second=stageEco(first.profile,read);
+assert.deepEqual(first,second,'Re-staging integrated candidate must be idempotent');
+const changed=stageEco(first.profile,name=>read(name)+(name==='eco-runtime.py'?'\n# changed fixture\n':''));
+assert.notEqual(changed.hashes['eco-runtime.py'],first.hashes['eco-runtime.py']);
+assert.ok(changed.profile.egg.scripts.installation.script.includes('# changed fixture'));
+assert.deepEqual(changed.profile.egg.variables,original.egg.variables);
+assert.deepEqual(changed.profile.settings_documents,original.settings_documents);
+assert.ok(Object.keys(first.hashes).length===9);
+console.log('Eco staging regression passed: integrated restage, current helper refresh, canonical controls, settings declarations and no mutation.');

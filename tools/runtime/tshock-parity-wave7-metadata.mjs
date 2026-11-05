@@ -1,0 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {root,runtime,activeLease,docker,digest} from './campaign-native-20261029.mjs';
+const dir=path.join(runtime,'tshock-wave7'),s=JSON.parse(fs.readFileSync(path.join(dir,'state.json')));activeLease(s.lease.lease_id,'tshock_native');
+const result=docker(['run','--rm','--pull','never','--network','none','--read-only','--memory','256m','--memory-swap','256m','--cpus','1','--tmpfs','/tmp:rw,size=128m','--env','DOTNET_CLI_HOME=/tmp','--env','DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1','--env','DOTNET_NOLOGO=1','--mount',`type=bind,source=${root},target=/work,readonly`,'--mount',`type=bind,source=/var/lib/voltra-parity-20261029/volumes/${s.server.uuid},target=/v,readonly`,'--entrypoint','/bin/sh','8dd1a57fe6b7','-c','dotnet build /work/tools/runtime/tshock-parity-wave7-metadata.csproj -o /tmp/out -p:BaseIntermediateOutputPath=/tmp/obj/ --ignore-failed-sources >/tmp/build.log && dotnet /tmp/out/tshock-parity-wave7-metadata.dll /v/bin/TerrariaServer.dll /v/bin/OTAPI.dll || { cat /tmp/build.log; exit 1; }']);
+fs.writeFileSync(path.join(dir,'protocol-metadata.json'),JSON.stringify({at:new Date().toISOString(),read_only_metadata:true,image:'8dd1a57fe6b7',output:result,tool_sha256:digest(fs.readFileSync(path.join(root,'tools/runtime/tshock-parity-wave7-metadata.cs')))},null,2)+'\n');console.log(result);

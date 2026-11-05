@@ -6,6 +6,7 @@ const extra=(name:string,extensions:string[],kind:string)=>LanguageDescription.o
 export const editorLanguages=[...languages,
   LanguageDescription.of({name:'JSONC',extensions:['jsonc','code-workspace'],load:()=>import('@codemirror/legacy-modes/mode/javascript').then(m=>new LanguageSupport(StreamLanguage.define({...m.json,tokenTable:{property:tags.propertyName}})))}),
   LanguageDescription.of({name:'JSON5',extensions:['json5','mcmeta'],load:()=>import('@codemirror/legacy-modes/mode/javascript').then(m=>new LanguageSupport(StreamLanguage.define({...m.json,tokenTable:{property:tags.propertyName}})))}),
+  extra('HJSON',['hjson'],'hjson'),
   extra('HOCON',['hocon'],'hocon'),
   extra('Forge config',['cfg'],'forge'),
   extra('SNBT',['snbt'],'snbt'),

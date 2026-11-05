@@ -103,7 +103,7 @@ func TestSubdomainReservations(t *testing.T) {
 	if fake.writes != 0 {
 		t.Fatal("empty join name created DNS")
 	}
-	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "survival", "route_id": 9901}, 400)
+	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "survival", "route_id": 9901}, 422)
 	encrypted := subdomainTestCredentials(t, a)
 	integration, err := a.insert(ctx, "integrations", M{"name": "DNS test", "provider": "cloudflare", "enabled": true, "credentials": encrypted})
 	if err != nil {
@@ -111,8 +111,23 @@ func TestSubdomainReservations(t *testing.T) {
 	}
 	config, _ := json.Marshal(M{"domain": "example.invalid", "integration_id": integration["id"]})
 	exec(`INSERT INTO settings(key,value) VALUES('network.subdomain_gateway.9901',$1::jsonb)`, string(config))
-	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "bad.label", "route_id": 9901}, 400)
-	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "survival", "route_id": 9902}, 400)
+
+	enabledChoices := asMap(infraExpect(t, mux, user, "GET", "/api/client/servers/sd1/subdomain", nil, 200)["attributes"])
+	if len(asSlice(enabledChoices["choices"])) != 1 {
+		t.Fatal("enabled Cloudflare not offered")
+	}
+	exec("UPDATE integrations SET enabled=false WHERE id=$1", integration["id"])
+	disabledChoices := asMap(infraExpect(t, mux, user, "GET", "/api/client/servers/sd1/subdomain", nil, 200)["attributes"])
+	if len(asSlice(disabledChoices["choices"])) != 0 {
+		t.Fatal("disabled Cloudflare still offered")
+	}
+	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "hidden", "route_id": 9901}, 422)
+	if fake.writes != 0 {
+		t.Fatal("disabled integration mutated DNS")
+	}
+	exec("UPDATE integrations SET enabled=true WHERE id=$1", integration["id"])
+	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "bad.label", "route_id": 9901}, 422)
+	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "survival", "route_id": 9902}, 422)
 	infraExpect(t, mux, user, "PUT", "/api/client/servers/sd1/subdomain", M{"label": "survival", "route_id": 9901}, 200)
 	exec(`UPDATE servers SET name='A different display name' WHERE id=9901`)
 	unchanged := asMap(infraExpect(t, mux, user, "GET", "/api/client/servers/sd1/subdomain", nil, 200)["attributes"])

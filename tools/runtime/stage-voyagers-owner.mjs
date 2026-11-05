@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+const recipe='voyagers_of_nera/egg-voyagers-of-nera.json';
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe]);
+if(!profile?.egg) throw Error('Missing canonical exact recipe');
+const egg=profile.egg;
+let script=egg.scripts.installation.script;
+// Refresh each emitted shared dependency from current source, including BOM fix.
+const aliases={'steam_template.py':'steam-template.py','additional_survival_install.py':'additional-survival-install.py','ocean_space_servers.py':'ocean-space-servers.py','bundle_debian_python.py':'bundle-debian-python.py'};
+script=script.replace(/(cat > .voltra\/([^ ]+) <<'VOLTRA_SOURCE'\n)([\s\S]*?)(\nVOLTRA_SOURCE\n)/g, (_,head,name,body,tail)=>head+fs.readFileSync('internal/panel/game_library/scripts/'+(aliases[name]||name),'utf8')+tail);
+const call='python3 .voltra/ocean_space_servers.py install voyagers';
+if(!script.includes(call))throw Error('Installer shape changed');
+script=script.replace(call, "cat > .voltra/voyagers_owner.py <<'VOLTRA_VOYAGERS'\n"+fs.readFileSync('tools/runtime/voyagers-owner.py','utf8')+"\nVOLTRA_VOYAGERS\npython3 .voltra/voyagers_owner.py install");
+egg.scripts.installation.script=script;
+egg.startup=egg.startup.replace('.voltra/ocean_space_servers.py run voyagers','.voltra/voyagers_owner.py run');
+profile.revision='voyagers-native-authority-source-v1';
+profile.setup_steps.push('Voyagers source proposal: SERVER_NAME, SERVER_PASSWORD, MAX_PLAYERS and AUTOSAVE_TIMER_SECONDS seed an absent native host settings file once. After creation, the native INI is authoritative through Files; startup environment changes do not replace operator values. Dedicated typed editor integration and actual native readback remain pending.');
+const out='artifacts/game-parity-20261029/voyagers-owner';
+fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(out+'/profile.pending.json',JSON.stringify({[recipe]:profile},null,2)+'\n');
+console.log('Exact Voyagers proposal staged; canonical profile unchanged.');

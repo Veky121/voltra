@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const dir='.local/game-parity-20261029/etlegacy-api-overlay';fs.mkdirSync(dir,{recursive:true});
+const source='internal/panel/game_settings_arma.go',signature='func parseGameSettingsForEgg(egg M, file string, data []byte) (gameSettingsParsed, error) {';
+const content=fs.readFileSync(source,'utf8');if(content.split(signature).length!==2)throw Error('Unique parser dispatch required');
+const dispatch=path.join(dir,'game_settings_arma.go.pending');fs.writeFileSync(dispatch,content.replace(signature,signature+'\n\tif file == etlegacySettingsPath && nativeSettingsIsRecipe(egg, etlegacySettingsRecipe) { return parseETLegacySettings(data) }'));
+const overrides=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),fragment=JSON.parse(fs.readFileSync('artifacts/game-parity-20261029/banana-wave10-etlegacy-profile.json'));Object.assign(overrides,fragment);
+const metadata=path.join(dir,'overrides.json');fs.writeFileSync(metadata,JSON.stringify(overrides));
+const Replace={};const map=(target,overlay)=>Replace[path.resolve(target)]=path.resolve(overlay);
+map(source,dispatch);map('internal/panel/game_library/overrides.json',metadata);
+map('internal/panel/game_settings_etlegacy.go','artifacts/game-parity-20261029/banana-wave10-etlegacy-settings.go.pending');
+map('internal/panel/game_settings_etlegacy_test.go','artifacts/game-parity-20261029/banana-wave10-etlegacy-settings_test.go.pending');
+map('internal/panel/game_settings_etlegacy_api_test.go','artifacts/game-parity-20261029/banana-wave10-etlegacy-api_test.go.pending');
+fs.writeFileSync(path.join(dir,'overlay.json'),JSON.stringify({Replace},null,2)+'\n');console.log(JSON.stringify({overlay:path.join(dir,'overlay.json'),canonical_mutations:false}));

@@ -1,0 +1,30 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+const dir='artifacts/game-parity-20261029/resume-wave4-reforger';
+const key='arma/arma_reforger/egg-arma-reforger.json';
+const all=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const profile=structuredClone(all[key]);
+const base='internal/panel/game_library/scripts/';
+const hashes={};
+const normalize=s=>s.replace(/^\uFEFF/,'').replaceAll('\r\n','\n');
+let script=profile.egg.scripts.installation.script;
+for(const match of [...script.matchAll(/cat > \.voltra\/([^\s]+) <<'([^']+)'\r?\n([\s\S]*?)\r?\n\2/g)]){
+ const [whole,name,delimiter]=match;
+ const sourceName=name==='steam_template.py'?'steam-template.py':name;
+ assert(fs.existsSync(base+sourceName),'Missing helper '+sourceName);
+ const bytes=fs.readFileSync(base+sourceName);
+ const source=normalize(bytes.toString()).replace(/\n$/,'');
+ script=script.replace(whole,`cat > .voltra/${name} <<'${delimiter}'\n${source}\n${delimiter}`);
+ hashes[name]={source_sha256:createHash('sha256').update(bytes).digest('hex'),embedded_sha256:createHash('sha256').update(source+'\n').digest('hex')};
+}
+assert(hashes['reforger-controls.py']);
+assert(hashes['arma-native.py']);
+profile.egg.scripts.installation.script=script;
+assert.deepEqual(profile.egg.variables,all[key].egg.variables);
+const unchanged=structuredClone(profile);unchanged.egg.scripts.installation.script=all[key].egg.scripts.installation.script;
+assert.deepEqual(unchanged,all[key]);
+fs.mkdirSync(dir,{recursive:true});
+fs.writeFileSync(dir+'/profile.json',JSON.stringify({[key]:profile},null,2)+'\n');
+fs.writeFileSync(dir+'/helper-hashes.json',JSON.stringify(hashes,null,2)+'\n');
+console.log(JSON.stringify({recipe:key,controls:profile.egg.variables.length,helpers:Object.keys(hashes),metadata:'unchanged',output:dir+'/profile.json'}));

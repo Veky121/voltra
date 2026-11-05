@@ -98,7 +98,7 @@ export default function Terminal({history:logHistory,status,connection,busy,onCl
       <div className="console-terminal-body">
         <pre ref={output} className="console-output" aria-label="Server console output" tabIndex={0} onPointerDown={event=>{if(event.button===0){selectionWindow.current=currentRange.current;pointerSelecting.current=true;setHeldHistory(old=>old??logHistory);setAutoScroll(false)}}} onScroll={()=>{measureViewport();const element=output.current;if(element&&!pointerSelecting.current&&!heldHistory)setAutoScroll(element.scrollHeight-element.scrollTop-element.clientHeight<32)}}>{displayed.count?<><span className="console-spacer" aria-hidden="true" style={{height:range.start*viewport.lineHeight}}/>{visibleChunks.map(chunk=><HistoryChunk key={chunk.id} chunk={chunk}/>)}<span className="console-spacer" aria-hidden="true" style={{height:(displayed.count-range.end)*viewport.lineHeight}}/></>:'Waiting for console output…'}</pre>
       </div>
-      {server.console_input_supported===false?<div className="console-readonly">This launcher provides logs only. Use Game settings and the power controls to manage the server.</div>:can(permissions,'control.console')?<form className="console-command-bar" onSubmit={event=>{
+      {server.console_input_supported===false?<div className="console-readonly">This launcher provides logs only. Use Game Config and the power controls to manage the server.</div>:can(permissions,'control.console')?<form className="console-command-bar" onSubmit={event=>{
         event.preventDefault();
         if(!command.trim()||working||!running)return;
         const sent=command;

@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import {verifyRuntime,activeLease,api,containers,releaseNative} from './campaign-native-20261029.mjs';
+if(!process.argv.includes('--coordinator-phased-admission-go'))throw Error('Explicit phased admission scope required');
+const file='.local/game-parity-20261029/veloren-root-native/state.json',state=JSON.parse(fs.readFileSync(file));
+const runtime=await verifyRuntime();activeLease(state.lease.lease_id,state.lease.owner);
+if(state.server||state.nest||state.egg||state.allocations||state.slot)throw Error('Fixture ownership exists; cannot release as unused reservation');
+const serverRows=(await api('/api/application/servers')).data.map(x=>x.attributes);
+const allocationRows=(await api('/api/application/nodes/1/allocations')).data.map(x=>x.attributes);
+const checks={no_fixture_ids_in_durable_state:true,no_named_server:!serverRows.some(x=>/Campaign Veloren native wave8/i.test(x.name)),no_allocations_on_reserved_ports:!allocationRows.some(x=>state.lease.ports.includes(x.port)),no_owned_container:!containers().some(x=>/veloren_wave8_native|Campaign Veloren native wave8/i.test(x.Name))};
+if(!Object.values(checks).every(Boolean))throw Error('Unused reservation absence proof failed');
+const receipt={at:new Date().toISOString(),lease:state.lease,checks,runtime_pid:runtime.pid,outcome:'released',reason:'No fixture created; release unused game reservation before separately guarded canonical installer image utility. No tested/blocked history changed.'};
+fs.writeFileSync('artifacts/game-parity-20261029/veloren-wave8-unused-reservation-release.json',JSON.stringify(receipt,null,2)+'\n');
+releaseNative(state.lease.lease_id,state.lease.owner,'released',true);
+state.lease_released=true;state.release=receipt;fs.writeFileSync(file,JSON.stringify(state,null,2)+'\n');
+console.log(JSON.stringify({lease:state.lease.lease_id,outcome:'released',checks}));

@@ -654,6 +654,14 @@ func TestCollaborationSchedulerDelaysRecoveryAndOffline(t *testing.T) {
 	if e != nil || len(asSlice(backup["ignored_files"])) != 2 {
 		t.Fatal("backup ignore payload not passed", backup, e)
 	}
+	listed, err := a.listBackups(ctx, num(s["id"]), "newest")
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("scheduled backup listing: %v %v", listed, err)
+	}
+	origin := asMap(listed[0]["origin"])
+	if str(origin["type"]) != "scheduled" || num(origin["schedule_id"]) != sid {
+		t.Fatalf("scheduled backup lost its origin: %v", origin)
+	}
 	status, e := a.one(ctx, "SELECT * FROM schedules WHERE id=$1", sid)
 	if e != nil || boolean(status["is_processing"]) {
 		t.Fatal("schedule still processing", status, e)

@@ -1,14 +1,10 @@
-# File manager v1
+# File manager
 
-The Files route now loads the integrated SVAR file browser by default. The previous
-workspace is preserved as `FilesV0.tsx`, accessible through **Open v0** or
-`?manager=v0`. V0 remains selected while browsing its folders. A render error in
-v1 offers the v0 fallback. No original PHP application or daemon source was changed.
+The Files route uses the shared `FileExplorer` with an integrated editor. The legacy workspace remains available through `?manager=v0` and the render-error fallback.
 
 ## Features
 
-- Every directory entry is returned and accessible. The default table renders a
-  virtual viewport; there is no 250-file slice. Grid and split views are available.
+- The explorer shows the full directory listing and contracts beside an open editor. Memoized rows, shared metadata formatters and offscreen rendering containment reduce repeated work. There is no 250-file slice.
 - Folder tree, breadcrumbs, search, sorting, keyboard selection, select all and
   bulk actions connect to actual server APIs.
 - Original file operations remain available: new file/folder, read/write,
@@ -33,8 +29,7 @@ v1 offers the v0 fallback. No original PHP application or daemon source was chan
 - A separate server-save status distinguishes browser upload completion from
   successful storage in Wings. Failed finalization retries from staging without
   re-uploading the browser file.
-- Icons are self-hosted. SVAR and Uppy load only on the Files route. Licenses and
-  provenance are recorded in `THIRD_PARTY_NOTICES.txt` and `web/public/licenses/`.
+- Icons are self-hosted and the Files workspace is lazy-loaded. Licenses and provenance remain in `THIRD_PARTY_NOTICES.txt` and `web/public/licenses/`.
 
 ## API compatibility
 
@@ -62,7 +57,7 @@ New routes below are relative to `/api/client/servers/{server}/files`:
 
 Node upload limits and disk quotas still apply. A node configured for 100 MiB
 continues to enforce that limit. Raising it requires the node setting and Wings
-configuration to agree; the acceptance node was configured for 2 GiB.
+configuration to agree. User-facing capacity forms use GB.
 
 Browser chunks stage on panel disk, then stream to Wings using constant memory.
 Pending uploads therefore need their full file size on the panel's staging disk.
@@ -105,33 +100,12 @@ Same-host panel workers can share staging through filesystem locks. Multiple hos
 need sticky routing or a shared, appropriately locked upload storage implementation.
 Reverse proxies must allow PATCH/HEAD/DELETE and at least the configured chunk size.
 
-## Verification and local preview
+## Workspace controls
 
-The existing Windows app PID 46872 was not stopped or restarted. Its `web/dist`
-was not rebuilt by this task. Source and dependencies build, and the replacement
-was tested through a separate loopback panel at `http://127.0.0.1:8098` with no
-background workers. Its build lives under `.local/file-manager/web`.
+A compact storage summary sits above the file toolbar. File actions stay beside the explorer. Selected items and the open document offer Delete through the shared confirmation dialog. Unsaved edits require save or discard before deletion; failed actions retain the document.
 
-`tools/file-manager-server` is the isolated acceptance server. The optional
-`FILE_MANAGER_PATCH_DELAY_MS` adds test latency, used to exercise browser pause.
-`web/vite.file-manager-test.config.ts` builds the app plus an explicitly test-only
-generated-file entry; normal Vite builds do not include that entry.
+## Verification
 
-Evidence:
+Run frontend checks from [local development](docs/LOCAL_DEVELOPMENT.md). The [browser fixture](web/tests/browser/file-manager-ui.md) covers selection, editor layout, draft protection and large directories with intercepted requests. It does not prove real uploads or mutations.
 
-- `artifacts/file-manager-acceptance.json`: dedicated Wings node 143/server 143,
-  real interrupted 1 GiB upload, offset conflict/resume, idempotent completion,
-  complete streamed download SHA-256 match, near-end range byte match, empty files,
-  overwrite, cancellation, Linux/Unicode names, and 1,205-entry tar/list round trip.
-- `artifacts/file-manager-browser-acceptance.json`: browser-driven selection/search,
-  editor/save/conflict checks, v0 switching and generated 256 MiB Uppy pause/resume.
-  The resumed file's full downloaded checksum matches its generated source.
-- `artifacts/file-manager-split.png`: verified browsing layout.
-- Full `go test ./... -count=1` passed with PostgreSQL configured. Focused Linux
-  race tests passed for transfers, parity, validation and pull limits. `go vet`
-  and the panel build passed. All 92 frontend tests, TypeScript and Vite builds passed.
-
-The dedicated local test Wings uses ports 18087/12027 and the disposable server
-UUID `08b66b95-78fa-4503-b841-366de558ee2f`. Configuration and staging are under
-`.local/file-manager`; the fixture is separate from the homelab acceptance VM and
-the original daemon. It is retained for review, not a production deployment.
+[API parity](FILE_MANAGER_PARITY.md) records routes and permissions. The [initial acceptance receipt](docs/archive/file-manager-acceptance.md) retains the original real-transfer evidence and its limits. Those old process IDs and preview ports are not development startup instructions.

@@ -12,6 +12,8 @@
 #   8. On SIGINT/SIGTERM, shut the server down cleanly.
 set -uo pipefail
 export FS25_START_TIME_MS="$(date +%s%3N)"
+export FS25_INSTALL_ONLY=false
+[ "${1:-}" != "--install-only" ] || export FS25_INSTALL_ONLY=true
 
 umask 077
 FS25_LIB="/home/container/.voltra/fs25/lib"
@@ -43,6 +45,8 @@ warn() { echo -e "\e[33m[fs25] WARN:\e[0m $*"; }
 err()  { echo -e "\e[31m[fs25] ERROR:\e[0m $*"; }
 
 mkdir -p "$INSTALLER_DIR" "$DLC_DIR"
+exec 8>"${DLC_DIR}/.startup.lock"
+flock -n 8 || { err "Another FS25 startup/session owns the update lock."; exit 1; }
 
 # ---- Compliance notice --------------------------------------------------------
 # This image ships NO game content and circumvents NO copy protection. It runs
@@ -63,6 +67,11 @@ compliance_notice
 log "Starting virtual display (Xvfb on ${DISPLAY})..."
 Xvfb "$DISPLAY" -screen 0 1280x720x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
 XVFB_PID=$!
+if [ "$FS25_INSTALL_ONLY" = true ]; then
+    trap 'wineserver -k >/dev/null 2>&1 || true; kill "$XVFB_PID" 2>/dev/null || true' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+fi
 sleep 2
 
 # ---- 2. Wine prefix -----------------------------------------------------------
@@ -96,12 +105,12 @@ if [ ! -f "${GAME_DIR}/dedicatedServer.exe" ]; then
     log "FS25 not installed yet — running installer..."
     # If no installer was uploaded, fetch it from the official GIANTS portal using
     # the operator's own serial (license-gated; see lib/download-game.sh).
-    bash "${FS25_LIB}/download-game.sh" || {
+    bash "${FS25_LIB}/download-game.sh" --base-only || {
         err "Automatic download failed. See the download error above."
         err "Retry later, or upload the GIANTS installer into ${INSTALLER_DIR}/ and restart."
         exit 1
     }
-    if ! bash "${FS25_LIB}/install-game.sh"; then
+    if ! bash "${FS25_LIB}/install-game.sh" --base-only; then
         err "Installation failed. Check the log above. The server cannot start."
         err "Make sure the installer is uploaded to: ${INSTALLER_DIR}/"
         exit 1
@@ -109,17 +118,40 @@ if [ ! -f "${GAME_DIR}/dedicatedServer.exe" ]; then
 else
     log "FS25 already installed."
     bash "${FS25_LIB}/install-game.sh" --activate-only || exit 1
-    # Fetch DLCs the licence covers but that are not here yet, then install any
-    # DLC sitting in the upload folder. Without the fetch, DOWNLOAD_DLC=true did
-    # nothing on an existing server — the portal was only ever queried during the
-    # very first install. Both steps are best-effort: a DLC must never stop the
-    # server from coming up.
-    bash "${FS25_LIB}/download-game.sh" --dlc-only || warn "DLC download reported problems (continuing)."
-    bash "${FS25_LIB}/install-game.sh" --dlc-only || warn "DLC pass reported problems (continuing)."
+fi
+
+# Reinstall performs the base update. Ordinary starts only check compatibility;
+# they never attempt newer DLCs against an outdated or unverified base game.
+node "${FS25_LIB}/game-update.mjs" prepare
+base_result=$?
+if [ "$base_result" -eq 2 ]; then
+    err "Base-game recovery needs attention. The server remains stopped."
+    exit 1
+elif [ "$base_result" -ne 0 ]; then
+    [ "$FS25_INSTALL_ONLY" != true ] || exit 1
+    warn "Base-game check failed or an update is needed. Use Reinstall server; DLC updates skipped."
+else
+    dlc_failed=0
+    bash "${FS25_LIB}/download-game.sh" --dlc-only || dlc_failed=1
+    bash "${FS25_LIB}/install-game.sh" --dlc-only || dlc_failed=1
+    if [ "$dlc_failed" -ne 0 ]; then
+        node "${FS25_LIB}/game-update.mjs" dlc-failed
+        warn "DLC maintenance failed; previous payloads retained where available."
+        [ "$FS25_INSTALL_ONLY" != true ] || exit 1
+    fi
 fi
 
 # ---- 4. Render configuration from environment ---------------------------------
+node "${FS25_LIB}/dlc-update.mjs" recover || {
+    err "DLC recovery failed. Preserved backups need attention before FS25 can start."
+    exit 1
+}
 node "${FS25_LIB}/configure.mjs" || exit 1
+if [ "$FS25_INSTALL_ONLY" = true ]; then
+    log "Game and DLC files prepared. Voltra will start the server automatically and verify gameplay."
+    exit 0
+fi
+node "${FS25_LIB}/game-update.mjs" starting
 
 # The dedicated server binds its web portal to the container network IP, not
 # loopback, so detect it and share it with the helper that drives the portal.
@@ -156,6 +188,7 @@ shutdown() {
     kill "$WINE_PID"  >/dev/null 2>&1 || true
     [ -z "${TAIL_PID:-}" ] || kill "$TAIL_PID"  >/dev/null 2>&1 || true
     [ -z "${DLC_VERIFY_PID:-}" ] || kill "$DLC_VERIFY_PID" >/dev/null 2>&1 || true
+    [ -z "${UPDATE_VERIFY_PID:-}" ] || kill "$UPDATE_VERIFY_PID" >/dev/null 2>&1 || true
     kill "$XVFB_PID"  >/dev/null 2>&1 || true
     exit 0
 }
@@ -175,6 +208,8 @@ if nc -z "$WEB_HOST" "$WEB_PORT" 2>/dev/null; then
     log "Requesting game session start via web portal..."
     node "${FS25_LIB}/dlc-state.mjs" &
     DLC_VERIFY_PID=$!
+    node "${FS25_LIB}/game-update.mjs" watch &
+    UPDATE_VERIFY_PID=$!
     node "${FS25_LIB}/start-game.mjs" || warn "Could not auto-start the session; start it manually via the web portal on port ${WEB_PORT}."
 else
     warn "Web portal never came up. Inspect ${WINE_LOG}."

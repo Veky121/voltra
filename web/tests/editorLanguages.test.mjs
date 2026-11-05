@@ -6,6 +6,8 @@ import {highlightTree,classHighlighter} from '@lezer/highlight';
 import {decodeEditorFile,detectLanguage,editorLanguages,isBinaryText} from '../src/client/editorLanguages.ts';
 
 const fixtures=[
+  ['rules.hjson','reactorExplosions: false\nlogicUnitBuild: false\nlogicUnitDeconstruct: false\n','HJSON'],
+  ['rules.HJSON.bak',"// game config\n{enabled: true, title: hello world}",'HJSON'],
   ['server.properties','# Minecraft server\nonline-mode=true\nserver-port=25565','Properties files'],
   ['eula.txt','# EULA setting\neula=false','Properties files'],
   ['forge-client.toml','# Forge config\n[general]\nenabled=true','TOML'],
@@ -64,7 +66,7 @@ test('catalog languages all load and include actual parser support',async()=>{
   }
 });
 test('game-specific modes generate highlighted tokens',async()=>{
-  for(const name of ['Forge config','HOCON','SNBT','Minecraft function','Skript','JSON5','JSONC']){
+  for(const name of ['HJSON','Forge config','HOCON','SNBT','Minecraft function','Skript','JSON5','JSONC']){
     const fixture=fixtures.find(f=>f[2]===name);
     const support=await editorLanguages.find(l=>l.name===name).load();
     const state=EditorState.create({doc:fixture[1],extensions:[support]});
@@ -97,4 +99,12 @@ test('UTF-8 loading keeps the byte order mark and rejects unreadable encodings',
 });
 test('large unknown JSON uses a bounded sample',()=>{
   assert.equal(detectLanguage('unknown','{"value":"'+'x'.repeat(1000000)+'"}').name,'JSON');
+});
+
+test('HJSON highlighting preserves the exact Mindustry rules text',async()=>{
+ const original='reactorExplosions: false\r\nlogicUnitBuild: false\r\nlogicUnitDeconstruct: false\r\n';
+ const support=await editorLanguages.find(l=>l.name==='HJSON').load();
+ const state=EditorState.create({doc:original,extensions:[EditorState.lineSeparator.of('\r\n'),support]});
+ assert.ok(ensureSyntaxTree(state,state.doc.length,1000));
+ assert.equal(state.sliceDoc(),original);
 });

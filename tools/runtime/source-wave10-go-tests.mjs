@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const prefix=process.argv[2]||'source-wave10-go-tests';
+const files=['game_settings_arma.go','game_settings_discovery.go','game_settings_documents.go','game_settings_etlegacy.go','game_settings_etlegacy_test.go','game_settings_etlegacy_api_test.go','game_settings_openra.go','game_settings_openra_test.go','game_settings_openra_api_test.go'].map(n=>'internal/panel/'+n).concat('internal/panel/game_library/overrides.json');
+const hash=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const before=Object.fromEntries(files.map(p=>[p,hash(p)]));
+const env=JSON.parse(fs.readFileSync('.local/game-parity-20261029/runtime/panel-private-env.json'));
+const url=new URL(env.DATABASE_URL);assert(['127.0.0.1','localhost'].includes(url.hostname)&&url.port==='55439');
+const result=spawnSync('go',['test','-json','./internal/panel','-run','^(TestETLegacy|TestOpenRA|TestSourceSettings|TestCSS|TestGoldSrc|TestFactorio)','-count=1'],{env:{...process.env,TEST_DATABASE_URL:env.DATABASE_URL},encoding:'utf8',windowsHide:true,timeout:180000});
+const log=(result.stdout||'')+(result.stderr||'');fs.writeFileSync('artifacts/game-parity-20261029/'+prefix+'.log',log);
+const actions=log.split('\n').flatMap(line=>{try{return [JSON.parse(line)]}catch{return []}});
+const counts=Object.fromEntries(['pass','fail','skip'].map(action=>[action,actions.filter(e=>e.Action===action&&e.Test).length]));
+const after=Object.fromEntries(files.map(p=>[p,hash(p)]));assert.deepEqual(after,before,'Source drift during check');
+const receipt={at:new Date().toISOString(),exit:result.status,counts,source_hashes:before,unchanged:true,database:'isolated PostgreSQL localhost55439; fixture schemas',actual_http_handlers:true,filesystem:'fixture daemon',native_game:false,log:prefix+'.log'};
+fs.writeFileSync('artifacts/game-parity-20261029/'+prefix+'.json',JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify(receipt));if(result.status!==0||counts.skip)process.exitCode=1;

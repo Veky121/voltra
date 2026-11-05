@@ -1,0 +1,38 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+const hash=x=>createHash('sha256').update(x).digest('hex');
+const recipe='counter_strike/counter_strike_1.6/egg-counter-strike1-6--vanilla.json';
+const before=fs.readFileSync('internal/panel/game_library/overrides.json');
+const original=JSON.parse(before)[recipe], profile=structuredClone(original);
+assert.equal(profile.egg.variables.length,18);
+assert(profile.egg.startup.endsWith('.voltra/counterstrike_preflight.py cs16')||profile.egg.startup.endsWith('.voltra/cs16_gameplay_runtime.py'));
+profile.egg.startup=profile.egg.startup.replace('.voltra/counterstrike_preflight.py cs16','.voltra/cs16_gameplay_runtime.py');
+profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.replace(/^cat > \.voltra\/cs16_gameplay_(?:runtime|install)\.py <<'(VOLTRA_CS16_GAMEPLAY_[A-Z0-9_]+)'\n[\s\S]*?^\1\n/gm,'');
+const calls=profile.egg.scripts.installation.script.match(/^PYTHONPATH=\.voltra python3 \.voltra\/(?:goldsrc_install|cs16_gameplay_install)\.py$/gm);
+assert.equal(calls?.length,1);const call=calls[0];
+let embed='',helpers=[];
+for(const name of ['cs16-gameplay-runtime','cs16-gameplay-install']){
+ const source='internal/panel/game_library/scripts/'+name+'.py';
+ const raw=fs.readFileSync(source,'utf8').replaceAll('\r\n','\n');
+ const content=raw.endsWith('\n')?raw:raw+'\n';
+ const delimiter='VOLTRA_CS16_GAMEPLAY_'+name.toUpperCase().replaceAll('-','_');
+ assert(!content.split('\n').includes(delimiter));
+ embed+=`cat > .voltra/${name.replaceAll('-','_')}.py <<'${delimiter}'\n${content}${delimiter}\n`;
+ helpers.push({source,sha256:hash(content)});
+}
+profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.replace(call,embed+'PYTHONPATH=.voltra python3 .voltra/cs16_gameplay_install.py');
+profile.settings_documents=['cstrike/voltra_gameplay.cfg'];
+profile.revision='cs16-gameplay-native-v3';
+const restored=structuredClone(profile);
+restored.egg.startup=original.egg.startup;
+restored.egg.scripts.installation.script=original.egg.scripts.installation.script;
+restored.revision=original.revision;
+if('settings_documents' in original)restored.settings_documents=original.settings_documents;else delete restored.settings_documents;
+assert.deepEqual(restored,original,'Only scoped entrypoints, embeds, discovery and revision may change');
+assert(fs.readFileSync('internal/panel/game_library/overrides.json').equals(before));
+const destination='artifacts/game-parity-20261029/cs16-vanilla-wave8-gameplay-profile.json';
+fs.writeFileSync(destination,JSON.stringify({[recipe]:profile},null,2)+'\n');
+const receipt={recipe,destination,baseline_overrides_sha256:hash(before),baseline_profile_sha256:hash(JSON.stringify(original)),profile_sha256:hash(JSON.stringify(profile)),helpers,ordered_controls:18,original_controls_defaults_permissions_preserved:true,shared_helpers_unchanged:true,settings_document:'/cstrike/voltra_gameplay.cfg',root_dispatch_required:'steamGameID(egg)==cs16 && file==goldSrcCS16SettingsPath -> parseGoldSrcCS16Settings(data)',fresh_seed:'Only genuinely missing cstrike directory plus measured app90 build15961496; use actual native values, never GUI saved defaults',migration:'Explicit current-effective snapshot bound to installed app90 build and hashes of all legacy CFG files. No silent default migration. Existing gameplay bytes/mode never reseeded.',map_authority:'server.cfg -> voltra_gameplay.cfg -> voltra_managed.cfg -> servercfgfile voltra_server.cfg, on every map load',legacy_execution:'Revalidate reachable server.cfg/include chain on every boot; reject aliases, servercfgfile changes, missing/traversal/generated includes, recursive chains and unreviewed executable commands before writes or automatic acquisition. Preserve supported native ban commands and stock scalar settings.',limitations:['Snapshot receipt is an explicit trusted operator action, not an automatic live-cvar probe.','Complex operator scripts require explicit manual review; legacy mode without the dedicated authority file stays available.','Multi-file publication is not crash-atomic; shared configure writes remain unchanged.','Fresh unreviewed publisher builds keep native defaults and require later measured review.'],tests:{linux_pass:20,network:'none',source:'read-only',memory_mib:256,memory_swap_mib:256,cpu:1},native_authority_mutated:false};
+fs.writeFileSync('artifacts/game-parity-20261029/cs16-vanilla-wave8-gameplay-integration.json',JSON.stringify(receipt,null,2)+'\n');
+console.log(JSON.stringify(receipt));

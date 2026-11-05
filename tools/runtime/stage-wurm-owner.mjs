@@ -1,0 +1,15 @@
+﻿import fs from 'node:fs';
+const recipe='wurm_unlimited/egg-wurm-unlimited.json';
+const profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const profile=structuredClone(profiles[recipe]);
+if(!profile)throw Error('Canonical Wurm profile missing');
+const source=fs.readFileSync('internal/panel/game_library/scripts/wurm-owner.py','utf8').replace(/^\uFEFF/,'');
+profile.egg.startup='exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/wurm_owner.py';
+let script=profile.egg.scripts.installation.script;
+const needle='PYTHONPATH=.voltra python3 .voltra/stationeers_wurm_starbound_install.py wurm';
+script=script.replace(/cat > \.voltra\/wurm_owner.py <<'VOLTRA_WURM_OWNER'\n[\s\S]*?\nVOLTRA_WURM_OWNER\n/g,'').replace("PYTHONPATH=.voltra python3 -c 'import os; from pathlib import Path; from wurm_owner import install; install(Path.cwd(),dict(os.environ))'",needle);
+if(!script.includes(needle))throw Error('Unknown canonical installer; refuse staging');
+profile.egg.scripts.installation.script=script.replace(needle,`cat > .voltra/wurm_owner.py <<'VOLTRA_WURM_OWNER'\n${source}\nVOLTRA_WURM_OWNER\nPYTHONPATH=.voltra python3 -c 'import os; from pathlib import Path; from wurm_owner import install; install(Path.cwd(),dict(os.environ))'`);
+profile.revision='wurm-owner-source-v2';
+profile.detail+=' Source-only Wurm adapter staged; new helper not served/native tested. CleanLogsOnStart seeds only when absent; native launcher edits retained.';
+const out='artifacts/game-parity-20261029/wave30-wurm';fs.mkdirSync(out,{recursive:true});fs.writeFileSync(out+'/recipe-fragment.json',JSON.stringify({[recipe]:profile},null,2)+'\n');

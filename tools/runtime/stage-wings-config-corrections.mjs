@@ -1,0 +1,37 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+const source='internal/panel/game_library/overrides.json',baseline=fs.readFileSync(source),all=JSON.parse(baseline);
+const cs2='counter_strike/counter_strike_2/egg-counter--strike2.json',sponge='minecraft/java/spongevanilla/egg-sponge-vanilla.json';
+const cfg='game/csgo/cfg/voltra-native.cfg',launch='config/sponge/launch.properties';
+const cs2Source=fs.readFileSync('internal/panel/game_library/scripts/cs2-runtime.py','utf8');
+assert.ok(cs2Source.includes("NATIVE = 'voltra-native.cfg'"));assert.match(cs2Source,/if not native\.exists\(\):\s+private_write\(native, DEFAULT\)/);
+assert.ok(cs2Source.includes("argv[index:index] = ['+exec', NATIVE]"));
+assert.ok(all[cs2].settings_documents.includes(cfg));
+const version=all[sponge].egg.variables.find(v=>v.env_variable==='SV_VERSION').default_value;
+assert.equal(version,'1.21.10-17.0.0');
+const metadataUrl='https://dl-api.spongepowered.org/v2/groups/org.spongepowered/artifacts/spongevanilla/versions/'+version;
+const metadata=await(await fetch(metadataUrl)).json();const commit=metadata.commit.commits[0].commit.sha;
+assert.equal(commit,'ab34e23bc3730ad07415596594bdaf9dcabaea86');
+const publisherUrl='https://raw.githubusercontent.com/SpongePowered/Sponge/'+commit+'/src/applaunchConfig/java/org/spongepowered/common/applaunch/config/LaunchConfig.java';
+const response=await fetch(publisherUrl);assert.equal(response.status,200);const publisher=await response.text();
+assert.ok(publisher.includes('baseDir.resolve("config/sponge")'));assert.ok(publisher.includes('configDir.resolve("launch.properties")'));
+assert.match(publisher,/if \(Files\.exists\(launchConfigFile\)\)[\s\S]*?return LaunchConfig\.DEFAULT\.withProperties\(props\);/);
+assert.ok(publisher.includes('Files.createDirectories(configDir)'));assert.ok(publisher.includes('Files.newBufferedWriter(launchConfigFile)'));
+const corrections=[];
+for(const [recipe,file,name]of[[cs2,cfg,'cs2'],[sponge,launch,'spongevanilla']]){
+ const original=all[recipe],profile=structuredClone(original),rules=JSON.parse(profile.egg.config.files);
+ assert.deepEqual(rules[file],{parser:'file',find:{}},'Expected exact empty raw-file mapping');delete rules[file];profile.egg.config.files=JSON.stringify(rules);
+ if(!profile.settings_documents.includes(file))profile.settings_documents.push(file);
+ assert.deepEqual(profile.egg.variables,original.egg.variables);assert.equal(profile.egg.scripts.installation.script,original.egg.scripts.installation.script);
+ const check=structuredClone(profile);check.egg.config.files=original.egg.config.files;check.settings_documents=original.settings_documents;assert.deepEqual(check,original);
+ const target='artifacts/game-parity-20261029/'+name+'-wings-config-profile.pending.json';fs.writeFileSync(target,JSON.stringify({[recipe]:profile},null,2)+'\n');
+ corrections.push({recipe,target,removed_rule:file,remaining_rules:rules,settings_documents:profile.settings_documents,controls_unchanged:profile.egg.variables.length,installer_unchanged:true});
+ all[recipe]=profile;
+}
+assert.equal(hash(fs.readFileSync(source)),hash(baseline),'Canonical overrides changed during staging');
+const dir='.local/game-parity-20261029/wings-config-corrections';fs.mkdirSync(dir,{recursive:true});
+fs.writeFileSync(dir+'/overrides-overlay.json',JSON.stringify(all));fs.writeFileSync(dir+'/Sponge-LaunchConfig.java',publisher);
+const report={at:new Date().toISOString(),scope:'Two exact metadata-only review fragments. No canonical/global mappings applied.',baseline_sha256:hash(baseline),corrections,source_checks:{cs2:{source:'internal/panel/game_library/scripts/cs2-runtime.py',sha256:hash(cs2Source),creation:'Actual configure wrapper creates absent persistent CFG via private_write and executes it with +exec. Existing file remains untouched by this branch; explicit settings_documents already provides discovery.'},spongevanilla:{configured_release:version,metadata_url:metadataUrl,publisher_commit:commit,publisher_source_url:publisherUrl,publisher_source_sha256:hash(publisher),creation:'Pinned publisher LaunchConfig.load returns existing native Properties; when absent it creates config/sponge and writes launch.properties itself. No Wings creation rule is needed. Explicit settings_documents now retains the existing UI document after removal.'}},preserved:'All original controls/defaults/permissions, installer/helpers, startup, images, readiness/stop, remaining port rules and agreements are unchanged. Sponge server.properties managed listener mappings remain.',native_boundary:'Source/metadata evidence only; no publisher server started and no EULA/agreements accepted for these fragments.',root_next:'Review and apply each fragment narrowly; synchronize existing owned egg/process caches separately, then perform native preservation acceptance.'};
+fs.writeFileSync('artifacts/game-parity-20261029/catalog-wings-config-corrections.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({corrections,publisher_commit:commit,canonical_unchanged:true}));

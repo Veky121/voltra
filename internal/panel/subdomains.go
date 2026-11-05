@@ -181,6 +181,14 @@ func (a *App) subdomainServer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if str(config["domain"]) != "" && num(config["integration_id"]) > 0 {
+			var enabled bool
+			if e := a.DB.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM integrations WHERE id=$1 AND provider='cloudflare' AND enabled AND egg_id IS NULL)", num(config["integration_id"])).Scan(&enabled); e != nil {
+				fail(w, e)
+				return
+			}
+			if !enabled {
+				continue
+			}
 			route["domain"] = config["domain"]
 			route["integration_id"] = config["integration_id"]
 			choices = append(choices, route)

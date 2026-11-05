@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const recipe = 'conan_exiles/egg-conan-exiles-enhanced.json';
+const profiles = JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'));
+const catalog = JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));
+const current = profiles[recipe], upstream = catalog.entries.find(e => e.path === recipe);
+assert.equal(current.upstream_sha256, upstream.sha256);
+const profile = structuredClone(current);
+const wrapper = fs.readFileSync('internal/panel/game_library/scripts/conan-enhanced.py', 'utf8');
+const installation = profile.egg.scripts.installation;
+assert(installation.script.includes('python3 .voltra/conan_empires.py install enhanced'));
+installation.script = installation.script.replace('python3 .voltra/conan_empires.py install enhanced',
+  `cat > .voltra/conan_enhanced.py <<'VOLTRA_ENHANCED_WRAPPER'\n${wrapper}\nVOLTRA_ENHANCED_WRAPPER\npython3 .voltra/conan_enhanced.py install enhanced`);
+assert(profile.egg.startup.endsWith('.voltra/conan_empires.py run enhanced'));
+profile.egg.startup = profile.egg.startup.replace('.voltra/conan_empires.py run enhanced', '.voltra/conan_enhanced.py run enhanced');
+assert.deepEqual(profile.egg.variables, current.egg.variables);
+profile.revision = 'conan-enhanced-preflight-v2';
+profile.verification = 'not_verified';
+profile.detail = 'Enhanced-only public Linux branch and case-insensitive native INI preflight. Source tests only; candidate is unserved.';
+fs.mkdirSync('artifacts/game-parity-20261029/conan-enhanced-owner', {recursive:true});
+fs.writeFileSync('artifacts/game-parity-20261029/conan-enhanced-owner/profile.json', JSON.stringify({[recipe]:profile}, null, 2)+'\n');

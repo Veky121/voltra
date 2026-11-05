@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+
+const key = 'core_keeper/egg-core-keeper.json';
+const overrides = JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json', 'utf8'));
+const original = overrides[key];
+assert.ok(original?.egg?.startup.endsWith('.voltra/core_keeper_runtime.py'));
+const profile = structuredClone(original);
+const helper = fs.readFileSync('tools/runtime/corekeeper-parity-wave2.py', 'utf8').replaceAll('\r\n', '\n');
+const marker = 'VOLTRA_COREKEEPER_PARITY_WAVE2';
+assert.ok(!helper.includes(marker));
+profile.revision = 'core-keeper-native-file-authority-wave2';
+profile.settings_documents = {...profile.settings_documents, '/CoreKeeperSaves/ServerConfig.json': 'json'};
+profile.egg.startup = profile.egg.startup.replace(/core_keeper_runtime\.py$/, 'corekeeper_parity_wave2.py');
+profile.egg.scripts.installation.script += `\ncat > .voltra/corekeeper_parity_wave2.py <<'${marker}'\n${helper}\n${marker}\n`;
+profile.verification = 'runtime_partial';
+profile.detail = 'Source-only native JSON authority proposal; five campaign gates unverified. Historical acceptance for the prior adapter remains in artifacts/core-keeper-live-acceptance.json and is not evidence for this bridge.';
+assert.deepEqual(profile.egg.variables, original.egg.variables);
+assert.deepEqual(profile.egg.config, original.egg.config);
+assert.deepEqual(profile.egg.docker_images, original.egg.docker_images);
+const output = 'artifacts/game-parity-20261029/corekeeper-wave2-profile.json';
+fs.writeFileSync(output, JSON.stringify({[key]: profile}, null, 2) + '\n');
+console.log(JSON.stringify({output, variables_preserved: profile.egg.variables.length, helper_sha256: crypto.createHash('sha256').update(helper).digest('hex'), native_acceptance: false}));

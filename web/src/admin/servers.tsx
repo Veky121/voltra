@@ -1,3 +1,4 @@
+import {ReinstallServerButton} from '../client/ReinstallServerButton';
 import {accountNickname} from '../client/accountProfile';
 import {confirmAction} from '../ui/ConfirmAction';
 import {useErrorState} from '../notifications/useErrorState';
@@ -512,14 +513,7 @@ export function ServerLifecycle({ record, onSaved }: { record: any; onSaved: () 
           </Action>
         }/>
         <SettingsRow label="Reinstall server" description="Runs the installer again and may overwrite files." control={
-          <Action
-            path={`${servers}/${record.id}/reinstall`}
-            confirm={`Reinstall ${record.name}? The installer will run again and may overwrite files.`}
-            danger
-            onDone={onSaved}
-          >
-            Reinstall server
-          </Action>
+          <ReinstallServerButton server={record} onDone={onSaved}/>
         }/>
         <SettingsRow label="Installation state" description={record.container?.installed ? 'Currently marked as installed.' : 'Currently marked as not installed.'} control={
           <Action

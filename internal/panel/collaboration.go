@@ -1108,7 +1108,11 @@ func (a *App) collabSchedulerRun(ctx context.Context, runID int64) (bool, error)
 			resp.Body.Close()
 		}
 	case "backup":
-		_, actionErr = a.createBackup(actionCtx, server, M{"name": "Scheduled backup " + str(schedule["id"]) + " at " + now(), "ignored": strings.Split(str(task["payload"]), "\n"), "truncate": true})
+		var backup M
+		backup, actionErr = a.createBackup(actionCtx, server, M{"name": "Scheduled backup " + str(schedule["id"]) + " at " + now(), "ignored": strings.Split(str(task["payload"]), "\n"), "truncate": true})
+		if actionErr == nil {
+			_ = a.audit(actionCtx, 0, num(server["id"]), "server:backup.start", M{"backup": backup["uuid"], "source": "scheduled", "schedule_id": schedule["id"], "schedule_name": schedule["name"]})
+		}
 	default:
 		actionErr = bad("Unknown task action.")
 	}

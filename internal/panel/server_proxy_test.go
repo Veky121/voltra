@@ -142,3 +142,27 @@ func TestServerProxyRecovery(t *testing.T) {
 		t.Fatal("game port changed", port, e)
 	}
 }
+
+func TestServerPortForwardCapabilities(t *testing.T) {
+	clients := []M{{"id": int64(1), "setup_complete": true, "test_status": "complete", "local_port_start": int64(25000), "local_port_end": int64(26000)}, {"id": int64(2), "setup_complete": false, "test_status": "complete", "local_port_start": int64(25000), "local_port_end": int64(26000)}, {"id": int64(3), "setup_complete": true, "test_status": "error", "local_port_start": int64(25000), "local_port_end": int64(26000)}}
+	for _, tc := range []struct {
+		name, ip string
+		port     int64
+		reserved []int64
+		want     int
+	}{
+		{"tested connection", "192.168.1.2", 25565, nil, 1},
+		{"local only", "127.0.0.1", 25565, nil, 0},
+		{"local v6", "::1", 25565, nil, 0},
+		{"invalid IP", "example.test", 25565, nil, 0},
+		{"outside pool", "192.168.1.2", 27000, nil, 0},
+		{"reserved port", "192.168.1.2", 25565, []int64{25565}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := serverPortForwardClients(M{"ip": tc.ip, "port": tc.port}, clients, tc.reserved)
+			if len(got) != tc.want || (len(got) > 0 && got[0] != 1) {
+				t.Fatalf("unexpected capabilities: %v", got)
+			}
+		})
+	}
+}

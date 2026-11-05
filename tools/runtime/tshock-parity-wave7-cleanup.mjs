@@ -1,0 +1,16 @@
+import fs from 'node:fs';import path from 'node:path';
+import {runtime,verifyRuntime,api,activeLease,observePower,containers,docker,releaseNative} from './campaign-native-20261029.mjs';
+const dir=path.join(runtime,'tshock-wave7'),s=JSON.parse(fs.readFileSync(path.join(dir,'state.json')));await verifyRuntime();activeLease(s.lease.lease_id,'tshock_native');
+const a=(await api('/api/application/servers/'+s.server.id)).attributes;
+if(a.uuid!=='cdb1471c-4d55-4c80-8fe2-694612d5230d'||a.uuid!==s.server.uuid||a.egg!==s.egg.id||a.node!==1)throw Error('Exact owned fixture required');
+if((await observePower(s)).current_state!=='offline'||containers().some(c=>c.Name.includes(s.server.uuid)&&c.State.Running))throw Error('Stopped game required');
+if(!JSON.parse(fs.readFileSync(path.join(dir,'preservation.json'))).strict_sha_bytes_mode_uid_gid_mtime_equal||!JSON.parse(fs.readFileSync(path.join(dir,'settings-verify-post-reinstall.json'))).password_preserved||!fs.existsSync(path.join(dir,'installer-released.json')))throw Error('Native proof/installer release prerequisite missing');
+const nest=(await api('/api/admin/nests/'+s.nest.id)).attributes,egg=(await api('/api/admin/eggs/'+s.egg.id)).attributes;if(nest.name!=='Campaign TShock wave7'||egg.nest_id!==s.nest.id)throw Error('Fixture definitions changed');
+fs.writeFileSync(path.join(dir,'cleanup-request.json'),JSON.stringify({at:new Date().toISOString(),uuid:s.server.uuid,server:s.server.id,egg:s.egg.id,nest:s.nest.id,allocations:s.allocations.map(a=>a.id)},null,2)+'\n');
+await api('/api/application/servers/'+s.server.id,'DELETE');
+for(const allocation of s.allocations){const current=(await api('/api/application/nodes/1/allocations')).data.map(x=>x.attributes).find(x=>x.id===allocation.id);if(!current||current.server_id!==null||current.ip!=='127.0.0.1'||current.port!==allocation.port)throw Error('Owned allocation drift');await api('/api/application/nodes/1/allocations/'+current.id,'DELETE');}
+await api('/api/admin/eggs/'+s.egg.id,'DELETE');await api('/api/admin/nests/'+s.nest.id,'DELETE');
+const checks={containers:!containers().some(c=>c.Name.includes(s.server.uuid)),allocations:!(await api('/api/application/nodes/1/allocations')).data.some(x=>s.allocations.some(a=>a.id===x.attributes.id))};
+for(const [key,p] of [['server','/api/application/servers/'+s.server.id],['egg','/api/admin/eggs/'+s.egg.id],['nest','/api/admin/nests/'+s.nest.id]]){const r=await fetch('http://127.0.0.1:18099'+p);await r.text();checks[key]=r.status===404;}
+const volume=docker(['run','--rm','--pull','never','--network','none','--read-only','--memory','256m','--memory-swap','256m','--cpus','1','--mount','type=bind,source=/var/lib/voltra-parity-20261029/volumes,target=/volumes,readonly','python:3.12-slim','python','-B','-c',`from pathlib import Path;assert not Path('/volumes/${s.server.uuid}').exists();print('absent')`]);checks.volume=volume.trim()==='absent';
+const result={at:new Date().toISOString(),uuid:s.server.uuid,checks,outcome:'tested',full_parity_claimed:false};fs.writeFileSync(path.join(dir,'cleanup.json'),JSON.stringify(result,null,2)+'\n');if(!Object.values(checks).every(Boolean))throw Error('Owned cleanup incomplete');releaseNative(s.lease.lease_id,'tshock_native','tested',true);console.log(JSON.stringify(result));

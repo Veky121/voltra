@@ -1,0 +1,13 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import crypto from 'node:crypto';
+const recipe='teeworlds/egg-teeworlds.json',profiles=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json')),previous=profiles[recipe],profile=structuredClone(previous),egg=profile.egg;
+assert(previous&&egg.variables.length===8);const variables=JSON.stringify(egg.variables);
+profile.revision='teeworlds-0.7.5-file-authority-v2';profile.settings_documents=['autoexec.cfg'];
+const authorityNotice='Startup gameplay values seed missing native settings once; subsequent native file edits are authoritative.';
+egg.description=egg.description.replaceAll(' '+authorityNotice,'').replace('Preserves native UDP RCON, external console, custom maps and configuration.','Preserves native UDP RCON, external console, custom maps and configuration. '+authorityNotice);
+assert.equal(egg.description.split(authorityNotice).length-1,1);
+let script='#!/bin/bash\nset -euo pipefail\nexport DEBIAN_FRONTEND=noninteractive\ncd /mnt/server\napt-get update\napt-get install -y --no-install-recommends ca-certificates python3 cmake ninja-build g++ zlib1g-dev libssl-dev\ntest ! -L .voltra\nmkdir -p .voltra\n';
+const helpers=[];for(const name of ['teeworlds-install.py','teeworlds-runtime.py','teeworlds-console.cpp.inc']){const body=fs.readFileSync('internal/panel/game_library/scripts/'+name,'utf8');script+=`test ! -L .voltra/${name}\ncat > .voltra/${name} <<'VOLTRA_SOURCE'\n${body}\nVOLTRA_SOURCE\n`;helpers.push({file:name,sha256:crypto.createHash('sha256').update(body).digest('hex')});}
+script+='python3 .voltra/teeworlds-install.py\n';egg.scripts.installation.script=script;
+profile.setup_steps=profile.setup_steps.map(s=>s.startsWith('The form supplies')?'The form seeds missing name, MotD, map, mode, player limit, listing and password values in autoexec.cfg once. Later native edits survive restarts and reinstalls. Only bind address and allocated UDP port remain enforced after autoexec.cfg. Startup controls never reapply existing gameplay settings.':s.replace('generated credentials','native and retained legacy RCON credentials'));
+assert.equal(JSON.stringify(egg.variables),variables);assert.equal(egg.startup,previous.egg.startup);assert.deepEqual(egg.config,previous.egg.config);
+const out='artifacts/game-parity-20261029/teeworlds-native-profile.json';fs.writeFileSync(out,JSON.stringify({[recipe]:profile},null,2)+'\n');console.log(JSON.stringify({file:out,sha256:crypto.createHash('sha256').update(fs.readFileSync(out)).digest('hex'),helpers,preserved_controls:egg.variables.length}));

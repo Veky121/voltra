@@ -9,7 +9,7 @@ The public repository is `Veky121/voltra`, a public fork of `pterodactyl/panel`.
 | Release | `v1.2.3-beta.1`, `v1.2.3` | `update-release` | Yes |
 | Nightly | `v1.2.3-nightly.20261023.1` | `update-nightly` | Opt in |
 
-Agent work defaults to Nightly publication. Update Release only when Veky explicitly requests it for that work; general push/update instructions are insufficient. See `AGENTS.md`. This publication rule does not change an installed desktop user's selected channel.
+Agent work defaults to Nightly publication. Update Release only when Veky explicitly requests it for that work; general push/update instructions are insufficient. This publication rule does not change an installed desktop user's selected channel.
 
 Beta means the product is unfinished. Release means an intentional publication and includes both beta and final tags. There is no automatic promotion schedule. Use increasing SemVer tags; beta sequence numbers start at 1. A final version sorts above betas of the same base version.
 
@@ -23,7 +23,7 @@ The UI uses Wails beta.34's supported custom-UI operations: `Check` shows availa
 
 ## Signing setup, performed by the repository owner
 
-From the future repository root, generate keys only into the ignored directory:
+For initial signing setup only, generate keys from the module-root checkout into the ignored directory. Existing installations depend on the current signing key; do not generate a replacement during routine publication:
 
 ```powershell
 go run ./tools/release keygen .local/updater-keys
@@ -79,7 +79,7 @@ Panel builds embed the full release tag through `-X voltra/internal/panel.NodeRe
 Repository owner publication sequence:
 
 1. Review the exported module-root checkout, keys, environment and repository rules. Run local checks below.
-2. Push the reviewed source to `main`. Tag its commit `v0.1.0-beta.1` and push that tag, or dispatch the Voltra workflow against the existing tag. It invokes Wings automatically after publication.
+2. Push the reviewed source to `main`. For routine agent publication, choose a new increasing `v<base>-nightly.<UTC date>.<sequence>` tag and push it, or dispatch against that existing tag. Use a beta/final Release tag only when explicitly requested. The workflow invokes Wings automatically after publication.
 3. Require both workflows to pass. Download node assets and verify `NODE-SHA256SUMS`; inspect Wings provenance separately.
 4. Test an older disposable Windows install opting into beta through its compatibility alias. Check must show availability without downloading. Install must reject corrupted bytes or wrong signatures. A verified install must wait for Restart. Confirm the legacy stable alias cannot see the beta and the canonical Release feed can. Repeat with nightly before offering nightlies to users.
 
@@ -97,3 +97,7 @@ npm run check --prefix web
 ```
 
 Cross-build both Linux architectures with `CGO_ENABLED=0`, `GOOS=linux`, and `GOARCH=amd64` or `arm64`. A successful build and fixture tests do not prove a remote GitHub publication, Windows binary swap, or live installer. Those require the owner-run release and disposable-machine acceptance above. No secret generation, GitHub publication or service restart is part of local verification.
+
+## Source export
+
+Use `python tools/release/export_source.py <clean-checkout>` to copy this module into a separate publication checkout. The exporter retains product documentation and attribution while excluding agent instructions, working notes, runtime state and generated artifacts. Local files remain intact. Review and test the exported diff before pushing. A source push alone does not publish an app update.

@@ -1,0 +1,45 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {runtime,digest} from './campaign-native-20261029.mjs';
+const dir=path.join(runtime,'banana-wave4-openttd'),state=JSON.parse(fs.readFileSync(path.join(dir,'state.json')));
+const relative=value=>typeof value==='string'?path.relative(process.cwd(),value).replaceAll('\\','/'):value;
+const artifacts='artifacts/game-parity-20261029/';
+const report={
+ schema_version:1,campaign:'game-parity-20261029',recipe:'openttd/egg-open-t-t-d-server.json',observed_at:new Date().toISOString(),
+ runtime:{environment:'windows-docker-desktop-linux-local-npipe',pid:state.runtime.pid,binary_sha256:state.runtime.binary_sha256,snapshot:state.runtime.snapshot,source_fingerprint:state.runtime.source_fingerprint},
+ ownership:{lease:state.lease.lease_id,owner:state.lease.owner,server_id:state.fixture.server.id,uuid:state.fixture.server.uuid,node:1,egg:state.fixture.egg.id,nest:state.fixture.nest.id,ports:state.lease.ports,memory_mib:512,disk_mib:2048,cpu:1,swap:0},
+ gates:{
+  install:{status:'verified',kind:'native_server',acquisition:'Official checksum-pinned OpenTTD15.3 and free OpenGFX8.0; exact hashes matched publisher manifests and installer succeeded.',attempts:state.installers.map(a=>({at:a.at,actual_exit:a.actual_exit,proof:a.proof,cgroup:a.cgroup,pre_gate_capture:a.attached_before_release,log:relative(a.log),wait:relative(a.wait)})),callback:state.install_outcome,slot_released:state.slot_released},
+  setup:{status:'partial',kind:'source_and_native',controls:5,original_controls_preserved:true,remaining:'Root shared browser/setup form acceptance pending. Existing canonical defaults were used for actual native create.'},
+  console:{status:'partial',kind:'native_server',actions:state.actions,raw_crash:state.crash,remaining:'Root UI colors/rendering acceptance pending; plain native logs must not be presented as native ANSI output.'},
+  settings:{status:'partial',kind:'native_server',public_fields:state.settings?.fields.length,typed_edit:state.edit,guards:state.guards,running_guard:state.running_guard,permissions:state.permissions,remaining:'OpenTTD15.3 private.cfg/secrets.cfg declaration + scoped masking and native file-mode repair staged; served API currently404 for both extra documents.'},
+  lifecycle:{status:'partial',kind:'native_server',protocol:{transport:'TCP',tool:'GameDig5.3.3 OpenTTD game-info query uses TCP packet7 request/6 response',observations:state.protocol},native_client:state.native_client,world:state.world,world_checks:state.world_checks,reinstall_preservation:state.preservation,checkpoint:state.checkpoint,permissions:state.permissions,remaining:'Finish served private/secret document masking and mode0600 native repair. Headless native client join/map synchronization passed; graphical player gameplay remains unverified.'}
+ },
+ evidence:{native_state:state.evidence,offline_launcher:artifacts+'banana-wave4-openttd-offline.json',candidate_launcher:artifacts+'banana-wave4-openttd-private-offline.json',private_state_path:relative(path.join(dir,'state.json'))},
+ staged_repairs:{profile:artifacts+'banana-wave4-openttd-private-profile.json',launcher:artifacts+'banana-wave4-openttd-start.sh.pending',parser:artifacts+'banana-wave4-openttd-fields.go.pending',parser_test:artifacts+'banana-wave4-openttd-fields_test.go.pending',hook:'After successful generic parse in parseGameSettingsForEgg: parsed = openttdSettingsFields(egg,file,parsed).',source_test:'Focused Go overlay test passed; private candidate launcher13 offline cases passed.'},
+ measured_gaps:['15.3 creates real private.cfg/secrets.cfg, absent from current shared settings; explicit API requests404.', 'After native graceful save, all three cfg files mode0644 owner988:988. Pending wrapper preflight+umask077+chmod0600 candidate remains source-only.'],
+ harness_corrections:['Initial save command included .sav; OpenTTD appends extension, creating .sav.sav. Corrected command produced the real79876byte save.','Numeric native API values must be strings; first numeric JSON request refused422, corrected typed string edit persisted16 players.','Earlier progress wording said UDP; source inspection proves current GameDig OpenTTD query is TCP, corrected throughout report.','Offline harness interpolation/tmpfs-exec/fake-printf issues fixed before final passing fixture; no real game was involved.'],
+ publisher_sources:['https://cdn.openttd.org/openttd-releases/15.3/manifest.yaml','https://cdn.openttd.org/opengfx-releases/8.0/manifest.yaml','https://raw.githubusercontent.com/OpenTTD/OpenTTD/15.3/src/settings.cpp','https://raw.githubusercontent.com/OpenTTD/OpenTTD/15.3/src/table/settings/network_settings.ini','https://raw.githubusercontent.com/OpenTTD/OpenTTD/15.3/src/openttd.cpp','https://raw.githubusercontent.com/OpenTTD/OpenGFX/8.0/README.md'],
+ native_server_core_complete:false,complete:false,client_gameplay_verified:false,wan_verified:false,publication:false,
+};
+for(const action of report.gates.console.actions||[])action.capture=relative(action.capture);
+const output=artifacts+'banana-wave4-openttd-native-partial.json';fs.writeFileSync(output,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({report:output,sha256:digest(fs.readFileSync(output)),complete:false}));
+if(process.argv.includes('--final')){
+ const privateUI=artifacts+'native-ui-openttd-private.json',secretsUI=artifacts+'native-ui-openttd-secrets.json';
+ if(!state.lease_released||!state.file_mode_proof?.all_native_configs_private||!state.documents_proof||!fs.existsSync(privateUI)||!fs.existsSync(secretsUI))throw Error('Final default-core closure lacks required native/UI/cleanup proof');
+ report.scope='Root-accepted measured default OpenTTD15.3/OpenGFX8.0 native server core; explicit scalar correction and graphical/WAN gaps remain.';
+ report.native_server_core_complete=true;report.complete=false;
+ report.root_review={default_server_core:'accepted',ui:[privateUI,secretsUI],private_fields:9,secret_fields:10,errors:0,blocked_requests:0};
+ report.gates.setup.status='verified';report.gates.setup.kind='root_reviewed_default_native_server';report.gates.setup.remaining='No separate graphical player/gameplay or WAN claim.';
+ report.gates.console.status='verified';report.gates.console.ui=[privateUI,secretsUI];report.gates.console.remaining='Plain native output; no native ANSI producer claim.';
+ report.gates.settings.status='verified';report.gates.settings.scope='Measured native defaults/name/password/maxclients, typed file roundtrips, secret/derived guards, private9/secrets10 UI fields.';
+ report.gates.settings.documents=state.documents_proof;report.gates.settings.file_modes=state.file_mode_proof;report.gates.settings.native_name=state.private_name;report.gates.settings.secret_write=state.secret_check;
+ report.gates.settings.remaining='Known public numeric max_password_time is over-redacted by the shared getter. Exact scoped source/API correction is staged; every public scalar is not claimed perfectly typed.';
+ report.gates.lifecycle.status='verified';report.gates.lifecycle.remaining='Native protocol/map synchronization is verified; graphical gameplay, player load and WAN remain unverified.';
+ report.measured_gaps=['Public max_password_time numeric timeout still appears as masked text on served3d36; pending source correction tested with real PostgreSQL API overlay.'];
+ report.pending_correction={source:'https://raw.githubusercontent.com/OpenTTD/OpenTTD/15.3/src/table/settings/network_settings.ini',key:'network/max_password_time',type:'UINT16',default:2000,minimum:0,maximum:32000,files:[artifacts+'banana-wave4-openttd-timeout-fields.go.pending',artifacts+'banana-wave4-openttd-timeout-documents.go.pending',artifacts+'banana-wave4-openttd-timeout_test.go.pending'],tests:artifacts+'banana-wave4-openttd-timeout-tests.log',passes:3,fail:0,skip:0};
+ report.staged_repairs.status='Root reviewed/promoted and native-verified; exact final canonical reinstall actualexit0. Separate reviewed helper refresh also recorded.';report.staged_repairs.helper_refresh=state.helper_refresh;report.staged_repairs.source_test='Original launcher10 and revised private launcher15 offline cases passed; focused privacy Go overlay passed.';
+ report.cleanup=JSON.parse(fs.readFileSync(artifacts+'banana-wave4-openttd-cleanup.json'));report.cleanup.receipt_scope='Owned-resource cleanup only; native completion verdict is the separate root-reviewed report.';
+ report.harness_corrections.push('First reviewed-refresh attempt failed closed because snapshot retains the immutable override embed but not a separate helper source file. No helper changed; temporary fixture-password edit was reset and all five baseline hashes restored. Retry matched approved ee205511 source bytes to the exact served heredoc and retained old-helper backup.');
+ const final=artifacts+'banana-wave4-openttd-native.json';fs.writeFileSync(final,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({final,default_native_server_core:true,all_public_scalars_perfect:false,graphical_gameplay:false,wan:false,cleanup:true}));
+}

@@ -461,7 +461,7 @@ func (a *App) unmanagedServerPower(ctx context.Context, server M, action string,
 	if err != nil {
 		return nil, err
 	}
-	if str(fresh["status"]) != "" || boolean(fresh["maintenance_mode"]) || boolean(fresh["transferring"]) {
+	if (str(fresh["status"]) != "" && !(str(fresh["status"]) == "reinstall_failed" && fresh["installed_at"] != nil)) || boolean(fresh["maintenance_mode"]) || boolean(fresh["transferring"]) {
 		return nil, APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance or suspension."}
 	}
 	if len(socketUser) > 0 {
@@ -533,7 +533,7 @@ func (a *App) steamSocketPower(ctx context.Context, user, server M, raw []byte) 
 	if err != nil {
 		return true, err
 	}
-	if str(fresh["status"]) != "" || boolean(fresh["maintenance_mode"]) {
+	if (str(fresh["status"]) != "" && !(str(fresh["status"]) == "reinstall_failed" && fresh["installed_at"] != nil)) || boolean(fresh["maintenance_mode"]) {
 		return true, APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance or suspension."}
 	}
 	var response *http.Response

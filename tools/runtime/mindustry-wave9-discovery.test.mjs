@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {decodeMindustryDiscovery} from './mindustry-wave9-discovery.mjs';
+const text=s=>{const b=Buffer.from(s);return Buffer.concat([Buffer.from([b.length]),b]);},integer=n=>{const b=Buffer.alloc(4);b.writeInt32BE(n);return b;},port=Buffer.from([0x71,0xe8]);
+const valid=()=>Buffer.concat([text('Literal $() 世界'),text('Tendrils'),integer(0),integer(1),integer(160),text('official'),Buffer.from([0]),integer(19),text('Operator description'),text(''),port]);
+test('exact publisher response fields and UTF8',()=>{const p=decodeMindustryDiscovery(valid());assert.equal(p.name,'Literal $() 世界');assert.equal(p.map,'Tendrils');assert.equal(p.player_limit,19);assert.equal(p.description,'Operator description');assert.equal(p.build,160);assert.equal(p.port,29160);});
+test('truncation and trailing bytes refuse',()=>{let b=valid();assert.throws(()=>decodeMindustryDiscovery(b.subarray(0,b.length-1)));assert.throws(()=>decodeMindustryDiscovery(Buffer.concat([b,Buffer.from([0])])));});
+test('malformed UTF8 and negative player count refuse',()=>{let b=valid();b[1]=255;assert.throws(()=>decodeMindustryDiscovery(b));b=Buffer.concat([text('n'),text('m'),integer(-1),integer(1),integer(160),text('official'),Buffer.from([0]),integer(19),text(''),text(''),port]);assert.throws(()=>decodeMindustryDiscovery(b));});

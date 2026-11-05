@@ -145,3 +145,12 @@
 .steam-maintenance-actions .maintenance-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:100px}
 .steam-maintenance-details{padding:0 12px 12px;font-size:13px}
 .steam-maintenance-details p{margin:6px 4px;color:var(--muted);line-height:1.5}
+
+.steam-setup-page.template-setup-page{width:100%;max-width:880px;margin-inline:auto}
+.steam-setup-layout.template-setup-layout{width:100%;max-width:880px;margin-inline:auto;grid-template-columns:minmax(0,1fr);gap:12px}
+.template-setup-help{font-size:13px;color:var(--muted);padding:0 4px}
+.template-setup-help>[data-slot=collapsible-content]{padding:8px 12px;line-height:1.6}
+.template-setup-help h2{font-size:13px;color:var(--text);margin:14px 0 6px}
+.template-setup-help p{margin:6px 0}
+.template-setup-help ol{padding-left:20px}
+.template-setup-help li+li{margin-top:8px}

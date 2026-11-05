@@ -1,0 +1,13 @@
+﻿import fs from 'node:fs';
+const recipe='onset/egg-onset.json', dir='artifacts/game-parity-20261029/wave30-onset';
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe]);
+profile.revision='onset-wave30-source-unserved';
+profile.egg.startup='exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/onset_native.py run';
+const source=fs.readFileSync('internal/panel/game_library/scripts/onset-native.py','utf8').replace(/^\uFEFF/,'');
+let script=profile.egg.scripts.installation.script;
+const marker='python3 .voltra/bundle_debian_python.py';
+script=script.replace(/cat > \.voltra\/onset_native.py <<'VOLTRA_SOURCE'\n[\s\S]*?\nVOLTRA_SOURCE\n/g,'').replace('python3 .voltra/onset_native.py install','python3 .voltra/open_world_servers.py install onset');
+if(!script.includes(marker)||!script.includes('python3 .voltra/open_world_servers.py install onset'))throw Error('Canonical installer changed');
+script=script.replace(marker,`cat > .voltra/onset_native.py <<'VOLTRA_SOURCE'\n${source}\nVOLTRA_SOURCE\n${marker}`).replace('python3 .voltra/open_world_servers.py install onset','python3 .voltra/onset_native.py install');
+profile.egg.scripts.installation.script=script;
+fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(dir+'/profile.pending.json',JSON.stringify(profile,null,2)+'\n');

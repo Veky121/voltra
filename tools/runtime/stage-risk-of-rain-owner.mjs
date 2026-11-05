@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+const recipe='risk_of_rain_2/egg-risk-of-rain2.json';
+const directory='artifacts/game-parity-20261029/risk-runtime-authority';
+const profile=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe];
+const helper=fs.readFileSync('internal/panel/game_library/scripts/risk-of-rain-owner.py','utf8');
+const proposed=structuredClone(profile);
+proposed.egg.startup='exec /usr/bin/python3 .voltra/risk-of-rain-owner.py run';
+const script=proposed.egg.scripts.installation.script.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+const block=/cat > \.voltra\/risk-of-rain-owner\.py <<'VOLTRA_RISK_OWNER'\n[\s\S]*?\nVOLTRA_RISK_OWNER/;
+if(!block.test(script))throw Error('Unknown canonical installer dispatch');
+proposed.egg.scripts.installation.script=script.replace(block,()=>`cat > .voltra/risk-of-rain-owner.py <<'VOLTRA_RISK_OWNER'\n${helper}\nVOLTRA_RISK_OWNER`);
+fs.mkdirSync(directory,{recursive:true});
+fs.writeFileSync(`${directory}/profile-proposal.json`,JSON.stringify({[recipe]:proposed},null,2)+'\n');
+fs.writeFileSync(`${directory}/dispatcher-proposal.json`,JSON.stringify({recipe,canonical_mutated:false,startup:proposed.egg.startup,install:'python3 .voltra/risk-of-rain-owner.py install',settings_dispatch:'UNAPPLIED revised helper. No Go dispatcher change proposed. Retain existing permissions/editors. Native server.cfg authoritative after seed; port mismatch refuses. Typed writable UI remains pending active-file/native verification.',retain_setup_unavailable_reason:true},null,2)+'\n');

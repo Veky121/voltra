@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {emptyNetworkSandbox,networkSandboxAllowed,networkSandboxView,updateNetworkSandbox} from '../src/dev/networkSandbox.ts';
+const ports=[{id:7,ip:'127.0.0.1',port:25592,is_default:true},{id:8,ip:'127.0.0.1',port:25593,is_default:false}];
+const setup={clients:[],routes:[]};
+test('test mode stays local, development-only, admin-only and unconfigured',()=>{
+ assert.equal(networkSandboxAllowed(true,'localhost',true,ports,setup),true);
+ assert.equal(networkSandboxAllowed(false,'localhost',true,ports,setup),false);
+ assert.equal(networkSandboxAllowed(true,'example.com',true,ports,setup),false);
+ assert.equal(networkSandboxAllowed(true,'127.0.0.1',false,ports,setup),false);
+ assert.equal(networkSandboxAllowed(true,'localhost',true,ports,{clients:[{}],routes:[]}),false);
+ assert.equal(networkSandboxAllowed(true,'localhost',true,ports,{clients:[],routes:[{}]}),false);
+ assert.equal(networkSandboxAllowed(true,'localhost',true,[{...ports[0],ip:'192.168.1.2'}],setup),false);
+ assert.equal(networkSandboxAllowed(true,'localhost',true,ports,undefined),false);
+});
+test('local forwarding, DNS, editing and cleanup use simulated state only',()=>{
+ let state=emptyNetworkSandbox();
+ assert.equal(networkSandboxView(state,ports).domain.choices.length,0);
+ state=updateNetworkSandbox(state,{type:'forward',allocationID:7,protocols:['udp','tcp'],publicPort:0},ports);
+ assert.equal(state.routes.length,2);
+ assert.ok(state.routes.every(r=>r.status==='simulated'&&r.public_host.endsWith('.test')));
+ state=updateNetworkSandbox(state,{type:'forward',allocationID:7,protocols:['tcp'],publicPort:30000},ports);
+ assert.equal(state.routes.length,2);
+ const route=state.routes.find(r=>r.protocol==='tcp');
+ assert.equal(route.public_port,30000);
+ state=updateNetworkSandbox(state,{type:'subdomain',label:'My-Server',routeID:route.id},ports);
+ assert.equal(networkSandboxView(state,ports).domain.hostname,'play.my-server.voltra.test');
+ state=updateNetworkSandbox(state,{type:'remove-route',id:route.id},ports);
+ assert.equal(networkSandboxView(state,ports).domain.hostname,'');
+ assert.equal(state.routes.length,1);
+ assert.throws(()=>updateNetworkSandbox(state,{type:'subdomain',label:'bad.name',routeID:0},ports));
+ assert.throws(()=>updateNetworkSandbox(state,{type:'forward',allocationID:7,protocols:['tcp'],publicPort:10},ports));
+ assert.throws(()=>updateNetworkSandbox(state,{type:'forward',allocationID:8,protocols:['udp'],publicPort:25592},ports));
+});

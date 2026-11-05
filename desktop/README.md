@@ -103,7 +103,7 @@ routes there. Leave the setting absent to use the normal panel URL. Invalid
 configured URLs fail pairing-code creation instead of sending credentials to
 an unintended origin.
 
-## Updates and GitHub setup later
+## Updates
 
 Local builds include the official GitHub channel feed and pinned Ed25519 public
 key. Use `build.ps1 -DisableUpdates` only for deliberately offline builds.
@@ -129,18 +129,7 @@ signatures mandatory. Unsigned artifacts cannot downgrade verification to
 checksum-only mode. Feed checks bypass HTTP caches. Native code signing and
 GitHub publishing remain separate release tasks.
 
-Use the pinned Wails CLI for publishing tools:
-
-```powershell
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.34
-wails3 updater genkey -out .local/release-keys/updater.key
-```
-
-Keep the private key outside version control. The command prints the raw
-base64 public key used by `-UpdatePublicKey`. Build a release executable, name
-the uploaded asset `Voltra-windows-amd64.exe`, then use `wails3 updater manifest`
-to describe and sign it. Run `wails3 updater verify` before uploading the
-manifest and executable. Preserve the signing key across versions.
+Publication, signing-key setup and asset verification have one maintained procedure in [RELEASES.md](../RELEASES.md). Routine agent publications use Nightly; Release needs an explicit request. Keep each installed user's selected channel.
 
 The manifest provider uses Wails' standard update protocol and can also point
 at a static HTTPS host. GitHub's generic Releases provider does not attach

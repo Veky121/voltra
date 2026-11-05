@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+const recipe='renown/egg-renown.json', base='internal/panel/game_library/scripts/';
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe]);
+const hashes={};
+let script=profile.egg.scripts.installation.script.replace(/cat > \.voltra\/([^ ]+) <<'VOLTRA_GHOST_LOVE_RENOWN_SOURCE'\n[\s\S]*?\nVOLTRA_GHOST_LOVE_RENOWN_SOURCE\n/g,(_,target)=>{
+ const source=base+(target.endsWith('.json')?target:target.replaceAll('_','-'));
+ const bytes=fs.readFileSync(source);hashes[source]=crypto.createHash('sha256').update(bytes).digest('hex');
+ return `cat > .voltra/${target} <<'VOLTRA_GHOST_LOVE_RENOWN_SOURCE'\n${bytes}\nVOLTRA_GHOST_LOVE_RENOWN_SOURCE\n`;
+});
+const source=base+'renown-runtime.py', wrapper=fs.readFileSync(source);
+hashes[source]=crypto.createHash('sha256').update(wrapper).digest('hex');
+script=script.replace(/cat > \.voltra\/renown_runtime.py <<'VOLTRA_RENOWN_SOURCE'\n[\s\S]*?\nVOLTRA_RENOWN_SOURCE\n/g,'').replace('python3 .voltra/renown_runtime.py install','python3 .voltra/ghost_love_renown.py install renown');
+const old='python3 .voltra/ghost_love_renown.py install renown';
+if(!script.includes(old))throw Error('Renown installer dispatch changed');
+script=script.replace(old,`cat > .voltra/renown_runtime.py <<'VOLTRA_RENOWN_SOURCE'\n${wrapper}\nVOLTRA_RENOWN_SOURCE\npython3 .voltra/renown_runtime.py install`);
+profile.egg.scripts.installation.script=script;
+profile.egg.startup=profile.egg.startup.replace('.voltra/ghost_love_renown.py run renown','.voltra/renown_runtime.py run');
+if(!profile.egg.startup.includes('.voltra/renown_runtime.py run'))throw Error('Renown startup dispatch changed');
+profile.revision='renown-native-authority-wave30';
+profile.detail='UNSERVED source fragment; historical runtime_partial remains applicable only to its original build.';
+profile.setup_steps.includes('Existing LinuxServer Game.ini and Engine.ini own native settings after missing-key seeding. Allocations and launcher own listener ports. Plugins may override native values. No new native acceptance.') || profile.setup_steps.push('Existing LinuxServer Game.ini and Engine.ini own native settings after missing-key seeding. Allocations and launcher own listener ports. Plugins may override native values. No new native acceptance.');
+const out='artifacts/game-parity-20261029/wave30-renown';fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(out+'/profiles.pending.json',JSON.stringify({[recipe]:profile},null,2)+'\n');
+fs.writeFileSync(out+'/embeds.json',JSON.stringify(hashes,null,2)+'\n');

@@ -12,17 +12,15 @@ This repository is the Go rewrite and derivative of Pterodactyl Panel developed 
 
 ## Build and run locally
 
-Use the Go version declared in [go.mod](go.mod), Node.js with npm, and Docker Desktop for the Windows development helper. Run these commands from the repository root:
+Use the Go version declared in [go.mod](go.mod), Node.js with npm, Git, and Docker Desktop with Linux containers. Run from the repository root:
 
 ```powershell
-npm ci --prefix web
-npm run build --prefix web
-.\start-local.ps1
+.\dev.ps1 start
 ```
 
-Open <http://127.0.0.1:8088> and complete first-run administrator setup. The helper creates a separate local PostgreSQL instance and stores generated credentials in ignored `.local/runtime.env`. Keep that file and the database volume together. Losing the encryption key makes stored integration credentials unreadable.
+Open <http://127.0.0.1:5181>. Local credentials are in `.local/dev/login.txt`. This runs the real app with a dedicated PostgreSQL database, patched Wings, two local accounts and three game records. Files, console output and backups come from actual local games; installation and game agreements remain explicit.
 
-For frontend development, run `npm run dev --prefix web` in another terminal. Vite uses <http://127.0.0.1:5180> and proxies API requests to the Go panel.
+Any agent or terminal can run `.\dev.ps1 restart backend`, `status`, `logs backend`, or `stop`. Processes persist independently of the starting agent, and ordinary starts preserve your edits. Frontend source changes reload through Vite. See [local development](docs/LOCAL_DEVELOPMENT.md) for service boundaries, production inventory refresh and verification.
 
 ## Build without the Windows helper
 
@@ -41,21 +39,18 @@ Complete setup over a direct loopback connection before exposing the installatio
 ## Development checks
 
 ```sh
-go test ./...
+go test ./cmd/... ./internal/...
 npm run check --prefix web
 npm run test:editor --prefix web
 ```
 
-Database integration tests require an isolated PostgreSQL database through `TEST_DATABASE_URL`. Runtime acceptance tools under `tools/` can install software and create game servers. Read their prerequisites and use isolated resources. A successful build or unit test does not prove a game client can join.
+For the managed Windows dev environment, `.\test-local.ps1` configures the isolated database tests and runs the frontend typecheck. Otherwise supply `TEST_DATABASE_URL` for database integration tests. The explicit Go package paths exclude generated acceptance overlays under `artifacts/`; those are not standalone production packages. Runtime acceptance tools under `tools/` can install software and create game servers. Read their prerequisites and use isolated resources. A successful build or unit test does not prove a game client can join.
 
 ## Documentation
 
-- [Game setup](GAME_SETUP.md), [Minecraft](MINECRAFT_SETUP.md), and [Steam](STEAM.md)
-- [File manager](FILE_MANAGER.md) and [proxy gateways](FRP_PROXY.md)
-- [Desktop build and pairing](desktop/README.md)
-- [Brand assets](branding/README.md)
+Start with the [documentation index](docs/README.md). It separates setup and operations, implementation contracts, verification tools and historical evidence.
 
-Some engineering documents refer to local acceptance receipts under `artifacts/` or an adjacent reference checkout. Those private development files are excluded from this source repository and are not required for the normal panel build.
+Some engineering notes refer to private receipts under `artifacts/` or an adjacent reference checkout. Those files are excluded from the public source repository and are not needed for the normal build.
 
 ## License and provenance
 

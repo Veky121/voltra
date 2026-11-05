@@ -1,4 +1,6 @@
-# Steam games and Quick setup
+# Steam games and settings
+
+The UI calls the configuration page Game settings. Older acceptance notes and the `/quick-setup` API use the original Quick setup name.
 
 The Game Library includes Satisfactory and Palworld alongside Minecraft. Steam
 installation and maintenance belong to the application. The managed game
@@ -82,7 +84,7 @@ unless the user changes them. Folder shortcuts require actual safe directories.
 
 ## Verification
 
-`go test ./...` with `TEST_DATABASE_URL` exercises isolated PostgreSQL schemas.
+`go test ./cmd/... ./internal/...` with `TEST_DATABASE_URL` exercises isolated PostgreSQL schemas and excludes generated acceptance overlays. For the managed local environment, use `test-local.ps1` as described in [local development](docs/LOCAL_DEVELOPMENT.md).
 Steam job tests use authenticated WebSocket streams and fake Steam/Wings.
 Executor tests use fake Docker plus Linux ownership/terminal/service fixtures.
 The web fixture in `web/tests/browser/steam-ui.md` never contacts a real API.

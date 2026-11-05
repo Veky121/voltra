@@ -4,8 +4,9 @@ const paperDifficultyRecipe = "minecraft/java/paper/egg-paper.json"
 
 func paperDifficultyPresentation(field M) {
 	if str(field["key"]) == "difficulty" {
-		field["label"] = "Difficulty default"
-		field["description"] = "Sets the saved difficulty default; existing worlds can keep their current difficulty."
+		field["label"] = "Difficulty for new worlds"
+		field["help"] = "Existing worlds keep their saved difficulty; use Console to change it and run difficulty to check the loaded value."
+		field["description"] = field["help"]
 	}
 }
 

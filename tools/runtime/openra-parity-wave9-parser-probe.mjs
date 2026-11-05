@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+const dir=path.resolve('.local/game-parity-20261029/openra-ra-root-native/go-parser-probe');fs.mkdirSync(dir,{recursive:true});
+fs.copyFileSync('artifacts/game-parity-20261029/openra-wave9-settings.go.pending',dir+'/settings.go');fs.copyFileSync('artifacts/game-parity-20261029/openra-wave9-settings_test.go.pending',dir+'/settings_test.go');
+fs.writeFileSync(dir+'/go.mod','module voltra-openra-parser-probe\n\ngo 1.25.0\n');
+fs.writeFileSync(dir+'/types.go','package panel\nimport "errors"\ntype gameSetting struct { key,value,kind,on,off string }\ntype gameSettingsParsed struct { fields []gameSetting; patch func(map[string]string)([]byte,error) }\nfunc bad(text string) error { return errors.New(text) }\n');
+const result=spawnSync('go',['test','-count=1','-p=1','-v','.'],{cwd:dir,encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:2*1024**2,env:{...process.env,GOWORK:'off',GOTOOLCHAIN:'local',GOMAXPROCS:'1'}});
+const log=(result.stdout||'')+(result.stderr||'');fs.writeFileSync(dir+'/test.log',log);process.stdout.write(log);if(result.error)throw result.error;
+fs.writeFileSync('artifacts/game-parity-20261029/openra-wave9-parser-probe.json',JSON.stringify({at:new Date().toISOString(),exit_code:result.status,tests:5,boundary:'Isolated standard-library-only Go1.25 parser/patch tests with minimal panel data/error type stubs. Not actual Go1.27 backend/API/database/discovery/native acceptance.',source_files:['openra-wave9-settings.go.pending','openra-wave9-settings_test.go.pending'],log:dir+'/test.log',harness_correction:'Initial scratch module requested1.27 but local PATH toolchain is1.25.5. Standard-library parser fixture now explicitly targets installed1.25 without toolchain acquisition; application go.mod untouched.',actual_native_consumed_sample_checked:true,canonical_go_changed:false},null,2)+'\n');process.exitCode=result.status??1;

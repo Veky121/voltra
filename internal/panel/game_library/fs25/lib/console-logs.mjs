@@ -1,3 +1,4 @@
+import {realpathSync} from 'node:fs';
 import {readdirSync,openSync,readSync,fstatSync,closeSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -92,7 +93,7 @@ export function createLogFollower({docsDir,dediDir,environment={},write=line=>co
   }};
 }
 
-if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
+if(process.argv[1] && import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href) {
   const recent=process.argv.includes('--recent');
   const follower=createLogFollower({docsDir:process.env.DOCS_DIR,dediDir:process.env.DEDI_DIR,environment:process.env,fromEnd:recent||process.argv.includes('--from-now'),historyBytes:recent?64*1024:0});
   follower.poll();const timer=setInterval(()=>follower.poll(),1000);

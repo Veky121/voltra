@@ -1,0 +1,26 @@
+// Offline-only handoff. Never changes canonical profiles, runtime, or queue state.
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+const base='artifacts/game-parity-20261029/', recipe='soldat/egg-soldat.json';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const review=JSON.parse(fs.readFileSync(base+'soldat-wave10-ready-review.json'));
+for(const f of review.preferred_files) assert.equal(hash(fs.readFileSync(f.path)),f.sha256,f.path+' drift');
+const fragment=fs.readFileSync(base+'soldat-wave10-preferred-profile.json');
+const profiles=JSON.parse(fragment), p=profiles[recipe];
+assert.deepEqual(Object.keys(profiles),[recipe]);
+assert.deepEqual(p.defaults,{memory:512,disk:4096});
+assert.equal(p.egg.variables.length,7);
+assert.equal(p.required_ports,2);
+assert.deepEqual(p.port_rules[0].offsets,[10]);
+const wrapper=fs.readFileSync('tools/runtime/soldat-wave10-native.py.v3.pending','utf8').replace(/^\uFEFF/,'').replaceAll('\r\n','\n');
+assert(p.egg.scripts.installation.script.replaceAll('\r\n','\n').includes(wrapper));
+assert(p.egg.startup.endsWith('.voltra/soldat-classic-native.py run'));
+const canonical='internal/panel/game_library/overrides.json', before=hash(fs.readFileSync(canonical));
+fs.writeFileSync(base+'soldat-resume-wave1-fragment.json',fragment);
+const queuePath='.local/game-parity-20261029/runtime/queue.json';
+const q=JSON.parse(fs.readFileSync(queuePath));
+const held=q.claims.filter(c=>c.status==='active'&&(c.game===recipe||String(c.owner).startsWith('soldat')));
+const receipt={at:new Date().toISOString(),recipe,preferred_inputs:review.preferred_files,fragment_sha256:hash(fragment),canonical_sha256:before,canonical_unchanged:hash(fs.readFileSync(canonical))===before,foundation_receipt_present:fs.existsSync(base+'resume-wave1-foundation.json'),held_soldat_leases:held,installer_slot_owned_by_soldat:String(q.installer_slot?.owner).startsWith('soldat'),runtime_mutations:false};
+fs.writeFileSync(base+'soldat-resume-wave1-stage.json',JSON.stringify(receipt,null,2)+'\n');
+console.log(JSON.stringify(receipt,null,2));

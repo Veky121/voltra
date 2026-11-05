@@ -1,3 +1,4 @@
+import {realpathSync} from 'node:fs';
 import {readFileSync} from 'node:fs';
 import {basename,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -27,7 +28,7 @@ export function installerKey(filename,environment=process.env) {
   throw Error('This uploaded DLC has no matching admin licence. Download it through the assigned licence first.');
 }
 
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
+if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href) {
   try {process.stdout.write(installerKey(process.argv[2]).replace(/[\s-]/g,''));}
   catch {console.error('[fs25/install] No unambiguous admin licence is assigned to this DLC.');process.exitCode=1;}
 }

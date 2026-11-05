@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+const source='internal/panel/game_library/overrides.json',baseline=fs.readFileSync(source);
+const recipe='vintage_story/egg-vintage-story.json',original=JSON.parse(baseline)[recipe],profile=structuredClone(original);
+const normalize=s=>s.replaceAll('\r\n','\n').replace(/\n*$/,'\n');
+const candidate=normalize(fs.readFileSync('artifacts/game-parity-20261029/vintagestory-runtime.pending.py','utf8'));
+let script=profile.egg.scripts.installation.script;
+const pattern=/cat > \.voltra\/vintage-story-runtime\.py <<'VOLTRA_PYTHON_SOURCE'\n[\s\S]*?\nVOLTRA_PYTHON_SOURCE/;
+assert.equal([...script.matchAll(new RegExp(pattern.source,'g'))].length,1);
+script=script.replace(pattern,"cat > .voltra/vintage-story-runtime.py <<'VOLTRA_PYTHON_SOURCE'\n"+candidate+"VOLTRA_PYTHON_SOURCE");
+const helpers=[['native-console.py','native_console.py'],['steam-template.py','steam_template.py']];
+let embeds='';const hashes=[{file:'.voltra/vintage-story-runtime.py',sha256:hash(candidate)}];
+for(const [sourceName,target]of helpers){const data=normalize(fs.readFileSync('internal/panel/game_library/scripts/'+sourceName,'utf8'));const marker='VOLTRA_VINTAGE_'+target.replaceAll('.','_').toUpperCase();assert.ok(!data.includes(marker));embeds+=`cat > .voltra/${target} <<'${marker}'\n${data}${marker}\n`;hashes.push({file:'.voltra/'+target,sha256:hash(data)});}
+const invocation='python3 .voltra/vintage-story-install.py';assert.equal(script.split(invocation).length,2);script=script.replace(invocation,embeds+invocation);
+profile.egg.scripts.installation.script=script;
+profile.settings_documents??=[];if(!profile.settings_documents.includes('data/serverconfig.json'))profile.settings_documents.push('data/serverconfig.json');
+assert.equal(original.egg.variables.length,5);assert.deepEqual(profile.egg.variables,original.egg.variables);
+const rest=structuredClone(profile);rest.egg.scripts.installation.script=original.egg.scripts.installation.script;rest.settings_documents=original.settings_documents;assert.deepEqual(rest,original);
+fs.writeFileSync('artifacts/game-parity-20261029/vintagestory-console-profile.pending.json',JSON.stringify({[recipe]:profile},null,2)+'\n');
+assert.equal(hash(fs.readFileSync(source)),hash(baseline));
+const report={at:new Date().toISOString(),recipe,baseline_sha256:hash(baseline),candidate_sha256:hash(candidate),helper_hashes:hashes,controls_preserved:5,managed_native_keys:['/Port','/MaxClients'],settings_documents:profile.settings_documents,source_only:true,tests:'5 bounded Linux offline tests passed, including actual shared-supervisor subprocess stand-ins for clean0, positive17, raw SIGKILL-9 to137 and requested /stop0; redaction and exactly one nonzero diagnostic verified. Actual publisher console supervision remains unverified until reviewed owned helper refresh.',preserved:'Original OPTIONS and custom dataPath semantics; MaxClients and Port remain CLI-owned; no native JSON rewriting; original installation payload and publisher pin preserved.',root_integration:'Review candidate and exact pending profile; no canonical/helper/override changes applied by child. Nullable Go/doc integration is separately root-owned.',gaps:['Shared supervisor native stdin/ANSI/clean stop and crash proof pending','New helper gated preservation reinstall pending','Settings API roundtrip and permissions pending fresh root activation','Actual player-client acceptance unavailable']};
+fs.writeFileSync('artifacts/game-parity-20261029/vintagestory-console-candidate.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));

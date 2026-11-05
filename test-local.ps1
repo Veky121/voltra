@@ -1,34 +1,18 @@
-param([switch]$Race, [switch]$Json)
+﻿param([switch]$Race, [switch]$Json, [string]$Run='.')
 $ErrorActionPreference='Stop'
 Set-Location -LiteralPath $PSScriptRoot
-foreach ($line in Get-Content .local/runtime.env) { if ($line -match '^([A-Z0-9_]+)=(.*)$') { [Environment]::SetEnvironmentVariable($Matches[1],$Matches[2],'Process') } }
-$env:TEST_DATABASE_URL=$env:DATABASE_URL
-if ($Race) {
-    $ErrorActionPreference='Continue'
-    docker build -t pteroclone-go-tests -f tools/runtime/Dockerfile.tests .
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    $containerDatabaseURL=$env:DATABASE_URL.Replace('127.0.0.1:55432','host.docker.internal:55432')
-    @("TEST_DATABASE_URL=$containerDatabaseURL", "ENCRYPTION_KEY=$env:ENCRYPTION_KEY") | Set-Content .local/race.env -Encoding ascii
-    $sourcePath=$PSScriptRoot.Replace('\','/')
-    $referencePath=(Join-Path (Split-Path $PSScriptRoot -Parent) 'pterodactyl-vite/upstream').Replace('\','/')
-    $dockerArguments = @('run','--rm','--env-file','.local/race.env','-v',"${sourcePath}:/app:ro",'-v',"${referencePath}:/pterodactyl-vite/upstream:ro",'-v','pteroclone-go-test-cache:/root/.cache/go-build','pteroclone-go-tests')
-    if ($Json) {
-        New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-        $dockerArguments += @('go','test','-json','-race','./...','-count=1','-timeout=180s')
-        docker @dockerArguments | Out-File -FilePath artifacts/go-race.jsonl -Encoding utf8
-    } else {
-        docker @dockerArguments
-    }
-    exit $LASTEXITCODE
-}
-if ($Json) {
-    New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-    go test ./... -json -count=1 | Out-File -FilePath artifacts/go-tests.jsonl -Encoding utf8
-} else {
-    go test ./... -count=1
-}
+$configuration=Join-Path $PSScriptRoot '.local/dev/environment.json'
+if (-not (Test-Path -LiteralPath $configuration)) { throw 'Run ./dev.ps1 start first.' }
+$local=Get-Content -LiteralPath $configuration -Raw | ConvertFrom-Json
+foreach ($variable in @(Get-ChildItem Env: | Where-Object { $_.Name.StartsWith('PG') })) { [Environment]::SetEnvironmentVariable($variable.Name,$null,'Process') }
+$env:TEST_DATABASE_URL="postgres://voltra_dev:$($local.database_password)@127.0.0.1:55440/voltra_dev?sslmode=disable"
+$env:ENCRYPTION_KEY=$local.encryption_key
+# Existing package fixtures create and clean separate schemas, preserving public.
+# Explicit paths exclude generated acceptance overlays under artifacts/.
+$arguments=@('test','./cmd/...','./internal/...','-count=1','-run',$Run)
+if ($Race) { $arguments+='-race' }
+if ($Json) { $arguments+='-json' }
+& go @arguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-go vet ./...
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run build --prefix web
+& npm.cmd run check --prefix web
 exit $LASTEXITCODE

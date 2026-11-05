@@ -1,0 +1,15 @@
+﻿import fs from 'node:fs';
+const key='mohaa/egg-mohaa.json';
+const profile=structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[key]);
+const before=JSON.stringify(profile.egg.variables);
+const source=fs.readFileSync('internal/panel/game_library/scripts/mohaa-owner-next-runtime.py','utf8');
+const marker='python3 .voltra/small_games_family_install.py mohaa\n';
+if(!profile.egg.scripts.installation.script.endsWith(marker))throw Error('Installer shape changed');
+profile.egg.scripts.installation.script=profile.egg.scripts.installation.script.slice(0,-marker.length)+`cat > .voltra/mohaa_owner_next_runtime.py <<'VOLTRA_MOHAA_OWNER_NEXT'\n${source}\nVOLTRA_MOHAA_OWNER_NEXT\n`+marker;
+profile.egg.startup='exec python3 .voltra/mohaa_owner_next_runtime.py';
+profile.revision='mohaa-owner-next-source-v2';
+profile.verification='not_verified';
+profile.detail='Source-only native-file authority adapter; no native acceptance. Existing server.cfg is authoritative. CONFIG_URL retained for compatibility but runtime never downloads a template. Existing resource defaults remain provisional.';
+if(before!==JSON.stringify(profile.egg.variables))throw Error('Variables changed');
+fs.mkdirSync('artifacts/game-parity-20261029/mohaa-owner-next',{recursive:true});
+fs.writeFileSync('artifacts/game-parity-20261029/mohaa-owner-next/profile.json',JSON.stringify({[key]:profile},null,2)+'\n');

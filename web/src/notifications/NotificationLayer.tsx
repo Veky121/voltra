@@ -22,7 +22,7 @@ export function NotificationLayer({children}:{children:ReactNode}){
   if(event.kind==='clear'){toast.close();setOpen(false);return}
   if(event.kind!=='add'||open)return;
   const item=event.entry;
-  toast.add({id:item.id,type:'error',title:item.title,description:item.message.slice(0,220),timeout:6000,actionProps:{children:'View',onClick:()=>{setOpen(true);toast.close(item.id)}}});
+  toast.add({id:item.id,type:item.kind==='success'?'success':'error',title:item.title,description:item.message.slice(0,220),timeout:6000,actionProps:{children:'View',onClick:()=>{setOpen(true);toast.close(item.id)}}});
  }),[open]);
  useEffect(()=>{if(open)toast.close()},[open]);
  useEffect(()=>{if(open&&entries.some(e=>!e.read))markNotificationsRead()},[open,entries]);
@@ -32,10 +32,10 @@ export function NotificationLayer({children}:{children:ReactNode}){
  }
  return <NotificationContext.Provider value={()=>setOpen(true)}><Toaster limit={3} timeout={6000}>{children}
   <Sheet open={open} onOpenChange={setOpen}><SheetContent className="notification-history">
-   <SheetHeader><SheetTitle>Notifications</SheetTitle><SheetDescription>Errors from this session. Kept as you move between pages.</SheetDescription></SheetHeader>
-   <div className="notification-toolbar"><span>{entries.length} {entries.length===1?'issue':'issues'}</span><Button variant="outline" disabled={!entries.length} onClick={download}><Download/>Export log</Button><Button variant="ghost" disabled={!entries.length} onClick={clearNotifications}><Trash2/>Clear all</Button></div>
-   <div className="notification-list">{!entries.length?<p className="notification-empty">No errors recorded.</p>:entries.map(entry=><article key={entry.id} className="notification-entry" data-notification-id={entry.id}>
-    <div className="notification-entry-title">{entry.resolved?<CheckCircle2 className="notification-resolved"/>:<AlertCircle className="notification-error"/>}<strong>{entry.title}</strong><Button variant="ghost" size="icon-sm" aria-label="Dismiss notification" onClick={()=>{dismissNotification(entry.id);toast.close(entry.id)}}><X/></Button></div>
+   <SheetHeader><SheetTitle>Notifications</SheetTitle><SheetDescription>Action confirmations and errors from this session.</SheetDescription></SheetHeader>
+   <div className="notification-toolbar"><span>{entries.length} {entries.length===1?'notification':'notifications'}</span><Button variant="outline" disabled={!entries.length} onClick={download}><Download/>Export log</Button><Button variant="ghost" disabled={!entries.length} onClick={clearNotifications}><Trash2/>Clear all</Button></div>
+   <div className="notification-list">{!entries.length?<p className="notification-empty">No notifications yet.</p>:entries.map(entry=><article key={entry.id} className="notification-entry" data-notification-id={entry.id}>
+    <div className="notification-entry-title">{entry.kind==='success'||entry.resolved?<CheckCircle2 className="notification-resolved"/>:<AlertCircle className="notification-error"/>}<strong>{entry.title}</strong><Button variant="ghost" size="icon-sm" aria-label="Dismiss notification" onClick={()=>{dismissNotification(entry.id);toast.close(entry.id)}}><X/></Button></div>
     <p className="notification-message">{entry.message}</p>
     <div className="notification-meta"><time dateTime={new Date(entry.lastAt).toISOString()} title={new Date(entry.firstAt).toLocaleString()}>{new Date(entry.lastAt).toLocaleTimeString()}</time><span>{entry.source.split('/').pop()?.replace(/\.(tsx?|jsx?)$/,'').replace(/([a-z])([A-Z])/g,'$1 $2')}</span>{entry.count>1&&<span>{entry.count} occurrences</span>}{entry.resolved&&<span>Recovered</span>}</div>
     {entry.page&&<Link to={entry.page} onClick={()=>setOpen(false)}>Open {entry.page==='/'?'overview':entry.page.replace(/^\//,'')}</Link>}

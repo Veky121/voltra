@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+const recipe = 'aloft/egg-aloft.json';
+const profile = structuredClone(JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe]);
+const helper = fs.readFileSync('internal/panel/game_library/scripts/aloft-preflight.py', 'utf8');
+const oldStartup = '.voltra/unreal_survival_next.py run aloft';
+if (!profile.egg.startup.includes(oldStartup)) throw new Error('Unexpected Aloft startup; integration needs review');
+profile.egg.startup = profile.egg.startup.replace(oldStartup, '.voltra/aloft_parity_wave2.py run aloft');
+const script = profile.egg.scripts.installation.script;
+const marker = 'python3 .voltra/bundle_debian_python.py';
+if (script.split(marker).length !== 2 || helper.includes('\nVOLTRA_ALOFT_PREFLIGHT\n')) throw new Error('Unsafe installer insertion');
+profile.egg.scripts.installation.script = script.replace(marker, `cat > .voltra/aloft_parity_wave2.py <<'VOLTRA_ALOFT_PREFLIGHT'\n${helper}\nVOLTRA_ALOFT_PREFLIGHT\n${marker}`);
+fs.writeFileSync('artifacts/game-parity-20261029/aloft-wave2-profile.json', JSON.stringify({[recipe]:profile}, null, 2) + '\n');
+console.log(JSON.stringify({recipe, helper_sha256:crypto.createHash('sha256').update(helper).digest('hex'), canonical_changed:false}));

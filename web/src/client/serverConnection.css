@@ -1,12 +1,5 @@
 .server-connection{margin-top:14px;font-size:calc(12px * var(--ui-font-scale,1));max-width:100%}
-.server-connection-details dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:12px 16px;margin:0;align-items:center}
-.server-connection-row{display:contents}
-.server-connection-details dt{color:var(--muted)}
-.server-connection-details dd{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
-.server-connection-details dd>button{border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);min-height:30px;padding:4px 8px;white-space:normal;background:var(--ui-hover);color:var(--text);font:inherit;cursor:pointer;overflow-wrap:anywhere;text-align:left;max-width:100%}
-.server-connection-details dd>button:hover{background:var(--ui-surface)}
-.server-connection-details dd>button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.server-connection-details dd>span,.server-connection-feedback{color:var(--muted);font-size:11px}
+.server-connection-feedback{color:var(--muted);font-size:11px}
 .server-connection-feedback:empty{display:none}
 .connection-join-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:68px;padding:16px}
 .connection-join-row .copy-button{font-size:15px;max-width:100%}
@@ -19,13 +12,10 @@
 .connection-details dd{margin:0;overflow-wrap:anywhere}
 .connection-details dt{color:var(--muted)}
 .connection-domain-status{display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:13px;color:var(--muted)}
-.server-connection-details>.button{display:inline-flex;margin-top:16px}
-.server-connection-details>.connection-details{padding:12px 0 0}
 .connection-advanced>button,.connection-routing>button{font-size:13px;min-height:32px;margin:0 0 12px}
 .connection-routing [data-slot=collapsible-content],.connection-advanced [data-slot=collapsible-content]{min-width:0}
 @media(max-width:480px){.connection-details dl{grid-template-columns:1fr;gap:4px}.connection-details dd{margin-bottom:8px}}
 .server-connection-uuid{display:block;overflow-wrap:anywhere;margin-bottom:12px}
-@media(max-width:420px){.server-connection-details dl{gap:7px 8px}.server-connection-details dd>button{padding:4px 8px}}
 .server-subdomain-form{grid-column:1/-1;border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);padding:14px;background:var(--ui-surface);color:var(--text)}
 .server-subdomain-form p{line-height:1.6;overflow-wrap:anywhere}
 .server-subdomain-form form{display:grid;gap:12px;margin:12px 0}
@@ -40,6 +30,5 @@
 .server-connection-addresses>div{display:flex;align-items:center;gap:8px;min-width:0;min-height:26px}
 .server-connection-addresses .server-meta-label{min-width:36px;flex-shrink:0}
 .server-connection-addresses .button{min-height:26px;height:26px;padding:2px 7px;font-weight:500}
-.server-connection-summary .server-connection-more{font-weight:400}
 .server-hero-meta .server-connection>.server-connection-feedback:not(:empty){position:absolute;z-index:2;left:44px;top:100%;margin-top:4px;padding:4px 8px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-surface);color:var(--text);box-shadow:0 2px 8px #0003}
-@media(max-width:600px){.server-hero-meta{gap:12px 20px}.server-connection-summary{gap:8px 12px}.server-connection-summary .server-connection-more{min-height:26px;height:26px}}
+@media(max-width:600px){.server-hero-meta{gap:12px 20px}.server-connection-summary{gap:8px 12px}}

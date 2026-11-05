@@ -1,6 +1,6 @@
 # Patched Wings and node distribution
 
-Voltra publishes its patched Wings daemon and outbound node connector as separate Linux executables in the same versioned GitHub release at `Veky121/voltra`. The module directory containing this document is the future public repository root. No installer uses a `latest` URL or executes a `curl | bash` pipeline.
+Voltra publishes its patched Wings daemon and outbound node connector as separate Linux executables in the same versioned GitHub release at `Veky121/voltra`. The module directory containing this document is the public repository root. No installer uses a `latest` URL or executes a `curl | bash` pipeline.
 
 ## Source and patch inventory
 

@@ -1,0 +1,22 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const recipe = 'cs2d/egg-c-s2-d.json';
+const current = JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe];
+const profile = structuredClone(current);
+const canonical = 'internal/panel/game_library/scripts/cs2d-preflight.py';
+const source = fs.readFileSync(canonical, 'utf8').replaceAll('\r\n', '\n');
+assert(!source.includes('VOLTRA_CS2D_PREFLIGHT'));
+const old = '.voltra/small-native-runtime.py cs2d';
+assert(profile.egg.startup.endsWith(old));
+profile.egg.startup = profile.egg.startup.slice(0, -old.length) + '.voltra/cs2d-preflight.py';
+const anchor = 'python3 .voltra/bundle-debian-python.py\n';
+assert.equal(profile.egg.scripts.installation.script.split(anchor).length, 2);
+profile.egg.scripts.installation.script = profile.egg.scripts.installation.script.replace(anchor,
+  `cat > .voltra/cs2d-preflight.py <<'VOLTRA_CS2D_PREFLIGHT'\n${source}\nVOLTRA_CS2D_PREFLIGHT\n${anchor}`);
+assert.deepEqual(profile.egg.variables, current.egg.variables);
+const restored = structuredClone(profile);
+restored.egg.startup = current.egg.startup;
+restored.egg.scripts.installation.script = current.egg.scripts.installation.script;
+assert.deepEqual(restored, current, 'Unrelated profile changes');
+fs.writeFileSync('artifacts/game-parity-20261029/cs2d-wave5-profile.json', JSON.stringify({[recipe]:profile}, null, 2)+'\n');
+console.log(JSON.stringify({staged:true, original_controls:profile.egg.variables.length, settings_documents_added:false}));

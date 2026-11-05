@@ -2,7 +2,9 @@
 
 These scripts use Node built-ins. The reference PHP panel is read only. Mutations target the Go rewrite on loopback and port 8090 is rejected. No script prints request bodies, API keys, daemon secrets or database credentials.
 
-Run from `ptero-go`:
+The commands below target a dedicated parity fixture, not the ordinary `dev.ps1` environment. Several runners rely on a pre-setup development identity; they cannot impersonate users through that header on a configured installation. Verify the target and fixture authentication before running mutation suites. Never disable setup or authentication on a shared runtime to make these tests pass.
+
+Run from `ptero-go` after preparing that fixture:
 
 ```powershell
 node tools/parity/inventory.mjs
@@ -26,9 +28,9 @@ node tools/parity/feature-audit.mjs
 node tools/parity/report.mjs
 ```
 
-`PARITY_BASE_URL` defaults to `http://127.0.0.1:8088`. `PARITY_DEV_USER_HEADER` defaults to `X-Dev-User-ID`. The header is meaningful only in local development and allows tests to check account boundaries even though browser sign-in is deferred.
+`PARITY_BASE_URL` defaults to `http://127.0.0.1:8088`; this historical fixture default is not the shared development API port. `PARITY_DEV_USER_HEADER` defaults to `X-Dev-User-ID`. The panel accepts that identity override only for direct loopback requests with `DEV_MODE=true` before setup is completed. The managed development runtime uses completed password setup and rejects this bypass.
 
-The inventory records every route from the pinned original route export, controller method, original client route, UI control instance, CLI command, permission and supplied PTDL egg. Pterodactyl product requirements begin `not_exercised`. Browser login, password/email identity changes and TOTP are deferred at the user's request. Laravel development/debug tooling is retained in the inventory as reference tooling.
+The inventory records every route from the pinned original route export, controller method, original client route, UI control instance, CLI command, permission and supplied PTDL egg. Pterodactyl product requirements begin `not_exercised`. Older inventories classified authentication flows as deferred; that is historical acceptance scope. Password sessions and optional Cloudflare login are implemented, while panel-native TOTP remains absent. Laravel development/debug tooling remains reference tooling. An old inventory does not establish current authentication coverage.
 
 HTTP checks assert persisted results and failures, rather than counting successful status codes. Each runner creates unique fixtures and removes only those fixtures. `PARITY_SERVER` must name a dedicated rewrite server. File tests write/delete uniquely named scratch files. The base acceptance suite creates inactive schedules; the extended and database suites execute their own schedules against their own servers. No runner resets a database, modifies reference Wings, or starts arbitrary corpus games.
 

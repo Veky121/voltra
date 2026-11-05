@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+import {runtime,verifyRuntime,activeLease,api,docker} from './campaign-native-20261029.mjs';
+const dir=path.join(runtime,'citadel-wave4'),s=JSON.parse(fs.readFileSync(path.join(dir,'state.json'))),proof=JSON.parse(fs.readFileSync(path.join(dir,'installer-proof.json')));
+await verifyRuntime();activeLease(s.lease.lease_id,'citadel_native');const c=JSON.parse(docker(['inspect',proof.id]))[0];if(!c.Name.includes(s.server.uuid)||!c.Name.includes('installer')||!c.State.Running)throw Error('Owned live gated installer required');
+const began=new Date().toISOString(),tag=Date.now(),events=[],stream=fs.createWriteStream(path.join(dir,'installer-events-'+tag+'.jsonl'));
+const monitor=spawn('docker',['--context','desktop-linux','events','--since',began,'--filter','container='+proof.id,'--filter','event=die','--format','{{json .}}'],{windowsHide:true});let pending='';monitor.stdout.on('data',data=>{pending+=data.toString();let at;while((at=pending.indexOf('\n'))>=0){const line=pending.slice(0,at);pending=pending.slice(at+1);if(!line)continue;const e=JSON.parse(line);events.push(e);stream.write(JSON.stringify(e)+'\n');}});
+const auth=(await api('/api/client/servers/'+s.server.uuid+'/websocket')).data,socket=new WebSocket(auth.socket),consoleStream=fs.createWriteStream(path.join(dir,'installer-console-'+tag+'.jsonl'));const secret=JSON.parse(fs.readFileSync(path.join(dir,'credentials.json'))).test_password;
+try{
+ await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Installer console auth timeout')),10000);socket.addEventListener('open',()=>socket.send(JSON.stringify({event:'auth',args:[auth.token]})));socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('Installer console failed'));});socket.addEventListener('message',m=>{const e=JSON.parse(String(m.data));if(e.event==='auth success'){clearTimeout(timer);resolve();}if(['install output','install completed','console output','status'].includes(e.event))consoleStream.write(JSON.stringify({at:new Date().toISOString(),event:e.event,args:e.args?.map(x=>String(x).replaceAll(secret,'[REDACTED]'))})+'\n');});});
+ fs.writeFileSync(path.join(dir,'installer-watch-ready.json'),JSON.stringify({at:began,installer:proof.id,console_authenticated:true}));console.log('Owned installer die-event and authenticated console observer attached');
+ const deadline=Date.now()+50000;let outcome;
+ while(Date.now()<deadline){const a=(await api('/api/application/servers/'+s.server.id)).attributes;if(a.uuid!==s.server.uuid)throw Error('Fixture identity changed');if(a.status==='install_failed'||(a.status===null&&a.container?.installed===1)){outcome={at:new Date().toISOString(),status:a.status,installed:a.container?.installed};break;}await new Promise(r=>setTimeout(r,500));}
+ await new Promise(r=>setTimeout(r,500));const result={at:new Date().toISOString(),installer:proof.id,outcome:outcome||{pending:true},die:events.map(e=>e.Actor?.Attributes),console_authenticated:true};fs.writeFileSync(path.join(dir,'installer-observation-'+tag+'.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
+}finally{socket.close();monitor.kill();stream.end();consoleStream.end();}

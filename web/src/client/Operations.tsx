@@ -1,13 +1,13 @@
-import {ConnectionOverview} from './ServerConnection';
-import {ServerSubdomain} from './ServerSubdomain';
+import {ReinstallServerButton} from './ReinstallServerButton';
+import PortConnections from './PortConnections';
 import {usePendingSetting} from './PendingSettings';
-import ServerStorageSummary from './ServerStorageSummary';
-import ServerInsights from './ServerInsights';
+import {BackupOverview, backupDisplayName, backupOriginLabel, backupCreated} from './BackupOverview';
+import {LockKeyhole} from 'lucide-react';
+import './backups.css';
+import './powerProgress.css';
 import {confirmAction} from '../ui/ConfirmAction';
-import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { JavaSettings } from "./JavaSettings";
-import { ProxyEndpoints } from "./ProxyEndpoints";
 import {SettingsRow,SettingsSection} from '../ui/Settings';
 import {Link} from 'react-router-dom';
 import {
@@ -38,10 +38,29 @@ import {
   value,
 } from "./common";
 
+function BackupStateBadge({pending,successful}:{pending:boolean;successful:boolean}) {
+  const wasPending=useRef(pending);
+  const [created,setCreated]=useState(false);
+  useEffect(()=>{
+    if(pending){wasPending.current=true;setCreated(false);return;}
+    if(!wasPending.current)return;
+    wasPending.current=false;
+    if(!successful)return;
+    setCreated(true);
+    const timer=setTimeout(()=>setCreated(false),5000);
+    return ()=>clearTimeout(timer);
+  },[pending,successful]);
+  const label=pending?'In progress':!successful?'Failed':created?'Created':'';
+  return <span role="status" aria-hidden={!label} style={{visibility:label?'visible':'hidden'}}
+    className={`badge ${pending?'operations-status-pending':!successful?'operations-status-error':'operations-status-success'}`}>{label||'Created'}</span>;
+}
+
 export function Backups() {
-  const { base, permissions, server } = useServer();
+  const { base, permissions } = useServer();
   const [page, setPage] = useState(1);
   const r = useAPI(`${base}/backups?page=${page}&per_page=20`);
+  const [activeAction,setActiveAction]=useState<{id:string;label:string}|null>(null);
+  const [feedback,setFeedback]=useState<{id:string;message:string;failed:boolean}|null>(null);
   const a = useAction();
   const [open, setOpen] = useState(false),
     [name, setName] = useState(""),
@@ -53,109 +72,84 @@ export function Backups() {
     const t = setInterval(r.reload, 10000);
     return () => clearInterval(t);
   }, [base, page]);
+  useEffect(()=>{
+    if(!feedback)return;
+    const timer=setTimeout(()=>setFeedback(null),5000);
+    return ()=>clearTimeout(timer);
+  },[feedback]);
+  const runBackup=(id:string,label:string,success:string,fn:()=>Promise<any>,done?:()=>void)=>a.run(async()=>{
+    setActiveAction({id,label});
+    setFeedback(null);
+    try {
+      const result=await fn();
+      setFeedback({id,message:success,failed:false});
+      done?.();
+      return result;
+    } catch(error) {
+      setFeedback({id,message:error instanceof Error?error.message:'Action failed. Try again.',failed:true});
+      throw error;
+    } finally {
+      setActiveAction(null);
+    }
+  });
   const perform = (id: string, action: string, body?: any, method = "POST") =>
-    a.run(
-      () =>
-        api(
-          `${base}/backups/${id}${action ? "/" + action : ""}`,
-          json(method, body)
-        ),
-      () => {
-        r.reload();
-        setRestore(null);
-      }
-    );
+    runBackup(id,action==='restore'?'Requesting restore...':action==='lock'?'Updating lock...':'Deleting backup...',
+      action==='restore'?'Restore requested':action==='lock'?'Lock updated':'Backup deleted',
+      ()=>api(`${base}/backups/${id}${action ? "/" + action : ""}`,json(method,body)),
+      ()=>{r.reload();setRestore(null);if(method==='DELETE')a.setSuccess('Backup deleted.');});
   return (
     <section className="operations-page backups-page">
-      <ServerStorageSummary backupResponse={r.data} backupError={r.error} extra={<ServerInsights section="backups" backupRequest={r} embedded/>}/>
       <div className="toolbar server-page-toolbar">
-        <ServerPageTitle title="Backups" limit={server.feature_limits?.backups}/>
-        <Button variant="secondary" onClick={r.reload}>
-          Refresh
-        </Button>
+        <div className="server-page-title"><h2>Backups</h2></div>
         {can(permissions, "backup.create") && (
           <Button onClick={() => setOpen(true)}>Create backup</Button>
         )}
       </div>
-      <Notice action={a} />
+      <BackupOverview response={r.data} error={r.error}/>
       <PageError error={r.error} />
-      {r.loading && <p role="status">Loading backups...</p>}
-      <div className="grid grid-2">
-        {items(r.data).map((b) => (
-          <Card key={b.uuid} className="operations-record">
-            <div className="toolbar operations-record-heading">
-              <h3>{b.name}</h3>
-              <span className={`badge ${b.completed_at ? b.is_successful ? 'operations-status-success' : 'operations-status-error' : 'operations-status-pending'}`}>
-                {b.is_locked ? "Locked · " : ""}
-                {b.completed_at
-                  ? b.is_successful
-                    ? "Completed"
-                    : "Failed"
-                  : "In progress"}
-              </span>
+      {r.error && <Button variant="secondary" onClick={r.reload}>Retry</Button>}
+      {r.loading && !r.data && <p role="status">Loading backups...</p>}
+      <div className="backup-cards" role="list" aria-label="Backups">
+        {items(r.data).map((b) => {
+          const created=backupCreated(b.created_at);
+          const active=activeAction?.id===b.uuid?activeAction:null;
+          const result=feedback?.id===b.uuid?feedback:null;
+          const pending=!b.completed_at;
+          return <Card key={b.uuid} className="backup-card" role="listitem"
+            data-backup-active={active||pending?'':undefined}
+            data-backup-state={active?'action':pending?'creating':b.is_successful?'completed':'failed'}
+            aria-busy={!!active||pending}>
+            <div className="backup-card-heading">
+              <div className="backup-card-title">
+                <h3 title={backupDisplayName(b.name)}>{backupDisplayName(b.name)}</h3>
+                <p className={`backup-card-feedback ${result?.failed?'backup-card-error':''}`} role="status" title={active?.label||result?.message||backupOriginLabel(b.origin)}>{active?.label||(pending?'Creating backup...':result?.message)||backupOriginLabel(b.origin)}</p>
+              </div>
+              <div className="backup-card-status">
+                <span className="backup-lock-indicator" style={{visibility:b.is_locked?'visible':'hidden'}} aria-hidden={!b.is_locked}><LockKeyhole size={14} aria-hidden="true"/>Locked</span>
+                <BackupStateBadge pending={pending} successful={!!b.is_successful}/>
+              </div>
             </div>
-            <p className="muted">
-              {date(b.created_at)} · {bytes(b.bytes)}
-            </p>
-            <small>
-              <code>{b.uuid}</code>
-            </small>
-            {b.checksum && (
-              <Disclosure>
-                <DisclosureTrigger>Checksum</DisclosureTrigger>
-                <code>{b.checksum}</code>
-              </Disclosure>
-            )}
-            <div className="actions operations-record-actions">
-              {can(permissions, "backup.download") && b.is_successful && (
-                <Button
-                  variant="secondary"
-                  disabled={a.busy}
-                  onClick={() =>
-                    a.run(() => download(`${base}/backups/${b.uuid}/download`))
-                  }
-                >
-                  Download
-                </Button>
-              )}
-              {can(permissions, "backup.restore") && b.is_successful && (
-                <Button
-                  variant="secondary"
-                  disabled={a.busy}
-                  onClick={() => {
-                    setRestore(b);
-                    setTruncate(false);
-                  }}
-                >
-                  Restore
-                </Button>
-              )}
-              {can(permissions, "backup.delete") && (
-                <>
-                  <Button
-                    variant="secondary"
-                    disabled={a.busy}
-                    onClick={() => perform(b.uuid, "lock")}
-                  >
-                    {b.is_locked ? "Unlock" : "Lock"}
-                  </Button>
-                  <Button
-                    variant="danger"
-                    disabled={a.busy || b.is_locked}
-                    onClick={async () => {
-                      if (await confirmAction({title:"Delete?",description:`Permanently delete backup ${b.name}?`,confirmLabel:"Delete",danger:true}))
-                        perform(b.uuid, "", undefined, "DELETE");
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </>
-              )}
+            <div className="backup-card-footer">
+              <div className="backup-created">
+                <span className="backup-meta-label">Created</span>
+                <time dateTime={b.created_at}><strong>{created.time}</strong><span>{created.date}</span></time>
+              </div>
+              <div className="backup-card-size"><span className="backup-meta-label">Size</span><strong>{b.completed_at?bytes(b.bytes):'Pending'}</strong></div>
+              <div className="backup-card-actions">
+                {can(permissions,'backup.download') && <Button variant="secondary" disabled={a.busy||!b.is_successful} onClick={()=>runBackup(b.uuid,'Preparing download...','Download started',()=>download(`${base}/backups/${b.uuid}/download`))}>Download</Button>}
+                {can(permissions,'backup.restore') && <Button variant="secondary" disabled={a.busy||!b.is_successful} onClick={()=>{setRestore(b);setTruncate(false)}}>Restore</Button>}
+                {can(permissions,'backup.delete') && <>
+                  <Button variant="secondary" disabled={a.busy} onClick={()=>perform(b.uuid,'lock')}>{b.is_locked?'Unlock':'Lock'}</Button>
+                  <Button variant="danger" disabled={a.busy||b.is_locked} onClick={async()=>{
+                    if(await confirmAction({title:'Delete backup?',description:`Permanently delete backup ${b.name}?`,confirmLabel:'Delete',danger:true}))perform(b.uuid,'',undefined,'DELETE');
+                  }}>Delete</Button>
+                </>}
+              </div>
             </div>
-          </Card>
-        ))}
+          </Card>;
+        })}
       </div>
-      {!r.loading && !items(r.data).length && (
+      {!r.loading && !r.error && !items(r.data).length && (
         <Card className="operations-empty">No backups have been created.</Card>
       )}
       <Pager data={r.data} page={page} setPage={setPage} />
@@ -232,42 +226,7 @@ export function Backups() {
 }
 
 export function Network() {
-  const { base, permissions, server, reload } = useServer();
-  const r = useAPI(`${base}/network/allocations`);
-  const domainQuery=useAPI(`${base}/subdomain`);
-  const a = useAction();
-  const [revision,setRevision]=useState(0);
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const perform = (path: string, body?: any, method = "POST") =>
-    a.run(
-      () => api(`${base}/network/allocations${path}`, json(method, body)),
-      ()=>{r.reload();reload();setRevision(n=>n+1)}
-    );
-  const [savingNotes,setSavingNotes]=useState(false);
-  const changedNotes=Object.entries(notes).filter(([id,text])=>{const port=items(r.data).find(n=>String(n.id)===id);return port&&text!==(port.notes??'')});
-  async function saveNotes(){
-    setSavingNotes(true);a.setError('');
-    try{for(const [id,text] of changedNotes){await api(`${base}/network/allocations/${id}`,json('POST',{notes:text}));setNotes(current=>{const next={...current};if(next[id]===text)delete next[id];return next})}}
-    catch(error){a.setError(error instanceof Error?error.message:String(error));throw error}finally{setSavingNotes(false)}
-  }
-  usePendingSetting(`network-notes:${base}`,changedNotes.length>0,{summary:'Port notes',blocked:savingNotes||!can(permissions,'allocation.update'),save:saveNotes,afterSave:r.reload,discard:()=>{setNotes({});a.setError('')}});
-  return <section className="operations-page network-page settings-responsive" aria-label="Connections">
-    <ConnectionOverview domainQuery={domainQuery}/>
-    <ProxyEndpoints base={base} revision={revision}/>
-    <ServerSubdomain query={domainQuery}/>
-    <Disclosure className="connection-advanced"><DisclosureTrigger>Advanced ports</DisclosureTrigger>
-    <SettingsSection title="Server ports" action={can(permissions,'allocation.create')?<Button disabled={a.busy} onClick={()=>perform('')}>Assign port</Button>:undefined}>
-      <p className="server-proxy-note">Ports assigned on the node. Assigning a port does not expose it through a gateway. Limit: {server.feature_limits?.allocations ?? 'Unlimited'}.</p>
-      <Notice action={a}/><PageError error={r.error}/>{r.error&&<Button variant="secondary" onClick={r.reload}>Retry loading ports</Button>}
-      {r.loading&&!r.data&&<p className="server-proxy-note" role="status">Loading server ports...</p>}
-      <div className="settings-options-grid">{items(r.data).map(n=><SettingsRow key={n.id} label={`${n.ip}:${n.port}`} description={n.is_default?'Primary player port':n.ip_alias||n.alias?`Address alias: ${n.ip_alias||n.alias}. Forwarding is configured separately.`:'Additional server port'} control={<div className="network-port-actions">
-       {n.is_default&&<span className="badge">Primary</span>}
-       {!n.is_default&&can(permissions,'allocation.update')&&<Button variant="secondary" disabled={a.busy} onClick={async()=>{if(await confirmAction({title:'Change primary port?',description:`Use ${n.ip}:${n.port} as the primary allocation? Check the game's port settings and proxy routes after changing it.`,confirmLabel:'Make primary'}))perform(`/${n.id}/primary`)}}>Make primary</Button>}
-       {!n.is_default&&can(permissions,'allocation.delete')&&<Button variant="danger" disabled={a.busy} onClick={async()=>{if(await confirmAction({title:'Unassign port?',description:`Unassign ${n.ip}:${n.port}? Remove its proxy routes first.`,confirmLabel:'Unassign',danger:true}))perform(`/${n.id}`,undefined,'DELETE')}}>Unassign</Button>}
-      </div>}><label className="network-port-note">Notes<Input aria-label={`Notes for port ${n.port}`} disabled={!can(permissions,'allocation.update')||savingNotes} value={notes[n.id]??n.notes??''} maxLength={255} onChange={e=>setNotes(old=>({...old,[n.id]:e.target.value}))}/></label></SettingsRow>)}</div>
-      {!r.loading&&!items(r.data).length&&<p className="server-proxy-note">No ports assigned.</p>}
-    </SettingsSection></Disclosure>
-  </section>;
+ return <PortConnections/>;
 }
 
 function Variable({
@@ -432,6 +391,7 @@ export function Startup() {
 
 export function Settings({details,showReinstall=true}:{details?:ReactNode;showReinstall?:boolean}={}) {
   const { base, server, permissions, reload } = useServer();
+  const fs25 = Array.isArray(server.egg_features) && server.egg_features.includes('voltra_fs25');
   const account = useAPI("/api/client/account");
   const a = useAction();
   const [name, setName] = useState(server.name || ""),
@@ -506,29 +466,13 @@ export function Settings({details,showReinstall=true}:{details?:ReactNode;showRe
         </SettingsSection>
         {showReinstall && can(permissions, "settings.reinstall") && (
           <SettingsSection title="Reinstall">
-            <SettingsRow label="Reinstall server" description="Stops the server and may overwrite files. Back up first." control={
-            <Button
-              variant="danger"
-              disabled={a.busy}
-              onClick={async () => {
-                if (
-                  await confirmAction({title:`Reinstall ${server.name}?`,description:"Installation scripts can overwrite existing files. Back up first.",confirmLabel:"Reinstall server",danger:true})
-                )
-                  a.run(
-                    () => api(`${base}/settings/reinstall`, json("POST")),
-                    () => {
-                      reload();
-                      a.setSuccess("Reinstallation requested.");
-                    }
-                  );
-              }}
-            >
-              Reinstall server
-            </Button>
+            <SettingsRow label="Reinstall server" description={fs25 ? "Updates FS25 first, then DLCs. Keeps saves, mods, settings and licences." : "Stops the server and may overwrite files. Back up first."} control={
+            <ReinstallServerButton server={server} permissions={permissions} onDone={reload}/>
             }/>
           </SettingsSection>
         )}
       </div>
+
     </section>
   );
 }

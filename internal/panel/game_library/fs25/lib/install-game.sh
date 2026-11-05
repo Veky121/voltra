@@ -10,6 +10,13 @@
 # servers, fake license files, or otherwise weaken copy protection. The serial
 # is supplied by the operator and validated by GIANTS online — keep it that way.
 set -uo pipefail
+umask 077
+
+# Running this against a live session would replace files the game is using.
+if pgrep -x 'FarmingSimulato|dedicatedServer' >/dev/null 2>&1; then
+    echo '[fs25/install] Refusing installation while FS25 is running.' >&2
+    exit 1
+fi
 
 DLC_ONLY=0
 [ "${1:-}" = "--dlc-only" ] && DLC_ONLY=1
@@ -121,154 +128,112 @@ activate_license() {
 }
 
 # ---- DLC installation ---------------------------------------------------------
-# GIANTS DLC installers are GUI-only — they ignore /SILENT and require an online
-# product-key activation, so there is no way to unpack them headlessly (the
-# payload inside the NSIS installer is only a <dlcStub> XML; the real .dlc is
-# produced by the activation). We therefore drive the dialogs with xdotool.
-#
-# The flow, verified against the real installer on FS25 1.20 in a 1280x720 Xvfb:
-#
-#   1. Window "FarmingSimulator2025": "Please enter your <product> Product Key"
-#      -> type the serial into the auto-focused field, click "Activate >"
-#   2. The product window opens and installs
-#   3. A small "Installation successful." message box appears -> OK, then the
-#      installer exits by itself
-#
-# Step 3 is the awkward one: that box carries no window title of its own and
-# shows up at an unpredictable moment, so there is nothing reliable to wait for.
-# We therefore just click the OK position periodically — a click there while the
-# wizard is still working does nothing — and treat the installer exiting as the
-# clean finish.
-#
-# Require a successful installer exit and new nonempty payloads. A stable
-# file size alone can mean a stalled installer. Timed-out payloads are isolated.
-DLC_TIMEOUT="${DLC_TIMEOUT:-900}"          # absolute ceiling per DLC (seconds)
+# Each product is installed once, using its highest downloaded version. The
+# previous payload is moved aside atomically and retained until game validation.
+# This also avoids the overwrite prompt that the old fixed-click loop missed.
+DLC_TIMEOUT="${DLC_TIMEOUT:-900}"
+[[ "$DLC_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { err "DLC_TIMEOUT must be positive seconds."; exit 1; }
 
-pdlc_snapshot() { find "${DOCS_DIR}/pdlc" -maxdepth 1 -type f -name '*.dlc' -printf '%f\n' 2>/dev/null | sort; }
-
-install_one_dlc() {
-    local dlc="$1" name="$2"
-    local serial_clean=""
+install_one_dlc() (
+    local dlc="$1" name="$2" hash="$3" serial_clean pid="" finished=0 elapsed=0 exit_code=0
+    local entered=0 last_progress=-15 last_click=0 start bytes
     serial_clean=$(node "${FS25_LIB}/dlc-licences.mjs" "$dlc") || return 1
+    node "${FS25_LIB}/dlc-update.mjs" begin "$dlc" || return 1
 
-    mkdir -p "${DOCS_DIR}/pdlc"
-    local before; before="$(pdlc_snapshot)"
+    cleanup_dlc() {
+        if [ -n "$pid" ]; then
+            # Only this installer's Windows image and isolated Unix process group.
+            # Never use wineserver -k: it kills every game in the Wine prefix.
+            timeout 10s wine taskkill /IM "${dlc##*/}" /T /F >/dev/null 2>&1 || true
+            kill -TERM -- "-$pid" 2>/dev/null || true
+            sleep 1
+            kill -KILL -- "-$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+        fi
+        if [ "$finished" -ne 1 ]; then
+            node "${FS25_LIB}/dlc-update.mjs" rollback "$dlc" || return 1
+            warn "${name}: update failed; previous payload restored if present."
+        fi
+    }
+    trap cleanup_dlc EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
 
-    wine "$dlc" >"/tmp/fs25-dlc-${name}.log" 2>&1 &
-    local pid=$!
-
-    local stage=key start elapsed=0 since_click=0 exited=0
-    start=$(date +%s)
-
-    while :; do
+    log "${name}: launching ${dlc##*/}; previous payload held for rollback."
+    setsid wine "$dlc" >"/tmp/fs25-dlc-${name}.log" 2>&1 &
+    pid=$!; start=$SECONDS
+    while kill -0 "$pid" 2>/dev/null; do
         sleep 3
-        elapsed=$(( $(date +%s) - start ))
-
-        # Cleanest possible finish: the installer ended on its own.
-        if ! kill -0 "$pid" 2>/dev/null; then
-            exited=1
-            log "  ${name}: installer finished on its own after ${elapsed}s."
-            break
+        elapsed=$((SECONDS-start))
+        kill -0 "$pid" 2>/dev/null || break
+        # Wine windows do not always expose the Unix launcher PID. Match the
+        # known activation title throughout the run, including late dialogs.
+        if [ "$entered" -eq 0 ] && [ "$elapsed" -ge 12 ]; then
+            local key_window
+            key_window=$(xdotool search --onlyvisible --name '^FarmingSimulator2025$' 2>/dev/null | head -n1 || true)
+            if [ -n "$key_window" ]; then
+                log "${name}: activation dialog detected; submitting assigned GIANTS key."
+                xdotool windowfocus --sync "$key_window" || return 1
+                xdotool mousemove 747 361 click 1 || return 1
+                xdotool key --clearmodifiers End || return 1
+                xdotool key --clearmodifiers --repeat 64 BackSpace || return 1
+                printf '%s' "$serial_clean" | xdotool type --clearmodifiers --delay 100 --file - || return 1
+                sleep 2
+                xdotool mousemove 884 536 click 1 || return 1
+                entered=1
+            fi
         fi
-
+        # Existing installer versions have an untitled success dialog at this
+        # position. Do not send Enter or accept arbitrary update/error dialogs.
+        if [ "$((elapsed-last_click))" -ge 6 ]; then
+            xdotool mousemove 641 382 click 1 >/dev/null 2>&1 || true
+            last_click=$elapsed
+        fi
+        if [ "$((elapsed-last_progress))" -ge 15 ]; then
+            bytes=$(stat -c %s "${DOCS_DIR}/pdlc/${name}.dlc" 2>/dev/null || echo 0)
+            log "${name}: installing, ${elapsed}s elapsed, payload ${bytes} bytes; total unknown."
+            last_progress=$elapsed
+        fi
         if [ "$elapsed" -ge "$DLC_TIMEOUT" ]; then
-            warn "  ${name}: timeout after ${elapsed}s — aborting this DLC."
-            break
+            # No raw window text/screenshots: activation dialogs can contain keys.
+            printf 'reason=timeout\nelapsed_seconds=%s\nactivation_submitted=%s\npayload_bytes=%s\n' "$elapsed" "$entered" "$bytes" > "${DLC_DIR}/.last-failure-${name}.txt"
+            warn "${name}: timed out after ${elapsed}s; activation submitted=${entered}; installer still running."
+            warn "${name}: inspect the private installer log /tmp/fs25-dlc-${name}.log and Wine display before retrying."
+            return 1
         fi
-
-        # Fill in the product-key dialog if it shows up. It only appears the
-        # FIRST time a given DLC is activated on this machine; on a re-install
-        # the installer goes straight to installing. So this must never gate the
-        # rest of the loop — an earlier version did, and then sat there until the
-        # timeout on every re-install.
-        #
-        # Match "FarmingSimulator2025" (no spaces): that is the key dialog. The
-        # install wizard is titled "Farming Simulator 25 - <product>" and must
-        # not be mistaken for it.
-        if [ "$stage" = key ]; then
-            if [ -n "$serial_clean" ] && [ "$elapsed" -ge 12 ] \
-               && xdotool search --onlyvisible --name "FarmingSimulator2025" >/dev/null 2>&1; then
-                xdotool mousemove 747 361 click 1; sleep 0.5
-                xdotool key --clearmodifiers End; xdotool key --clearmodifiers --repeat 64 BackSpace; sleep 0.5
-                printf '%s' "$serial_clean" | xdotool type --clearmodifiers --delay 100 --file -; sleep 2
-                xdotool mousemove 884 536 click 1        # "Activate >"
-                log "  ${name}: product key entered."
-                stage=confirm
-            elif [ "$elapsed" -ge 30 ]; then
-                stage=confirm       # no key dialog — already activated before
-            fi
-        fi
-
-        # Keep tapping OK. The success box has no window title to wait for, and
-        # clicking that spot while the wizard is still busy is a no-op.
-        if [ "$stage" = confirm ]; then
-            since_click=$((since_click + 3))
-            if [ "$since_click" -ge 6 ]; then
-                xdotool mousemove 641 382 click 1 >/dev/null 2>&1 || true
-                since_click=0
-            fi
-        fi
-
     done
-
-    # Only force it down if it did not end on its own; never leave it running.
-    if [ "$exited" -eq 0 ] && kill -0 "$pid" 2>/dev/null; then
-        xdotool mousemove 641 382 click 1 >/dev/null 2>&1 || true   # one last OK
-        sleep 5
-        kill "$pid" >/dev/null 2>&1 || true
-        sleep 2
-        kill -9 "$pid" >/dev/null 2>&1 || true
-    fi
-    sleep 2
-
-    # What actually landed in pdlc/ decides — no filename guessing.
-    local added
-    added="$(comm -13 <(printf '%s\n' "$before") <(pdlc_snapshot) | grep -v '^$' || true)"
-    local complete=1 payload
-    while IFS= read -r payload; do
-        [ -n "$payload" ] && [ -s "${DOCS_DIR}/pdlc/$payload" ] || complete=0
-    done <<< "$added"
-    local installer_exit=0
-    if [ "$exited" -eq 1 ]; then wait "$pid" || installer_exit=$?; fi
-    log "  ${name}: installer exit ${installer_exit}; payload check ${complete}."
-    # Some GIANTS DLC installers return 1 under Wine after writing the complete
-    # payload. Keep it pending: only the licensed game loading it can verify it.
-    if [ "$exited" -eq 1 ] && [ "$installer_exit" -le 1 ] && [ -n "$added" ] && [ "$complete" -eq 1 ]; then
-        printf '%s\n' "$added" > "${DLC_DIR}/.pending-$(sha256sum "$dlc" | cut -d' ' -f1)"
-        log "  ${name}: payload installed after ${elapsed}s; waiting for game validation."
-        return 0
-    fi
-
-    # Never leave a newly created incomplete payload available to the game.
-    mkdir -p "${DLC_DIR}/failed"
-    while IFS= read -r payload; do
-        [ -z "$payload" ] || mv -- "${DOCS_DIR}/pdlc/$payload" "${DLC_DIR}/failed/$payload" 2>/dev/null || true
-    done <<< "$added"
-    warn "  ${name} did not register (continuing without it). Check"
-    warn "  /tmp/fs25-dlc-${name}.log; installer exit ${installer_exit}. No licence verdict is inferred."
-    return 1
-}
+    wait "$pid" || exit_code=$?
+    pid=""
+    log "${name}: installer exited with status ${exit_code} after ${elapsed}s; checking replacement payload."
+    # GIANTS installers can return 1 under Wine. The game must still load the
+    # exact requested version before the backup is removed or success is recorded.
+    [ "$exit_code" -le 1 ] || return 1
+    node "${FS25_LIB}/dlc-update.mjs" complete "$dlc" "$hash" || return 1
+    finished=1
+    log "${name}: payload staged; waiting for the game to validate the requested version."
+)
 
 install_dlcs() {
-    shopt -s nullglob
-    local installed=0
-    for dlc in "${DLC_DIR}/${DLC_PREFIX}"*.exe; do
-        local base name
-        base="$(basename "$dlc")"
+    mkdir -p "$DLC_DIR"
+    local dlc base name hash failures=0 plan
+    # flock survives subprocesses and releases automatically on process exit.
+    exec 9>"${DLC_DIR}/.install.lock"
+    flock -n 9 || { err "Another DLC installation is active. Retry when it finishes."; return 1; }
+    plan=$(node "${FS25_LIB}/dlc-update.mjs" plan) || return 1
+    while IFS= read -r base; do
+        [ -n "$base" ] || continue
+        dlc="${DLC_DIR}/${base}"
         name="${base#${DLC_PREFIX}}"; name="${name%%_*}"
-        local marker="${DLC_DIR}/.installed-$(sha256sum "$dlc" | cut -d' ' -f1)" complete=1 payload
-        [ -s "$marker" ] || marker="${DLC_DIR}/.pending-$(sha256sum "$dlc" | cut -d' ' -f1)"
-        if [ -s "$marker" ]; then
-            while IFS= read -r payload; do
-                case "$payload" in ''|*/*|*..*) complete=0;; *) [ -s "${DOCS_DIR}/pdlc/$payload" ] || complete=0;; esac
-            done < "$marker"
-            [ "$complete" -ne 1 ] || continue
+        hash=$(sha256sum "$dlc" | cut -d' ' -f1) || return 1
+        if node "${FS25_LIB}/dlc-update.mjs" valid "$dlc" "$hash"; then
+            log "${name}: selected version already staged or verified; payload hash matches."
+            continue
         fi
-        log "Installing DLC: ${name}"
-        install_one_dlc "$dlc" "$name" && installed=$((installed+1))
-    done
-    [ "$installed" -gt 0 ] && log "Installed ${installed} new DLC(s)."
-    return 0
+        log "Installing DLC: ${name} (${base})"
+        install_one_dlc "$dlc" "$name" "$hash" || failures=$((failures+1))
+    done <<< "$plan"
+    exec 9>&-
+    [ "$failures" -eq 0 ] || { warn "${failures} DLC update(s) failed; previous versions retained where available."; return 1; }
 }
 
 # ---- Base game install --------------------------------------------------------
@@ -294,5 +259,5 @@ if [ "$DLC_ONLY" -eq 0 ]; then
     cleanup_installer
 fi
 
-install_dlcs
-log "Install step complete."
+[ "${1:-}" = "--base-only" ] || install_dlcs || exit 1
+log "Install step complete; staged DLCs still require game validation."

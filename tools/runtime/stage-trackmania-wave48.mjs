@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+const recipe='trackmania/egg-trackmania.json';
+const canonical=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json','utf8'));
+const profile=structuredClone(canonical[recipe]);
+const script=profile.egg.scripts.installation.script;
+const name='.voltra/truck-trackmania-native.py';
+const pattern=new RegExp(`(cat > ${name.replaceAll('.','\\.')} <<'VOLTRA_NATIVE_SOURCE'\\n)[\\s\\S]*?(\\nVOLTRA_NATIVE_SOURCE)`);
+if(!pattern.test(script))throw Error('Canonical helper geometry changed');
+profile.egg.scripts.installation.script=script.replace(pattern,(_,a,b)=>a+fs.readFileSync('internal/panel/game_library/scripts/truck-trackmania-native.py','utf8')+b);
+const out='artifacts/game-parity-20261029/wave48-trackmania';
+fs.mkdirSync(out,{recursive:true});
+fs.writeFileSync(`${out}/profile-fragment.json`,JSON.stringify({[recipe]:profile},null,2)+'\n');
+console.log('Trackmania-only fragment staged, unapplied.');

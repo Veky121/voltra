@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {spawn} from 'node:child_process';
+import {verifyRuntime,profileFromRuntime,activeLease,api,docker,observePower,acquireInstaller,releaseInstaller,installerGate,waitNativeInstaller,releaseGate,waitInstallOutcome} from './campaign-native-20261029.mjs';
+if(!process.argv.includes('--coordinator-installer-go'))throw Error('Explicit serialized coordinator handoff required');
+const dir='.local/game-parity-20261029/openra-ra-root-native',file=dir+'/state.json',s=JSON.parse(fs.readFileSync(file)),save=()=>fs.writeFileSync(file,JSON.stringify(s,null,2)+'\n');
+activeLease(s.lease.lease_id,s.lease.owner);s.latest_runtime=await verifyRuntime();save();
+if(!s.snapshots?.['before-reinstall-typed']||s.typed?.native_reload_pending!==false||!s.slot_released||(await observePower(s)).current_state!=='offline'||s.reinstall_outcome)throw Error('Owned typed stopped baseline and fresh reinstall required');
+const p=profileFromRuntime(s.recipe,s.latest_runtime),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+if(p.egg.startup!=='exec python3 .voltra/openra-ra-runtime.py'||!p.egg.scripts.installation.script.includes('def seed_settings(')||!p.egg.scripts.installation.script.endsWith('python3 .voltra/openra-family.py ra install\n'))throw Error('Root-served reviewed seed helper required');
+if(s.original_variables?.length!==10||JSON.stringify(p.egg.variables)!==JSON.stringify(s.original_variables))throw Error('Ten original controls changed');
+const owned=(await api('/api/application/servers/'+s.server.id)).attributes;if(owned.uuid!==s.server.uuid||owned.egg!==s.egg.id||owned.node!==1)throw Error('Owned exact fixture drift');
+s.slot=acquireInstaller(s.lease.lease_id,s.lease.owner);s.slot_released=false;save();
+await api('/api/admin/eggs/'+s.egg.id+'/scripts','PATCH',{script_install:installerGate(p.egg.scripts.installation.script,s.slot.token)});
+s.reinstall_request={at:new Date().toISOString(),installer_sha256:hash(p.egg.scripts.installation.script),profile_source:s.latest_runtime.snapshot};save();
+await api('/api/application/servers/'+s.server.id+'/reinstall','POST',{});
+const gated=await waitNativeInstaller(s);s.reinstall_proof=gated.proof;
+const cgroups=docker(['exec',gated.container.Id,'sh','-c','cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.swap.max /sys/fs/cgroup/cpu.max']);
+if(cgroups.trim()!=='1073741824\n0\n100000 100000')throw Error('Actual1GiB/zero-swap/CPU1 installer cgroup mismatch');s.reinstall_cgroups=cgroups;
+for(const[args,label]of[[['logs','--follow',gated.container.Id],'reinstall.log'],[['wait',gated.container.Id],'reinstall-wait.txt']]){const fd=fs.openSync(dir+'/'+label,'wx'),child=spawn('docker',['--context','desktop-linux',...args],{windowsHide:true,stdio:['ignore',fd,fd]});fs.closeSync(fd);child.on('error',()=>{s.reinstall_observer_error=true;save();});s.reinstall_observers??=[];s.reinstall_observers.push({label,pid:child.pid});}save();releaseGate(gated.container,s.lease,s.slot.token);
+s.reinstall_outcome=await waitInstallOutcome(s);save();if(!s.reinstall_outcome.success)throw Error('Actual canonical reinstall failed; retain owned resources');
+let code;for(let n=0;n<20;n++){const raw=fs.existsSync(dir+'/reinstall-wait.txt')?fs.readFileSync(dir+'/reinstall-wait.txt','utf8').trim():'';if(/^\d+$/.test(raw)){code=Number(raw);break;}await new Promise(r=>setTimeout(r,150));}
+s.reinstall_docker_wait=code;save();if(code!==0)throw Error('Independent actual Docker wait0 required');releaseInstaller(s.slot);s.slot_released=true;save();
+console.log(JSON.stringify({outcome:s.reinstall_outcome,actual_docker_wait:code,cgroups,slot_released:true,preboot_comparison_pending:true}));

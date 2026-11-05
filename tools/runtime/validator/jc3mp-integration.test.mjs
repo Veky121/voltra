@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {snapshot,recipe,jc3mpEnvironment,materializeJC3MPDefaults,build,sha} from './jc3mp-canonical-check.mjs';
+import {registration,transportPython,diagnosticGate} from './jc3mp-checks.mjs';
+const profile=JSON.parse(fs.readFileSync(snapshot+'/internal/panel/game_library/overrides.json'))[recipe];
+test('private exact frozen request and admission estimates',()=>{const e=jc3mpEnvironment(profile);assert.equal(e.PUBLIC_SERVER,'false');assert.equal(e.SRCDS_APPID,'619960');assert.deepEqual(materializeJC3MPDefaults(profile.egg.variables,{environment:e}).environment,e);for(const changed of [{PUBLIC_SERVER:'true'},{SRCDS_APPID:'1'},{STEAM_USER:'account'},{AUTO_UPDATE:'0'}])assert.throws(()=>materializeJC3MPDefaults(profile.egg.variables,{environment:{...e,...changed}}));assert.ok(registration.jc3mp.peakMiB>=registration.jc3mp.installPeakMiB);assert.throws(()=>diagnosticGate('caller true'),/DIAGNOSTIC_REQUIRED/);});
+test('transport probe compiles without execution',()=>{const r=spawnSync('python',['-c','import sys; compile(sys.stdin.read(),"transport","exec")'],{input:transportPython,encoding:'utf8',windowsHide:true});assert.equal(r.status,0,r.stderr);});
+test('manifest and gate remain frozen22 with reviewed reserves',()=>{const m=JSON.parse(fs.readFileSync('.local/validator-campaign/jc3mp22-canonical-manifest.json'));assert.equal(m.build,build);assert.equal(sha(fs.readFileSync(m.reconciliation.path)),m.reconciliation.sha256);assert.equal(m.games[0].id,'jc3mp-canonical');assert.equal(m.policy.maxParallel,16);assert.equal(m.maxInstallers,4);assert.ok(m.policy.reserveMiB>=8192&&m.policy.reserveDiskMiB>=32768);assert.ok(m.games[0].peakMiB>=m.games[0].installPeakMiB);});
+test('shared entrypoint shebang and int/bool aliases preserved',()=>{const s=fs.readFileSync('tools/runtime/validator/source-canonical-check.mjs','utf8');assert.ok(/^#!\/usr\/bin\/env node\r?\n/.test(s));assert.ok(s.includes("key==='int'?'integer':key==='bool'?'boolean'"));});
