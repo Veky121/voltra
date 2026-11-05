@@ -78,3 +78,14 @@ test('live snapshots fence older HTTP results and clear forbidden authority',asy
  n.calls[0].resolve({name:'older HTTP'});await tick();assert.equal(state.data.name,'live');
  c.applyLiveQuery(path,null,'Access changed');assert.equal(state.data,null);assert.equal(state.error,'Access changed');a.unsubscribe();
 });
+
+test('exact invalidations coalesce across consumers and fence the previous request',async()=>{
+ c.purgeQueryCache();const n=network();let state;
+ const a=c.observeQuery(path,n.request,s=>state=s),b=c.observeQuery(path,n.request,()=>{});await tick();
+ for(let i=0;i<100;i++)assert.equal(c.invalidateExactQuery(path),true);
+ assert.equal(n.calls[0].options.signal.aborted,true);await tick();assert.equal(n.calls.length,2);
+ n.calls[0].resolve({old:true});await tick();assert.equal(state.data,null);
+ n.calls[1].resolve({fresh:true});await tick();assert.deepEqual(state.data,{fresh:true});
+ c.invalidateExactQuery(path);c.purgeQueryCache();await tick();assert.equal(n.calls.length,2);
+ a.unsubscribe();b.unsubscribe();assert.equal(c.invalidateExactQuery('/not-cached'),false);
+});

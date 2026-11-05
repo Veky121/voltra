@@ -289,7 +289,8 @@ func minecraftKnownHistoricalInstaller(script string) bool {
 	canonical := strings.TrimRight(strings.ReplaceAll(script, "\r\n", "\n"), "\n")
 	sum := sha256.Sum256([]byte(canonical))
 	switch hex.EncodeToString(sum[:]) {
-	case "1e41d423d1818426a110f970464b4baf0e75a54118b084c3a9a4d900140304d5",
+	case "64839fff0d7f3fe61100f304e3ded725a64ac6b0e9967ec77f2b9a24172678fd",
+		"1e41d423d1818426a110f970464b4baf0e75a54118b084c3a9a4d900140304d5",
 		"efe82ae16ace2afc6e9858b50616feefa34ece3578e64399d0347c4502317d3b":
 		return true
 	default:

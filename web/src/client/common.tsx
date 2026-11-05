@@ -1,5 +1,3 @@
-import {captureErrorContext,reportPanelSuccess} from '../notifications/store';
-import {useErrorState} from '../notifications/useErrorState';
 import {Alert,AlertDescription} from '../components/ui/alert';
 import {formatBytesGB,formatMiBGB} from '../resourceUnits';
 import './gameSwitch.css';
@@ -37,14 +35,11 @@ export const json = (method: string, body?: any): RequestInit => ({
       }),
 });
 export function useAction() {
-  const [error, setError] = useErrorState('client/common.tsx');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [success, setSuccessState] = useState("");
-  const context = captureErrorContext('Server action');
-  const setSuccess = (message: string) => {
-    setSuccessState(message);
-    if (message) reportPanelSuccess(message, context);
-  };
+
+  const setSuccess = setSuccessState;
   async function run<T>(
     fn: () => Promise<T>,
     done?: (result: T) => void

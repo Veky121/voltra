@@ -16,11 +16,9 @@ async function load(entry) {
  else if(path==='react/jsx-runtime')contents='export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";';
  else if(path==='react-router-dom')contents='export const Link="a";export const useLocation=()=>({pathname:"/"});export const useNavigate=()=>()=>{};';
  else if(path==='./lib')contents='export const api=(...a)=>globalThis.__gate.request(...a);export const queryCacheSessionIdentity=s=>JSON.stringify(s);'+['Select','Button','Card','ErrorBox','Field','Loading'].map(n=>`export const ${n}="${n}";`).join('');
- else if(path==='./notifications/useErrorState')contents='export const useErrorState=()=>globalThis.__gate.useState("");';
  else if(path==='./components/ui/checkbox')contents='export const Checkbox="input";';
  else if(path==='./components/ui/input')contents='export const Input="input";';
  else if(path==='./ui/ActionButton')contents='export const ActionButton="button";';
- else if(path==='./notifications/store')contents='export const captureErrorContext=()=>({});export const reportPanelError=()=>{};';
  else if(path==='./desktop')contents='export const DesktopRecoveryActions="recovery";';
  else contents='export default "stub";';
  return {contents,loader:'js'};

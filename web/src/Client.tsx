@@ -3,6 +3,7 @@ import { SidebarSection } from "./Navigation";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Loading, useAPI } from "./lib";
+import {ServerPageSkeleton} from './ui/ServerPageSkeleton';
 import {
   can,
   PageError,
@@ -39,7 +40,7 @@ function routePage(children: ReactNode) {
 
 function RoutePage({children}:{children:ReactNode}) {
   const location=useLocation();
-  return <RouteRecovery key={location.pathname}><Suspense fallback={<Loading />}>{children}</Suspense></RouteRecovery>;
+  return <RouteRecovery key={location.pathname}><Suspense fallback={location.pathname.startsWith('/server/')?<ServerPageSkeleton path={location.pathname+location.search}/>:<Loading />}>{children}</Suspense></RouteRecovery>;
 }
 
 function LegacySettingsPage({page}:{page:string}) {
@@ -50,6 +51,7 @@ function LegacySettingsPage({page}:{page:string}) {
 
 function Server() {
   const { id } = useParams();
+  const location=useLocation();
   const base = `/api/client/servers/${id}`;
   const r = useAPI(base);
   const account=useAPI('/api/client/account');
@@ -66,8 +68,8 @@ function Server() {
   },[base,lifecycleState,installationPending,r.reload]);
   if (r.loading && !r.data)
     return (
-      <div className="page" role="status">
-        Loading server...
+      <div className="page">
+        <ServerPageSkeleton path={location.pathname+location.search}/>
       </div>
     );
   if (!r.data)

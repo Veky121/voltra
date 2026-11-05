@@ -1,5 +1,4 @@
 import {SettingsSection,SettingsRow} from '../ui/Settings';
-import {useErrorState} from '../notifications/useErrorState';
 import {useState} from 'react';
 import {api,Button,ErrorBox,unwrap,useAPI} from '../lib';
 import './fs25Licences.css';
@@ -8,7 +7,7 @@ import './fs25Licences.css';
 export function FS25Licences({serverID}:{serverID:number}) {
  const endpoint=`/api/admin/servers/${serverID}/fs25/licences`,query=useAPI(endpoint);
  const data=query.data?unwrap(query.data):null;
- const [busy,setBusy]=useState(false),[error,setError]=useErrorState('admin/FS25Licences.tsx'),[success,setSuccess]=useState('');
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
  return <SettingsSection title="Assigned licences" className="fs25-licences">
   <ErrorBox>{error||query.error}</ErrorBox>{success&&<p role="status">{success}</p>}
   {!data&&!query.error&&<p>Loading assigned licences...</p>}

@@ -1,0 +1,459 @@
+package runtimeimages
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+var firstID = "sha256:" + strings.Repeat("a", 64)
+var secondID = "sha256:" + strings.Repeat("b", 64)
+
+type fakeEngine struct {
+	mu                             sync.Mutex
+	local                          map[string]string
+	pullID                         string
+	pulls                          int
+	inspectErr, pullErr, retainErr error
+	started, unblock               chan struct{}
+}
+
+func (f *fakeEngine) Inspect(_ context.Context, ref string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.inspectErr != nil {
+		return "", f.inspectErr
+	}
+	if id := f.local[ref]; id != "" {
+		return id, nil
+	}
+	return "", ErrMissing
+}
+func (f *fakeEngine) Pull(ctx context.Context, ref string) (string, error) {
+	f.mu.Lock()
+	f.pulls++
+	id, err := f.pullID, f.pullErr
+	started, unblock := f.started, f.unblock
+	f.mu.Unlock()
+	if started != nil {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+	}
+	if unblock != nil {
+		select {
+		case <-unblock:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err == nil {
+		f.local[ref] = id
+		f.local[id] = id
+	}
+	return id, err
+}
+func (f *fakeEngine) Retain(_ context.Context, id, tag string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.retainErr != nil {
+		return f.retainErr
+	}
+	f.local[tag] = id
+	return nil
+}
+func newTest(t *testing.T, cached bool) (*Manager, *fakeEngine) {
+	t.Helper()
+	f := &fakeEngine{local: map[string]string{}, pullID: firstID}
+	if cached {
+		f.local["example/game:stable"] = firstID
+		f.local[firstID] = firstID
+	}
+	m, err := New(f, filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m, f
+}
+func resolve(t *testing.T, m *Manager) string {
+	t.Helper()
+	id, err := m.Resolve(context.Background(), "example/game:stable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+func waitIdle(t *testing.T, m *Manager) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		rows, err := m.Snapshot()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) > 0 && !rows[0].Busy {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("manager remained busy")
+}
+func TestCachedStartHasNoPullAndSurvivesRestart(t *testing.T) {
+	m, f := newTest(t, true)
+	if resolve(t, m) != firstID || f.pulls != 0 {
+		t.Fatal("cached image pulled")
+	}
+	again, err := New(f, m.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.local["example/game:stable"] = secondID
+	if resolve(t, again) != firstID || f.pulls != 0 {
+		t.Fatal("mutable tag changed approved image")
+	}
+}
+func TestColdConcurrentStartsDeduplicate(t *testing.T) {
+	m, f := newTest(t, false)
+	f.unblock = make(chan struct{})
+	f.started = make(chan struct{}, 1)
+	var wg sync.WaitGroup
+	errs := make(chan error, 12)
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			id, err := m.Resolve(context.Background(), "example/game:stable")
+			if err == nil && id != firstID {
+				err = errors.New("wrong identity")
+			}
+			errs <- err
+		}()
+	}
+	<-f.started
+	close(f.unblock)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if f.pulls != 1 {
+		t.Fatalf("pulls=%d", f.pulls)
+	}
+}
+func TestInspectFailureDoesNotPull(t *testing.T) {
+	m, f := newTest(t, false)
+	f.inspectErr = errors.New("daemon unavailable")
+	if _, err := m.Resolve(context.Background(), "example/game:stable"); err == nil || f.pulls != 0 {
+		t.Fatal("transport failure treated as missing")
+	}
+}
+func TestLocalOnlyNeverPulls(t *testing.T) {
+	m, f := newTest(t, false)
+	if _, err := m.Resolve(context.Background(), "~example/local:1"); err == nil || f.pulls != 0 {
+		t.Fatal("local-only miss pulled")
+	}
+	f.local["example/local:1"] = firstID
+	f.local[firstID] = firstID
+	if _, err := m.Resolve(context.Background(), "~example/local:1"); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := m.Snapshot()
+	if rows[0].NextCheckAt != nil || m.StartCheck(rows[0].Reference) == nil {
+		t.Fatal("local image scheduled")
+	}
+}
+func TestDigestPinnedNeverChecksTag(t *testing.T) {
+	m, f := newTest(t, false)
+	ref := "example/game@" + firstID
+	f.local[ref] = firstID
+	f.local[firstID] = firstID
+	if _, err := m.Resolve(context.Background(), ref); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := m.Snapshot()
+	if rows[0].NextCheckAt != nil || m.StartCheck(ref) == nil {
+		t.Fatal("digest reference was scheduled")
+	}
+}
+func TestStagingApprovalRollbackAndStaleSelection(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	f.pullID = secondID
+	if err := m.StartCheck("example/game:stable"); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, m)
+	rows, _ := m.Snapshot()
+	if rows[0].CandidateID != secondID || rows[0].LastCheckedAt == nil || resolve(t, m) != firstID {
+		t.Fatal("candidate activated before approval")
+	}
+	if m.Change(context.Background(), "example/game:stable", "approve", firstID) == nil {
+		t.Fatal("stale approval accepted")
+	}
+	if err := m.Change(context.Background(), "example/game:stable", "approve", secondID); err != nil {
+		t.Fatal(err)
+	}
+	if resolve(t, m) != secondID {
+		t.Fatal("approval not used")
+	}
+	if err := m.Change(context.Background(), "example/game:stable", "rollback", firstID); err != nil {
+		t.Fatal(err)
+	}
+	if resolve(t, m) != firstID {
+		t.Fatal("rollback not used")
+	}
+}
+func TestCachedStartDoesNotWaitForUpdateAndCheckIsDeduplicated(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	f.pullID = secondID
+	f.started = make(chan struct{}, 1)
+	f.unblock = make(chan struct{})
+	if err := m.StartCheck("example/game:stable"); err != nil {
+		t.Fatal(err)
+	}
+	<-f.started
+	if !errors.Is(m.StartCheck("example/game:stable"), ErrBusy) {
+		t.Fatal("duplicate check")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	id, err := m.Resolve(ctx, "example/game:stable")
+	if err != nil || id != firstID {
+		t.Fatal("cached start waited for pull", err)
+	}
+	close(f.unblock)
+	waitIdle(t, m)
+}
+func TestCheckFailureRetainsApprovalAndPersistsBackoff(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	f.pullErr = errors.New("private registry secret must not leak")
+	stamp := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	m.now = func() time.Time { return stamp }
+	if err := m.StartCheck("example/game:stable"); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, m)
+	rows, _ := m.Snapshot()
+	s := rows[0]
+	if s.ApprovedID != firstID || s.LastCheckedAt != nil || s.NextCheckAt.Sub(stamp) != time.Hour || s.Error == "" || strings.Contains(s.Error, "secret") {
+		t.Fatal(s)
+	}
+	again, err := New(f, m.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolve(t, again) != firstID {
+		t.Fatal("failed check broke cached boot")
+	}
+}
+func TestMissingApprovedDoesNotFollowFloatingTag(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	delete(f.local, firstID)
+	f.local["example/game:stable"] = secondID
+	if _, err := m.Resolve(context.Background(), "example/game:stable"); err == nil || f.pulls != 0 {
+		t.Fatal("missing approved image silently replaced")
+	}
+}
+func TestRetainFailureDoesNotApprove(t *testing.T) {
+	m, f := newTest(t, true)
+	f.retainErr = errors.New("disk full")
+	if _, err := m.Resolve(context.Background(), "example/game:stable"); err == nil {
+		t.Fatal("failed retention accepted")
+	}
+	rows, _ := m.Snapshot()
+	if len(rows) != 0 {
+		t.Fatal("unretained image recorded")
+	}
+}
+func TestPersistenceFailureFailsClosed(t *testing.T) {
+	m, _ := newTest(t, true)
+	m.path = filepath.Join(m.path, "missing", "state.json")
+	if err := os.WriteFile(filepath.Dir(filepath.Dir(m.path)), []byte("file"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Resolve(context.Background(), "example/game:stable"); err == nil {
+		t.Fatal("unsaved approval accepted")
+	}
+	if _, err := m.Snapshot(); err == nil {
+		t.Fatal("storage failure hidden")
+	}
+}
+func TestCorruptStateRejected(t *testing.T) {
+	for _, raw := range []string{"null", "{} trailing", `{"x":{"reference":"x","approved_id":"invalid"}}`} {
+		t.Run(raw, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "state.json")
+			os.WriteFile(path, []byte(raw), 0600)
+			if _, err := New(&fakeEngine{}, path); err == nil {
+				t.Fatal("corrupt state accepted")
+			}
+		})
+	}
+}
+func TestUnregisteredCheckRejected(t *testing.T) {
+	m, f := newTest(t, false)
+	if m.StartCheck("attacker/unknown:1") == nil || f.pulls != 0 {
+		t.Fatal("unregistered pull allowed")
+	}
+}
+func TestPullStreamErrorsNeverPass(t *testing.T) {
+	for _, raw := range []string{"", `{"status":"Downloading"}`, `{"error":"denied"}`, `{"errorDetail":{"message":"no space"}}`, `garbage`, "null", `{"status":"Status: Downloaded newer image for x"}` + "\n" + `{"error":"late failure"}`, strings.Repeat("x", 2<<20)} {
+		if err := consumePull(strings.NewReader(raw), func(string) {}); err == nil {
+			t.Fatalf("accepted bad stream %.80q", raw)
+		}
+	}
+	if err := consumePull(strings.NewReader("{\"status\":\"Pulling\"}\n{\"status\":\"Status: Image is up to date for x\"}\n"), func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestTickRespectsSchedule(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	m.Tick()
+	if f.pulls != 0 {
+		t.Fatal("check ran early")
+	}
+	m.now = func() time.Time { return time.Now().Add(25 * time.Hour) }
+	m.Tick()
+	waitIdle(t, m)
+	if f.pulls != 1 {
+		t.Fatal("due check missing")
+	}
+}
+func TestSchedulePauseSurvivesCheckAndRestart(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	if err := m.Schedule(context.Background(), "example/game:stable", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StartCheck("example/game:stable"); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, m)
+	again, err := New(f, m.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := again.Snapshot()
+	if rows[0].ScheduleEnabled || rows[0].NextCheckAt != nil {
+		t.Fatal("manual check enabled paused schedule")
+	}
+	if err = again.Schedule(context.Background(), "example/game:stable", true); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ = again.Snapshot()
+	if !rows[0].ScheduleEnabled || rows[0].NextCheckAt == nil {
+		t.Fatal("schedule not resumed")
+	}
+}
+func TestApprovalAndChecksCannotOverwriteEachOther(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	f.pullID = secondID
+	if err := m.StartCheck("example/game:stable"); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, m)
+	release, err := m.claim(context.Background(), "example/game:stable", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(m.StartCheck("example/game:stable"), ErrBusy) {
+		t.Fatal("check entered approval critical section")
+	}
+	if !errors.Is(m.Schedule(context.Background(), "example/game:stable", false), ErrBusy) {
+		t.Fatal("schedule entered approval critical section")
+	}
+	s, _ := m.state("example/game:stable")
+	s.PreviousID, s.ApprovedID, s.CandidateID = s.ApprovedID, s.CandidateID, ""
+	if err = m.commit(s); err != nil {
+		t.Fatal(err)
+	}
+	release()
+	if err = m.StartCheck("example/game:stable"); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, m)
+	rows, _ := m.Snapshot()
+	if rows[0].ApprovedID != secondID || rows[0].PreviousID != firstID {
+		t.Fatal("check reverted completed approval")
+	}
+}
+func TestInvalidReferencesRejected(t *testing.T) {
+	for _, ref := range []string{"", "~", "https://user:password@registry.example/game:1", "registry.example/game@sha512:" + strings.Repeat("a", 128), "registry.example/game@sha256:bad", "hello\x01world", "hello\x7fworld", "-argument", "a b", "a\nb", "sha256:bad"} {
+		if validReference(ref) {
+			t.Errorf("accepted invalid reference %q", ref)
+		}
+	}
+	for _, ref := range []string{"ubuntu:22.04", "ghcr.io/pterodactyl/yolks:java_25", "localhost:5000/a/b:latest", "~local/image:custom", firstID, "example/image@" + firstID} {
+		if !validReference(ref) {
+			t.Errorf("rejected valid reference %q", ref)
+		}
+	}
+}
+func TestPersistenceFailureCachedStartKeepsLastCommittedApproval(t *testing.T) {
+	m, f := newTest(t, true)
+	resolve(t, m)
+	s, _ := m.state("example/game:stable")
+	s.ApprovedID = secondID
+	f.local[secondID] = secondID
+	m.path = filepath.Join(m.path, "cannot-be-a-child")
+	if err := m.commit(s); err == nil {
+		t.Fatal("expected persistence failure")
+	}
+	if resolve(t, m) != firstID {
+		t.Fatal("failed persistence activated new approval")
+	}
+	if _, err := m.Snapshot(); err == nil {
+		t.Fatal("admin failure hidden")
+	}
+}
+
+type waitSignalContext struct {
+	context.Context
+	ready chan struct{}
+	once  sync.Once
+}
+
+func (c *waitSignalContext) Done() <-chan struct{} {
+	c.once.Do(func() { close(c.ready) })
+	return c.Context.Done()
+}
+func TestConcurrentColdFailureSharedWithWaiters(t *testing.T) {
+	m, f := newTest(t, false)
+	f.pullErr = errors.New("registry unavailable")
+	f.started = make(chan struct{}, 1)
+	f.unblock = make(chan struct{})
+	leader := make(chan error, 1)
+	go func() { _, err := m.Resolve(context.Background(), "example/game:stable"); leader <- err }()
+	<-f.started
+	ctx := &waitSignalContext{Context: context.Background(), ready: make(chan struct{})}
+	follower := make(chan error, 1)
+	go func() {
+		release, err := m.claim(ctx, "example/game:stable", true)
+		if release != nil {
+			release()
+		}
+		follower <- err
+	}()
+	<-ctx.ready
+	close(f.unblock)
+	if <-leader == nil || <-follower == nil {
+		t.Fatal("failed in-flight download was not shared")
+	}
+	if f.pulls != 1 {
+		t.Fatal("failed download was retried by waiter")
+	}
+}

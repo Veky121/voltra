@@ -1,7 +1,6 @@
 import {usePendingSetting,useDiscardSettings} from '../client/PendingSettings';
 import {IntegrationLayout,IntegrationField as Field} from './IntegrationLayout';
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {GatewaySubdomains} from './GatewaySubdomains';
@@ -42,7 +41,7 @@ function Gateway({gateway, onChanged, onDeleted}: {gateway: RecordItem; onChange
   const [draft, setDraft] = useState<RecordItem>({...gateway, auth_token:""});
   const [client, setClient] = useState<RecordItem>({node_id:"",admin_url:"",admin_user:"",admin_password:"",local_port_start:1024,local_port_end:65535});
   const [mapping, setMapping] = useState({client_id:"",server_id:"",allocation_id:"",protocol:"tcp",public_port:""});
-  const [busy, setBusy] = useState(""), [error, setError] = useErrorState('admin/ProxyGateways.tsx'), [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(""), [error, setError] = useState(''), [notice, setNotice] = useState("");
   const selectedClient = rows(clients.data).find((c: RecordItem) => String(c.id) === mapping.client_id);
   const allocations = useAPI(selectedClient ? `/api/application/nodes/${selectedClient.node_id}/allocations?per_page=100` : null);
   const available = rows(allocations.data).filter((a: RecordItem) => String(a.server_id) === mapping.server_id && Number(a.port) >= selectedClient?.local_port_start && Number(a.port) <= selectedClient?.local_port_end);

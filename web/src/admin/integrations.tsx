@@ -1,6 +1,5 @@
 import {IntegrationLayout} from './IntegrationLayout';
 import {usePendingSetting} from '../client/PendingSettings';
-import {useErrorState} from '../notifications/useErrorState';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Button as MiraButton} from '../components/ui/button';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
@@ -96,7 +95,7 @@ function IntegrationForm({ record }: { record: any }) {
   const [bindings, setBindings] = useState<Record<string, string>>(() => record
     ? Object.fromEntries(Object.entries(record.bindings ?? {}).map(([k, v]) => [k, (v as string[]).join(", ")]))
     : fs25 ? {license_key:"GAME_SERIAL"} : Object.fromEntries(providers.curseforge.fields.map(f => [f.key, f.variables])));
-  const [error, setError] = useErrorState('admin/integrations.tsx');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [keyType, setKeyType] = useState(record?.bindings?.license_key?.includes('DLC_PRODUCT_KEY') ? 'dlc' : 'game');
   const eggs = eggsQ.data ? rows(eggsQ.data) : [];

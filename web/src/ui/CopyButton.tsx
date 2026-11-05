@@ -3,7 +3,6 @@ import {Copy} from 'lucide-react';
 import {ActionButton} from './ActionButton';
 import {ButtonFeedback} from './ButtonFeedback';
 import {useTransientMessage} from '../hooks/useTransientMessage';
-import {captureErrorContext,reportPanelError} from '../notifications/store';
 
 type Props=Omit<ComponentProps<'button'>,'onClick'|'value'> & {value:string;onCopyError?:(message:string)=>void};
 export function CopyButton({value,onCopyError,children=value,className='',disabled,...props}:Props){
@@ -12,10 +11,10 @@ export function CopyButton({value,onCopyError,children=value,className='',disabl
  useEffect(()=>{active.current=true;return()=>{active.current=false}},[]);
  async function copy(){
   if(inFlight.current)return;
-  const context=captureErrorContext('Clipboard');
+
   inFlight.current=true;setBusy(true);setCopied('');
   try{await navigator.clipboard.writeText(value);if(active.current){setCopied('Copied');onCopyError?.('')}}
-  catch{const message='Copy unavailable. Select and copy the address manually.';reportPanelError(message,context);if(active.current)onCopyError?.(message)}
+  catch{const message='Copy unavailable. Select and copy the address manually.';if(active.current)onCopyError?.(message)}
   finally{inFlight.current=false;if(active.current)setBusy(false)}
  }
  const state=busy?'pending':copied?'success':'idle';

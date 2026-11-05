@@ -1,5 +1,4 @@
 import {usePendingSetting} from '../client/PendingSettings';
-import {useErrorState} from '../notifications/useErrorState';
 import {useState} from 'react';
 import {api,Button,Input,Select,useAPI,unwrap} from '../lib';
 import {ErrorMessage} from './shared';
@@ -8,7 +7,7 @@ import {SettingsRow,SettingsSection} from '../ui/Settings';
 export function GatewaySubdomains({gateway}:{gateway:Record<string,any>}){
  const path=`/api/admin/proxy-gateways/${gateway.id}/subdomains`,query=useAPI(path),integrations=useAPI('/api/admin/integrations');
  const data=query.data?.attributes;
- const [domain,setDomain]=useState<string|null>(null),[integration,setIntegration]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useErrorState('admin/GatewaySubdomains.tsx');
+ const [domain,setDomain]=useState<string|null>(null),[integration,setIntegration]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [connecting,setConnecting]=useState(false),[token,setToken]=useState(''),[zone,setZone]=useState(''),[saved,setSaved]=useState(false);
  const providers=(integrations.data?.data||[]).map((i:any)=>i.attributes).filter((i:any)=>i.provider==='cloudflare'&&i.enabled&&!i.egg_id);
  const selectedDomain=(domain??data?.domain??'').trim(),selectedIntegration=integration??String(data?.integration_id??'');

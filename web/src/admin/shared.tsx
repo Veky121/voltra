@@ -1,6 +1,5 @@
 import {usePendingSetting} from '../client/PendingSettings';
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {FieldGroup} from '../components/ui/field';
 import {PageHeading} from '../ui/PageHeading';
 import {Alert,AlertDescription} from '../components/ui/alert';
@@ -23,7 +22,7 @@ export function useAPI(path: string | null) {
   const source = useCoreAPI(path);
   const [complete, setComplete] = useState<any>(null);
   const [loadingPages, setLoadingPages] = useState(false);
-  const [pageError, setPageError] = useErrorState('admin/shared.tsx');
+  const [pageError, setPageError] = useState('');
   useEffect(() => {
     let cancelled = false;
     setComplete(null);
@@ -359,7 +358,7 @@ export function Editor({
     ...resourceDraft(fields, initial ?? {}),
   });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('admin/shared.tsx');
+  const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [baseline,setBaseline]=useState(value);
   const form=useRef<HTMLFormElement>(null),key=useId();
@@ -424,7 +423,7 @@ export function Action({
   danger?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('admin/shared.tsx');
+  const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   return (
     <div className="admin-action management-ui">

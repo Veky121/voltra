@@ -1,6 +1,5 @@
+import {TextPanelSkeleton} from '../ui/ServerPageSkeleton';
 import {confirmAction} from '../ui/ConfirmAction';
-import {observedFetch} from '../notifications/observedFetch';
-import {useErrorState} from '../notifications/useErrorState';
 import {IconButton} from '../ui/IconButton';
 import {lazy,Suspense,useEffect,useRef,useState,type RefObject} from 'react';
 import {api,Button} from '../lib';
@@ -27,7 +26,7 @@ export default function FileDocument(props:Props){
 
 function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirtyChange,navigationGuard}:Props){
   const [draft,setDraft]=useState(()=>loadedDraft(path,''));
-  const [loading,setLoading]=useState(true),[opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/FileDocument.tsx'),[notice,setNotice]=useState('');
+  const [loading,setLoading]=useState(true),[opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [kind,setKind]=useState<'text'|'image'|'audio'|'video'|'pdf'|'binary'|'large'>(previewKind(path));
   const [conflict,setConflict]=useState<string|null>(null),[reload,setReload]=useState(0);
   const [chunk,setChunk]=useState(''),[offset,setOffset]=useState(0),[size,setSize]=useState<number|null>(null),[ranged,setRanged]=useState(false),[chunkBusy,setChunkBusy]=useState(false);
@@ -52,7 +51,7 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
         if(initialKind!=='text'){setOpened(true);return;}
         // Fetch inert bytes for text detection so custom game-config extensions
         // can be edited without requiring a browser MIME preview allowlist.
-        const response=await observedFetch(download,{signal:abort.signal,headers:{Range:`bytes=0-${EDIT_LIMIT}`}},[416]);
+        const response=await fetch(download,{signal:abort.signal,headers:{Range:`bytes=0-${EDIT_LIMIT}`}});
         // HTTP byte ranges on a zero-byte file are unsatisfiable. It is still
         // a valid editable document, including a newly created empty file.
         if(response.status===416&&response.headers.get('Content-Range')==='bytes */0'){
@@ -81,7 +80,7 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
     const saving=draftRef.current,expected=forceBaseline??saving.saved;
     setBusy(true);setError('');setNotice('');
     try{
-      const current=await observedFetch(contents);await checkResponse(current);
+      const current=await fetch(contents);await checkResponse(current);
       const bounded=await readBounded(current,EDIT_LIMIT+1);
       if(bounded.truncated||bounded.buffer.byteLength>EDIT_LIMIT)throw new Error('The remote file grew beyond the editor limit. Download it before replacing its contents.');
       const remote=decodeEditorFile(bounded.buffer);
@@ -95,7 +94,7 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
   async function loadChunk(next:number){
     if(chunkBusy)return;setChunkBusy(true);setError('');
     try{
-      const response=await observedFetch(download,{headers:{Range:`bytes=${next}-${next+VIEW_CHUNK-1}`}});await checkResponse(response);
+      const response=await fetch(download,{headers:{Range:`bytes=${next}-${next+VIEW_CHUNK-1}`}});await checkResponse(response);
       if(next>0&&response.status!==206){await response.body?.cancel();throw new Error('This node does not support partial downloads. Download the file to view the remaining contents.');}
       const data=await readBounded(response,VIEW_CHUNK);
       if(alive.current){setChunk(new TextDecoder().decode(data.buffer));setOffset(next);setSize(responseSize(response));setRanged(response.status===206)}
@@ -113,10 +112,10 @@ function DocumentSession({base,path,permissions,onClose,onDelete,deleting,onDirt
     <div className="file-document-content">
     {error&&<div role="alert" className="error">{error}<Button variant="secondary" disabled={dirty||busy} onClick={()=>setReload(n=>n+1)}>Retry opening</Button></div>}
     {notice&&<p role="status" className="file-document-notice">{notice}</p>}
-    {loading?<p role="status">Opening file...</p>:opened&&readable&&<>
+    {loading?<TextPanelSkeleton label="Opening file"/>:opened&&readable&&<>
       {kind==='text'&&<>
         {mixed&&<p className="file-document-notice">This file mixes newline formats. Preview is read only to preserve its bytes. Download it to edit without converting line endings.</p>}
-        <FileEditorBoundary key={draft.revision} path={path} content={draft.content} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}><Suspense fallback={<p role="status">Loading editor...</p>}><FileEditor key={draft.revision} path={path} storageKey={base} content={draft.content} dirty={dirty} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense></FileEditorBoundary>
+        <FileEditorBoundary key={draft.revision} path={path} content={draft.content} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}><Suspense fallback={<TextPanelSkeleton label="Loading editor"/>}><FileEditor key={draft.revision} path={path} storageKey={base} content={draft.content} dirty={dirty} readOnly={!writable||mixed} onChange={content=>setDraft(current=>({...current,content}))} onSave={()=>void save()}/></Suspense></FileEditorBoundary>
       </>}
       {kind==='image'&&<div className="file-document-media"><img src={preview} alt={path.split('/').at(-1)} onError={()=>setNotice('Your browser could not display this image. Download it to open it in another application.')}/></div>}
       {kind==='audio'&&<audio className="file-document-player" controls preload="metadata" src={preview} onError={()=>setNotice('Your browser does not support this audio format. Download it to use another player.')}/>}

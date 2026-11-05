@@ -7,16 +7,16 @@ import {fileURLToPath} from 'node:url';
 const fixtureKey = '__serverAdminToolsFixture';
 const modules = {
   icons: `export const Info='svg';`,
-  errors: `import {useState} from 'react'; export const useErrorState=()=>useState('');`,
   pending: `export const usePendingSetting=(key,dirty,change)=>globalThis.${fixtureKey}.pending.set(key,{...change,dirty}); export const useDiscardSettings=()=>async()=>{const f=globalThis.${fixtureKey};const entries=[...f.pending.values()].filter(x=>x.dirty);if(!entries.length)return true;f.confirmations.push('Discard changes?');if(!f.confirm)return false;for(const item of entries)item.discard();return true};`,
   confirm: `export const confirmAction=async options=>{const f=globalThis.${fixtureKey};f.confirmations.push(options.description);return f.confirm;};`,
   primitives: `export const Card='section',Field='div',Input='input',Textarea='textarea',ActionButton='button',Button='button';`,
   tabs: `import {jsx} from 'react/jsx-runtime';export const SectionTabs=({items,scope,active,onChange})=>jsx('nav',{children:items.map(item=>jsx('button',{role:'tab',id:scope+'-tab-'+item.id,'aria-selected':active===item.id,onClick:()=>onChange(item.id),children:item.label}))});`,
+  reinstall: `import {jsx} from 'react/jsx-runtime';export const ReinstallServerButton=({server,onDone})=>jsx('fixture-reinstall',{serverID:server.id,onDone});`,
   integrationHeader: `export const IntegrationHeader=({children})=>children;`,
 
   react: `export const useState=(...args)=>globalThis.${fixtureKey}.useState(...args); export const useEffect=(...args)=>globalThis.${fixtureKey}.useEffect(...args); export const useId=()=>globalThis.${fixtureKey}.useId(); export const useRef=initial=>useState(()=>({current:initial}))[0]; export const createContext=initial=>{const context={value:initial};context.Provider=({value,children})=>{context.value=value;return children};return context}; export const useContext=context=>context.value;`,
   'react/jsx-runtime': `export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key}); export const jsxs=jsx;`,
-  'react-router-dom': `export const useParams=()=>({id:'999'}); export const useSearchParams=()=>{const f=globalThis.${fixtureKey};const [search,setSearch]=f.useState(()=>new URLSearchParams(f.initialSearch||''));f.setSearch=setSearch;return [search,next=>{const dirty=[...f.pending.values()].filter(x=>x.dirty);if(dirty.length){f.confirmations.push('Discard changes?');if(!f.confirm)return;for(const change of dirty)change.discard();}f.navigations.push('?'+next.toString());setSearch(next);}];}; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a'; export const Navigate=props=>({type:'fixture-redirect',props});`,
+  'react-router-dom': `export const useLocation=()=>({pathname:'/server/7/runtime',search:globalThis.${fixtureKey}.initialSearch||''}); export const useParams=()=>({id:'999'}); export const useSearchParams=()=>{const f=globalThis.${fixtureKey};const [search,setSearch]=f.useState(()=>new URLSearchParams(f.initialSearch||''));f.setSearch=setSearch;return [search,next=>{const dirty=[...f.pending.values()].filter(x=>x.dirty);if(dirty.length){f.confirmations.push('Discard changes?');if(!f.confirm)return;for(const change of dirty)change.discard();}f.navigations.push('?'+next.toString());setSearch(next);}];}; export const useNavigate=()=>path=>globalThis.${fixtureKey}.navigations.push(path); export const Link='a'; export const NavLink='a'; export const Navigate=props=>({type:'fixture-redirect',props});`,
   lib: `import {jsx} from 'react/jsx-runtime';
     export const api=(...args)=>globalThis.${fixtureKey}.api(...args);
     export const useAPI=path=>globalThis.${fixtureKey}.query(path);
@@ -37,7 +37,7 @@ const modules = {
       ...props,type:'button',role:'switch','aria-checked':checked,disabled,
       onClick:()=>{if(!disabled)onCheckedChange?.(!checked,{event:{type:'click'}});}
     });`,
-  operations: `import {jsx} from 'react/jsx-runtime'; export const Settings=()=>jsx('fixture-general',{});`,
+  operations: `import {jsx} from 'react/jsx-runtime'; export const Settings=()=>jsx('fixture-general',{}); export const Network=()=>jsx('fixture-network',{});`,
   startup: `import {jsx} from 'react/jsx-runtime'; export default ({runtimeCommand,...props})=>jsx('fixture-runtime',{...props,children:runtimeCommand});`,
   shared: `export {api,useAPI,unwrap,rows} from 'fixture:lib';
     import {jsx} from 'react/jsx-runtime';
@@ -57,8 +57,8 @@ const bundled = await build({
   stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers'; export {GameLicences} from './src/admin/GameLicences';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
+    builder.onResolve({filter:/client\/ReinstallServerButton$/},()=>({path:'reinstall',namespace:'fixture'}));
     builder.onResolve({filter:/^lucide-react$/},()=>({path:'icons',namespace:'fixture'}));
-    builder.onResolve({filter:/notifications\/useErrorState$/},()=>({path:'errors',namespace:'fixture'}));
     builder.onResolve({filter:/PendingSettings$/},()=>({path:'pending',namespace:'fixture'}));
     builder.onResolve({filter:/ui\/ConfirmAction$/},()=>({path:'confirm',namespace:'fixture'}));
     builder.onResolve({filter:/ui\/SectionTabs$/},()=>({path:'tabs',namespace:'fixture'}));
@@ -201,7 +201,7 @@ test('account admin gate blocks owners and wildcard permissions before admin dat
 
 test('runtime tools use internal ID, keep top tabs local, and omit raw environment',async()=>{
   const f=fixture();f.render();
-  assert.equal(f.nodes(node=>node.props.role==='tab').length,6);
+  assert.equal(f.nodes(node=>node.props.role==='tab').length,7);
   assert.ok(f.queries.includes('/api/application/servers/7?include=allocations,variables,user,node,egg'));
   assert.ok(f.queries.every(path=>!path.includes('untrusted-url')&&!path.includes('999')));
   assert.doesNotMatch(f.text(),/never display this/);
@@ -325,7 +325,11 @@ test('editing an inspected key invalidates the discovered product and prevents s
 test('General retains lifecycle safeguards and Transfer contains only transfer actions',async()=>{
   const f=fixture();f.render();
   const actions=f.nodes(node=>node.type==='fixture-action');
-  assert.match(actions.find(node=>node.props.path.endsWith('/reinstall')).props.confirm,/may overwrite files/);
+  // Reinstall uses the shared backup-and-confirm flow, covered by reinstall-backup.test.mjs.
+  const reinstall=f.nodes(node=>node.type==='fixture-reinstall')[0];
+  assert.equal(reinstall.props.serverID,7);
+  assert.equal(typeof reinstall.props.onDone,'function');
+  assert.ok(actions.every(node=>!node.props.path.endsWith('/reinstall')));
   assert.match(actions.find(node=>node.props.path.endsWith('/force')).props.confirm,/Daemon files may remain/);
   assert.match(actions.find(node=>node.props.method==='DELETE'&&node.props.path==='/api/application/servers/7').props.confirm,/Permanently delete/);
   await f.tab('manage');assert.ok(f.nodes(node=>node.type==='fixture-action').every(node=>node.props.path.includes('/transfer')));

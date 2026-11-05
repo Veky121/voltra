@@ -1,4 +1,3 @@
-import {useErrorState} from '../notifications/useErrorState';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {Textarea as MiraTextarea} from '../components/ui/textarea';
 import { SidebarSection } from "../Navigation";
@@ -91,7 +90,7 @@ function EggImport({
   onSaved: () => void;
 }) {
   const [json, setJSON] = useState("");
-  const [error, setError] = useErrorState('admin/eggs.tsx');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
   return (
@@ -162,7 +161,7 @@ export function Egg() {
   const nestsQ = useAPI(nests);
   const record = q.data ? unwrap(q.data) : undefined;
   const [tab, setTab] = useState("details");
-  const [exportError, setExportError] = useErrorState('admin/eggs.tsx');
+  const [exportError, setExportError] = useState('');
   const fields = [
     f("nest_id", "Template group", "select", {
       required: true,

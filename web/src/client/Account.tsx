@@ -1,3 +1,4 @@
+import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {usePendingSetting} from './PendingSettings';
 import {confirmAction} from '../ui/ConfirmAction';
 import {PageHeading} from '../ui/PageHeading';
@@ -73,8 +74,7 @@ export function Activity({ path }: { path: string }) {
         />
       </div>
       <PageError error={r.error} />
-      {r.loading && <p role="status">Loading activity...</p>}
-      <div className="table-wrap operations-table">
+      {r.loading && !r.data ? <CollectionSkeleton label="Loading activity" layout="activity" count={5}/> : <div className="table-wrap operations-table">
         <MiraTable className="table">
           <MiraTableHeader>
             <MiraTableRow>
@@ -115,7 +115,7 @@ export function Activity({ path }: { path: string }) {
             ))}
           </MiraTableBody>
         </MiraTable>
-      </div>
+      </div>}
       {!r.loading && !items(r.data).length && (
         <p className="operations-empty">No activity found.</p>
       )}

@@ -1,4 +1,4 @@
-import {useErrorState} from '../notifications/useErrorState';
+import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {SectionTabs} from "../ui/SectionTabs";
 import './games-ui.css';
 import { useState } from "react";
@@ -37,7 +37,7 @@ function MinecraftContentView({ server }: { server: string }) {
   const [selected, setSelected] = useState<Project | null>(null);
   const [removing, setRemoving] = useState<Installed | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('client/MinecraftContent.tsx');
+  const [error, setError] = useState('');
   const [notice, setNotice] = useState("");
   const catalog = useAPI(`${base}?${new URLSearchParams({ provider, query, compatibility, include_unverified:String(includeUnverified) })}`);
   const data = unwrap(catalog.data) as Catalog | null;
@@ -65,7 +65,7 @@ function MinecraftContentView({ server }: { server: string }) {
     <header className="page-header mc-content-header"><h2>{noun === "plugins" ? "Plugins" : "Mods"}</h2>{data?.supported && <div className="mc-content-context"><span className="badge">Minecraft {data.minecraft_version}</span><span className="badge">{data.loader}{data.loader_version ? ` ${data.loader_version}` : ""}</span></div>}<Button variant="secondary" disabled={catalog.loading || busy} onClick={catalog.reload}>Refresh</Button></header>
     <ErrorBox>{catalog.error || error}</ErrorBox>
     {notice && <p className="success" role="status">{notice}</p>}
-    {!data && catalog.loading && <p role="status">Loading server content...</p>}
+    {!data && catalog.loading && <CollectionSkeleton label="Loading mods and plugins"/>}
     {data && !data.supported && <Card><h2>Catalog unavailable</h2><p>{data.reason}</p></Card>}
     {data?.supported && <>
       <SectionTabs label="Minecraft content" className="mc-content-tabs" scope="mc-content" active={tab} onChange={changeTab} disabled={busy} items={tabs.map(([id,name])=>({id,label:<>{name}{id==='installed'&&<span className="mc-content-count">{data.installed.length}</span>}</>,controls:'mc-content-panel'}))}/>
@@ -98,7 +98,7 @@ function ContentVersions({ base, provider, compatibility, includeUnverified, pro
   const [version, setVersion] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('client/MinecraftContent.tsx');
+  const [error, setError] = useState('');
   const chosen = data?.versions.find(v => v.id === version);
   async function install() {
     if (!chosen || busy) return;

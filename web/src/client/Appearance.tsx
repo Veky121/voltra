@@ -1,5 +1,4 @@
 import {usePendingSetting} from './PendingSettings';
-import {useErrorState} from '../notifications/useErrorState';
 import {useEffect,useState,type CSSProperties} from 'react';
 import {Check,RotateCcw} from 'lucide-react';
 import {Button,ErrorBox} from '../lib';
@@ -23,7 +22,7 @@ function ThemeSample({theme,mini=false}:{theme:ThemePreferences;mini?:boolean}){
 }
 export default function Appearance(){
  const {saved,preview,save,ready,error,reload}=useTheme();
- const [draft,setDraft]=useState(saved),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[saveError,setSaveError]=useErrorState('client/Appearance.tsx'),[resetKey,setResetKey]=useState(0);
+ const [draft,setDraft]=useState(saved),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[saveError,setSaveError]=useState(''),[resetKey,setResetKey]=useState(0);
  useEffect(()=>{setDraft(saved);setResetKey(v=>v+1)},[saved]);
  useEffect(()=>{preview(draft);return()=>preview(null)},[draft,preview]);
  const dirty=JSON.stringify(draft)!==JSON.stringify(saved),disabled=busy||!ready;

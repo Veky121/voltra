@@ -26,6 +26,7 @@ import (
 
 // Infrastructure routes deliberately share their application and admin implementations.
 func (a *App) registerInfrastructure(mux *http.ServeMux) {
+	a.registerRuntimeManagement(mux)
 	for _, base := range []string{"/api/application", "/api/admin"} {
 		for _, resource := range []string{"locations", "nodes"} {
 			for _, method := range []string{"GET", "POST"} {

@@ -42,6 +42,7 @@ type Config struct {
 	ConsoleHistoryLines                                                                    int
 }
 type App struct {
+	readChanges        liveReadChanges
 	liveSnapshots      liveSnapshotHub
 	resourceReads      sharedResourceReads
 	liveEvents         liveEventHub
@@ -436,6 +437,7 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("schema: %w", err)
 	}
+	a.startLiveChanges()
 	return a, nil
 }
 func (a *App) migrate(ctx context.Context) error {
@@ -467,6 +469,7 @@ func (a *App) migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 func (a *App) Close() {
+	a.stopLiveChanges()
 	a.liveSnapshots.close()
 	a.resourceReads.close()
 	a.liveEvents.close()
@@ -631,8 +634,8 @@ func (a *App) Handler() http.Handler {
 		}
 		if r.Method!="GET" && r.Method!="HEAD" && r.Method!="OPTIONS" && (UserID(r)>0||strings.HasPrefix(r.URL.Path,"/api/remote/")) && strings.HasPrefix(r.URL.Path,"/api/") {
 			tracked:=&liveMutationResponse{ResponseWriter:w};mux.ServeHTTP(tracked,r)
-			if tracked.status>=200&&tracked.status<300 {
-				a.liveSnapshots.invalidate(UserID(r))
+			if (tracked.status>=200&&tracked.status<300)||(strings.Contains(r.URL.Path,"/files/")&&tracked.status>=400&&tracked.status!=401&&tracked.status!=403&&tracked.status!=429) {
+				a.publishMutationReadChanges(r.Context(), r.URL.Path)
 				if !strings.HasSuffix(r.URL.Path,"/navigation")&&(strings.HasPrefix(r.URL.Path,"/api/client/servers/")||strings.HasPrefix(r.URL.Path,"/api/admin/servers")||strings.HasPrefix(r.URL.Path,"/api/application/servers")) {a.liveEvents.navigationChanged(UserID(r))}
 			}
 		} else {mux.ServeHTTP(w, r)}

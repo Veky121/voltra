@@ -333,3 +333,34 @@ CREATE TABLE IF NOT EXISTS console_log_collectors (
  connected boolean NOT NULL DEFAULT false, last_event_at timestamptz
 );
 ALTER TABLE console_log_collectors ADD COLUMN IF NOT EXISTS run_start_id bigint NOT NULL DEFAULT 0;
+
+-- Commit-scoped hints for active readers. No row values enter NOTIFY.
+CREATE OR REPLACE FUNCTION voltra_notify_read_change() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF (to_jsonb(OLD) - ARRAY['updated_at','last_used_at','last_seen_at']) IS NOT DISTINCT FROM
+       (to_jsonb(NEW) - ARRAY['updated_at','last_used_at','last_seen_at']) THEN
+      RETURN NULL;
+    END IF;
+  END IF;
+  PERFORM pg_notify('voltra_read_changes', json_build_object('schema',TG_TABLE_SCHEMA,'table',TG_TABLE_NAME)::text);
+  RETURN NULL;
+END $$;
+DO $$
+DECLARE table_name text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['users','browser_sessions','desktop_devices','api_keys','ssh_keys',
+    'locations','nodes','node_enrollments','node_requests','node_connectors','nests','eggs','egg_variables',
+    'servers','allocations','server_variables','subusers','backups','schedules','tasks','schedule_runs',
+    'database_hosts','databases','mounts','mount_nodes','mount_eggs','mount_servers','activity_logs',
+    'settings','integrations','server_integration_secrets','server_transfers','daemon_revocations',
+    'steam_servers','steam_jobs','steam_job_events','steam_private_authorizations','steam_private_jobs',
+    'steam_private_attempts','steam_private_publications','user_server_navigation','steam_game_provisions',
+    'proxy_gateways','proxy_node_clients','proxy_routes']
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS voltra_read_change ON %I',table_name);
+    EXECUTE format('CREATE TRIGGER voltra_read_change AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION voltra_notify_read_change()',table_name);
+    EXECUTE format('DROP TRIGGER IF EXISTS voltra_read_truncate ON %I',table_name);
+    EXECUTE format('CREATE TRIGGER voltra_read_truncate AFTER TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION voltra_notify_read_change()',table_name);
+  END LOOP;
+END $$;

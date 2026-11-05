@@ -10,7 +10,7 @@ function fixture(permissions){
   const react={createContext:()=>({}),useContext:()=>null,useRef:current=>({current}),useEffect:fn=>effects.push(fn),useState:initial=>{const index=states.length;states.push(initial);return [initial,update=>{states[index]=typeof update==='function'?update(states[index]):update}];}};
   class Socket{sent=[];constructor(){sockets.push(this)}send(raw){this.sent.push(JSON.parse(raw))}close(){this.onclose?.()}emit(event,line){this.onmessage({data:JSON.stringify({event,args:[line]})})}}
   const api=async path=>{requests.push(path);return path.endsWith('/websocket')?{socket:'ws://localhost',token:'fixture'}:{transfers:[]}};
-  const modules={react,'./operationEvents':operations,'./remoteTransferModel':transfers,'../lib':{api},'../notifications/store':{captureErrorContext:()=>({}),reportPanelError:()=>{}},'./common':{can:(list,p)=>list.includes('*')||list.includes(p),value:x=>x}};
+  const modules={react,'./operationEvents':operations,'./remoteTransferModel':transfers,'../lib':{api},'./common':{can:(list,p)=>list.includes('*')||list.includes(p),value:x=>x}};
   const code=ts.transpileModule(readFileSync(new URL('../src/client/useRemoteTransfers.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
   const exports={},timer=(fn,delay)=>{const id=++next;timers.set(id,{fn,delay});return id},clear=id=>timers.delete(id);
   new Function('require','exports','window','WebSocket','location','setTimeout','clearTimeout','setInterval','clearInterval',code)(name=>modules[name]??{},exports,window,Socket,{href:'http://localhost'},timer,clear,timer,clear);

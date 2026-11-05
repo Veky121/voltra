@@ -1,0 +1,10 @@
+.text-panel-skeleton{min-height:300px;padding:18px;font-family:monospace}
+.text-panel-skeleton>div{display:grid;gap:10px}
+.text-panel-skeleton [data-slot=skeleton]{height:10px;max-width:750px}
+.server-skeleton .section-tab{cursor:default}
+.skeleton-action-label{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 12px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius,6px);color:var(--muted);font-size:13px}
+.server-skeleton .fm-actions{display:flex;gap:8px;flex-wrap:wrap}
+.server-skeleton .file-explorer-tree{overflow:auto}
+.server-skeleton .file-skeleton-root{padding:8px 28px;color:var(--muted);font-size:13px}
+.server-skeleton .operations-filters>.skeleton-control{width:220px;justify-content:flex-start}
+@media(max-width:600px){.text-panel-skeleton{min-height:240px}.server-skeleton .operations-filters>.skeleton-control{width:100%}}

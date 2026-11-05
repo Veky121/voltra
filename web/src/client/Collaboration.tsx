@@ -1,3 +1,4 @@
+import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
 import {Archive, Terminal, Power, ChevronRight} from "lucide-react";
 import {Collapsible, CollapsibleTrigger, CollapsibleContent} from "../components/ui/collapsible";
@@ -36,14 +37,24 @@ import {
 } from "./common";
 import type { RecordData } from "./common";
 
+function DatabasePassword({base,database,revision}:{base:string;database:RecordData;revision:unknown}) {
+  const [revealed,setRevealed]=useState(false);
+  const result=useAPI(revealed?`${base}/databases/${database.id}?include=password`:null);
+  useEffect(()=>setRevealed(false),[revision]);
+  const password=value(value(result.data)?.relationships?.password)?.password||'';
+  return <SettingsRow label="Password" control={<Input aria-label={`Password for ${database.name||database.database}`} type={revealed?'text':'password'} readOnly value={revealed?password:'••••••••'} placeholder={result.loading?'Loading password…':''}/>}>
+    <Button variant="secondary" onClick={()=>setRevealed(value=>!value)}>{revealed?'Hide':'Show'} password</Button>
+    {revealed&&result.error&&<><PageError error={result.error}/><Button variant="secondary" onClick={result.reload}>Retry password</Button></>}
+  </SettingsRow>;
+}
+
 export function Databases() {
   const { base, permissions, server } = useServer();
-  const r = useAPI(`${base}/databases?include=password`);
+  const r = useAPI(`${base}/databases`);
   const a = useAction();
   const [open, setOpen] = useState(false),
     [name, setName] = useState(""),
-    [remote, setRemote] = useState("%"),
-    [visible, setVisible] = useState<Record<string, boolean>>({});
+    [remote, setRemote] = useState("%");
   return (
     <section className="operations-page databases-page" aria-label="Databases">
       <div className="toolbar server-page-toolbar">
@@ -57,11 +68,9 @@ export function Databases() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
-      {r.loading && <p className="operations-loading" role="status">Loading databases...</p>}
+      {r.loading && !r.data && <CollectionSkeleton label="Loading databases" layout="databases" count={2}/>}
       <div className="grid grid-2">
         {items(r.data).map((d) => {
-          const password =
-            value(d.relationships?.password)?.password || d.password || "";
           const host = `${d.host?.address || d.host?.host || d.host || ""}:${
             d.host?.port || 3306
           }`;
@@ -71,22 +80,7 @@ export function Databases() {
               <SettingsRow label="Username" control={<Input aria-label={`Username for ${d.name || d.database}`} readOnly value={d.username} />}/>
               <SettingsRow label="Connections from" control={<span className="settings-value">{d.connections_from || d.remote}</span>}/>
               {can(permissions, "database.view_password") && (
-                <SettingsRow label="Password" control={
-                    <Input
-                      aria-label={`Password for ${d.name || d.database}`}
-                      type={visible[d.id] ? "text" : "password"}
-                      readOnly
-                      value={password}
-                    />}>
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      setVisible((old) => ({ ...old, [d.id]: !old[d.id] }))
-                    }
-                  >
-                    {visible[d.id] ? "Hide" : "Show"} password
-                  </Button>
-                </SettingsRow>
+                <DatabasePassword key={`${base}:${d.id}`} base={base} database={d} revision={r.data}/>
               )}
               <div className="settings-actions operations-record-actions">
                 {can(permissions, "database.update") && (
@@ -203,10 +197,6 @@ export function Schedules() {
   const { base, permissions } = useServer();
   const r = useAPI(`${base}/schedules?include=tasks`);
   const a = useAction();
-  useEffect(() => {
-    const timer = setInterval(r.reload, 10000);
-    return () => clearInterval(timer);
-  }, [base]);
   const [editing, setEditing] = useState<RecordData | null>(null),
     [task, setTask] = useState<RecordData | null>(null);
   const [runFeedback, setRunFeedback] = useState<{id: number; state: 'pending' | 'success'} | null>(null);
@@ -264,7 +254,7 @@ export function Schedules() {
       </div>
       <Notice action={a} />
       <PageError error={r.error} />
-      {r.loading && <p className="operations-loading" role="status">Loading schedules...</p>}
+      {r.loading && !r.data && <CollectionSkeleton label="Loading schedules" layout="schedules"/>}
       <div className="schedule-list">
       {items(r.data).map((s) => {
         const tasks = items(s.relationships?.tasks || s.tasks);
@@ -573,7 +563,7 @@ export function Users() {
       <Notice action={a} />
       <PageError error={r.error} />
       <PageError error={p.error} />
-      {r.loading && <p className="operations-loading" role="status">Loading users...</p>}
+      {r.loading && !r.data && <CollectionSkeleton label="Loading users" layout="users" count={2}/>}
       <div className="grid grid-2">
         {items(r.data).map((u) => (
           <Card key={u.uuid || u.id} className="operations-record">

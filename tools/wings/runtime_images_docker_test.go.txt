@@ -1,0 +1,111 @@
+package runtimeimages
+
+import (
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
+)
+
+// The opt-in Docker test uses existing local images, own tags and stopped
+// containers only. It does not download anything or contact a registry.
+type localCandidateEngine struct{ dockerEngine }
+
+func (e localCandidateEngine) Pull(ctx context.Context, ref string) (string, error) {
+	return e.Inspect(ctx, ref)
+}
+func TestDockerLocalApprovalIdentity(t *testing.T) {
+	if os.Getenv("VOLTRA_IMAGE_MANAGER_DOCKER_TEST") != "1" {
+		t.Skip("requires explicitly opted-in local Docker fixture")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cli, err := client.NewClientWithOpts(client.WithHost("unix:///var/run/docker.sock"), client.WithAPIVersionNegotiation())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+	engine := localCandidateEngine{dockerEngine{cli}}
+	a, err := engine.Inspect(ctx, "debian:bookworm-slim")
+	if err != nil {
+		t.Fatal("existing fixture image unavailable", err)
+	}
+	b, err := engine.Inspect(ctx, "ubuntu:22.04")
+	if err != nil {
+		t.Fatal("existing second fixture image unavailable", err)
+	}
+	if a == b {
+		t.Fatal("fixtures must have different identities")
+	}
+	ref := fmt.Sprintf("voltra-image-manager-fixture:%d", time.Now().UnixNano())
+	h := sha256.Sum256([]byte(ref))
+	tags := []string{ref, fmt.Sprintf("voltra-retained/%x:%s", h[:12], strings.TrimPrefix(a, "sha256:")), fmt.Sprintf("voltra-retained/%x:%s", h[:12], strings.TrimPrefix(b, "sha256:"))}
+	t.Cleanup(func() {
+		for _, tag := range tags {
+			cleanup, c := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err := cli.ImageRemove(cleanup, tag, image.RemoveOptions{PruneChildren: false})
+			c()
+			if err != nil && !client.IsErrNotFound(err) {
+				t.Errorf("owned fixture tag cleanup failed: %s", tag)
+			}
+		}
+	})
+	if err = cli.ImageTag(ctx, a, ref); err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(engine, filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCreate := func(want string) {
+		t.Helper()
+		id, err := m.Resolve(ctx, ref)
+		if err != nil || id != want {
+			t.Fatalf("resolved %s want %s: %v", id, want, err)
+		}
+		created, err := cli.ContainerCreate(ctx, &container.Config{Image: id, Cmd: []string{"/bin/true"}, Labels: map[string]string{"io.voltra.test": "image-manager"}}, &container.HostConfig{NetworkMode: "none", ReadonlyRootfs: true}, nil, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := cli.ContainerRemove(context.Background(), created.ID, container.RemoveOptions{}); err != nil {
+				t.Error("owned stopped fixture cleanup failed", err)
+			}
+		}()
+		inspect, err := cli.ContainerInspect(ctx, created.ID)
+		if err != nil || inspect.Image != want {
+			t.Fatalf("Docker used wrong actual image: %s, %v", inspect.Image, err)
+		}
+	}
+	assertCreate(a)
+	if err = cli.ImageTag(ctx, b, ref); err != nil {
+		t.Fatal(err)
+	}
+	assertCreate(a)
+	if err = m.StartCheck(ref); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, m)
+	rows, _ := m.Snapshot()
+	if rows[0].CandidateID != b {
+		t.Fatal("local staged candidate missing")
+	}
+	assertCreate(a)
+	if err = m.Change(ctx, ref, "approve", b); err != nil {
+		t.Fatal(err)
+	}
+	assertCreate(b)
+	if err = m.Change(ctx, ref, "rollback", a); err != nil {
+		t.Fatal(err)
+	}
+	assertCreate(a)
+	t.Log("Real Docker inspect, retained tags, immutable container creation, candidate approval, and rollback verified. Candidate discovery was local-only; registry download and live game start untested.")
+}

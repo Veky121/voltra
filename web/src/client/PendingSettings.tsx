@@ -1,4 +1,3 @@
-import {useErrorState} from '../notifications/useErrorState';
 import {saveSettingChanges} from './saveSettingChanges';
 import {createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Button} from '../lib';
@@ -29,7 +28,7 @@ export function PendingSettings({children}: {children: ReactNode}) {
 }
 function PendingSettingsOwner({children}: {children: ReactNode}) {
   const [changes, setChanges] = useState<Record<string, Change>>({});
-  const [busy, setBusy] = useState(false), [error, setError] = useErrorState('client/PendingSettings.tsx');
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const locked = useRef(false);
   const [saved,setSaved]=useTransientMessage(2000);
   const session=useRef(0);

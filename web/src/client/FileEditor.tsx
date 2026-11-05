@@ -1,4 +1,3 @@
-import {useErrorState} from '../notifications/useErrorState';
 import {Button} from '../components/ui/button';
 import {Combobox,ComboboxTrigger,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '../components/ui/combobox';
 import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
@@ -49,7 +48,7 @@ export default function FileEditor({path,storageKey,content,readOnly,onChange,on
   const [selection,setSelection]=useState(()=>{
     try{const saved=localStorage.getItem(preferenceKey);return saved==='Plain text'||editorLanguages.some(l=>l.name===saved)?saved!:'auto'}catch{return 'auto'}
   });
-  const [open,setOpen]=useState(false),[search,setSearch]=useState(''),[languageError,setLanguageError]=useErrorState('client/FileEditor.tsx'),[loadingLanguage,setLoadingLanguage]=useState(false);
+  const [open,setOpen]=useState(false),[search,setSearch]=useState(''),[languageError,setLanguageError]=useState(''),[loadingLanguage,setLoadingLanguage]=useState(false);
   const host=useRef<HTMLDivElement>(null),view=useRef<EditorView|null>(null),picker=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),searchInput=useRef<HTMLInputElement>(null);
   const callbacks=useRef({onChange,onSave});callbacks.current={onChange,onSave};
   const language=useRef(new Compartment()),access=useRef(new Compartment());

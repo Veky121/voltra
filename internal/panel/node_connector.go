@@ -163,7 +163,7 @@ func (a *App) connectNodeConnector(w http.ResponseWriter, r *http.Request) {
 			c.panelOrigin = connectorPanelOrigin(message.PanelOrigin)
 			c.capabilities = map[string]bool{}
 			for _, capability := range message.Capabilities {
-				if steamapi.KnownCapability(capability) || capability == "network-v1" {
+				if steamapi.KnownCapability(capability) || capability == "network-v1" || capability == "runtime-maintenance-v1" {
 					c.capabilities[capability] = true
 				}
 			}
@@ -289,7 +289,7 @@ func (a *App) dialNodeServiceGrant(ctx context.Context, id int64, service string
 		h.mu.Unlock()
 		return nil, errors.New("node connector is offline or at its connection limit")
 	}
-	if service != "" && !((service == "steam" && c.capabilities["steam-v1"]) || (service == "network" && c.capabilities["network-v1"]) || (service == steamapi.PrivateStreamService && c.capabilities[steamapi.PrivateCapability])) {
+	if service != "" && !((service == "steam" && c.capabilities["steam-v1"]) || (service == "network" && c.capabilities["network-v1"]) || (service == "runtime" && c.capabilities["runtime-maintenance-v1"]) || (service == steamapi.PrivateStreamService && c.capabilities[steamapi.PrivateCapability])) {
 		h.mu.Unlock()
 		return nil, errors.New("update and reconnect the node agent to enable the requested service")
 	}

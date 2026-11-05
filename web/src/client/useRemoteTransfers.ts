@@ -2,7 +2,6 @@ import {createContext,useContext,useEffect,useRef,useState} from 'react';
 import {mergeTransfers,reconcileTransfers,transferPollDelay,type RemoteTransfer} from './remoteTransferModel';
 export type {RemoteTransfer} from './remoteTransferModel';
 import {api} from '../lib';
-import {captureErrorContext,reportPanelError} from '../notifications/store';
 import {can,value} from './common';
 import {mergeOperationEvent,operationEventsFromMessage,type OperationEvent} from './operationEvents';
 
@@ -23,12 +22,12 @@ export function useRemoteTransferQueue(base:string,permissions:string[],onComple
   known.current={};setRecords({});setOperations([]);setError('');
   const canFiles=can(permissions,'file.read')||can(permissions,'file.create');
   const canConsole=can(permissions,'websocket.connect');
-  const context=captureErrorContext('Server transfer');
+
   const merge=(entries:RemoteTransfer[],kind?:'upload'|'download',started?:Record<string,RemoteTransfer>)=>{
    if(!active)return;
    const next=kind&&started?reconcileTransfers(known.current,entries,kind,started):mergeTransfers(known.current,entries);
    const completed=entries.some(entry=>entry.state==='complete'&&known.current[entry.identifier]?.state!=='complete');
-   for(const entry of entries){if(entry.state==='failed'&&known.current[entry.identifier]?.state!=='failed')reportPanelError(entry.error||'A server download failed. Open Transfers for details.',{...context,quiet:!known.current[entry.identifier]})}
+
    known.current=next;setRecords(next);
    if(completed)current.current.onComplete();
   };

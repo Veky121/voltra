@@ -1,5 +1,4 @@
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
 import ServerStorageSummary from './ServerStorageSummary';
 import ServerInsights from './ServerInsights';
@@ -92,7 +91,7 @@ function useTelemetry(base:string,enabled:boolean):Telemetry{
 const PowerContext=createContext<{pending:PowerOperation|null;busy:boolean;error:string;success:string;completedSignal:PowerSignal|null;power:(signal:PowerSignal)=>Promise<void>;dismissError:()=>void}>({pending:null,busy:false,error:'',success:'',completedSignal:null,power:async()=>{},dismissError:()=>{}});
 
 function usePowerOperation(base:string,telemetry:Telemetry){
-  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useErrorState('client/ServerDashboard.tsx',{transient:true});
+  const [pending,setPending]=useState<PowerOperation|null>(null),[error,setError]=useState('');
   const [success,setSuccess]=useTransientMessage(2000);
   const [completedSignal,setCompletedSignal]=useState<PowerSignal|null>(null);
   const requestInFlight=useRef<PowerOperation|null>(null),operationRef=useRef<PowerOperation|null>(null),active=useRef(true);

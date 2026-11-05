@@ -1,5 +1,4 @@
 import {usePendingSetting} from '../client/PendingSettings';
-import {useErrorState} from '../notifications/useErrorState';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import { miBToGB, gbToMiB } from "../resourceUnits";
@@ -19,7 +18,7 @@ export function MinecraftRuntimeRules(){
   const query=useAPI("/api/admin/minecraft/runtime-rules");
   const [rules,setRules]=useState<RuntimeRule[]>([]);
   const [openRules,setOpenRules]=useState<Record<string,boolean>>({});
-  const [busy,setBusy]=useState(false),[error,setError]=useErrorState('admin/MinecraftRuntimeRules.tsx'),[saved,setSaved]=useState(false);
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
   const [baseline,setBaseline]=useState<RuntimeRule[]>([]);
   const dirty=JSON.stringify(rules)!==JSON.stringify(baseline);
   useEffect(()=>{if(query.data&&!dirty){const next=(unwrap(query.data).rules??[]).map((rule:RuntimeRule)=>({...rule,min_memory_mib:miBToGB(Number(rule.min_memory_mib))}));setRules(next);setBaseline(next)}},[query.data]);

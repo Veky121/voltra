@@ -1,4 +1,3 @@
-import {captureErrorContext,reportPanelError} from './notifications/store';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {Component, type ReactNode} from 'react';
 import './routeEntry.css';
@@ -8,7 +7,7 @@ import './routeEntry.css';
 export default class RouteRecovery extends Component<{children:ReactNode; resetKey?:string}, {failed:boolean}> {
   state = {failed:false};
   static getDerivedStateFromError() { return {failed:true}; }
-  componentDidCatch(error:Error){reportPanelError(error,captureErrorContext('Page rendering',this.props.resetKey?{page:this.props.resetKey}:{}));}
+
   componentDidUpdate(previous:Readonly<{children:ReactNode; resetKey?:string}>) {
     if (this.state.failed && previous.resetKey !== this.props.resetKey) this.setState({failed:false});
   }

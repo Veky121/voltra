@@ -1,5 +1,4 @@
 import {usePendingSetting} from '../client/PendingSettings';
-import {useErrorState} from '../notifications/useErrorState';
 import {Badge as MiraBadge} from '../components/ui/badge';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import { useEffect, useState } from "react";
@@ -39,7 +38,7 @@ export function JavaRuntimes() {
   const query = useAPI(endpoint);
   const [runtimes, setRuntimes] = useState<JavaRuntime[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('admin/JavaRuntimes.tsx');
+  const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [baseline,setBaseline]=useState<JavaRuntime[]>([]);

@@ -18,12 +18,16 @@ import (
 )
 
 type Executor struct {
-	docker               Docker
-	wingsConfig, journal string
-	supported            bool
-	mu                   sync.Mutex
-	active               map[string]bool
-	slots                chan struct{}
+	clientMaintenanceMu sync.Mutex
+	clientMaintenance   *clientMaintenance
+	// Test-only identity override for isolated native acceptance.
+	clientMaintenanceTestID string
+	docker                  Docker
+	wingsConfig, journal    string
+	supported               bool
+	mu                      sync.Mutex
+	active                  map[string]bool
+	slots                   chan struct{}
 	// Test seams remain package private, never protocol or Config settings.
 	pollInterval, timeLimit time.Duration
 	owner                   func(os.FileInfo) (uint32, uint32, bool)

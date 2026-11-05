@@ -1,9 +1,7 @@
-import {useErrorState} from '../notifications/useErrorState';
-import {NotificationBell} from '../notifications/NotificationLayer';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {useContext,useEffect,useState} from 'react';
 import {Link,useLocation} from 'react-router-dom';
-import {ChevronsUpDown,ArrowLeft,Check} from 'lucide-react';
+import {ChevronDown,ChevronsUpDown,ArrowLeft,Check} from 'lucide-react';
 import BrandMark from '../BrandMark';
 import {AdminNavigation,NavigationGroup,PanelSwitcher} from '../Navigation';
 import {Icon,NavIcon} from '../Icons';
@@ -46,16 +44,16 @@ function Shortcuts({label,servers,view}:{label:string;servers:NavigationServer[]
 function AccountMenu({account}:{account:Record<string,any>}){
  const nickname=accountNickname(account),administrator=!!(account.root_admin||account.admin);
  const session=useContext(AccountSessionContext),{isMobile,state}=useSidebar();
- const [busy,setBusy]=useState(false),[error,setError]=useErrorState('components/AppSidebar.tsx');
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
  return <><SidebarMenu><SidebarMenuItem className="voltra-account-row"><DropdownMenu>
   <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="voltra-account-trigger" tooltip={nickname}/>} aria-label={`Account menu for ${nickname}`}>
-   <span className="voltra-account-avatar" aria-hidden="true">{(nickname||'A').charAt(0).toUpperCase()}</span><span className="voltra-account-copy"><strong>{nickname}</strong><small>{administrator?'Administrator':'Member'}</small></span><ChevronsUpDown className="voltra-picker-chevron"/>
+   <span className="voltra-account-avatar" aria-hidden="true">{(nickname||'A').charAt(0).toUpperCase()}</span><span className="voltra-account-copy"><strong>{nickname}</strong><small>{administrator?'Administrator':'Member'}</small></span><ChevronDown className="voltra-picker-chevron voltra-account-chevron" aria-hidden="true"/>
   </DropdownMenuTrigger>
   <DropdownMenuContent side={isMobile?'top':state==='collapsed'?'right':'top'} align="end" sideOffset={8} className="voltra-dropdown voltra-account-dropdown">
    <DropdownMenuGroup><DropdownMenuLabel>Your account</DropdownMenuLabel><DropdownMenuItem render={<Link to="/account"/>}><Icon name="settings"/>Settings</DropdownMenuItem></DropdownMenuGroup><DropdownMenuSeparator/>
    <DropdownMenuItem variant="destructive" disabled={busy||!session.canSignOut} onClick={async()=>{if(busy||!session.canSignOut)return;setBusy(true);setError('');try{await session.signOut()}catch(failure){setError(failure instanceof Error?failure.message:String(failure))}finally{setBusy(false)}}}><Icon name="logout"/>{busy?'Logging out…':'Logout'}</DropdownMenuItem>
   </DropdownMenuContent>
- </DropdownMenu><NotificationBell/></SidebarMenuItem></SidebarMenu>{error&&<p className="voltra-account-error" role="alert">{error}</p>}</>;
+ </DropdownMenu></SidebarMenuItem></SidebarMenu>{error&&<p className="voltra-account-error" role="alert">{error}</p>}</>;
 }
 
 export function SidebarRouteEffects(){

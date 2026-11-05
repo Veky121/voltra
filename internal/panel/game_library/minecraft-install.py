@@ -1,4 +1,5 @@
 """Execute a panel-validated, non-secret Minecraft installation plan."""
+from contextlib import contextmanager
 import base64
 import hashlib
 import io
@@ -207,6 +208,138 @@ def bootstrap_java(major, directory):
     return str(candidates[0])
 
 
+
+PACK_REPLACE = {"mods", "config", "defaultconfigs", "kubejs", "scripts"}
+PACK_PRESERVE = {"server.properties", "eula.txt", "ops.json", "whitelist.json",
+                 "banned-players.json", "banned-ips.json", "usercache.json",
+                 "user_jvm_args.txt", "local", "VOLTRA_OVERRIDE"}
+
+
+@contextmanager
+def pack_content_transaction(staging, root):
+    """Replace pack-owned directories, including ones absent from the new pack.
+
+    Keep rollback copies until the caller finishes publishing its launch/receipt.
+    Never follow existing links or replace a configured world directory.
+    """
+    staging, root = Path(staging), Path(root)
+    properties = root / "server.properties"
+    if properties.is_symlink():
+        raise ValueError("Server properties is a symlink")
+    worlds = {"world", "world_nether", "world_the_end"}
+    if properties.is_file():
+        for line in properties.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("level-name="):
+                name = line.strip().split("=", 1)[1]
+                safe_target(root, name)
+                worlds.add(name.split("/")[0])
+    if worlds & PACK_REPLACE:
+        raise ValueError("Configured world conflicts with a pack-owned directory")
+    state = root / '.voltra/minecraft-pack-content.json'
+    if (root / '.voltra').is_symlink() or state.is_symlink():
+        raise ValueError('Pack state contains a symlink')
+    previous = json.loads(state.read_text()) if state.is_file() else {}
+    baseline = previous.get('config_files', {})
+    if not isinstance(baseline, dict):
+        raise ValueError('Invalid pack config baseline')
+    config_files, retained = {}, []
+    def checksum(path):
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    for name in ('config', 'defaultconfigs'):
+        for source in (staging / name).rglob('*'):
+            if source.is_file() and not source.is_symlink():
+                config_files[source.relative_to(staging).as_posix()] = checksum(source)
+    for name in sorted(PACK_REPLACE):
+        for base in (staging, root):
+            path = safe_target(base, name)
+            if path.exists() and not path.is_dir():
+                raise ValueError("Pack-owned path is not a directory: " + name)
+            if path.exists():
+                for child in path.rglob("*"):
+                    if child.is_symlink() or not (child.is_file() or child.is_dir()):
+                        raise ValueError("Pack-owned directory contains links or special files")
+    overrides = safe_target(root, 'VOLTRA_OVERRIDE')
+    if overrides.exists() and not overrides.is_dir():
+        raise ValueError('VOLTRA_OVERRIDE must be a directory')
+    for source in overrides.rglob('*'):
+        relative = source.relative_to(overrides).as_posix()
+        safe_target(overrides, relative)
+        if source.is_symlink() or not (source.is_file() or source.is_dir()):
+            raise ValueError('VOLTRA_OVERRIDE contains links or special files')
+        if relative.split('/')[0] not in {'config', 'defaultconfigs'}:
+            raise ValueError('VOLTRA_OVERRIDE supports only config/ and defaultconfigs/')
+    with tempfile.TemporaryDirectory(prefix=".voltra-pack-rollback-", dir=root) as temporary:
+        rollback = Path(temporary)
+        changed = []
+        prepared_overrides = rollback / 'prepared-overrides'
+        if overrides.exists():
+            shutil.copytree(overrides, prepared_overrides)
+        else:
+            prepared_overrides.mkdir()
+        try:
+            for name in sorted(PACK_REPLACE):
+                destination = root / name
+                backup = rollback / name
+                existed = destination.exists()
+                if existed:
+                    os.replace(destination, backup)
+                changed.append((destination, backup if existed else None))
+                source = staging / name
+                if source.exists():
+                    shutil.copytree(source, destination)
+                if name in {'config', 'defaultconfigs'} and existed:
+                    for old in backup.rglob('*'):
+                        if not old.is_file():
+                            continue
+                        relative = name + '/' + old.relative_to(backup).as_posix()
+                        # Unknown legacy files and edits belong to the user.
+                        if relative not in baseline or checksum(old) != baseline[relative]:
+                            target = safe_target(root, relative)
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(old, target)
+                            override = safe_target(prepared_overrides, relative)
+                            if not override.exists():
+                                override.parent.mkdir(parents=True, exist_ok=True)
+                                shutil.copy2(old, override)
+                            retained.append(relative)
+                    # Preserve a user's deletion of a previously supplied config.
+                    for relative in baseline:
+                        if relative.split('/')[0] == name and not safe_target(backup, relative[len(name)+1:]).exists():
+                            target = safe_target(root, relative)
+                            if target.is_file():
+                                target.unlink()
+                                retained.append(relative)
+            # Explicit overrides always win over the publisher and inferred edits.
+            for source in prepared_overrides.rglob('*'):
+                if source.is_file():
+                    relative = source.relative_to(prepared_overrides).as_posix()
+                    target = safe_target(root, relative)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, target)
+                    if relative not in retained:
+                        retained.append(relative)
+            yield
+            old_overrides = rollback / 'old-overrides' if overrides.exists() else None
+            if old_overrides:
+                os.replace(overrides, old_overrides)
+            changed.append((overrides, old_overrides))
+            os.replace(prepared_overrides, overrides)
+            state.parent.mkdir(parents=True, exist_ok=True)
+            pending = rollback / 'content-receipt.json'
+            pending.write_text(json.dumps({'config_files': config_files,
+                'retained_user_configs': retained}, sort_keys=True) + '\n')
+            os.replace(pending, state)
+            if retained:
+                print('Applied VOLTRA_OVERRIDE configs; review compatibility: ' + ', '.join(retained))
+        except BaseException:
+            for destination, backup in reversed(changed):
+                if destination.exists():
+                    shutil.rmtree(destination)
+                if backup is not None:
+                    os.replace(backup, destination)
+            raise
+
+
 def install(plan, root, work_directory=None):
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -255,31 +388,39 @@ def install(plan, root, work_directory=None):
         launch_file = launch[1:] if launch.startswith("@") else launch.removeprefix("-jar ")
         if not (staging / launch_file).is_file():
             raise ValueError("The loader installer did not generate its launch target")
-        for source in staging.rglob("*"):
-            if source.is_symlink():
-                raise ValueError("The installer generated an unsupported symlink")
-            if not source.is_file():
-                continue
-            relative = source.relative_to(staging).as_posix()
-            if relative == ".voltra-forge-server.jar":
-                target = root / relative
-                if target.is_symlink():
-                    raise ValueError("Refusing to replace a symlink")
-            else:
-                target = safe_target(root, relative)
-            if relative in {"server.properties", "user_jvm_args.txt"} and target.exists():
-                continue
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, target)
-        properties = safe_target(root, "server.properties")
-        if not properties.exists():
-            properties.write_text(
-                "server-ip=0.0.0.0\nserver-port=25565\nonline-mode=true\nenable-query=false\n"
-                + "max-players=" + os.environ["MAX_PLAYERS"] + "\n"
-                + "gamemode=" + os.environ["GAME_MODE"] + "\n"
-                + "difficulty=" + os.environ["DIFFICULTY"] + "\n"
-                + "motd=A Minecraft server\n", encoding="utf-8")
-        safe_target(root, "eula.txt").write_text("eula=true\n", encoding="utf-8")
+        replacing_pack = bool(plan.get("archives"))
+        from contextlib import nullcontext
+        with pack_content_transaction(staging, root) if replacing_pack else nullcontext():
+            for source in staging.rglob("*"):
+                if source.is_symlink():
+                    raise ValueError("The installer generated an unsupported symlink")
+                if not source.is_file():
+                    continue
+                relative = source.relative_to(staging).as_posix()
+                if relative == ".voltra-forge-server.jar":
+                    target = root / relative
+                    if target.is_symlink():
+                        raise ValueError("Refusing to replace a symlink")
+                else:
+                    target = safe_target(root, relative)
+                first = relative.split("/")[0]
+                if replacing_pack and first in PACK_REPLACE:
+                    continue
+                if (first in PACK_PRESERVE or first.startswith("world")) and (root / first).exists():
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+            properties = safe_target(root, "server.properties")
+            if not properties.exists():
+                properties.write_text(
+                    "server-ip=0.0.0.0\nserver-port=25565\nonline-mode=true\nenable-query=false\n"
+                    + "max-players=" + os.environ["MAX_PLAYERS"] + "\n"
+                    + "gamemode=" + os.environ["GAME_MODE"] + "\n"
+                    + "difficulty=" + os.environ["DIFFICULTY"] + "\n"
+                    + "motd=A Minecraft server\n", encoding="utf-8")
+            eula = safe_target(root, "eula.txt")
+            if not eula.exists():
+                eula.write_text("eula=true\n", encoding="utf-8")
 
 
 def main():

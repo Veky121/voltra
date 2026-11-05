@@ -1,4 +1,3 @@
-import {useErrorState} from '../notifications/useErrorState';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {GameSwitch} from './GameSwitch';
 import './games-ui.css';
@@ -32,7 +31,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
   const [profileAction, setProfileAction] = useState('create'), [now, setNow] = useState(Date.now());
   const [authorization, setAuthorization] = useState(''), [jobPassword, setJobPassword] = useState('');
   const [branch, setBranch] = useState(status.branch || 'public'), [betaPassword, setBetaPassword] = useState('');
-  const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useErrorState('client/PrivateSteamMaintenance.tsx'), [message, setMessage] = useState('');
+  const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
   const submitting = useRef(false);
   const recovery = useRef<AbortController | null>(null);
   const [recovering, setRecovering] = useState(false);

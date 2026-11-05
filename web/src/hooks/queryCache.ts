@@ -2,6 +2,7 @@ export type QueryRequest = <T>(path:string,options?:RequestInit)=>Promise<T>;
 type Snapshot = {data:any;error:string;loading:boolean};
 type Entry = {path:string;request:QueryRequest;state:Snapshot;expires:number;listeners:Set<()=>void>;abort?:AbortController;flight?:Promise<void>;queued:boolean;version:number};
 const entries=new Map<string,Entry>();
+const pendingInvalidations=new Set<Entry>();
 let epoch=0;
 let sessionScope:unknown;
 /** In-memory view state must be fenced by the same authentication boundary as reads. */
@@ -69,6 +70,11 @@ export function applyLiveQuery(path:string,data:any,error:string){
   entry.version++;entry.abort?.abort();entry.abort=undefined;entry.flight=undefined;entry.queued=false;
   entry.state={data,error,loading:false};entry.expires=error?0:Date.now()+queryTTL(path);emit(entry);
 }
+/** A change arrived, but its replacement snapshot is still being collected. */
+export function fenceQueryResponse(path:string){
+ const entry=entries.get(path);if(!entry)return;
+ entry.version++;entry.expires=0;entry.abort?.abort();entry.abort=undefined;entry.flight=undefined;entry.queued=false;
+}
 /** Call after any out-of-band mutation. Conservative invalidation also refreshes active readers. */
 export function invalidateQueryCache(mutationPath?:string){
   const path=mutationPath===undefined?undefined:normalizedQueryPath(mutationPath).split('?')[0];
@@ -100,4 +106,15 @@ export function purgeQueryCache(){
 if(typeof window!=='undefined'){
   window.addEventListener('panel-auth-changed',purgeQueryCache);
   window.addEventListener('desktop-session-rejected',purgeQueryCache);
+}
+
+/** Fence an older HTTP response before refreshing exactly one watched read. */
+export function invalidateExactQuery(path:string):boolean {
+ const entry=entries.get(path);if(!entry)return false;
+ if(pendingInvalidations.has(entry))return true;
+ pendingInvalidations.add(entry);const generation=epoch;
+ entry.version++;entry.expires=0;entry.abort?.abort();entry.abort=undefined;entry.flight=undefined;entry.queued=false;
+ entry.state={...entry.state,loading:false};
+ queueMicrotask(()=>{pendingInvalidations.delete(entry);if(generation===epoch&&entry.listeners.size)load(entry,true)});
+ return true;
 }

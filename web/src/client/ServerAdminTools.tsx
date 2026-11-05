@@ -1,15 +1,16 @@
 import {usePendingSetting} from './PendingSettings';
-import {useErrorState} from '../notifications/useErrorState';
 import {Input as MiraInput} from '../components/ui/input';
 import {Textarea as MiraTextarea} from '../components/ui/textarea';
 import './gameSwitch.css';
 import { useEffect, useState } from "react";
-import { api, Button, Card, ErrorBox, Loading, unwrap, useAPI } from "../lib";
+import { api, Button, Card, ErrorBox, unwrap, useAPI } from "../lib";
+import {SettingsSkeleton} from '../ui/SettingsSkeleton';
+import {ServerPageSkeleton} from '../ui/ServerPageSkeleton';
 import {
   Build, DeleteServer, Details, ServerLifecycle, Transfer, ServerMounts,
   ServerSettingsTabs, RuntimeAssignment, Startup,
 } from "../admin/servers";
-import {useSearchParams} from 'react-router-dom';
+import {useLocation,useSearchParams} from 'react-router-dom';
 import {settingsTab,settingsTabSearch} from './settingsNavigation';
 import {Settings,Network} from './Operations';
 import ServerStartup from "./ServerStartup";
@@ -95,8 +96,9 @@ export function configurationRequest(configuration: ServerConfiguration, draft: 
 
 export default function ServerAdminTools() {
   const { server } = useServer();
+  const location = useLocation();
   const account = useAPI("/api/client/account");
-  if (account.loading) return <Loading />;
+  if (account.loading && !account.data) return <ServerPageSkeleton path={location.pathname+location.search}/>;
   if (account.error) return <Card><ErrorBox>{account.error}</ErrorBox><Button variant="secondary" onClick={account.reload}>Retry administrator check</Button></Card>;
   // Ownership and wildcard server permissions do not grant panel administration.
   // Each application/admin/configuration endpoint also enforces backend admin auth.
@@ -136,7 +138,7 @@ function AuthorizedServerTools({ serverID }: { serverID: number }) {
       // The shared route blocker handles dirty drafts for clicks and Back/Forward.
       if(tab!==active)setSearch(settingsTabSearch(search,tab),{preventScrollReset:true});
     }} />
-    {active==='network' ? <section key={active} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}><Network/></section> : query.loading && !record ? <Loading /> : query.error ? null : record && serverAdminID(record.id) !== serverID
+    {active==='network' ? <section key={active} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}><Network/></section> : query.loading && !record ? <SettingsSkeleton variant={active==='general'?'general':'rows'} /> : query.error ? null : record && serverAdminID(record.id) !== serverID
       ? <ErrorBox>The returned server does not match this workspace. Reload before making changes.</ErrorBox>
       : record && <section key={active} role="tabpanel" id={`${scope}-panel-${active}`} aria-labelledby={`${scope}-tab-${active}`} tabIndex={0}>
         {active === "general" && <>
@@ -163,7 +165,7 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
   const [configuration, setConfiguration] = useState<ServerConfiguration | null>(null);
   const [draft, setDraft] = useState<ConfigurationDraft>({});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('client/ServerAdminTools.tsx');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState("");
   const dirty = configuration !== null && JSON.stringify(draft) !== JSON.stringify(configurationDraft(configuration));
   useEffect(() => {
@@ -204,7 +206,7 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
   }
   usePendingSetting(`configuration:${serverID}`,dirty,{blocked:!configuration?.can_update||busy||query.loading||!!query.error,save:saveConfiguration,afterSave:onSaved,discard:()=>{if(configuration)setDraft(configurationDraft(configuration));setError('')}});
   if (!configuration) return <Card><h3>Installation &amp; process</h3><ErrorBox>{query.error}</ErrorBox>
-    {query.loading ? <Loading /> : <Button variant="secondary" onClick={query.reload}>Retry configuration</Button>}
+    {query.loading ? <SettingsSkeleton /> : <Button variant="secondary" onClick={query.reload}>Retry configuration</Button>}
   </Card>;
 
   const editable = configuration.can_update && !busy && !query.loading && !query.error;

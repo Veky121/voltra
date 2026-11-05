@@ -1,0 +1,26 @@
+.collection-skeleton{min-width:0;width:100%}
+.server-skeleton [data-slot=skeleton]{background:color-mix(in srgb,var(--text) 9%,transparent);border-radius:3px;animation:skeleton-soft-pulse 2.4s ease-in-out infinite}
+.skeleton-line{height:13px;flex-shrink:1}
+.skeleton-line-small{height:9px}
+.skeleton-control{height:34px;min-width:58px;padding:0 12px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius,6px);background:var(--ui-surface)}
+.skeleton-control-wide{width:100%;justify-content:flex-start}
+.skeleton-control-tall{height:92px;align-items:flex-start;padding-top:14px}
+.server-skeleton .backup-card-feedback{display:flex;align-items:center}
+.server-skeleton .backup-created time{gap:8px}
+.server-skeleton .schedule-open{cursor:default}
+.server-skeleton .schedule-open:hover{background:transparent}
+.server-skeleton .schedule-identity{gap:8px}
+.server-skeleton .schedule-arrow{width:16px}
+.server-skeleton .operations-record h3{min-height:20px;display:flex;align-items:center}
+.server-skeleton .skeleton-record-description{min-height:19px;margin:12px 0;display:flex;align-items:center}
+.server-skeleton .settings-section-heading{display:flex;align-items:center}
+.file-skeleton-row{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 0 0 28px}
+.file-skeleton-name{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.file-skeleton-check{width:14px;height:14px;flex-shrink:0}
+.file-skeleton-icon{width:14px;height:16px;flex-shrink:0}
+.server-skeleton .explorer-metadata>span{display:flex;align-items:center}
+.server-skeleton .explorer-size{justify-content:flex-end}
+.server-skeleton td>.skeleton-line+.skeleton-line{margin-top:9px}
+.skeleton-plain-list>div{display:grid;gap:9px;padding:18px 0;border-bottom:1px solid var(--ui-divider)}
+@keyframes skeleton-soft-pulse{0%,100%{opacity:.6}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.server-skeleton [data-slot=skeleton]{animation:none}}

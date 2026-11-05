@@ -1,4 +1,4 @@
-import {useErrorState} from '../notifications/useErrorState';
+import {SettingsSkeleton} from '../ui/SettingsSkeleton';
 import {Checkbox} from '../components/ui/checkbox';
 import {SettingsSection as PreferenceSection, SettingsRow} from '../ui/Settings';
 import {settingDescription} from './settingDescription';
@@ -26,7 +26,7 @@ export function StartupVariableField({ variable, permitted, onSave, onDirty }: V
   const [draft, setDraft] = useState(baseline);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const [error, setError] = useErrorState('client/ServerStartup.tsx');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [clear, setClear] = useState(false);
   const [reset, setReset] = useState(false);
@@ -110,7 +110,7 @@ function RuntimeImage({ base, image, images, permitted, customAllowed, onDirtyCh
   const previous = useRef(image);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const [error, setError] = useErrorState('client/ServerStartup.tsx');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   useEffect(() => { const oldImage = previous.current; setDraft(current => current === oldImage ? image : current); previous.current = image; }, [image]);
   const choices = Object.entries(images);
@@ -158,7 +158,7 @@ function StartupContent({section, administrator = false, showCommandPreview = tr
   useEffect(() => { if (!pending) return; const warn = (event: BeforeUnloadEvent) => {event.preventDefault(); event.returnValue = '';}; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn); }, [pending]);
   if (!permitted && section === 'game') return null;
   if (!permitted) return <section className="startup-settings games-ui"><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2><p>You do not have permission to view startup settings.</p></section>;
-  if (!query.data) return <section className="startup-settings games-ui"><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2>{query.loading ? <p role="status">Loading startup settings...</p> : <><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry</Button></>}</section>;
+  if (!query.data) return <section className="startup-settings games-ui"><h2>{section === 'game' ? 'Additional game options' : 'Runtime'}</h2>{query.loading ? <SettingsSkeleton label="Loading startup settings"/> : <><PageError error={query.error} /><Button variant="secondary" onClick={query.reload}>Retry</Button></>}</section>;
   const variables = (items(query.data) as StartupVariable[]).map(variable => saved[variable.env_variable] || variable).filter(variable => startupVariableSection(variable) === section);
   const meta: StartupMeta = { ...(query.data.meta || {}), ...savedMeta };
   const updateAllowed = can(permissions, 'startup.update');

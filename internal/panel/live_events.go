@@ -180,7 +180,11 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 	disconnected := make(chan struct{})
 	commands := make(chan liveSubscriptionRequest, 1)
 	updates := make(chan liveDelivery, 64)
+	resync := make(chan struct{}, 1)
+	changes, takeChanges, stopChanges := a.readChanges.subscribe()
+	defer stopChanges()
 	bindings := map[string]*liveBinding{}
+	readDomains := map[string]bool{}
 	defer func() {
 		for _, b := range bindings {
 			b.cancel()
@@ -195,7 +199,7 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 			if conn.ReadJSON(&message) != nil {
 				return
 			}
-			if message.Type != "subscribe" || len(message.Paths) > 64 || time.Since(last) < 25*time.Millisecond {
+			if message.Type != "subscribe" || len(message.Paths) > 64 || len(message.Domains) > 16 || time.Since(last) < 25*time.Millisecond {
 				return
 			}
 			last = time.Now()
@@ -217,7 +221,7 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		packet := M{"type": kind, "version": 1}
 		if kind == "ready" {
-			packet["capabilities"] = []string{"snapshots"}
+			packet["capabilities"] = []string{"snapshots", "event-driven"}
 		}
 		return conn.WriteJSON(packet)
 	}
@@ -234,10 +238,39 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-disconnected:
 			return
+		case <-resync:
+			return
+		case <-changes:
+			domains := takeChanges()
+			relevant := false
+			for _, domain := range domains {
+				if readDomains[domain] || readDomains["all"] || (domain == "all" && len(readDomains) > 0) {
+					relevant = true
+					break
+				}
+			}
+			if !relevant {
+				continue
+			}
+			current, e := a.liveEventIdentity(r)
+			if e != nil || current != id {
+				return
+			}
+			_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+			if conn.WriteJSON(M{"type": "reads.invalidated", "version": 1, "domains": domains}) != nil {
+				return
+			}
 		case command := <-commands:
 			current, e := a.liveEventIdentity(r)
 			if e != nil || current != id {
 				return
+			}
+			readDomains = map[string]bool{}
+			for _, domain := range command.Domains {
+				switch domain {
+				case "all", "backups", "schedules", "files", "steam", "activity", "navigation", "network", "databases", "catalog", "nodes", "servers", "access", "settings":
+					readDomains[domain] = true
+				}
 			}
 			wanted := map[string]bool{}
 			for _, path := range command.Paths {
@@ -253,7 +286,8 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 			for _, path := range command.Paths {
 				if b, exists := bindings[path]; exists {
 					b.revision = command.Revision
-					b.lastDigest = "" // New consumers need a full snapshot, not just a heartbeat.
+					b.lastDigest = "" // New consumers need a fresh snapshot.
+					a.liveSnapshots.refreshBinding(b)
 					continue
 				}
 				topic, valid := a.liveTopic(path)
@@ -267,7 +301,7 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 				if topic.event == "server.resources" {
 					topic.server = str(server["uuid"])
 				}
-				binding := &liveBinding{path: path, revision: command.Revision, topic: topic, updates: updates}
+				binding := &liveBinding{path: path, revision: command.Revision, topic: topic, updates: updates, resync: resync}
 				if a.watchLiveTopic(topic, id, binding) {
 					bindings[path] = binding
 				}
@@ -276,6 +310,9 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 		case update := <-updates:
 			b := update.binding
 			if bindings[b.path] != b {
+				continue
+			}
+			if !a.liveSnapshots.deliveryCurrent(update) {
 				continue
 			}
 			if time.Since(update.sample.sampledAt) > 10*time.Second {
@@ -316,9 +353,15 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 				}
 				b.lastDigest = digest
 			}
+			changed := update.generation != b.lastGeneration
+			b.lastGeneration = update.generation
+			if packet["type"] == "unchanged" && !changed && time.Since(b.lastSent) < 45*time.Second && b.topic.event != "console.entries" && b.topic.event != "server.resources" {
+				continue
+			}
 			if conn.WriteJSON(packet) != nil {
 				return
 			}
+			b.lastSent = time.Now()
 			if accessErr != nil {
 				b.cancel()
 				delete(bindings, b.path)
@@ -334,6 +377,9 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 			current, e := a.liveEventIdentity(r)
 			if e != nil || current != id {
+				return
+			}
+			if write("heartbeat") != nil {
 				return
 			}
 			if conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(5*time.Second)) != nil {

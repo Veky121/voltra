@@ -1,4 +1,3 @@
-import {useEffect} from 'react';
 import {Button,useAPI} from '../lib';
 import {can,date,items,useServer} from './common';
 import {backupProtection} from './serverProtection';
@@ -28,11 +27,6 @@ export function BackupOverview({response,error}:{response:any;error:string}) {
   const {base,server,permissions}=useServer();
   const readable=can(permissions,'schedule.read');
   const schedules=useAPI(readable?`${base}/schedules?include=tasks`:null);
-  useEffect(()=>{
-    if(!readable)return;
-    const timer=setInterval(schedules.reload,10000);
-    return ()=>clearInterval(timer);
-  },[base,readable]);
   const protection=backupProtection(items(schedules.data));
   const storage=!error?backupStorage(response?.meta?.storage):null;
   const count=!error?response?.meta?.backup_count:undefined;

@@ -96,6 +96,8 @@ func Run(ctx context.Context, c Config) error {
 	}
 	delay := time.Second
 	steam := steamexec.New()
+	stopClientMaintenance := steam.StartClientMaintenance(ctx)
+	defer stopClientMaintenance()
 	for {
 		if ctx.Err() != nil {
 			return nil
@@ -177,7 +179,7 @@ func sessionWithSteam(ctx context.Context, base *url.URL, c Config, steam steamR
 		Type         string   `json:"type"`
 		Capabilities []string `json:"capabilities"`
 		PanelOrigin  string   `json:"panel_origin"`
-	}{Type: "hello", Capabilities: append(append(steamCapabilities(), NetworkCapability), private.Capabilities()...), PanelOrigin: strings.TrimRight(c.PanelURL, "/")}); err != nil {
+	}{Type: "hello", Capabilities: append(append(append(steamCapabilities(), NetworkCapability), private.Capabilities()...), runtimeCapabilities(steam)...), PanelOrigin: strings.TrimRight(c.PanelURL, "/")}); err != nil {
 		return errors.New("connector capability advertisement failed")
 	}
 	_ = ws.SetWriteDeadline(time.Time{})
@@ -200,7 +202,7 @@ func sessionWithSteam(ctx context.Context, base *url.URL, c Config, steam steamR
 		if err := ws.ReadJSON(&msg); err != nil {
 			return errors.New("connector control connection closed")
 		}
-		if msg.Type != "open" || !streamID.MatchString(msg.ID) || (msg.Service != "" && msg.Service != "steam" && msg.Service != "network" && msg.Service != steamapi.PrivateStreamService) || msg.Service == steamapi.PrivateStreamService && (msg.PrivateGrant == nil || msg.PrivateGrant.Validate() != nil) || msg.Service != steamapi.PrivateStreamService && msg.PrivateGrant != nil {
+		if msg.Type != "open" || !streamID.MatchString(msg.ID) || (msg.Service != "" && msg.Service != "steam" && msg.Service != "network" && msg.Service != "runtime" && msg.Service != steamapi.PrivateStreamService) || msg.Service == steamapi.PrivateStreamService && (msg.PrivateGrant == nil || msg.PrivateGrant.Validate() != nil) || msg.Service != steamapi.PrivateStreamService && msg.PrivateGrant != nil {
 			return errors.New("invalid connector control message")
 		}
 		mu.Lock()
@@ -218,6 +220,8 @@ func sessionWithSteam(ctx context.Context, base *url.URL, c Config, steam steamR
 				_ = private.bridge(ctx, base, c, id, *grant)
 			} else if service == "network" {
 				_ = bridgeNetwork(ctx, base, c, id)
+			} else if service == "runtime" {
+				_ = bridgeRuntime(ctx, base, c, id, steam)
 			} else if service == "steam" {
 				_ = bridgeSteam(ctx, base, c, id, steam)
 			} else {

@@ -1,5 +1,4 @@
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {PendingSettings, usePendingSetting} from './PendingSettings';
 import './games-ui.css';
@@ -59,7 +58,7 @@ function QuickSetupContent({data, search, onSaved, onDirty}: {data: Settings; se
   const {permissions, base, server} = useServer();
   const telemetry = useServerTelemetry();
   const [draft, setDraft] = useState<Record<string, QuickValue>>({});
-  const [error, setError] = useErrorState('client/GameQuickSetup.tsx'), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(data);
   const submitting = useRef(false);
   const writable = can(permissions, 'file.update');

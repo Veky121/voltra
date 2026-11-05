@@ -1,4 +1,3 @@
-import {captureErrorContext,reportPanelError,resolvePanelErrors,setNotificationScope} from './notifications/store';
 import {Field as MiraField} from './components/ui/field';
 import {Skeleton} from './components/ui/skeleton';
 import {Empty as MiraEmpty,EmptyDescription} from './components/ui/empty';
@@ -14,21 +13,18 @@ import {Alert,AlertDescription} from './components/ui/alert';
 import {Card as ShadcnCard} from './components/ui/card';
 export function queryCacheSessionIdentity(session:any):string{return JSON.stringify([!!session?.authenticated,session?.user?.id??null,!!session?.user?.root_admin]);}
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
-  const context=captureErrorContext('HTTP',{endpoint:path,method:options.method||'GET'});
-  let status:number|undefined;
-  try{
+
   const headers=new Headers(options.headers);
   headers.set('Accept','application/json');
   if(options.body&&!(options.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
   const response=await fetch(path,{...options,headers});
-  status=response.status;
   const mutationPath=normalizedQueryPath(path).split('?')[0];
   if(response.status===401)purgeQueryCache();
   if(response.ok&&mutationPath.startsWith('/api/auth/')&&mutationPath!=='/api/auth/session')purgeQueryCache();
   if(response.ok&&!['GET','HEAD','OPTIONS'].includes((options.method||'GET').toUpperCase())&&!mutationPath.startsWith('/api/auth/'))invalidateQueryCache(path);
   if(response.status===401)window.dispatchEvent(new Event('desktop-session-rejected'));
   if(response.ok&&path==='/api/auth/logout')window.dispatchEvent(new Event('panel-auth-changed'));
-  if(response.status===204){resolvePanelErrors(path,options.method||'GET',context.epoch);return undefined as T;}
+  if(response.status===204){return undefined as T;}
   const contentType=response.headers.get('content-type')||'';
   let data:any;
   try{data=contentType.includes('json')?await response.json():await response.text()}
@@ -38,10 +34,9 @@ export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
     throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status,code:data?.errors?.[0]?.code,requestId:response.headers.get("X-Request-ID")||data?.errors?.[0]?.request_id});
   }
   if(path==='/api/admin/settings'&&options.method&&options.method.toUpperCase()!=='GET')window.dispatchEvent(new Event('panel-settings-changed'));
-  if(mutationPath==='/api/auth/session'){setQueryCacheScope(queryCacheSessionIdentity(data));setNotificationScope(queryCacheSessionIdentity(data));}
-  resolvePanelErrors(path,options.method||'GET',context.epoch);
+  if(mutationPath==='/api/auth/session'){setQueryCacheScope(queryCacheSessionIdentity(data));}
+
   return data as T;
-  }catch(error){if(!options.signal?.aborted)reportPanelError(error,{...context,status});throw error}
 }
 export function unwrap(response:any):any{return response?.attributes??response}
 export function rows(response:any):any[]{return (response?.data??[]).map((x:any)=>({...unwrap(x),...(x.meta?{_meta:x.meta}:{})}))}

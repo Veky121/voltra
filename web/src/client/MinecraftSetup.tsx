@@ -1,4 +1,3 @@
-import {useErrorState} from '../notifications/useErrorState';
 import {PageHeading} from '../ui/PageHeading';
 import {RadioGroup,RadioGroupItem} from '../components/ui/radio-group';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
@@ -47,7 +46,7 @@ function MinecraftSetupForm({options, pack, onChangePack}: {options: MinecraftOp
   const navigate = useNavigate();
   const [form, setForm] = useState<SetupForm>(() => ({name: pack?.project.name ?? "Minecraft Survival", version: pack?.version.game_versions[0] ?? options.latest, loader: pack?.version.loaders[0] ?? "vanilla", loaderChoice: "stable", loaderVersion: "", runtime: "auto", memory: pack ? "4" : "2", xms: "0.25", xmx: "1.75", autoHeap: true, extraArgs: "", node: "", eula: false}));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('client/MinecraftSetup.tsx');
+  const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const submitting = useRef(false);
   const active = useRef(true);

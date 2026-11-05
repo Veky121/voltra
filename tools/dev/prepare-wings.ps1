@@ -16,7 +16,11 @@ $inputs = @(
     'tools/wings/apply-release.mjs', 'tools/runtime/wings-failed-install-logs.patch',
     'tools/wings/install_wait_test.go.txt', 'tools/wings/remote-download-headers.patch',
     'tools/wings/remote_headers.go.txt', 'tools/wings/remote_headers_test.go.txt',
-    'tools/wings/remote_transfers.go.txt', 'tools/wings/remote_transfers_test.go.txt'
+    'tools/wings/remote_transfers.go.txt', 'tools/wings/remote_transfers_test.go.txt',
+    'tools/wings/apply-runtime-images.mjs', 'tools/wings/runtime_images.go.txt',
+    'tools/wings/runtime_images_sync.go.txt', 'tools/wings/runtime_images_docker.go.txt',
+    'tools/wings/runtime_images_router.go.txt', 'tools/wings/runtime_images_test.go.txt',
+    'tools/wings/runtime_images_docker_test.go.txt'
 )
 foreach ($command in @('git', 'node', 'go', 'docker')) {
     if (-not (Get-Command $command -ErrorAction SilentlyContinue)) { throw "Required command is unavailable: $command" }

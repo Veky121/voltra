@@ -32,7 +32,7 @@ Start with the guide for your task. Runtime state and test receipts can change i
 ## Developer references
 
 - [Connector wire protocol](../internal/steamapi/PROTOCOL.md).
-- [Notifications](PANEL_NOTIFICATIONS.md), [game operation reporting](GAME_OPERATION_REPORTING.md) and [live events](LIVE_EVENTS.md).
+- [Game operation reporting](GAME_OPERATION_REPORTING.md) and [live events](LIVE_EVENTS.md).
 - [Tool documentation](../tools/README.md) and [browser fixtures](../web/tests/browser/README.md).
 
 Agent instructions, handoffs, working notes and local test receipts stay on the developer's machine and are excluded from source publication and application packages.

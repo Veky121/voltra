@@ -16,7 +16,7 @@ import * as cfxAdmission from '../src/client/cfxAdmission.ts';
 const require=createRequire(import.meta.url),source=fs.readFileSync(new URL('../src/client/TemplateGames.tsx',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
 function load(){
- const module={exports:{}},modules={'./settingDescription':settingDescription,'../notifications/useErrorState':{useErrorState:()=>React.useState('')},'../ui/PageHeading':{PageHeading:({children})=>React.createElement('header',null,children)},'../ui/Disclosure':{Disclosure:'details',DisclosureTrigger:'summary'},'./cfxAdmission':cfxAdmission,'../resourceUnits.ts':resourceUnits,'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
+ const module={exports:{}},modules={'./settingDescription':settingDescription,'../ui/PageHeading':{PageHeading:({children})=>React.createElement('header',null,children)},'../ui/Disclosure':{Disclosure:'details',DisclosureTrigger:'summary'},'./cfxAdmission':cfxAdmission,'../resourceUnits.ts':resourceUnits,'./GameSwitch':{GameSwitch:props=>React.createElement('input',{...props,type:'checkbox',role:'switch'})},
   react:React,'react-router-dom':{useNavigate:()=>()=>{},useParams:()=>({}),Link:'a'},
   '../lib':{api(){throw Error('No network in component fixture');},Button:({children,variant,...props})=>React.createElement('button',props,children),Card:'section',ErrorBox:({children})=>React.createElement('div',null,children),Field:({label,hint,children})=>React.createElement('label',null,label,children,hint),Input:'input',Select:'select',unwrap:x=>x},
   './common':{json:()=>{}},'./GameSetupFields':{GameAgreementField:()=>null,GameMemoryField:({value})=>React.createElement('input',{'data-fixture':'memory',value,readOnly:true}),GameNameField:()=>null,GameNodeField:({value})=>React.createElement('input',{'data-fixture':'node',value,readOnly:true})},
@@ -66,7 +66,7 @@ test('actual generic form defers KF2 game defaults and retains anonymous install
  assert.match(html,/<option value="public" selected="">Anonymous Steam installation/);
  assert.doesNotMatch(html,/Game player limit|Game password|value="game-only"/);assert.match(html,/Public branch/);assert.match(html,/value="preview"/);
  assert.doesNotMatch(html,/hidden-account|hidden-password|hidden-code|hidden-beta/);
- assert.match(html,/Private support for this recipe is pending review/);
+ assert.doesNotMatch(html,/Publication policy pending review|Private support for this recipe is pending review/);
  assert.match(html,/>Create server<\/button>/);assert.doesNotMatch(html,/<button(?=[^>]*disabled)[^>]*>Create server/);
 });
 test('actual form retains Banana private default/readiness gating without enabling unregistered candidate policy',()=>{

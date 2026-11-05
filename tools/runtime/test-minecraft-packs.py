@@ -11,6 +11,9 @@ SOURCE = Path(__file__).resolve().parents[2] / 'internal/panel/game_library/scri
 spec = importlib.util.spec_from_file_location('packs', SOURCE)
 packs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packs)
+installer_spec = importlib.util.spec_from_file_location('content_installer', SOURCE.parents[1] / 'minecraft-install.py')
+content_installer = importlib.util.module_from_spec(installer_spec)
+installer_spec.loader.exec_module(content_installer)
 
 
 class Publication(unittest.TestCase):
@@ -41,7 +44,7 @@ class Publication(unittest.TestCase):
 
     def test_existing_operator_files_and_named_world_retained(self):
         self.put(self.root, 'server.properties', b'level-name=MyAdventure\n')
-        names = ['mods/required.jar', 'plugins/custom.jar', 'config/x.toml', 'MyAdventure/level.dat',
+        names = ['plugins/custom.jar', 'config/x.toml', 'MyAdventure/level.dat',
                  'user_jvm_args.txt', 'eula.txt', 'server.properties']
         for name in names:
             if name != 'server.properties':
@@ -50,6 +53,54 @@ class Publication(unittest.TestCase):
         before = {name: (self.root / name).read_bytes() for name in names}
         self.publish()
         self.assertEqual(before, {name: (self.root / name).read_bytes() for name in names})
+
+    def test_pack_update_replaces_mods_and_preserves_edited_configs(self):
+        self.put(self.stage, 'mods/mezz-0.6.3.jar', b'old')
+        self.put(self.stage, 'config/edited.toml', b'original')
+        self.put(self.stage, 'config/default.toml', b'original')
+        self.publish()
+        self.put(self.root, 'config/edited.toml', b'user edit')
+        self.put(self.root, 'mods/mezz-0.6.8.jar', b'leftover')
+        (self.stage / 'mods/mezz-0.6.3.jar').unlink()
+        self.put(self.stage, 'mods/mezz-0.6.10.jar', b'new')
+        self.put(self.stage, 'config/edited.toml', b'new default')
+        self.put(self.stage, 'config/default.toml', b'new default')
+        self.publish()
+        self.assertEqual([p.name for p in (self.root / 'mods').iterdir()], ['mezz-0.6.10.jar'])
+        self.assertEqual((self.root / 'config/edited.toml').read_bytes(), b'user edit')
+        self.assertEqual((self.root / 'VOLTRA_OVERRIDE/config/edited.toml').read_bytes(), b'user edit')
+        self.assertEqual((self.root / 'config/default.toml').read_bytes(), b'new default')
+        self.publish()
+        self.assertEqual((self.root / 'config/edited.toml').read_bytes(), b'user edit')
+
+    def test_pack_update_removes_absent_scripts_keeps_local_and_player_state(self):
+        self.put(self.root, 'scripts/old.zs', b'old')
+        for name in ['local/cache', 'usercache.json', 'ops.json', 'world/level.dat']:
+            self.put(self.root, name, b'user')
+            self.put(self.stage, name, b'pack')
+        self.publish()
+        self.assertFalse((self.root / 'scripts').exists())
+        for name in ['local/cache', 'usercache.json', 'ops.json', 'world/level.dat']:
+            self.assertEqual((self.root / name).read_bytes(), b'user')
+
+    def test_explicit_override_wins_and_cannot_be_supplied_by_pack(self):
+        self.put(self.root, 'VOLTRA_OVERRIDE/config/x.toml', b'user override')
+        self.put(self.root, 'config/x.toml', b'old effective config')
+        self.put(self.stage, 'config/x.toml', b'new pack')
+        self.put(self.stage, 'VOLTRA_OVERRIDE/config/x.toml', b'pack override')
+        self.publish()
+        self.assertEqual((self.root / 'config/x.toml').read_bytes(), b'user override')
+        self.assertEqual((self.root / 'VOLTRA_OVERRIDE/config/x.toml').read_bytes(), b'user override')
+        self.put(self.root, 'VOLTRA_OVERRIDE/config/x.toml', b'next user override')
+        self.publish()
+        self.assertEqual((self.root / 'config/x.toml').read_bytes(), b'next user override')
+
+    def test_override_cannot_reintroduce_mod_jars(self):
+        self.put(self.root, 'VOLTRA_OVERRIDE/mods/old.jar', b'old')
+        self.put(self.root, 'mods/current.jar', b'current')
+        with self.assertRaisesRegex(ValueError, 'supports only'):
+            self.publish()
+        self.assertEqual((self.root / 'mods/current.jar').read_bytes(), b'current')
 
     def test_tracked_program_upgraded_modified_program_retained(self):
         self.publish()
@@ -162,7 +213,7 @@ class Publication(unittest.TestCase):
             self.put(ready,'eula.txt',b'eula=true\n')
         def acquire(pin,destination,cache):destination.write_bytes(b'fixture-installer')
         with patch.dict(sys.modules,{'modded_java_install':SimpleNamespace(metadata=metadata),
-                                    'minecraft_install':SimpleNamespace(bootstrap_java=lambda major,root:'/private/java/bin/java')}):
+                                    'minecraft_install':SimpleNamespace(bootstrap_java=lambda major,root:'/private/java/bin/java', pack_content_transaction=content_installer.pack_content_transaction)}):
             with patch.object(packs,'acquire',side_effect=acquire),patch('subprocess.run',side_effect=run),patch('platform.machine',return_value='x86_64'):
                 receipt=packs.install_ftb(self.root,{'FTB_MODPACK_ID':'18'})
         argv,options=commands[0]

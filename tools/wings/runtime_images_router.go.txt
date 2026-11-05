@@ -1,0 +1,81 @@
+package router
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pterodactyl/wings/internal/runtimeimages"
+)
+
+func getRuntimeImages(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	manager, err := runtimeimages.Default()
+	if err != nil {
+		c.JSON(503, gin.H{"error": err.Error()})
+		return
+	}
+	rows, err := manager.Snapshot()
+	if err != nil {
+		c.JSON(503, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"version": 1, "check_interval_seconds": 86400, "images": rows})
+}
+func postRuntimeImages(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var q struct {
+		Action     string `json:"action"`
+		Reference  string `json:"reference"`
+		ExpectedID string `json:"expected_id"`
+		Enabled    *bool  `json:"enabled"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 4096))
+	dec.DisallowUnknownFields()
+	var extra any
+	if dec.Decode(&q) != nil || dec.Decode(&extra) != io.EOF || q.Reference == "" {
+		c.JSON(400, gin.H{"error": "invalid image management request"})
+		return
+	}
+	if q.Action != "check" && q.Action != "approve" && q.Action != "rollback" && q.Action != "schedule" {
+		c.JSON(400, gin.H{"error": "invalid image action"})
+		return
+	}
+	if q.Action == "schedule" && q.Enabled == nil || q.Action != "schedule" && q.Enabled != nil {
+		c.JSON(400, gin.H{"error": "enabled is required only for schedule changes"})
+		return
+	}
+	manager, err := runtimeimages.Default()
+	if err != nil {
+		c.JSON(503, gin.H{"error": err.Error()})
+		return
+	}
+	if q.Action == "check" {
+		err = manager.StartCheck(q.Reference)
+	} else {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+		defer cancel()
+		if q.Action == "schedule" {
+			err = manager.Schedule(ctx, q.Reference, *q.Enabled)
+		} else {
+			err = manager.Change(ctx, q.Reference, q.Action, q.ExpectedID)
+		}
+	}
+	if err != nil {
+		status := 409
+		if !errors.Is(err, runtimeimages.ErrBusy) {
+			status = 422
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+	if q.Action == "check" {
+		c.JSON(202, gin.H{"status": "checking"})
+	} else {
+		c.JSON(200, gin.H{"status": "applied"})
+	}
+}

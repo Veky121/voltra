@@ -1,4 +1,3 @@
-import {useErrorState} from '../notifications/useErrorState';
 import {PageHeading} from '../ui/PageHeading';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {miBToGB} from "../resourceUnits.ts";
@@ -55,7 +54,7 @@ export function SteamSetupForm({game, options}: {game: SteamGame; options: Steam
     try {steamAdvancedEnvironment([field], {[field.key]: field.type === 'boolean' ? field.default === '1' : field.default}); return false;} catch {return true;}
   });
   const [advanced, setAdvanced] = useState<Record<string, string | boolean>>(() => Object.fromEntries(advancedFields.map(field => [field.key, field.type === 'boolean' ? field.default === '1' : field.default])));
-  const [busy, setBusy] = useState(false), [error, setError] = useErrorState('client/SteamGames.tsx');
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const submitting = useRef(false);
   const submission = useRef<{payload: string; id: string} | null>(null);
   const memoryValue = memoryMiB(memory);

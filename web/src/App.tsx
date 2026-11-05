@@ -1,6 +1,6 @@
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {ArtworkProvider} from './client/ArtworkProvider';
-import {Suspense,lazy,useEffect,useState,type CSSProperties} from 'react';
+import {Suspense,lazy,useEffect,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
 import {useLocation} from 'react-router-dom';
 import {Loading,useAPI,unwrap} from './lib';
 import {SidebarTarget} from './Navigation';
@@ -32,6 +32,28 @@ function AuthenticatedShell(){
 }
 function AppShell({account}:{account:Record<string,any>}){
  const location=useLocation(),site=useAPI('/api/client/settings');
+ const contentRef=useRef<HTMLElement|null>(null);
+ useLayoutEffect(()=>{
+  const content=contentRef.current;
+  if(!content||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  // Animate layout sections, preserving their DOM, drafts and live subscriptions.
+  const sections=(parent:HTMLElement,depth=0):HTMLElement[]=>{
+   const children=Array.from(parent.children).filter((child):child is HTMLElement=>child instanceof HTMLElement&&!child.hidden&&child.getBoundingClientRect().height>0);
+   if(depth>=5)return children;
+   return children.flatMap(child=>{
+    const layout=child.matches('.page,.server-dashboard,.admin-page,.dashboard-charts,.operations-page,[data-slot=tabs-content]')||children.length===1;
+    return layout&&child.children.length?sections(child,depth+1):[child];
+   });
+  };
+  const targets=sections(content).filter(section=>!section.matches('.voltra-mobile-toolbar'));
+  const ordered=targets.map(element=>({element,top:element.getBoundingClientRect().top})).sort((a,b)=>a.top-b.top);
+  let row=-1,lastTop=-Infinity;
+  const animations=ordered.map(({element,top})=>{
+   if(top-lastTop>12){row++;lastTop=top;}
+   return element.animate([{opacity:0},{opacity:1}],{duration:120,delay:Math.min(row,5)*35,easing:'ease-out',fill:'backwards'});
+  });
+  return()=>animations.forEach(animation=>animation.cancel());
+ },[location.pathname]);
  const name=unwrap(site.data)?.name||'Voltra';
  const admin=location.pathname==='/admin'||location.pathname.startsWith('/admin/');
  const serverPage=location.pathname.startsWith('/server/');
@@ -47,7 +69,7 @@ function AppShell({account}:{account:Record<string,any>}){
    <SidebarRouteEffects/>
    <a className="skip-link" href="#main-content">Skip to content</a>
    <AppSidebar account={account} name={name} setTarget={setSidebarTarget}/>
-   <SidebarInset data-mira-density={preserveDensity?undefined:'compact'} id="main-content" className="app-content voltra-shadcn-content" tabIndex={-1}>
+   <SidebarInset ref={contentRef} data-mira-density={preserveDensity?undefined:'compact'} id="main-content" className="app-content voltra-shadcn-content" tabIndex={-1}>
     <div className="voltra-mobile-toolbar"><SidebarTrigger aria-label="Open navigation"/><span>{name}</span></div>
     <RouteRecovery resetKey={location.pathname}><Suspense fallback={<Loading/>}>{admin?<Admin/>:<Client/>}</Suspense></RouteRecovery>
    </SidebarInset>

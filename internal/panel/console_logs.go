@@ -631,6 +631,7 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 						}
 						state = text
 						capture.serverState = text
+						a.publishReadChanges("servers")
 					}
 				}
 			}

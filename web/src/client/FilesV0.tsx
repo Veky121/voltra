@@ -1,5 +1,3 @@
-import {observedFetch} from '../notifications/observedFetch';
-import {useErrorState} from '../notifications/useErrorState';
 import {Checkbox} from '../components/ui/checkbox';
 import {lazy,Suspense,useEffect,useRef,useState,type ReactNode} from 'react';
 import {useSearchParams} from 'react-router-dom';
@@ -47,7 +45,7 @@ export default function Files(){
   const a=useAction();
   const [selected,setSelected]=useState<string[]>([]),[search,setSearch]=useState(''),[sort,setSort]=useState({key:'name',ascending:true});
   const [dialog,setDialog]=useState(''),[name,setName]=useState(''),[source,setSource]=useState(''),[mode,setMode]=useState('644'),[url,setURL]=useState('');
-  const [draft,setDraft]=useState(()=>loadedDraft('','')),[editing,setEditing]=useState(false),[fileError,setFileError]=useErrorState('client/FilesV0.tsx');
+  const [draft,setDraft]=useState(()=>loadedDraft('','')),[editing,setEditing]=useState(false),[fileError,setFileError]=useState('');
   const dirty=!!file&&draft.path===file&&isDraftDirty(draft);
   const {attention,bar}=useFileNavigationGuard(dirty);
   const [menu,setMenu]=useState<OpenMenu|null>(null),[dragging,setDragging]=useState(false),[now,setNow]=useState(Date.now());
@@ -80,7 +78,7 @@ export default function Files(){
     void (async()=>{
       try{
         if(!can(permissions,'file.read-content'))throw new Error('You do not have permission to read this file.');
-        const response=await observedFetch(`${base}/files/contents?file=${encodeURIComponent(file)}`,{signal:abort.signal});
+        const response=await fetch(`${base}/files/contents?file=${encodeURIComponent(file)}`,{signal:abort.signal});
         if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(body?.errors?.[0]?.detail||`Could not open file (${response.status})`)}
         const {decodeEditorFile}=await import('./editorLanguages');
         const text=decodeEditorFile(await response.arrayBuffer());
@@ -127,7 +125,7 @@ export default function Files(){
         const d=value(await api(`${base}/files/upload`)),uploadURL=new URL(d.url,location.href);
         uploadURL.searchParams.set('directory',relativePath?full(relativePath):directory);
         const body=new FormData();for(const f of group)body.append('files',f,f.name);
-        const response=await observedFetch(uploadURL,{method:'POST',body});
+        const response=await fetch(uploadURL,{method:'POST',body});
         if(!response.ok)throw new Error(`Upload failed (${response.status}): ${await response.text()}`);
       }
     },()=>a.setSuccess(`${files.length} ${files.length===1?'file':'files'} uploaded.`));

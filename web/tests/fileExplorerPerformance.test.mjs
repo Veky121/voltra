@@ -49,6 +49,14 @@ test('refresh preserves rows and expansion, refreshes mounted folders, and keeps
   f.props.refreshKey=1;f.render();assert.equal(root.calls,2);assert.equal(mods.calls,2);
 });
 
+test('initial folder load exposes one loading status and replaces it with the real rows',()=>{
+ const f=fixture();f.render();
+ const status=f.nodes().filter(n=>n.props?.role==='status');
+ assert.equal(status.length,1);assert.equal(status[0].props['aria-label'],'Loading folder');assert.equal(status[0].props['aria-busy'],'true');
+ const root=f.listing('/',[entry('server.properties')]);root.loading=false;f.render();
+ assert.equal(f.nodes().filter(n=>n.props?.role==='status').length,0);assert.ok(f.button('Open /server.properties'));
+});
+
 test('sorting and filtering reuse memoized results on selection and background state changes',()=>{
   const f=fixture(),q=f.listing('/',[entry('z.txt'),entry('a10.txt'),entry('a2.txt'),entry('mods',false)]);q.loading=false;f.render();
   const labels=f.nodes().filter(n=>n.type==='button').map(n=>n.props['aria-label']).filter(x=>x?.startsWith('Open /'));assert.deepEqual(labels,['Open /a2.txt','Open /a10.txt','Open /z.txt']);

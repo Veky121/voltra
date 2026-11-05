@@ -1,6 +1,6 @@
 """Pack publication boundary; provider adapters stage into an empty directory.
 
-Existing operator content wins over publisher defaults, including unchanged mods.
+Pack-owned content directories are replaced; operator state is preserved.
 Only tracked, unmodified program files may be upgraded. No archive scripts run.
 """
 import hashlib
@@ -16,7 +16,7 @@ CONTENT = {'mods', 'plugins', 'config', 'defaultconfigs', 'kubejs', 'scripts',
            'backups', 'logs', 'crash-reports', 'journeymap', 'coremods', 'Flan',
            'customnpcs', 'schematics', 'hats'}
 OPERATOR = {'eula.txt', 'server.properties', 'user_jvm_args.txt', 'banned-ips.json',
-            'banned-players.json', 'ops.json', 'whitelist.json', 'permissions.yml',
+            'banned-players.json', 'usercache.json', 'ops.json', 'whitelist.json', 'permissions.yml',
             'bukkit.yml', 'spigot.yml', 'paper.yml'}
 
 
@@ -46,7 +46,7 @@ def target(root, relative):
 def operator_path(relative, world_names=()):
     first = relative.split('/')[0]
     return (relative in OPERATOR or first in CONTENT or first.startswith('world')
-            or first in world_names or relative.endswith(('.properties', '.cfg', '.toml', '.yml', '.yaml')))
+            or first in {'local', 'VOLTRA_OVERRIDE'} or first in world_names or relative.endswith(('.properties', '.cfg', '.toml', '.yml', '.yaml')))
 
 
 def configured_worlds(root):
@@ -64,11 +64,33 @@ def configured_worlds(root):
 
 
 def publish(staging, root, identity, launch):
+    # The same module is packaged as minecraft_install for original recipes.
+    try:
+        import minecraft_install as minecraft
+    except ModuleNotFoundError:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            'minecraft_install', Path(__file__).resolve().parents[1] / 'minecraft-install.py')
+        minecraft = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(minecraft)
+    root = Path(root).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    # Validate every staged file before moving any live directory.
+    for source in Path(staging).rglob('*'):
+        if source.is_symlink() or not (source.is_file() or source.is_dir()):
+            raise ValueError('Pack contains links or special files')
+        if source.relative_to(staging).parts[0] == '.voltra':
+            raise ValueError('Pack cannot replace adapter state')
+    with minecraft.pack_content_transaction(staging, root):
+        return _publish(staging, root, identity, launch)
+
+
+def _publish(staging, root, identity, launch):
     """Install absent defaults; preserve operator state; roll back failed writes.
 
-    The receipt records only this adapter's program files. Existing untracked
-    files are never adopted as publisher-owned or overwritten. Removed pack
-    files remain available for explicit operator migration rather than deletion.
+    Pack content was reconciled by the shared transaction before this step.
+    Other untracked or modified program files remain operator-owned. Libraries
+    and launch files are updated only when previously tracked and unchanged.
     """
     staging, root = Path(staging).resolve(), Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -88,11 +110,15 @@ def publish(staging, root, identity, launch):
         if source.is_dir():
             continue
         relative = source.relative_to(staging).as_posix()
+        if relative.split('/')[0] == 'VOLTRA_OVERRIDE':
+            continue  # Publisher archives cannot supply user overrides.
+        if relative.split('/')[0] in {'mods', 'config', 'defaultconfigs', 'kubejs', 'scripts'}:
+            continue
         if relative == 'eula.txt':
             # Publisher archives cannot accept an agreement for the operator.
             continue
         first = relative.split('/')[0]
-        if (first.startswith('world') or first in world_names) and target(root, first).exists():
+        if (first.startswith('world') or first in {'local', 'VOLTRA_OVERRIDE'} or first in world_names) and target(root, first).exists():
             retained.append(relative)
             continue
         if relative.startswith('.voltra/'):

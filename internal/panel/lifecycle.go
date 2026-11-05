@@ -2226,6 +2226,7 @@ func (a *App) remoteInstall(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		egg = fs25ReinstallEgg(s, egg)
+		egg["script_install"] = minecraftLegacyCurseForgeInstaller(str(egg["script_install"]))
 		writeJSON(w, 200, M{"container_image": egg["script_container"], "entrypoint": egg["script_entry"], "script": egg["script_install"]})
 		return
 	}

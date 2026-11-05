@@ -55,11 +55,11 @@ export function AdminNavigation(){
       ['/admin/users','Users'],['/admin/nodes','Nodes'],['/admin/database-hosts','Database hosts'],
     ]},
     {label:'Service management',description:'Game templates and Java runtimes',links:[
-      ['/admin/nests','Game templates'],['/admin/java-runtimes','Java runtimes'],
+      ['/admin/nests','Game templates'],['/admin/java-runtimes','Java runtimes'],['/admin/runtime-management','Runtime management'],
     ]},
   ];
   return <div className="sidebar-admin-groups">{groups.map(group=><NavigationGroup key={group.label} label={group.label} description={group.description}>
-    {group.links.map(([to,label])=><NavLink key={to} to={to} title={label} end={to==='/admin'} className={({isActive})=>isActive||(to==='/admin/nests'&&pathname.startsWith('/admin/eggs/'))?'active':''}><NavIcon name={({'/admin/proxy-gateways':'network','/admin':'dashboard','/admin/settings':'settings','/admin/integrations':'key','/admin/api-keys':'key','/admin/servers':'server','/admin/users':'users','/admin/nodes':'nodes','/admin/locations':'locations','/admin/database-hosts':'databases','/admin/nests':'eggs','/admin/java-runtimes':'startup','/admin/mounts':'mounts'} as Record<string,IconName>)[to]}/><span>{label}</span></NavLink>)}
+    {group.links.map(([to,label])=><NavLink key={to} to={to} title={label} end={to==='/admin'} className={({isActive})=>isActive||(to==='/admin/nests'&&pathname.startsWith('/admin/eggs/'))?'active':''}><NavIcon name={({'/admin/proxy-gateways':'network','/admin':'dashboard','/admin/settings':'settings','/admin/integrations':'key','/admin/api-keys':'key','/admin/servers':'server','/admin/users':'users','/admin/nodes':'nodes','/admin/locations':'locations','/admin/database-hosts':'databases','/admin/nests':'eggs','/admin/runtime-management':'startup','/admin/java-runtimes':'startup','/admin/mounts':'mounts'} as Record<string,IconName>)[to]}/><span>{label}</span></NavLink>)}
   </NavigationGroup>)}
     <Disclosure className="voltra-sidebar-advanced" key={String(pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations'))} defaultOpen={pathname.startsWith('/admin/api-keys')||pathname.startsWith('/admin/mounts')||pathname.startsWith('/admin/locations')}>
       <DisclosureTrigger title="Advanced administration">Advanced</DisclosureTrigger>

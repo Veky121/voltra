@@ -1,6 +1,5 @@
 import {confirmAction} from '../ui/ConfirmAction';
 import {transferDestination} from './fileTransferPaths';
-import {useErrorState} from '../notifications/useErrorState';
 import './gameSwitch.css';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
@@ -36,7 +35,7 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
     return()=>window.clearTimeout(timer);
   },[opened]);
   const displayedFile=opened||retainedFile;
-  const [epoch,setEpoch]=useState(0),[selected,setSelected]=useState<string[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/FileManager.tsx'),[notice,setNotice]=useState('');
+  const [epoch,setEpoch]=useState(0),[selected,setSelected]=useState<string[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [documentDirty,setDocumentDirty]=useState(false),[pendingTransfers,setPendingTransfers]=useState(false);
   const [rowMenu,setRowMenu]=useState<{id:string;anchor:HTMLButtonElement}|null>(null);
   useEffect(()=>setRowMenu(null),[directory,opened,epoch]);

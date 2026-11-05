@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,24 +27,30 @@ type liveSample struct {
 	status    int
 }
 type liveDelivery struct {
-	binding *liveBinding
-	sample  liveSample
+	binding    *liveBinding
+	sample     liveSample
+	generation uint64
 }
 type liveBinding struct {
-	lastDigest string
-	path       string
-	revision   uint64
-	topic      liveTopic
-	updates    chan liveDelivery
-	cancel     func()
+	lastDigest     string
+	lastGeneration uint64
+	lastSent       time.Time
+	path           string
+	revision       uint64
+	topic          liveTopic
+	updates        chan liveDelivery
+	cancel         func()
+	resync         chan struct{}
+	worker         *liveSnapshotWorker
 }
 type liveSnapshotWorker struct {
-	topic    liveTopic
-	user     int64
-	cancel   context.CancelFunc
-	wake     chan struct{}
-	bindings map[*liveBinding]struct{}
-	last     *liveSample
+	topic      liveTopic
+	generation uint64
+	user       int64
+	cancel     context.CancelFunc
+	wake       chan struct{}
+	bindings   map[*liveBinding]struct{}
+	last       *liveSample
 }
 type liveSnapshotHub struct {
 	mu      sync.Mutex
@@ -55,27 +62,40 @@ type liveSubscriptionRequest struct {
 	Type     string   `json:"type"`
 	Paths    []string `json:"paths"`
 	Revision uint64   `json:"revision"`
+	Domains  []string `json:"domains,omitempty"`
 }
 
 // Exact allowlist, with no arbitrary handler dispatch, file contents, startup
 // variables, private Steam credentials, downloads, or command execution.
 func (a *App) liveTopic(path string) (liveTopic, bool) {
-	t := liveTopic{path: path, interval: 5 * time.Second}
+	t := liveTopic{path: path, interval: 60 * time.Second}
 	if path == "/api/client?summary=overview&states=1" {
 		t.handler = a.clientServers
 		t.event = "servers.state"
-		t.interval = time.Second
+		t.interval = 15 * time.Second
 		return t, true
 	}
 	u, err := url.ParseRequestURI(path)
-	if err != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != path {
+	if err != nil || u.Fragment != "" || u.EscapedPath() != u.Path || len(path) > 2048 {
 		return t, false
 	}
-	parts := strings.Split(strings.TrimPrefix(path, "/api/client/servers/"), "/")
-	if !strings.HasPrefix(path, "/api/client/servers/") || len(parts) < 1 || len(parts) > 2 || parts[0] == "" || strings.ContainsAny(parts[0], "%.\\") {
+	parts := strings.Split(strings.TrimPrefix(u.Path, "/api/client/servers/"), "/")
+	if !strings.HasPrefix(path, "/api/client/servers/") || len(parts) < 1 || len(parts) > 3 || parts[0] == "" || strings.ContainsAny(parts[0], "%.\\") {
+		return t, false
+	}
+	if !liveQueryAllowed(parts, u.Query()) {
 		return t, false
 	}
 	t.server = parts[0]
+	if len(parts) == 3 {
+		if parts[1] != "files" || parts[2] != "list" {
+			return t, false
+		}
+		t.handler = a.clientFiles
+		t.event = "files.updated"
+		t.interval = 15 * time.Second
+		return t, true
+	}
 	if len(parts) == 1 {
 		t.handler = a.clientServerDetail
 		t.event = "server.updated"
@@ -93,7 +113,10 @@ func (a *App) liveTopic(path string) (liveTopic, bool) {
 	case "steam":
 		t.handler = a.clientSteamStatus
 		t.event = "jobs.updated"
-		t.interval = 2 * time.Second
+		t.interval = 60 * time.Second
+	case "users":
+		t.handler = a.collabUsers
+		t.event = "users.updated"
 	case "backups":
 		t.handler = a.clientBackups
 		t.event = "backups.updated"
@@ -121,6 +144,10 @@ func (a *App) authorizeLiveTopic(r *http.Request, t liveTopic, user int64) (M, e
 	}
 	permission := ""
 	switch t.event {
+	case "files.updated":
+		permission = "file.read"
+	case "users.updated":
+		permission = "user.read"
 	case "console.entries":
 		permission = "websocket.connect"
 	case "jobs.updated":
@@ -241,11 +268,16 @@ func (a *App) watchLiveTopic(t liveTopic, user int64, b *liveBinding) bool {
 		go a.runLiveSnapshot(ctx, key, w)
 	}
 	w.bindings[b] = struct{}{}
-	if w.last != nil {
+	b.worker = w
+	if w.last != nil && time.Since(w.last.sampledAt) < 10*time.Second {
 		select {
-		case b.updates <- liveDelivery{b, *w.last}:
+		case b.updates <- liveDelivery{b, *w.last, w.generation}:
 		default:
 		}
+	}
+	select {
+	case w.wake <- struct{}{}:
+	default:
 	}
 	var once sync.Once
 	b.cancel = func() {
@@ -272,6 +304,9 @@ func (a *App) runLiveSnapshot(ctx context.Context, key string, w *liveSnapshotWo
 		case <-ctx.Done():
 			return
 		}
+		h.mu.Lock()
+		generation := w.generation
+		h.mu.Unlock()
 		value := a.loadLiveSample(ctx, w.topic, w.user)
 		value.sampledAt = time.Now()
 		<-h.slots
@@ -279,11 +314,19 @@ func (a *App) runLiveSnapshot(ctx context.Context, key string, w *liveSnapshotWo
 			return
 		}
 		h.mu.Lock()
+		if generation != w.generation {
+			h.mu.Unlock()
+			continue
+		}
 		w.last = &value
 		for b := range w.bindings {
 			select {
-			case b.updates <- liveDelivery{b, value}:
+			case b.updates <- liveDelivery{b, value, generation}:
 			default:
+				select {
+				case b.resync <- struct{}{}:
+				default:
+				}
 			}
 		}
 		h.mu.Unlock()
@@ -319,18 +362,7 @@ func (a *App) runLiveSnapshot(ctx context.Context, key string, w *liveSnapshotWo
 		}
 	}
 }
-func (h *liveSnapshotHub) invalidate(user int64) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for _, w := range h.workers {
-		if user == 0 || w.user == user || w.topic.event == "server.resources" || w.topic.event == "servers.state" {
-			select {
-			case w.wake <- struct{}{}:
-			default:
-			}
-		}
-	}
-}
+func (h *liveSnapshotHub) invalidate(user int64) { h.invalidateDomains("all") }
 func (h *liveSnapshotHub) close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -364,4 +396,36 @@ func (w *liveMutationResponse) Flush() {
 		w.status = 200
 	}
 	_ = http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+// Query values are intentionally narrow. Signed URLs, credentials and arbitrary
+// include/filter parameters must never become shared snapshot payloads.
+func liveQueryAllowed(parts []string, q url.Values) bool {
+	for key, values := range q {
+		if len(values) != 1 {
+			return false
+		}
+		v := values[0]
+		family := ""
+		if len(parts) > 1 {
+			family = parts[1]
+		}
+		switch {
+		case family == "files" && len(parts) == 3 && parts[2] == "list" && key == "directory":
+			if len(v) > 1024 || strings.ContainsAny(v, "\x00\r\n") {
+				return false
+			}
+		case family == "schedules" && key == "include" && v == "tasks":
+		case (family == "backups" || family == "activity") && (key == "page" || key == "per_page"):
+			n, e := strconv.Atoi(v)
+			if e != nil || n < 1 || n > 10000 || (key == "per_page" && n > 100) {
+				return false
+			}
+		case family == "backups" && key == "sort" && (v == "newest" || v == "oldest" || v == "largest" || v == "smallest" || v == "name"):
+		case family == "backups" && key == "origin" && (v == "manual" || v == "scheduled" || v == "unknown"):
+		default:
+			return false
+		}
+	}
+	return true
 }

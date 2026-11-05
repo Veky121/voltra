@@ -24,6 +24,65 @@ def archive(files):
 
 
 class MinecraftInstallerTests(unittest.TestCase):
+    def test_guided_pack_update_replaces_mods_and_keeps_user_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def apply(mod, config):
+                payload = archive({'mods/' + mod: b'mod', 'config/options.toml': config})
+                plan = {'files': [{'path': 'server.jar'}], 'archives': [
+                    {'file': {}, 'prefixes': ['']}], 'launch': '-jar server.jar'}
+                def download(file, path):
+                    path.write_bytes(payload)
+                with mock.patch.object(installer, 'verified', return_value=b'jar'), \
+                     mock.patch.object(installer, 'verified_archive', side_effect=download), \
+                     mock.patch.dict(os.environ, {'MAX_PLAYERS': '20', 'GAME_MODE': 'survival', 'DIFFICULTY': 'normal'}):
+                    installer.install(plan, root)
+            apply('mezz-0.6.3.jar', b'default-v1')
+            (root / 'config/options.toml').write_bytes(b'user edit')
+            (root / 'mods/mezz-0.6.8.jar').write_bytes(b'stale')
+            (root / 'eula.txt').write_bytes(b'eula=false')
+            apply('mezz-0.6.10.jar', b'default-v2')
+            self.assertEqual([p.name for p in (root / 'mods').iterdir()], ['mezz-0.6.10.jar'])
+            self.assertEqual((root / 'config/options.toml').read_bytes(), b'user edit')
+            self.assertEqual((root / 'eula.txt').read_bytes(), b'eula=false')
+
+    def test_content_failure_restores_old_mods_and_config_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, stage = Path(directory) / 'root', Path(directory) / 'stage'
+            root.mkdir(); stage.mkdir()
+            (root / 'mods').mkdir(); (root / 'mods/old.jar').write_bytes(b'old')
+            (stage / 'mods').mkdir(); (stage / 'mods/new.jar').write_bytes(b'new')
+            with self.assertRaisesRegex(OSError, 'fixture'):
+                with installer.pack_content_transaction(stage, root):
+                    raise OSError('fixture')
+            self.assertEqual((root / 'mods/old.jar').read_bytes(), b'old')
+            self.assertFalse((root / 'mods/new.jar').exists())
+            self.assertFalse((root / '.voltra/minecraft-pack-content.json').exists())
+
+    def test_override_publication_failure_restores_directories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, stage = Path(directory) / 'root', Path(directory) / 'stage'
+            root.mkdir(); stage.mkdir()
+            for base, name, content in [(root, 'mods/old.jar', b'old'),
+                    (stage, 'mods/new.jar', b'new'),
+                    (root, 'VOLTRA_OVERRIDE/config/x.toml', b'override'),
+                    (root, 'config/x.toml', b'old effective')]:
+                path = base / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            replace = installer.os.replace
+            def fail_state(source, destination):
+                if Path(destination).name == 'minecraft-pack-content.json':
+                    raise OSError('fixture state failure')
+                return replace(source, destination)
+            with mock.patch.object(installer.os, 'replace', side_effect=fail_state):
+                with self.assertRaisesRegex(OSError, 'fixture'):
+                    with installer.pack_content_transaction(stage, root):
+                        pass
+            self.assertEqual((root / 'mods/old.jar').read_bytes(), b'old')
+            self.assertEqual((root / 'config/x.toml').read_bytes(), b'old effective')
+            self.assertEqual((root / 'VOLTRA_OVERRIDE/config/x.toml').read_bytes(), b'override')
+
     def test_archive_download_streams_verifies_and_extracts_from_disk(self):
         data = archive({'mods/server.jar': b'content', 'run.sh': b'never execute'})
         selection = {'url': 'https://edge.forgecdn.net/pack.zip', 'algorithm': 'sha256', 'hash': hashlib.sha256(data).hexdigest()}

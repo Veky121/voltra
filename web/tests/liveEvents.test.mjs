@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 const bundle=await build({entryPoints:[new URL('../src/hooks/liveEvents.ts',import.meta.url).pathname.replace(/^\/(.:)/,'$1')],bundle:true,write:false,format:'esm',platform:'node'});
-const {observeLiveNavigation,observeLivePath,isLivePathFresh,livePathAllowed}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const {observeLiveNavigation,observeLivePath,observeReadInvalidation,isLivePathFresh,livePathAllowed}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 
 test('live navigation coalesces events, resyncs on reconnect, and stops at auth boundary',t=>{
   t.mock.timers.enable({apis:['setTimeout']});
@@ -28,6 +28,29 @@ test('live navigation coalesces events, resyncs on reconnect, and stops at auth 
   instances[1].message({type:'ready',version:1});t.mock.timers.tick(75);assert.equal(refreshes,2);
   window.dispatchEvent(new Event('panel-auth-changed'));
   assert.equal(instances[1].closed,true);t.mock.timers.tick(60000);assert.equal(instances.length,2);
+});
+
+test('quiet topics stay fresh on heartbeat; scoped hints coalesce and reconnect refreshes',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const old={window:globalThis.window,document:globalThis.document,WebSocket:globalThis.WebSocket,now:Date.now};let now=100000;
+ Date.now=()=>now;const sockets=[];
+ class Socket{constructor(){this.sent=[];sockets.push(this)}send(raw){this.sent.push(JSON.parse(raw))}close(){this.onclose?.()}message(packet){this.onmessage?.({data:JSON.stringify({version:1,...packet})})}}
+ globalThis.window=Object.assign(new EventTarget(),{location:{href:'https://panel.test/'}});globalThis.document=Object.assign(new EventTarget(),{hidden:false});globalThis.WebSocket=Socket;
+ const path='/api/client/servers/one/backups?page=2&per_page=20';let refreshes=0;
+ const stop=observeLivePath(path,()=>{}),stopHints=observeReadInvalidation('/api/client/servers/one/network/allocations',()=>refreshes++);
+ t.after(()=>{stop();stopHints();Object.assign(globalThis,{window:old.window,document:old.document,WebSocket:old.WebSocket});Date.now=old.now});
+ const socket=sockets[0];socket.message({type:'ready',capabilities:['snapshots','event-driven']});t.mock.timers.tick(300);
+ assert.equal(refreshes,1);assert.deepEqual(socket.sent.at(-1).domains,['network','access','servers','backups']);
+ socket.message({type:'snapshot',path,revision:socket.sent.at(-1).revision,status:200,data:{data:[]}});
+ now+=30000;socket.message({type:'heartbeat'});assert.equal(isLivePathFresh(path),true);
+ now+=46000;assert.equal(isLivePathFresh(path),false);socket.message({type:'heartbeat'});assert.equal(isLivePathFresh(path),true);
+ now+=15000;assert.equal(isLivePathFresh(path),false);socket.message({type:'unchanged',path,revision:socket.sent.at(-1).revision,status:200});assert.equal(isLivePathFresh(path),true);
+ socket.message({type:'reads.invalidated',domains:['backups']});t.mock.timers.tick(300);assert.equal(refreshes,1);assert.equal(isLivePathFresh(path),false);
+ socket.message({type:'unchanged',path,revision:socket.sent.at(-1).revision,status:200});assert.equal(isLivePathFresh(path),true);
+ for(let i=0;i<100;i++)socket.message({type:'reads.invalidated',domains:['network']});t.mock.timers.tick(300);assert.equal(refreshes,2);
+ socket.close();assert.equal(isLivePathFresh(path),false);t.mock.timers.tick(40000);assert.equal(sockets.length,2);
+ sockets[1].message({type:'ready',capabilities:['snapshots','event-driven']});t.mock.timers.tick(300);assert.equal(refreshes,3);
+ window.dispatchEvent(new Event('panel-auth-changed'));t.mock.timers.tick(40000);assert.equal(sockets.length,2);
 });
 
 test('topic subscriptions share one socket, fence revisions, pause hidden and fall back on disconnect',t=>{

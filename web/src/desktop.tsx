@@ -1,6 +1,4 @@
 import {confirmAction} from './ui/ConfirmAction';
-import {observedFetch} from './notifications/observedFetch';
-import {useErrorState} from './notifications/useErrorState';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {useEffect,useState,type ReactNode} from 'react';
 import {Button,Card,ErrorBox,Field,Input,Loading,Modal,Select} from './lib';
@@ -14,7 +12,7 @@ import {SettingsRow,SettingsSection} from './ui/Settings';
 
 type Status={linked:boolean;panel_url:string;device_name:string;version:string;updates_enabled:boolean;storage_error?:string};
 async function local<T=Status>(path:string,body?:unknown):Promise<T>{
-  const response=await observedFetch(`/desktop/${path}`,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
+  const response=await fetch(`/desktop/${path}`,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||'The desktop request failed.');
   return data;
@@ -32,7 +30,7 @@ function DesktopUpdates({enabled}:{enabled:boolean}){
 
 export function DesktopAppInfo(){
   const navigate=useNavigate();
-  const [app,setApp]=useState<Status|null>(null),[error,setError]=useErrorState('desktop.tsx');
+  const [app,setApp]=useState<Status|null>(null),[error,setError]=useState('');
   const {status,busy,error:updateError,checkedAt}=useDesktopUpdates();
   useEffect(()=>{void local('status').then(setApp).catch(e=>setError(e.message))},[]);
   if(import.meta.env.VITE_DESKTOP!=='true')return null;
@@ -62,7 +60,7 @@ export function DesktopRecoveryActions(){
 }
 
 function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaximizedChange:(value:boolean)=>void}){
-  const [error,setError]=useErrorState('desktop.tsx');
+  const [error,setError]=useState('');
   useEffect(()=>{
     let active=true,timer:ReturnType<typeof setTimeout>;
     const refresh=()=>{void local<{maximized:boolean}>('window').then(state=>{if(active)onMaximizedChange(state.maximized)}).catch(()=>{});};
@@ -95,7 +93,7 @@ export default function DesktopGate({children}:{children:ReactNode}){
     const invoke=(message:string)=>(window as Window&{_wails?:{invoke?:(message:string)=>void}})._wails?.invoke?.(message);
     return installDesktopWindowGestures(window,invoke,()=>!maximized,()=>{void local<{maximized:boolean}>('window/maximize',{}).then(state=>setMaximized(state.maximized)).catch(()=>{});});
   },[maximized]);
-  const [status,setStatus]=useState<Status|null>(null),[error,setError]=useErrorState('desktop.tsx'),[busy,setBusy]=useState(false);
+  const [status,setStatus]=useState<Status|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [connection,setConnection]=useState(''),[name,setName]=useState('My computer');
   const [disconnected,setDisconnected]=useState(false);
   const [confirmUnlink,setConfirmUnlink]=useState(false);

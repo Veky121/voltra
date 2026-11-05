@@ -1,4 +1,4 @@
-import {useErrorState} from '../notifications/useErrorState';
+import {SettingsSkeleton} from '../ui/SettingsSkeleton';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import './games-ui.css';
 import {useEffect, useRef, useState} from 'react';
@@ -31,7 +31,7 @@ export default function SteamMaintenance() {
   return <div className="steam-maintenance-page games-ui"><header className="page-header"><div><h2>Updates & repair</h2><p className="muted">Manage game files, update checks and repairs.</p></div>{id && can(permissions, 'file.read-content') && <Link to={`/server/${encodeURIComponent(id)}/settings`}>Game Config →</Link>}</header>
     {!base ? <ErrorBox>Select a server to view Updates & repair.</ErrorBox> : !readable ? <p className="muted">Startup read permission is required to view Updates & repair.</p> : <>
       <ErrorBox>{request.error}</ErrorBox>{request.error && <Button variant="secondary" onClick={request.reload}>Retry Steam status</Button>}
-      {request.loading && !request.data && <p role="status">Loading Steam status...</p>}
+      {request.loading && !request.data && <SettingsSkeleton label="Loading Steam status"/>}
       {privateStatus.error && <ErrorBox>{privateStatus.error}</ErrorBox>}
       {request.data && (request.data.supported ? <SteamControls key={base} status={request.data} unavailable={!!request.error || !!privateStatus.error || (can(permissions, 'startup.update') && !privateStatus.data)} privateContent={!!privateStatus.data?.private_content} reload={request.reload}/> : <Card><p>Updates & repair is not configured for {server.name || 'this server'}.</p></Card>)}
       {privateStatus.data?.supported && <PrivateSteamMaintenance key={`private-${base}`} status={privateStatus.data} unavailable={!!privateStatus.error} reload={privateStatus.reload}/>}
@@ -44,7 +44,7 @@ function SteamControls({status, unavailable, privateContent, reload}: {status: S
   const telemetry = useServerTelemetry();
   const writable = can(permissions, 'startup.update');
   const [mode, setMode] = useState(status.mode), [minutes, setMinutes] = useState(String(status.check_interval_seconds / 60));
-  const [busy, setBusy] = useState(''), [error, setError] = useErrorState('client/SteamMaintenance.tsx'), [success, setSuccess] = useTransientMessage(2000);
+  const [busy, setBusy] = useState(''), [error, setError] = useState(''), [success, setSuccess] = useTransientMessage(2000);
   const [editing, setEditing] = useState(false);
   const submitting = useRef(false);
   useEffect(() => {if (!editing) {setMode(status.mode); setMinutes(String(status.check_interval_seconds / 60));}}, [status.mode, status.check_interval_seconds]);

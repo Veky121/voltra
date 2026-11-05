@@ -1,0 +1,141 @@
+package runtimeimages
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
+	"github.com/pterodactyl/wings/config"
+	"github.com/pterodactyl/wings/environment"
+)
+
+type dockerEngine struct{ client *client.Client }
+type progressKey struct{}
+type Progress func(string, string)
+
+func WithProgress(ctx context.Context, fn Progress) context.Context {
+	return context.WithValue(ctx, progressKey{}, fn)
+}
+func progress(ctx context.Context, kind, detail string) {
+	if fn, ok := ctx.Value(progressKey{}).(Progress); ok {
+		fn(kind, detail)
+	}
+}
+func (d dockerEngine) Inspect(ctx context.Context, ref string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	info, _, err := d.client.ImageInspectWithRaw(ctx, ref)
+	if client.IsErrNotFound(err) {
+		return "", ErrMissing
+	}
+	if err != nil {
+		return "", errors.New("Docker image inspection failed")
+	}
+	if info.Os != "linux" || info.Architecture != runtime.GOARCH {
+		return "", errors.New("cached image platform does not match this node")
+	}
+	if !validID(info.ID) {
+		return "", errors.New("Docker returned invalid image metadata")
+	}
+	return info.ID, nil
+}
+func (d dockerEngine) Retain(ctx context.Context, id, tag string) error {
+	if err := d.client.ImageTag(ctx, id, tag); err != nil {
+		return errors.New("image could not be retained for approval or rollback")
+	}
+	return nil
+}
+func (d dockerEngine) Pull(ctx context.Context, ref string) (string, error) {
+	opts := image.PullOptions{Platform: "linux/" + runtime.GOARCH}
+	_, auth := config.Get().Docker.RegistryCredentialsForImage(ref)
+	if auth != nil {
+		encoded, err := auth.Base64()
+		if err != nil {
+			return "", errors.New("registry credentials could not be encoded")
+		}
+		opts.RegistryAuth = encoded
+	}
+	progress(ctx, "started", "")
+	defer progress(ctx, "completed", "")
+	body, err := d.client.ImagePull(ctx, ref, opts)
+	if err != nil {
+		return "", errors.New("image download failed; check registry access and node storage")
+	}
+	defer body.Close()
+	if err = consumePull(body, func(s string) { progress(ctx, "status", s) }); err != nil {
+		return "", err
+	}
+	return d.Inspect(ctx, ref)
+}
+func consumePull(body io.Reader, emit func(string)) error {
+	scan := bufio.NewScanner(body)
+	scan.Buffer(make([]byte, 4096), 1<<20)
+	completed := false
+	for scan.Scan() {
+		var event struct {
+			Status      string           `json:"status"`
+			Error       string           `json:"error"`
+			ErrorDetail *json.RawMessage `json:"errorDetail"`
+		}
+		line := strings.TrimSpace(scan.Text())
+		if !strings.HasPrefix(line, "{") || json.Unmarshal([]byte(line), &event) != nil {
+			return errors.New("Docker returned malformed image progress")
+		}
+		if event.Error != "" || event.ErrorDetail != nil {
+			return errors.New("Docker reported an image download failure")
+		}
+		if strings.HasPrefix(event.Status, "Status: Downloaded newer image") || strings.HasPrefix(event.Status, "Status: Image is up to date") {
+			completed = true
+		}
+		if len(event.Status) <= 1024 && event.Status != "" {
+			emit(event.Status)
+		}
+	}
+	if scan.Err() != nil || !completed {
+		return errors.New("image download ended without confirmed completion")
+	}
+	return nil
+}
+
+var global struct {
+	once    sync.Once
+	manager *Manager
+	err     error
+}
+
+func Default() (*Manager, error) {
+	global.once.Do(func() {
+		cli, err := environment.Docker()
+		if err != nil || cli == nil {
+			global.err = errors.New("Docker client unavailable")
+			return
+		}
+		global.manager, global.err = New(dockerEngine{cli}, filepath.Join(config.Get().System.RootDirectory, "runtime-images.json"))
+		if global.err == nil {
+			go func() {
+				ticker := time.NewTicker(time.Minute)
+				defer ticker.Stop()
+				for range ticker.C {
+					global.manager.Tick()
+				}
+			}()
+		}
+	})
+	return global.manager, global.err
+}
+func Resolve(ctx context.Context, ref string) (string, error) {
+	m, err := Default()
+	if err != nil {
+		return "", err
+	}
+	return m.Resolve(ctx, ref)
+}

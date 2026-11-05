@@ -1,6 +1,10 @@
-.settings-skeleton{border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);overflow:hidden}
-.settings-skeleton>div{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:82px;padding:18px 16px;border-bottom:1px solid var(--ui-divider)}
-.settings-skeleton>div:last-child{border-bottom:0}
-.settings-skeleton-label{width:32%;height:14px}
-.settings-skeleton-control{width:38%;max-width:280px;height:34px}
-@media(prefers-reduced-motion:reduce){.settings-skeleton [data-slot=skeleton]{animation:none}}
+.settings-skeleton{width:100%;min-width:0}
+.settings-skeleton-section{width:100%;max-width:880px}
+.server-admin-tools .settings-skeleton-section{max-width:none}
+.settings-skeleton-section>.settings-group{padding:0;gap:0;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface);overflow:hidden}
+.settings-skeleton .settings-row-control>.skeleton-control{max-width:280px}
+.settings-skeleton .settings-fields .skeleton-control{max-width:none}
+.settings-skeleton .skeleton-control-tall{height:72px}
+.settings-skeleton .settings-section-heading{padding:0 16px;min-height:24px;margin-bottom:10px}
+.settings-skeleton .settings-section-heading h2{font-size:15px;font-weight:550;line-height:22px}
+.settings-skeleton .settings-actions{display:flex;align-items:center;justify-content:space-between}

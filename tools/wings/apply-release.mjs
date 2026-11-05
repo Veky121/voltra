@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { applyRuntimeImages } from './apply-runtime-images.mjs';
 
 const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const root = path.resolve(process.argv[2] || '');
@@ -24,6 +25,8 @@ for (const name of ['remote_headers.go', 'remote_headers_test.go', 'remote_trans
   fs.copyFileSync(path.join(moduleRoot, 'tools/wings', name + '.txt'), path.join(root, 'router/downloader', name));
 }
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+inputs.push('tools/wings/apply-runtime-images.mjs', 'tools/wings/runtime_images.go.txt', 'tools/wings/runtime_images_sync.go.txt', 'tools/wings/runtime_images_docker.go.txt', 'tools/wings/runtime_images_router.go.txt', 'tools/wings/runtime_images_test.go.txt', 'tools/wings/runtime_images_docker_test.go.txt');
+applyRuntimeImages(root, moduleRoot);
 const provenance = {
   upstream_repository: 'https://github.com/pterodactyl/wings',
   upstream_tag: 'v1.13.3', upstream_commit: upstream,

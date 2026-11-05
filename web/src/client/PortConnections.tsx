@@ -1,10 +1,10 @@
+import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {useEffect,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
 import {api,Button,Input,Modal,useAPI} from '../lib';
 import {SettingsSection} from '../ui/Settings';
 import {CopyButton} from '../ui/CopyButton';
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {can,items,PageError,useServer,value} from './common';
 import {connectionAddress as address} from './connectionAddress';
 import {portConnectionActions,groupPortRoutes} from './portConnectionActions';
@@ -30,7 +30,7 @@ export default function PortConnections(){
  const [editor,setEditor]=useState<{kind:'forward'|'domain';port:Row}|null>(null);
  const [clientID,setClientID]=useState(''),[protocols,setProtocols]=useState<string[]>([]),[publicPort,setPublicPort]=useState('');
  const [label,setLabel]=useState(''),[domainRouteID,setDomainRouteID]=useState('');
- const [busy,setBusy]=useState(false),[error,setError]=useErrorState('client/PortConnections.tsx',{transient:true});
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const portRoutes=(port:Row)=>routes.filter(r=>String(r.allocation_id)===String(port.id)||!r.allocation_id&&Number(r.local_port)===Number(port.port)&&r.local_ip===port.ip);
  function simulate(action:Parameters<typeof updateNetworkSandbox>[1]){setTestState(updateNetworkSandbox(testState,action,ports))}
  function refresh(){allocations.reload();setup.reload();publicRoutes.reload();domain.reload();reload()}
@@ -66,7 +66,7 @@ export default function PortConnections(){
  const loadError=allocations.error||account.error||setup.error||publicRoutes.error||domain.error;
  return <section className="operations-page network-page settings-responsive" aria-label="Network">{testAvailable&&<div className="network-local-test"><span>{testing?'Local test mode. No public DNS or forwarding changes.':'Local network actions'}</span>{testing&&<Button variant="secondary" disabled={busy} onClick={()=>{setTestState(emptyNetworkSandbox());setEditor(null);setError('')}}>Reset test</Button>}<Button variant="secondary" disabled={busy} onClick={()=>{setTestRequested(!testing);setEditor(null);setError('')}}>{testing?'Exit test mode':'Try actions locally'}</Button></div>}<SettingsSection title="Server ports" action={<div className="server-proxy-actions">{!testing&&can(permissions,'allocation.create')&&<Button disabled={busy} onClick={()=>void run(async()=>{await api(`${base}/network/allocations`,{method:'POST'})})}>Assign port</Button>}<Button variant="secondary" aria-label="Refresh ports" title="Refresh ports" disabled={busy||allocations.loading} onClick={refresh}><RefreshCw size={14}/></Button></div>}>
   <PageError error={loadError}/>{!editor&&<PageError error={error} onDismiss={()=>setError('')}/>}
-  {allocations.loading&&!allocations.data&&<p className="server-proxy-note" role="status">Loading ports...</p>}
+  {allocations.loading&&!allocations.data&&<CollectionSkeleton label="Loading ports" count={3}/>}
   <div className="port-connections">{items(allocations.data).map(port=>{const capability=portConnectionActions(port,setup.error?undefined:setupData,domain.error?undefined:domainData,admin,writable),ownRoutes=portRoutes(port);return <div key={port.id} className="port-connection">
    <div className="port-connection-main"><CopyButton className="button secondary port-address-copy" value={address(port.ip,port.port)}/><span className="badge" title={port.protocol_source==='forwarding'?'Configured forwarding protocol':'Game protocol'}>{port.protocols?.length?[...port.protocols].sort().map((p:string)=>p.toUpperCase()).join(' & '):'Not specified'}</span><div className="port-connection-actions">
     {admin&&(capability.forward||ownRoutes.length>0)&&<Button variant="secondary" disabled={busy} onClick={()=>openForward(port)}>{ownRoutes.length?'Edit forwarding':'Forward port'}</Button>}

@@ -25,6 +25,7 @@ const Integration = lazy(() => import("./admin/integrations").then(module => ({d
 const Integrations = lazy(() => import("./admin/integrations").then(module => ({default: module.Integrations})));
 const GameLicences = lazy(() => import("./admin/GameLicences").then(module => ({default: module.GameLicences})));
 const ProxyGateways = lazy(() => import("./admin/ProxyGateways").then(module => ({default: module.ProxyGateways})));
+const RuntimeManagement = lazy(() => import('./admin/RuntimeManagement'));
 const JavaRuntimes = lazy(() => import("./admin/JavaRuntimes").then(module => ({default: module.JavaRuntimes})));
 const MinecraftRuntimeRules = lazy(() => import("./admin/MinecraftRuntimeRules").then(module => ({default: module.MinecraftRuntimeRules})));
 
@@ -61,7 +62,7 @@ export default function Admin() {
           <Route path="integrations/proxy-gateways" element={routePage(<ProxyGateways />)} />
           <Route path="proxy-gateways" element={<Navigate to="/admin/integrations/proxy-gateways" replace />} />
           <Route path="integrations/:id" element={routePage(<Integration />)} />
-          <Route path="java-runtimes" element={routePage(<><JavaRuntimes /><MinecraftRuntimeRules /></>)} />
+          <Route path="runtime-management" element={routePage(<RuntimeManagement />)} /><Route path="java-runtimes" element={routePage(<><JavaRuntimes /><MinecraftRuntimeRules /></>)} />
           <Route
             path="*"
             element={

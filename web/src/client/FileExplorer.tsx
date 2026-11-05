@@ -1,3 +1,4 @@
+import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {IconButton} from '../ui/IconButton';
 import {Checkbox} from '../components/ui/checkbox';
 import {memo,useEffect,useMemo,useRef,useState} from 'react';
@@ -59,8 +60,9 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
       {path!=='/'&&<EntryMenu path={path} controls={shared.controls}/>}
     </div>
     {expanded&&<ul>
-      {listing.loading&&!listing.data?<li className="explorer-message" role="status">Loading…</li>:!listing.data&&listing.error?<li className="explorer-message is-error">Could not load this folder.<button type="button" onClick={listing.reload}>Retry</button></li>:<>
-        {listing.loading&&<li className="explorer-message" role="status">Refreshing...</li>}
+      {listing.loading&&!listing.data?<li><CollectionSkeleton layout="files" label="Loading folder" count={5}/></li>:!listing.data&&listing.error?<li className="explorer-message is-error">Could not load this folder.<button type="button" onClick={listing.reload}>Retry</button></li>:<>
+          {listing.loading&&<li className="button-feedback-sr" role="status">Refreshing folder…</li>}
+
         {listing.error&&<li className="explorer-message is-error">Could not refresh this folder.<button type="button" onClick={listing.reload}>Retry</button></li>}
         {visible.map(entry=>{
           const entryPath=`${path==='/'?'':path}/${entry.name}`;

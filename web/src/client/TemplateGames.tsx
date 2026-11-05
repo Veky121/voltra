@@ -1,5 +1,4 @@
 import {settingDescription} from './settingDescription';
-import {useErrorState} from '../notifications/useErrorState';
 import {PageHeading} from '../ui/PageHeading';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {cfxSetupProblem, fiveMTemplateID} from './cfxAdmission';
@@ -78,7 +77,7 @@ export function TemplateSetupForm({options}: {options: TemplateOptions}) {
   const [memory, setMemory] = useState(String(miBToGB(fs25 ? Math.min(options.defaults.memory, Math.max(128, gameMemoryBudget(1048576, initialNode))) : options.defaults.memory)));
   const [disk, setDisk] = useState(String(miBToGB(fs25 ? Math.min(options.defaults.disk, Math.max(128, gameResourceBudget(16777216, initialNode?.available_disk))) : options.defaults.disk)));
   const [image, setImage] = useState(options.images[0]?.value ?? '');
-  const [error, setError] = useErrorState('client/TemplateGames.tsx'), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const submitting = useRef(false), submission = useRef<{payload: string; id: string} | null>(null);
   const setupForm=useRef<HTMLFormElement>(null);
   let safeEnvironment: Record<string, string> = {}, steamEnvironmentError = '';

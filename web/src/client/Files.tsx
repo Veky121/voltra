@@ -1,3 +1,4 @@
+import {ServerPageSkeleton} from '../ui/ServerPageSkeleton';
 import {Component,lazy,Suspense,type ReactNode} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import './files-ui.css';
@@ -10,6 +11,6 @@ class ManagerBoundary extends Component<{children:ReactNode;onV0:()=>void},{fail
 }
 export default function Files(){
   const [query,setQuery]=useSearchParams();
-  if(query.get('manager')==='v0')return <><div className="fm-version"><span>File manager v0</span><button type="button" className="button secondary" onClick={()=>{const next=new URLSearchParams(query);next.delete('manager');setQuery(next)}}>Use new manager</button></div><Suspense fallback={<p role="status" className="files-ui-state">Loading file manager v0…</p>}><FilesV0/></Suspense></>;
-  return <ManagerBoundary onV0={()=>{const next=new URLSearchParams(query);next.set('manager','v0');setQuery(next)}}><Suspense fallback={<p role="status" className="files-ui-state">Loading file manager…</p>}><FileManager/></Suspense></ManagerBoundary>;
+  if(query.get('manager')==='v0')return <><div className="fm-version"><span>File manager v0</span><button type="button" className="button secondary" onClick={()=>{const next=new URLSearchParams(query);next.delete('manager');setQuery(next)}}>Use new manager</button></div><Suspense fallback={<ServerPageSkeleton path="/server/current/files"/>}><FilesV0/></Suspense></>;
+  return <ManagerBoundary onV0={()=>{const next=new URLSearchParams(query);next.set('manager','v0');setQuery(next)}}><Suspense fallback={<ServerPageSkeleton path="/server/current/files"/>}><FileManager/></Suspense></ManagerBoundary>;
 }

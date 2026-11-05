@@ -136,3 +136,22 @@ body.voltra-desktop [data-slot=sheet-overlay]{top:40px}
 .voltra-sidebar .panel-switcher[data-panel=servers]{--panel-selected-color:var(--panel-servers-color);--panel-selected-ink:var(--panel-servers-ink)}
 .voltra-sidebar .panel-switcher-indicator{background:var(--panel-selected-color);border-color:transparent}
 .voltra-sidebar .panel-switcher a.is-selected{color:var(--panel-selected-ink)}
+
+/* Account menu motion follows the popup lifecycle so dismissal finishes before unmount. */
+button.voltra-account-trigger{transition:background-color 160ms ease,border-color 160ms ease}
+.voltra-account-chevron{transition:transform 180ms cubic-bezier(.2,.8,.2,1)}
+.voltra-account-trigger[data-popup-open] .voltra-account-chevron{transform:rotate(180deg)}
+.voltra-account-dropdown{opacity:1;transform:translateY(0) scale(1);transform-origin:var(--transform-origin);transition:opacity 160ms ease,transform 180ms cubic-bezier(.2,.8,.2,1)}
+.voltra-account-dropdown[data-starting-style],.voltra-account-dropdown[data-ending-style]{opacity:0;transform:translateY(5px) scale(.97)}
+.voltra-account-dropdown[data-side=right][data-starting-style],.voltra-account-dropdown[data-side=right][data-ending-style]{transform:translateX(-5px) scale(.97)}
+@media(prefers-reduced-motion:reduce){.voltra-account-chevron,.voltra-account-dropdown,button.voltra-account-trigger{transition:none!important}.voltra-account-dropdown[data-starting-style],.voltra-account-dropdown[data-ending-style]{transform:none}}
+
+/* Shared sidebar selection and pointer/keyboard feedback. */
+.voltra-nav-link,.voltra-sidebar-back [data-slot=sidebar-menu-button]{position:relative;isolation:isolate;overflow:hidden;transition:background-color 160ms ease,color 160ms ease,transform 120ms ease}
+.voltra-nav-link::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;background:var(--scn-sidebar-accent);transform:scaleX(0);transform-origin:left center;opacity:0;transition:transform 240ms cubic-bezier(.2,.8,.2,1),opacity 160ms ease}
+.voltra-nav-link[data-active]{background:transparent}
+.voltra-nav-link[data-active]::before{transform:scaleX(1);opacity:1}
+.voltra-nav-link:active,.voltra-sidebar-back [data-slot=sidebar-menu-button]:active{transform:scale(.98)}
+.voltra-nav-link:focus-visible,.voltra-sidebar-back [data-slot=sidebar-menu-button]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+@media(hover:hover){.voltra-nav-link:not([data-active]):hover::before{transform:scaleX(1);opacity:.45}.voltra-nav-link:not([data-active]):hover{background:transparent}}
+@media(prefers-reduced-motion:reduce){.voltra-nav-link::before{transition:none}.voltra-nav-link:active,.voltra-sidebar-back [data-slot=sidebar-menu-button]:active{transform:none}}

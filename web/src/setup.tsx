@@ -1,4 +1,3 @@
-import {useErrorState} from './notifications/useErrorState';
 import {Checkbox} from './components/ui/checkbox';
 import {Input as MiraInput} from './components/ui/input';
 import { createContext, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -43,7 +42,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const explicitSetup = location.pathname.replace(/\/+$/, "") === "/setup";
   const [state, setState] = useState<{ status: SetupStatus; session: Session } | null>(null);
-  const [error, setError] = useErrorState('setup.tsx');
+  const [error, setError] = useState('');
   const checking = useRef(false);
   const authEpoch = useRef(0);
   const [revision, setRevision] = useState(0);
@@ -110,7 +109,7 @@ export default function SetupGate({ children }: { children: ReactNode }) {
 
 function SessionControls({ session, onSignedOut }: { session: Session; onSignedOut: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('setup.tsx');
+  const [error, setError] = useState('');
   return <div className="setup-session-controls">
     {error && <span role="alert">{error}</span>}
     {session.user?.root_admin && <Link to="/setup">Setup</Link>}
@@ -127,7 +126,7 @@ function SessionControls({ session, onSignedOut }: { session: Session; onSignedO
 function PendingHTTPS({ session, restartRequired, onVerified }: { session: Session; restartRequired: boolean; onVerified: () => void }) {
   const [result, setResult] = useState<HTTPSVerification | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('setup.tsx');
+  const [error, setError] = useState('');
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
   return <SetupFrame title="HTTPS pending">
@@ -158,7 +157,7 @@ function Login({ session, onAuthenticated }: { session: Session; onAuthenticated
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useErrorState('setup.tsx');
+  const [error, setError] = useState('');
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
   async function submit(event: FormEvent) {
@@ -194,7 +193,7 @@ function SetupWizard({ status, session, onSaved, onFinished }: { status: SetupSt
   const [validation, setValidation] = useState<Validation | null>(null);
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useErrorState('setup.tsx');
+  const [error, setError] = useState('');
   const active = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => () => active.current?.abort(), []);

@@ -6,7 +6,6 @@ import {api,Button,Input,useAPI} from '../lib';
 import {SettingsSection} from '../ui/Settings';
 import {CopyButton} from '../ui/CopyButton';
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {items,PageError,useServer,value} from './common';
 import './serverProxy.css';
 
@@ -30,7 +29,7 @@ function ServerProxyManager({base}:{base:string}) {
  const {server,reload}=useServer(),path=`/api/admin/servers/${encodeURIComponent(server.uuid||server.identifier)}/proxy`;
  const query=useAPI(path),data=value(query.data);
  const [allocationID,setAllocation]=useState(''),[clientID,setClient]=useState(''),[protocol,setProtocol]=useState(''),[publicPort,setPublicPort]=useState('');
- const [customPort,setCustomPort]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/ProxyEndpoints.tsx',{transient:true});
+ const [customPort,setCustomPort]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const allocations:any[]=data?.allocations||[],clients:any[]=data?.clients||[],routes:any[]=data?.routes||[];
  const allocation=allocations.find(p=>String(p.id)===allocationID)||(!allocationID?allocations[0]:undefined);
  const eligible=clients.filter(c=>c.setup_complete&&c.test_status==='complete'&&allocation&&allocation.port>=c.local_port_start&&allocation.port<=c.local_port_end);

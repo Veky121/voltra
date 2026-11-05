@@ -1,6 +1,5 @@
 import {IntegrationLayout} from './IntegrationLayout';
 import {SettingsSection,SettingsRow} from '../ui/Settings';
-import {useErrorState} from '../notifications/useErrorState';
 import {useState} from 'react';
 import {Link} from 'react-router-dom';
 import {api,Button,ErrorBox,Input,Loading,Select,rows,unwrap,useAPI} from '../lib';
@@ -14,7 +13,7 @@ type Inspection={products:{name:string;kind:string}[];suggested_name:string;kind
 export function GameLicences() {
  const records=useAPI('/api/admin/integrations'),eggs=useAPI('/api/admin/eggs'),servers=useAPI('/api/application/servers?per_page=100');
  const [key,setKey]=useState(''),[name,setName]=useState(''),[inspection,setInspection]=useState<Inspection|null>(null);
- const [busy,setBusy]=useState(false),[error,setError]=useErrorState('admin/GameLicences.tsx'),[success,setSuccess]=useState(''),[selected,setSelected]=useState('');
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState(''),[selected,setSelected]=useState('');
  const [savedInspection,setSavedInspection]=useState<{name:string;products:Inspection['products']}|null>(null);
  const all=records.data?rows(records.data).filter(record=>record.provider==='game_license'):[];
  const templates=eggs.data?rows(eggs.data):[];

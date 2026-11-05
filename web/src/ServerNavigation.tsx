@@ -1,4 +1,3 @@
-import {useErrorState} from './notifications/useErrorState';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {api,rows} from './lib';
@@ -11,7 +10,7 @@ const Context=createContext<NavigationState>({servers:[],loading:true,error:'',p
 export const useServerNavigation=()=>useContext(Context);
 
 export function ServerNavigationProvider({children}:{children:ReactNode}){
- const [servers,setServers]=useState<NavigationServer[]>([]),[loading,setLoading]=useState(true),[error,setError]=useErrorState('ServerNavigation.tsx'),[revision,setRevision]=useState(0),[pending,setPending]=useState(new Set<string>());
+ const [servers,setServers]=useState<NavigationServer[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[pending,setPending]=useState(new Set<string>());
  const busy=useRef(new Set<string>());
  const writeVersion=useRef(0);
  const reload=useCallback(()=>setRevision(v=>v+1),[]);

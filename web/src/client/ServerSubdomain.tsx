@@ -1,7 +1,6 @@
-﻿import {useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {RefreshCw} from 'lucide-react';
-import {useErrorState} from '../notifications/useErrorState';
 import {api,Button,Input,useAPI} from '../lib';
 import {SettingsRow,SettingsSection} from '../ui/Settings';
 import {ButtonFeedback} from '../ui/ButtonFeedback';
@@ -14,7 +13,7 @@ export function ServerSubdomain({query}:{query:ReturnType<typeof useAPI>}){
  const [acknowledged,setAcknowledged]=useState<{source:unknown;data:any}|null>(null);
  const data=acknowledged&&acknowledged.source===query.data?acknowledged.data:value(query.data)||{},choices:any[]=data.choices||[];
  const admin=value(account.data)?.root_admin===true,writable=can(permissions,'allocation.update');
- const [draft,setDraft]=useState<string|null>(null),[route,setRoute]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useErrorState('client/ServerSubdomain.tsx');
+ const [draft,setDraft]=useState<string|null>(null),[route,setRoute]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const label=draft??data.label??'';
  const selected=choices.find(c=>String(c.id)===route)||choices.find(c=>c.id===data.route?.id)||choices[0];
  const dirty=draft!==null&&label!==(data.label||'')||!!route&&String(data.route?.id||'')!==route;

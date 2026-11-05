@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 
 PRODUCT_DOCS = {
@@ -54,7 +55,12 @@ def main():
             continue
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(local, target)
+        # Vendored sources can carry Windows' read-only attribute. Avoid
+        # rewriting identical files and make changed destination copies writable.
+        if not target.is_file() or local.read_bytes() != target.read_bytes():
+            if target.is_file():
+                target.chmod(target.stat().st_mode | stat.S_IWRITE)
+            shutil.copy2(local, target)
         selected.add(relative.as_posix())
     removed = []
     tracked = subprocess.check_output(['git', '-C', str(destination), 'ls-files', '-z'], text=True).split('\0')

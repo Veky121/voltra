@@ -1,5 +1,4 @@
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {Disclosure,DisclosureTrigger} from '../ui/Disclosure';
 import {Input as MiraInput} from '../components/ui/input';
 import { formatMiBGB } from "../resourceUnits";
@@ -68,7 +67,7 @@ function message(error: unknown) {
 // and the scheduled refresh when the wizard/connection view leaves the page.
 function usePolling<T>(path: string, interval: number) {
   const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useErrorState('admin/node-pairing.tsx');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [version, setVersion] = useState(0);
@@ -113,7 +112,7 @@ function usePolling<T>(path: string, interval: number) {
 function useMutation() {
   const active = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useErrorState('admin/node-pairing.tsx');
+  const [error, setError] = useState('');
   useEffect(() => () => active.current?.abort(), []);
   async function run<T>(label: string, path: string, body?: unknown): Promise<{ value: T } | null> {
     if (active.current) return null;

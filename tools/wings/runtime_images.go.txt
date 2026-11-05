@@ -1,0 +1,403 @@
+// Package runtimeimages owns node-local image approvals. Game starts never
+// contact a registry when an approved image is still available locally.
+package runtimeimages
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/distribution/reference"
+)
+
+var ErrMissing = errors.New("image is not cached")
+var ErrBusy = errors.New("image operation already running")
+
+type Engine interface {
+	Inspect(context.Context, string) (string, error)
+	Pull(context.Context, string) (string, error)
+	Retain(context.Context, string, string) error
+}
+type Image struct {
+	Reference       string     `json:"reference"`
+	ApprovedID      string     `json:"approved_id"`
+	CandidateID     string     `json:"candidate_id"`
+	PreviousID      string     `json:"previous_id"`
+	LastCheckedAt   *time.Time `json:"last_checked_at"`
+	NextCheckAt     *time.Time `json:"next_check_at"`
+	Error           string     `json:"error"`
+	Busy            bool       `json:"busy"`
+	ScheduleEnabled bool       `json:"schedule_enabled"`
+}
+type Manager struct {
+	mu     sync.Mutex
+	engine Engine
+	path   string
+	images map[string]Image
+	active map[string]*flight
+	slots  chan struct{}
+	fatal  error
+	now    func() time.Time
+}
+type flight struct {
+	done chan struct{}
+	err  error
+}
+
+func New(engine Engine, path string) (*Manager, error) {
+	m := &Manager{engine: engine, path: path, images: map[string]Image{}, active: map[string]*flight{}, slots: make(chan struct{}, 2), now: time.Now}
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return m, nil
+	}
+	if err != nil {
+		return nil, errors.New("image approval state is unreadable")
+	}
+	defer f.Close()
+	dec := json.NewDecoder(io.LimitReader(f, 4<<20))
+	dec.DisallowUnknownFields()
+	var extra any
+	if dec.Decode(&m.images) != nil || dec.Decode(&extra) != io.EOF || m.images == nil || len(m.images) > 1000 {
+		return nil, errors.New("image approval state is invalid")
+	}
+	for ref, s := range m.images {
+		if !validReference(ref) || ref != s.Reference || !validID(s.ApprovedID) || s.CandidateID != "" && !validID(s.CandidateID) || s.PreviousID != "" && !validID(s.PreviousID) {
+			return nil, errors.New("image approval state contains an invalid image")
+		}
+		s.Busy = false
+		s.ScheduleEnabled = s.NextCheckAt != nil
+		m.images[ref] = s
+	}
+	return m, nil
+}
+func validID(s string) bool {
+	if len(s) != 71 || !strings.HasPrefix(s, "sha256:") || strings.ToLower(s) != s {
+		return false
+	}
+	_, err := hex.DecodeString(s[7:])
+	return err == nil
+}
+func validReference(s string) bool {
+	if len(s) == 0 || len(s) > 512 {
+		return false
+	}
+	raw := strings.TrimPrefix(s, "~")
+	if strings.HasPrefix(raw, "sha256:") {
+		return validID(raw)
+	}
+	if strings.Contains(raw, "@") && !strings.Contains(raw, "@sha256:") {
+		return false
+	}
+	_, err := reference.ParseNormalizedNamed(raw)
+	return err == nil
+}
+func (m *Manager) Snapshot() ([]Image, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.fatal != nil {
+		return nil, m.fatal
+	}
+	out := make([]Image, 0, len(m.images))
+	for ref, s := range m.images {
+		s.Busy = m.active[ref] != nil
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Reference < out[j].Reference })
+	return out, nil
+}
+
+// Commit a full replacement before making a new approval observable.
+func (m *Manager) commit(s Image) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.fatal != nil {
+		return m.fatal
+	}
+	replacement := make(map[string]Image, len(m.images)+1)
+	for k, v := range m.images {
+		replacement[k] = v
+	}
+	s.Busy = false
+	replacement[s.Reference] = s
+	if len(replacement) > 1000 {
+		return errors.New("image inventory limit reached")
+	}
+	if err := save(m.path, replacement); err != nil {
+		m.fatal = errors.New("image approval state could not be saved; repair node storage and restart Wings")
+		return m.fatal
+	}
+	m.images = replacement
+	return nil
+}
+func save(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), ".runtime-images-*")
+	if err != nil {
+		return err
+	}
+	name := f.Name()
+	defer os.Remove(name)
+	if err = f.Chmod(0600); err == nil {
+		err = json.NewEncoder(f).Encode(v)
+	}
+	if err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	if err = os.Rename(name, path); err != nil {
+		return err
+	}
+	return syncParent(filepath.Dir(path))
+}
+func (m *Manager) claim(ctx context.Context, ref string, wait bool) (func(), error) {
+	for {
+		m.mu.Lock()
+		if m.fatal != nil {
+			err := m.fatal
+			m.mu.Unlock()
+			return nil, err
+		}
+		if current := m.active[ref]; current != nil {
+			m.mu.Unlock()
+			if !wait {
+				return nil, ErrBusy
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-current.done:
+				if current.err != nil {
+					return nil, current.err
+				}
+				continue
+			}
+		}
+		current := &flight{done: make(chan struct{})}
+		m.active[ref] = current
+		m.mu.Unlock()
+		return func() { m.mu.Lock(); delete(m.active, ref); close(current.done); m.mu.Unlock() }, nil
+	}
+}
+func (m *Manager) state(ref string) (Image, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.images[ref]
+	return s, ok
+}
+func (m *Manager) retain(ctx context.Context, ref, id string) error {
+	h := sha256.Sum256([]byte(ref))
+	return m.engine.Retain(ctx, id, fmt.Sprintf("voltra-retained/%x:%s", h[:12], strings.TrimPrefix(id, "sha256:")))
+}
+func (m *Manager) pull(ctx context.Context, ref string) (string, error) {
+	select {
+	case m.slots <- struct{}{}:
+		defer func() { <-m.slots }()
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+	return m.engine.Pull(ctx, ref)
+}
+
+// Resolve returns an immutable local image ID. Local-only names are never pulled.
+func (m *Manager) Resolve(ctx context.Context, ref string) (resolved string, resultErr error) {
+	if !validReference(ref) {
+		return "", errors.New("invalid image reference")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+	// A background check cannot block cached game starts for its download duration.
+	if s, ok := m.state(ref); ok {
+		// Only last-committed approvals are kept in memory. A background state
+		// write failure must not prevent cached servers from starting.
+		id, err := m.engine.Inspect(ctx, s.ApprovedID)
+		if err != nil {
+			return "", errors.New("approved image unavailable; restore the retained image or approve a checked replacement")
+		}
+		if id != s.ApprovedID {
+			return "", errors.New("approved image identity changed")
+		}
+		return id, nil
+	}
+	release, err := m.claim(ctx, ref, true)
+	if err != nil {
+		return "", err
+	}
+	defer func() { m.mu.Lock(); m.active[ref].err = resultErr; m.mu.Unlock(); release() }()
+	if s, ok := m.state(ref); ok {
+		id, err := m.engine.Inspect(ctx, s.ApprovedID)
+		return id, err
+	}
+	id, err := m.engine.Inspect(ctx, strings.TrimPrefix(ref, "~"))
+	pulled := false
+	if errors.Is(err, ErrMissing) && !strings.HasPrefix(ref, "~") && !strings.HasPrefix(ref, "sha256:") {
+		id, err = m.pull(ctx, ref)
+		pulled = err == nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !validID(id) {
+		return "", errors.New("Docker returned an invalid image identity")
+	}
+	if err = m.retain(ctx, ref, id); err != nil {
+		return "", err
+	}
+	s := Image{Reference: ref, ApprovedID: id}
+	if pulled {
+		now := m.now().UTC()
+		s.LastCheckedAt = &now
+	}
+	if checkable(ref) {
+		next := m.now().UTC().Add(24 * time.Hour)
+		s.NextCheckAt = &next
+		s.ScheduleEnabled = true
+	}
+	if err = m.commit(s); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// StartCheck reserves the job before returning, so simultaneous requests cannot
+// start duplicate pulls. The job is independent of the admin HTTP connection.
+func (m *Manager) StartCheck(ref string) error {
+	release, err := m.claim(context.Background(), ref, false)
+	if err != nil {
+		return err
+	}
+	s, ok := m.state(ref)
+	if !ok {
+		release()
+		return errors.New("image has not been used by this node")
+	}
+	if !checkable(ref) {
+		release()
+		return errors.New("local and digest-pinned images have no floating update target")
+	}
+	go func() {
+		defer release()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		m.check(ctx, s)
+	}()
+	return nil
+}
+func (m *Manager) check(ctx context.Context, s Image) {
+	id, err := m.pull(ctx, s.Reference)
+	if err == nil && !validID(id) {
+		err = errors.New("Docker returned an invalid image identity")
+	}
+	if err == nil {
+		err = m.retain(ctx, s.Reference, id)
+	}
+	now := m.now().UTC()
+	next := now.Add(24 * time.Hour)
+	s.NextCheckAt = nil
+	if err != nil {
+		s.Error = "Image update check failed. Check registry access, node storage, and Docker; retry the check."
+		next = now.Add(time.Hour)
+	} else {
+		s.Error = ""
+		s.LastCheckedAt = &now
+		s.CandidateID = ""
+		if id != s.ApprovedID {
+			s.CandidateID = id
+		}
+	}
+	if s.ScheduleEnabled {
+		s.NextCheckAt = &next
+	}
+	_ = m.commit(s)
+}
+func (m *Manager) Change(ctx context.Context, ref, action, expected string) error {
+	release, err := m.claim(ctx, ref, false)
+	if err != nil {
+		return err
+	}
+	defer release()
+	s, ok := m.state(ref)
+	if !ok {
+		return errors.New("unknown managed image")
+	}
+	selected := s.CandidateID
+	if action == "rollback" {
+		selected = s.PreviousID
+	} else if action != "approve" {
+		return errors.New("invalid image action")
+	}
+	if selected == "" || selected != expected {
+		return errors.New("image selection changed; refresh before applying")
+	}
+	id, err := m.engine.Inspect(ctx, selected)
+	if err != nil || id != selected {
+		return errors.New("selected image unavailable; check or restore it before applying")
+	}
+	if err = m.retain(ctx, ref, id); err != nil {
+		return err
+	}
+	s.PreviousID, s.ApprovedID = s.ApprovedID, id
+	s.CandidateID = ""
+	return m.commit(s)
+}
+func checkable(ref string) bool {
+	return !strings.HasPrefix(ref, "~") && !strings.Contains(ref, "@sha256:") && !strings.HasPrefix(ref, "sha256:")
+}
+func (m *Manager) Schedule(ctx context.Context, ref string, enabled bool) error {
+	release, err := m.claim(ctx, ref, false)
+	if err != nil {
+		return err
+	}
+	defer release()
+	s, ok := m.state(ref)
+	if !ok {
+		return errors.New("unknown managed image")
+	}
+	if !checkable(ref) {
+		return errors.New("local and digest-pinned images cannot be scheduled")
+	}
+	s.ScheduleEnabled = enabled
+	s.NextCheckAt = nil
+	if enabled {
+		next := m.now().UTC().Add(24 * time.Hour)
+		s.NextCheckAt = &next
+	}
+	return m.commit(s)
+}
+
+// Tick skips busy references and starts at most two due checks per pass. Failed
+// attempts have a durable one-hour backoff, including across daemon restarts.
+func (m *Manager) Tick() {
+	rows, err := m.Snapshot()
+	if err != nil {
+		return
+	}
+	n := 0
+	for _, s := range rows {
+		if !s.Busy && s.NextCheckAt != nil && !s.NextCheckAt.After(m.now()) {
+			if m.StartCheck(s.Reference) == nil {
+				n++
+				if n == 2 {
+					return
+				}
+			}
+		}
+	}
+}

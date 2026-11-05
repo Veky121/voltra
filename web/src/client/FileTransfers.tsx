@@ -1,7 +1,4 @@
 import useRemoteTransfers,{type RemoteOptions} from './useRemoteTransfers';
-import {captureErrorContext,reportPanelError} from '../notifications/store';
-import {observedFetch} from '../notifications/observedFetch';
-import {useErrorState} from '../notifications/useErrorState';
 import {forwardRef,useEffect,useImperativeHandle,useRef,useState} from 'react';
 import Uppy from '@uppy/core';
 import Tus from '@uppy/tus';
@@ -23,13 +20,13 @@ export type FileTransfersProps={base:string;directory:string;permissions:string[
 const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function FileTransfers(props,ref){
   const current=useRef(props);current.current=props;
   const remote=useRemoteTransfers(props.base,props.permissions,props.onComplete);
-  const [uppy,setUppy]=useState<Queue|null>(null),[error,setError]=useErrorState('client/FileTransfers.tsx'),[expanded,setExpanded]=useState(false),[count,setCount]=useState(0);
+  const [uppy,setUppy]=useState<Queue|null>(null),[error,setError]=useState(''),[expanded,setExpanded]=useState(false),[count,setCount]=useState(0);
   const [finalizations,setFinalizations]=useState<Record<string,Finalization>>({});
   const records=useRef<Record<string,Finalization>>({});
   const finalizeRef=useRef<(entry:Finalization)=>Promise<void>>(async()=>{});
   useEffect(()=>{
     let mounted=true;
-    const transferContext=captureErrorContext('File upload',{endpoint:`${props.base}/files/transfers`,method:'POST'});
+
     records.current={};setFinalizations({});
     const reportPending=()=>current.current.onPendingChange?.(queue.getFiles().some(f=>!f.progress.uploadComplete)||Object.values(records.current).some(f=>f.state!=='complete'));
     const update=(entry:Finalization)=>{records.current={...records.current,[entry.id]:entry};if(mounted){setFinalizations(records.current);reportPending()}};
@@ -59,7 +56,7 @@ const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function 
     queue.on('file-removed',file=>{
       if(mounted){setCount(queue.getFiles().length);reportPending()}
       const url=file.response?.uploadURL||file.tus?.uploadUrl;
-      if(url&&!records.current[file.id])void observedFetch(url,{method:'DELETE',credentials:'same-origin',headers:{'Tus-Resumable':'1.0.0'}},[404]).catch(()=>{});
+      if(url&&!records.current[file.id])void fetch(url,{method:'DELETE',credentials:'same-origin',headers:{'Tus-Resumable':'1.0.0'}}).catch(()=>{});
     });
     queue.on('upload-success',(file,response)=>{
       if(!file)return;
@@ -67,7 +64,7 @@ const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function 
       if(!url){if(mounted)setError('The upload finished without a transfer URL. Please retry the file.');return}
       void finalize({id:file.id,name:file.name||'File',directory:String(file.meta.directory||'/'),url,state:'failed'});
     });
-    queue.on('upload-error',(_file,cause)=>{reportPanelError(cause,transferContext);if(mounted)setError(cause.message||'Upload failed. Retry the file to resume.')});
+    queue.on('upload-error',(_file,cause)=>{if(mounted)setError(cause.message||'Upload failed. Retry the file to resume.')});
     const beforeUnload=(event:BeforeUnloadEvent)=>{
       if(queue.getFiles().some(f=>!f.progress.uploadComplete)||Object.values(records.current).some(f=>f.state!=='complete')){event.preventDefault();event.returnValue=''}
     };
@@ -89,7 +86,7 @@ const FileTransfers=forwardRef<FileTransfersHandle,FileTransfersProps>(function 
   }}),[uppy,remote.start]);
   async function discard(entry:Finalization){
     try{
-      const response=await observedFetch(entry.url,{method:'DELETE',credentials:'same-origin',headers:{'Tus-Resumable':'1.0.0'}},[404]);
+      const response=await fetch(entry.url,{method:'DELETE',credentials:'same-origin',headers:{'Tus-Resumable':'1.0.0'}});
       if(!response.ok&&response.status!==404)throw new Error(`Could not discard transfer (${response.status}).`);
       const next={...records.current};delete next[entry.id];records.current=next;setFinalizations(next);
       if(uppy?.getFile(entry.id))uppy.removeFile(entry.id);

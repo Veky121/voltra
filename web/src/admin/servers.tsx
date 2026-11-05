@@ -1,7 +1,6 @@
 import {ReinstallServerButton} from '../client/ReinstallServerButton';
 import {accountNickname} from '../client/accountProfile';
 import {confirmAction} from '../ui/ConfirmAction';
-import {useErrorState} from '../notifications/useErrorState';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {SectionTabs} from "../ui/SectionTabs";
 import { useEffect, useState } from "react";
@@ -106,7 +105,7 @@ function CreateServer() {
       ? `/api/application/nodes/${values.node}/allocations?per_page=100`
       : null
   );
-  const [error, setError] = useErrorState('admin/servers.tsx');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const egg = eggQ.data ? unwrap(eggQ.data) : null;
   useEffect(() => {
@@ -544,7 +543,7 @@ export function Transfer({ record, onSaved }: { record: any; onSaved: () => void
       : null
   );
   const [busy, setBusy] = useState(false),
-    [error, setError] = useErrorState('admin/servers.tsx');
+    [error, setError] = useState('');
   const available = allocations.data
     ? rows(allocations.data)
         .filter((x) => !x.assigned && !x.server_id)
@@ -818,7 +817,7 @@ export function ServerDatabases({ record }: { record: any }) {
 }
 function DatabaseCredentials({ path }: { path: string }) {
   const [password, setPassword] = useState<string | null>(null),
-    [error, setError] = useErrorState('admin/servers.tsx');
+    [error, setError] = useState('');
   return (
     <div className="admin-credentials management-ui">
       {password === null ? (

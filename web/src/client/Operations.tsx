@@ -1,3 +1,4 @@
+import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {ReinstallServerButton} from './ReinstallServerButton';
 import PortConnections from './PortConnections';
 import {usePendingSetting} from './PendingSettings';
@@ -68,10 +69,6 @@ export function Backups() {
     [locked, setLocked] = useState(false),
     [restore, setRestore] = useState<any>(null),
     [truncate, setTruncate] = useState(false);
-  useEffect(() => {
-    const t = setInterval(r.reload, 10000);
-    return () => clearInterval(t);
-  }, [base, page]);
   useEffect(()=>{
     if(!feedback)return;
     const timer=setTimeout(()=>setFeedback(null),5000);
@@ -108,7 +105,7 @@ export function Backups() {
       <BackupOverview response={r.data} error={r.error}/>
       <PageError error={r.error} />
       {r.error && <Button variant="secondary" onClick={r.reload}>Retry</Button>}
-      {r.loading && !r.data && <p role="status">Loading backups...</p>}
+      {r.loading && !r.data && <CollectionSkeleton label="Loading backups" layout="cards" count={3}/>}
       <div className="backup-cards" role="list" aria-label="Backups">
         {items(r.data).map((b) => {
           const created=backupCreated(b.created_at);

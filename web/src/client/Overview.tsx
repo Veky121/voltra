@@ -3,7 +3,6 @@ import {ResourceSummary,ResourceMetric} from '../ui/ResourceSummary';
 import {queryCacheEpoch} from '../hooks/queryCache';
 import {readOverviewSnapshot,writeOverviewSnapshot} from './overviewSnapshot';
 import {formatMiBGB} from '../resourceUnits';
-import {useErrorState} from '../notifications/useErrorState';
 import {compareServers} from './serverOrder';
 import {Progress} from '../components/ui/progress';
 import {useArtworkLibrary} from './ArtworkProvider';
@@ -22,16 +21,16 @@ import "./workspace.css";
 import './shadcn-cards.css';
 import "./overview.css";
 import {useServerNavigation} from '../ServerNavigation';
-import {observeLivePath,observeLiveNavigation,isLivePathFresh} from '../hooks/liveEvents';
+import {observeLivePath,observeLiveNavigation,observeReadInvalidation,isLivePathFresh} from '../hooks/liveEvents';
 
 type ServerRecord=Record<string,any> & {name?:string;liveState:string;resources?:Record<string,any>;resourceError?:boolean};
 const labels:Record<string,string>={running:"Running",offline:"Stopped",stopped:"Stopped",unknown:"Checking",unavailable:"Unavailable",installing:"Installing",starting:"Starting",stopping:"Stopping",suspended:"Suspended",install_failed:"Install failed",reinstall_failed:"Reinstall failed",restoring_backup:"Restoring"};
 
 function useOverview(){
-  const [servers,setServers]=useState<ServerRecord[]>(()=>readOverviewSnapshot()??[]),[error,setError]=useErrorState('client/Overview.tsx'),[loading,setLoading]=useState(()=>!readOverviewSnapshot());
+  const [servers,setServers]=useState<ServerRecord[]>(()=>readOverviewSnapshot()??[]),[error,setError]=useState(''),[loading,setLoading]=useState(()=>!readOverviewSnapshot());
   useEffect(()=>{
     const epoch=queryCacheEpoch();
-    let active=true,metadataAt=0;
+    let active=true,metadataAt=0,metadataVersion=0;
     let stateTimer:ReturnType<typeof setTimeout>,resourceTimer:ReturnType<typeof setTimeout>,flushTimer:ReturnType<typeof setTimeout>|undefined;
     let stateAbort=new AbortController(),resourceAbort=new AbortController();
     let records:ServerRecord[]=readOverviewSnapshot()??[];
@@ -128,7 +127,8 @@ function useOverview(){
       statePolling=true;
       const controller=stateAbort=new AbortController();
       try{
-        if(Date.now()-metadataAt>=15000){
+        if(metadataAt===0||Date.now()-metadataAt>=60000){
+          const version=metadataVersion;
           let response=await api('/api/client?summary=overview&per_page=100',{signal:controller.signal});
           const all=items(response);
           const pages=Number(response.meta?.pagination?.total_pages??1);
@@ -136,7 +136,7 @@ function useOverview(){
             response=await api(`/api/client?summary=overview&per_page=100&page=${page}`,{signal:controller.signal});
             all.push(...items(response));
           }
-          if(!active||controller.signal.aborted)return;
+          if(!active||controller.signal.aborted||version!==metadataVersion)return;
           const previous=new Map(records.map(s=>[s.uuid,s]));
           publish(all.map(s=>({...s,liveState:s.status||(s.is_installing?'installing':previous.get(s.uuid)?.liveState||'unknown'),resources:previous.get(s.uuid)?.resources,resourceError:previous.get(s.uuid)?.resourceError})));
           metadataAt=Date.now();
@@ -179,9 +179,11 @@ function useOverview(){
         return {...s,status:state.status,is_installing:['installing','install_failed'].includes(state.status),liveState:state.status||(s.status?'unknown':s.liveState)};
       }));
     });
-    const stopInvalidations=observeLiveNavigation(()=>{metadataAt=0;if(active&&!document.hidden){clearTimeout(stateTimer);void poll()}});
+    const invalidateMetadata=()=>{metadataVersion++;metadataAt=0;if(active&&!document.hidden){clearTimeout(stateTimer);void poll()}};
+    const stopInvalidations=observeLiveNavigation(invalidateMetadata);
+    const stopReadInvalidations=observeReadInvalidation('/api/client?summary=overview',invalidateMetadata);
     void poll();
-    return()=>{active=false;stop();stopStates?.();stopInvalidations();for(const unsubscribe of subscriptions.values())unsubscribe();document.removeEventListener('visibilitychange',visibility);};
+    return()=>{active=false;stop();stopStates?.();stopInvalidations();stopReadInvalidations();for(const unsubscribe of subscriptions.values())unsubscribe();document.removeEventListener('visibilitychange',visibility);};
   },[]);
   return {servers,error,loading};
 }
