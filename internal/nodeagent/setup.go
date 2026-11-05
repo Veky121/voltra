@@ -693,6 +693,11 @@ func installServices(ctx context.Context, o SetupOptions) error {
 			return errors.New("Wings and Steam storage directories must not contain symlinks")
 		}
 	}
+	// MkdirAll does not tighten an existing directory during an upgrade.
+	// SteamCMD maintenance requires the journal itself to remain private.
+	if err := os.Chmod(journal, 0700); err != nil {
+		return fmt.Errorf("cannot secure Steam journal permissions before starting services: %w", err)
+	}
 	wingsPath, err := unitArg(o.WingsConfigPath)
 	if err != nil {
 		return err

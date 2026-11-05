@@ -41,8 +41,25 @@ func TestSteamServiceWritePathsLegacyUpgradeAndCustomRefusal(t *testing.T) {
 			}
 			writeConfig(storage)
 			o := SetupOptions{StartServices: true, Out: io.Discard, ConfigPath: filepath.Join(dir, "node.json"), WingsConfigPath: wings, SystemdDir: filepath.Join(dir, "systemd"), SteamJournalPath: filepath.Join(dir, "steam-jobs")}
+			// Older installations may already have a public journal directory.
+			if err := os.MkdirAll(o.SteamJournalPath, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(o.SteamJournalPath, 0755); err != nil {
+				t.Fatal(err)
+			}
+			retained := filepath.Join(o.SteamJournalPath, "retained-job.json")
+			if err := os.WriteFile(retained, []byte("preserve existing job"), 0600); err != nil {
+				t.Fatal(err)
+			}
 			if err := installServices(context.Background(), o); err != nil {
 				t.Fatal(err)
+			}
+			if info, err := os.Stat(o.SteamJournalPath); err != nil || info.Mode().Perm() != 0700 {
+				t.Fatal("existing Steam journal was not made private", err)
+			}
+			if raw, err := os.ReadFile(retained); err != nil || string(raw) != "preserve existing job" {
+				t.Fatal("journal upgrade changed existing job data", err)
 			}
 			nodePath, _ := unitArg(o.ConfigPath)
 			configPath, _ := unitArg(filepath.Dir(o.ConfigPath))

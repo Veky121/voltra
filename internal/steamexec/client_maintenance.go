@@ -155,7 +155,13 @@ func (e *Executor) ClientStatus() ClientStatus {
 	m := e.clientManager()
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.state
+	status := m.state
+	if e.supported && !status.Busy {
+		if err := e.clientStoragePreflight(); err != nil {
+			status.LastError = err.Error()
+		}
+	}
+	return status
 }
 
 // Disabling the schedule leaves any current helper running to completion.
@@ -211,6 +217,9 @@ func (e *Executor) SetClientSchedule(enabled bool) error {
 
 func (e *Executor) clientStateDir(create bool) error {
 	dir := filepath.Join(e.journal, "client-maintenance")
+	if err := e.clientStoragePreflight(); err != nil {
+		return err
+	}
 	if create {
 		// Reject an existing redirected journal before creating a child in it.
 		if _, err := os.Lstat(e.journal); err == nil {
@@ -234,6 +243,28 @@ func (e *Executor) clientStateDir(create bool) error {
 		}
 		if uid, _, ok := fileOwner(info); ok && (uid != uint32(os.Geteuid()) || info.Mode().Perm()&0077 != 0) {
 			return errors.New("SteamCMD maintenance storage must be private and node-owned")
+		}
+	}
+	return nil
+}
+
+// Status reads must expose unusable existing storage even before the first
+// check creates its state file. A fresh node with no storage is still ready.
+func (e *Executor) clientStoragePreflight() error {
+	for _, path := range []string{e.journal, filepath.Join(e.journal, "client-maintenance")} {
+		info, err := os.Lstat(path)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil || !info.IsDir() {
+			return errors.New("SteamCMD maintenance storage unavailable; repair the node's Steam journal directory")
+		}
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil || resolved != path {
+			return errors.New("SteamCMD maintenance storage must not contain symlinks")
+		}
+		if uid, _, ok := fileOwner(info); ok && (uid != uint32(os.Geteuid()) || info.Mode().Perm()&0077 != 0) {
+			return errors.New("SteamCMD maintenance storage must be private and node-owned; repair its ownership and set directory permissions to 0700")
 		}
 	}
 	return nil
