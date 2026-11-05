@@ -2,12 +2,13 @@ package panel
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestWave130DirectAdmission(t *testing.T) {
@@ -19,7 +20,7 @@ func TestWave130DirectAdmission(t *testing.T) {
 					if ownedSchema == "" {
 						return
 					}
-					pool, e := pgxpool.New(context.Background(), os.Getenv("TEST_DATABASE_URL"))
+					pool, e := pgxpool.New(context.Background(), isolatedTestDatabaseURL(t))
 					if e != nil {
 						t.Error(e)
 						return
@@ -135,7 +136,7 @@ func TestWave130L4D2API(t *testing.T) {
 			t.Run(route+"/"+value, func(t *testing.T) {
 				var schema string
 				t.Cleanup(func() {
-					p, e := pgxpool.New(context.Background(), os.Getenv("TEST_DATABASE_URL"))
+					p, e := pgxpool.New(context.Background(), isolatedTestDatabaseURL(t))
 					if e != nil {
 						t.Error("cleanup connection")
 						return

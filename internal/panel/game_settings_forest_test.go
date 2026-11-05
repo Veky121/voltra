@@ -8,7 +8,7 @@ import (
 )
 
 func TestForestEmittedFixture(t *testing.T) {
-	raw, err := os.ReadFile("../../artifacts/game-parity-20261029/forest-settings-owner/emitted-config.cfg")
+	raw, err := os.ReadFile("testdata/game-settings/game-parity-20261029/forest-settings-owner/emitted-config.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}

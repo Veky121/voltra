@@ -2,13 +2,14 @@ package panel
 
 import (
 	"encoding/json"
-	"github.com/pelletier/go-toml/v2"
 	"os"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func TestWave167BeamMPEffectiveContract(t *testing.T) {
-	b, e := os.ReadFile("../../artifacts/game-parity-20261029/wave167-beammp-effective/effective-cases.json")
+	b, e := os.ReadFile("testdata/game-settings/game-parity-20261029/wave167-beammp-effective/effective-cases.json")
 	if e != nil {
 		t.Fatal(e)
 	}

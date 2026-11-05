@@ -10,7 +10,7 @@ import (
 )
 
 func TestAbioticPublisherTypedPatch(t *testing.T) {
-	data, e := os.ReadFile("../../artifacts/game-parity-20261029/wave26-abiotic/publisher-SandboxSettings.ini")
+	data, e := os.ReadFile("testdata/game-settings/game-parity-20261029/wave26-abiotic/publisher-SandboxSettings.ini")
 	if e != nil {
 		t.Fatal(e)
 	}

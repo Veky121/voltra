@@ -181,18 +181,33 @@ WINE_PID=$!
 
 # ---- 8. Clean shutdown handler ------------------------------------------------
 shutdown() {
-    log "Shutdown requested ? stopping FS25 server..."
-    node "${FS25_LIB}/start-game.mjs" --stop || true
-    sleep 3
+    [ "${FS25_STOPPING:-0}" != 1 ] || return 1
+    FS25_STOPPING=1
+    log "Shutdown requested; waiting for FS25 to confirm stopping..."
+    if ! node "${FS25_LIB}/start-game.mjs" --stop; then
+        err "FS25 did not confirm stopping. Leaving Wine running; check the web portal and retry Stop."
+        FS25_STOPPING=0
+        return 1
+    fi
     wineserver -k >/dev/null 2>&1 || true
     kill "$WINE_PID"  >/dev/null 2>&1 || true
-    [ -z "${TAIL_PID:-}" ] || kill "$TAIL_PID"  >/dev/null 2>&1 || true
-    [ -z "${DLC_VERIFY_PID:-}" ] || kill "$DLC_VERIFY_PID" >/dev/null 2>&1 || true
-    [ -z "${UPDATE_VERIFY_PID:-}" ] || kill "$UPDATE_VERIFY_PID" >/dev/null 2>&1 || true
-    kill "$XVFB_PID"  >/dev/null 2>&1 || true
+    wait "$WINE_PID" 2>/dev/null || true
+    cleanup_workers
     exit 0
 }
+cleanup_workers() {
+    local pid
+    for pid in "${HEALTH_PID:-}" "${TAIL_PID:-}" "${DLC_VERIFY_PID:-}" "${UPDATE_VERIFY_PID:-}" "${XVFB_PID:-}"; do
+        [ -n "$pid" ] || continue
+        kill "$pid" >/dev/null 2>&1 || true
+        wait "$pid" 2>/dev/null || true
+    done
+}
 trap shutdown SIGINT SIGTERM
+
+# Monitor both services throughout this container session, including portal stops.
+node "${FS25_LIB}/health.mjs" &
+HEALTH_PID=$!
 
 # ---- 6. Wait for the web portal, then start the game session ------------------
 log "Waiting for web portal on ${WEB_HOST}:${WEB_PORT}..."
@@ -219,7 +234,12 @@ fi
 log "Web manager ready. Streaming log (web portal: http://${WEB_HOST}:${WEB_PORT}). Check the game log for gameplay readiness."
 
 # Keep PID1 alive while the Wine process runs; react to signals via the trap.
-while kill -0 "$WINE_PID" 2>/dev/null; do
-    wait "$WINE_PID" || true
+while true; do
+    wait "$WINE_PID"
+    wine_status=$?
+    # A refused stop interrupts wait. Keep owning the live child and allow retry.
+    kill -0 "$WINE_PID" 2>/dev/null || break
 done
-shutdown
+wineserver -k >/dev/null 2>&1 || true
+cleanup_workers
+exit "$wine_status"

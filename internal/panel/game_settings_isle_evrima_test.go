@@ -8,7 +8,7 @@ import (
 )
 
 func TestIsleEvrimaRetainedFixture(t *testing.T) {
-	data, e := os.ReadFile("../../artifacts/game-parity-20261029/isle-evrima-settings/retained-Game.ini")
+	data, e := os.ReadFile("testdata/game-settings/game-parity-20261029/isle-evrima-settings/retained-Game.ini")
 	if e != nil {
 		t.Fatal(e)
 	}

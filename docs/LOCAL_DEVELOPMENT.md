@@ -63,6 +63,18 @@ The old browser demo and start-local.ps1 are removed. Old acceptance tools, evid
 
 ## Verification
 
-Run `npm.cmd run check --prefix web`, focused Go tests, and `python tools/dev/snapshot_test.py`. `./test-local.ps1` uses isolated PostgreSQL schemas in the designated dev database and excludes generated artifact packages. After populating Mindustry, `node tools/dev/verify-api.mjs` checks the real Vite-to-API paths, permissions and backup data. `powershell -File tools/dev/verify-runtime.ps1` exercises independent controller processes, concurrent restarts, PID/port guards and recovery after a terminated lock holder; it briefly restarts the local app. Check `dev.ps1 status` and the authenticated node system-information endpoint before calling Wings ready. A running Docker container alone is insufficient. Native gameplay/client joining remains a separate check.
+The full backend integration suite needs a disposable PostgreSQL database named
+`voltra_test` or `voltra_test_<suffix>` on loopback. Set `TEST_DATABASE_URL` to its
+connection URL and run `go test -timeout=20m ./...`. The TCP port can vary. Each integration
+fixture creates and removes its own schema. GitHub CI supplies a separate
+PostgreSQL service and passes this URL through `tools/ci/test-linux.sh`.
+
+Required config examples are tracked in `internal/panel/testdata/game-settings`.
+Historical receipt checks are separate: `go test -tags campaign_audit ./internal/panel -run FixtureCleanup` requires the original campaign database and
+logs. `go test -tags native_fixtures ./internal/panel -run TestValheimPlusAPI`
+requires the retained game/plugin archive. These opt-in checks are not native
+acceptance evidence unless they actually run and pass with the matching inputs.
+
+Run `npm.cmd run check --prefix web`, focused Go tests, and `python tools/dev/snapshot_test.py`. `./test-local.ps1` creates a temporary database on the designated dev PostgreSQL server, removes it after testing, and excludes generated artifact packages. After populating Mindustry, `node tools/dev/verify-api.mjs` checks the real Vite-to-API paths, permissions and backup data. `powershell -File tools/dev/verify-runtime.ps1` exercises independent controller processes, concurrent restarts, PID/port guards and recovery after a terminated lock holder; it briefly restarts the local app. Check `dev.ps1 status` and the authenticated node system-information endpoint before calling Wings ready. A running Docker container alone is insufficient. Native gameplay/client joining remains a separate check.
 
 `powershell -File tools/dev/verify-websocket.ps1` verifies the real Vite WebSocket upgrade, panel proxy and Wings authentication without sending game commands. Initial validation receipts are under `.local/dev/evidence/`. No visual browser interaction, gameplay joining or backup restoration is implied by these checks.

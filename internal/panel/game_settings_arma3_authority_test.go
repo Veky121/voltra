@@ -12,7 +12,7 @@ func TestArma3ActiveSettingsAuthority(t *testing.T) {
 		Startup string
 		Pins    map[string]string
 	}
-	base := "../../artifacts/game-parity-20261029/wave91-arma3-repair/"
+	base := "testdata/game-settings/game-parity-20261029/wave91-arma3-repair/"
 	b, e := os.ReadFile(base + "authority-fixture.json")
 	if e != nil {
 		t.Fatal(e)

@@ -10,6 +10,7 @@
 // this working across game versions that add/rename settings.
 import http from 'http';
 import {pendingDLCs} from './dlc-state.mjs';
+import {sessionState} from './health.mjs';
 
 // The portal binds to the container network IP, not loopback; start.sh exports it.
 const HOST = `${process.env.WEB_HOST || '127.0.0.1'}:${process.env.WEB_PORT || '7999'}`;
@@ -17,7 +18,7 @@ const USERNAME = process.env.WEB_USERNAME || 'admin';
 const PASSWORD = process.env.WEB_PASSWORD || 'changeme';
 const STOP = process.argv.includes('--stop');
 const STATUS = process.argv.includes('--is-stopped');
-const stopped = page => /<input\b[^>]*name\s*=\s*"start_server"/i.test(page.body) && !/<input\b[^>]*name\s*=\s*"stop_server"/i.test(page.body);
+const stopped = page => sessionState(page.body) === 'offline';
 
 function encode(data) {
   return Object.entries(data)
@@ -63,6 +64,25 @@ async function login() {
 }
 
 // Read every settings field so we can resubmit the form as-is.
+function decodeAttribute(value) {
+  const named = {amp:'&', quot:'"', apos:"'", lt:'<', gt:'>', nbsp:'\u00a0'};
+  // Decode once. Literal query-string ampersands are not HTML references.
+  return value.replace(/&(#(?:x[0-9a-z]*|[0-9]*)|[a-z][a-z0-9]*)(;?)/gi, (match, reference, end, offset) => {
+    const key = reference.toLowerCase();
+    if (!end && !key.startsWith('#') && (!Object.hasOwn(named, key) || value[offset + match.length] === '=')) return match;
+    if (!end) throw new Error('Invalid HTML reference in portal settings');
+    if (!key.startsWith('#')) {
+      if (!Object.hasOwn(named, key)) throw new Error('Unsupported HTML reference in portal settings');
+      return named[key];
+    }
+    const hex = key.startsWith('#x'), digits = key.slice(hex ? 2 : 1);
+    if (!(hex ? /^[0-9a-f]+$/ : /^[0-9]+$/).test(digits)) throw new Error('Invalid HTML reference in portal settings');
+    const code = parseInt(digits, hex ? 16 : 10);
+    if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) throw new Error('Invalid HTML reference in portal settings');
+    return String.fromCodePoint(code);
+  });
+}
+
 function scrapeForm(html) {
   const params = {};
 
@@ -74,26 +94,26 @@ function scrapeForm(html) {
   let m;
   while ((m = inputRe.exec(html))) {
     const tag = m[0];
-    const name = (/name\s*=\s*"([^"]*)"/i.exec(tag) || [])[1];
+    const name = decodeAttribute((/name\s*=\s*"([^"]*)"/i.exec(tag) || [, ''])[1]);
     const type = ((/type\s*=\s*"([^"]*)"/i.exec(tag) || [])[1] || 'text').toLowerCase();
     if (!name) continue;
     if (type === 'submit' || type === 'button') continue;
     if (type === 'checkbox') {
       params[name] = /\bchecked\b/i.test(tag) ? 'on' : 'off';
     } else {
-      params[name] = (/value\s*=\s*"([^"]*)"/i.exec(tag) || [, ''])[1];
+      params[name] = decodeAttribute((/value\s*=\s*"([^"]*)"/i.exec(tag) || [, ''])[1]);
     }
   }
 
   // Selects -> the selected option value (fallback: first option).
   const selectRe = /<select\b[^>]*name\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\/select>/gi;
   while ((m = selectRe.exec(html))) {
-    const name = m[1];
+    const name = decodeAttribute(m[1]);
     const block = m[2];
     const sel = /<option\s+value\s*=\s*"([^"]*)"[^>]*\bselected\b/i.exec(block);
     const first = /<option\s+value\s*=\s*"([^"]*)"/i.exec(block);
-    if (sel) params[name] = sel[1];
-    else if (first) params[name] = first[1];
+    if (sel) params[name] = decodeAttribute(sel[1]);
+    else if (first) params[name] = decodeAttribute(first[1]);
   }
 
   return params;

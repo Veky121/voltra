@@ -4,25 +4,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path"
-
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestWave65FinalFiveSettingsPublicationAPI(t *testing.T) {
 	if os.Getenv("TEST_DATABASE_URL") == "" {
 		t.Skip("TEST_DATABASE_URL is required for isolated PostgreSQL protocol tests")
 	}
-	cfg, err := pgxpool.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
-	if err != nil || cfg.ConnConfig.Host != "127.0.0.1" || cfg.ConnConfig.Port != 55439 {
-		t.Fatal("expected private isolated local55439 test database")
+	cfg, err := pgxpool.ParseConfig(isolatedTestDatabaseURL(t))
+	if err != nil {
+		t.Fatal("invalid isolated test database")
 	}
 
 	for _, tc := range []struct {

@@ -72,7 +72,7 @@ func TestWave25SettingsAPI(t *testing.T) {
 			}
 			f.Files[tc.file] = []byte(tc.data)
 			if tc.recipe == "puck/egg-puck.json" {
-				data, e := os.ReadFile("../../artifacts/game-parity-20261029/wave24-puck-authority/start_server.sh")
+				data, e := os.ReadFile("testdata/game-settings/game-parity-20261029/wave24-puck-authority/start_server.sh")
 				if e != nil {
 					t.Fatal(e)
 				}

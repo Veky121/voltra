@@ -78,7 +78,7 @@ func TestKspLMPSettings(t *testing.T) {
 func TestKspLMPAuthority(t *testing.T) {
 	in := settingsAuthorityInput{Startup: kspLMPStartup, Files: map[string][]byte{}}
 	for _, n := range []string{"ksp_runtime.py", "native_config.py", "native_console.py"} {
-		b, e := os.ReadFile(filepath.Join("../../artifacts/game-parity-20261029/wave63-ksp-lmp-settings/emitted", n))
+		b, e := os.ReadFile(filepath.Join("testdata/game-settings/game-parity-20261029/wave63-ksp-lmp-settings/emitted", n))
 		if e != nil {
 			t.Fatal(e)
 		}

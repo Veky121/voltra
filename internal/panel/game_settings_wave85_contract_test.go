@@ -3,11 +3,12 @@ package panel
 import (
 	"bytes"
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestWave85NativeContractsAPI(t *testing.T) {
@@ -110,7 +111,7 @@ func TestWave85NativeContractsAPI(t *testing.T) {
 				if tc.recipe == wave85TML && !strings.Contains(string(f.Files[tc.file]), "world=/home/container/saves/Worlds/world.wld\nmodpath=/home/container/custommods\n# preserved\n") {
 					t.Fatal("paths or unknown bytes changed")
 				}
-				if e := os.WriteFile("../../artifacts/game-parity-20261029/wave85-native-editor-contracts/"+func() string {
+				if e := os.WriteFile(t.TempDir()+"/"+func() string {
 					if tc.recipe == wave85ASA {
 						return "asa-valid.ini"
 					}

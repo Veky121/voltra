@@ -105,7 +105,7 @@ func TestRiskOfRainRequiresAuthority(t *testing.T) {
 }
 
 func TestRiskOfRainCanonicalSeedFixture(t *testing.T) {
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/riskofrain-settings/canonical-emitted.fixture.cfg")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/riskofrain-settings/canonical-emitted.fixture.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}

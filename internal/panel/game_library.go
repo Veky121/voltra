@@ -263,7 +263,7 @@ func (a *App) gameLibraryMinecraftLoaderEgg(ctx context.Context, loader string, 
 	// Upgrade only the exact managed default. Keep custom installer scripts,
 	// images and every other administrator edit intact.
 	managedScript := strings.ReplaceAll(strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", minecraftInstallPython, 1), "\r\n", "\n")
-	previousPython := strings.Replace(minecraftInstallPython, "    # Wings mounts /tmp as a small tmpfs. Pack archives plus the Java bootstrap\n    # must use the server disk budget, not exhaust that tmpfs during extraction.\n    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory or root) as temporary:", "    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory) as temporary:", 1)
+	previousPython := strings.Replace(strings.ReplaceAll(minecraftInstallPython, "\r\n", "\n"), "    # Wings mounts /tmp as a small tmpfs. Pack archives plus the Java bootstrap\n    # must use the server disk budget, not exhaust that tmpfs during extraction.\n    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory or root) as temporary:", "    with tempfile.TemporaryDirectory(prefix=\"voltra-minecraft-\", dir=work_directory) as temporary:", 1)
 	previousScript := strings.ReplaceAll(strings.Replace(minecraftInstallScript, "# VOLTRA_PYTHON", previousPython, 1), "\r\n", "\n")
 	var storedScript string
 	if err = tx.QueryRow(ctx, "SELECT script_install FROM eggs WHERE id=$1", eggID).Scan(&storedScript); err != nil {

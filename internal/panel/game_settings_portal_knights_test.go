@@ -7,7 +7,7 @@ import (
 )
 
 func TestPortalKnightsSettingsPreserveBytes(t *testing.T) {
-	data, err := os.ReadFile("../../artifacts/portal-knights-settings-followup/publisher-schema.fixture.json")
+	data, err := os.ReadFile("testdata/game-settings/portal-knights-settings-followup/publisher-schema.fixture.json")
 	if err != nil {
 		t.Fatal(err)
 	}

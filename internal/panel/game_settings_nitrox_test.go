@@ -8,7 +8,7 @@ import (
 )
 
 func TestNitroxPublisherSyntaxFixture(t *testing.T) {
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/nitrox-settings-source/authoritative-syntax.cfg")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/nitrox-settings-source/authoritative-syntax.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}

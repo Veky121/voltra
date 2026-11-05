@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestSRB2SettingsAPI(t *testing.T) {
-	control, err := pgxpool.New(context.Background(), os.Getenv("TEST_DATABASE_URL"))
+	control, err := pgxpool.New(context.Background(), isolatedTestDatabaseURL(t))
 	if err != nil {
 		t.Fatal("isolated database unavailable")
 	}

@@ -131,7 +131,7 @@ func TestBepinexLoggingAPI(t *testing.T) {
 }
 
 func TestBepinexLoggingNativeBytes(t *testing.T) {
-	raw, err := os.ReadFile("../../artifacts/game-parity-20261029/wave380-bepinex-logging-editor/native-BepInEx.cfg")
+	raw, err := os.ReadFile("testdata/game-settings/game-parity-20261029/wave380-bepinex-logging-editor/native-BepInEx.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}

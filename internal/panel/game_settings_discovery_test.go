@@ -50,7 +50,7 @@ func discoveryOverlay(t *testing.T) {
 	gameTemplates()
 	old := templates
 	t.Cleanup(func() { templates = old })
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/discovery-profile.json")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/discovery-profile.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,13 @@
+{
+  "port": 28011,
+  "name": "Pterodactyl Puck Server",
+  "maxPlayers": 10,
+  "password": "",
+  "tickRate": 360,
+  "isPublic": true,
+  "useVoip": false,
+  "mods": [],
+  "useWhitelist": false,
+  "gameMode": "public",
+  "level": "default"
+}

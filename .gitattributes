@@ -13,3 +13,6 @@ internal/palworldloader/assets/* -text
 tools/runtime/palworld-runtime-probe/* -text
 # Candidate review checks this helper's exact bytes, including line endings.
 internal/panel/game_library/scripts/risk-of-rain-owner.py -text
+
+# Frozen settings helpers and config fixtures retain their exact captured bytes.
+internal/panel/testdata/game-settings/** -text -whitespace

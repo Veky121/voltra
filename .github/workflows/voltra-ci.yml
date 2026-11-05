@@ -8,6 +8,22 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: voltra_test
+          POSTGRES_PASSWORD: voltra-ci-only
+          POSTGRES_DB: voltra_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U voltra_test -d voltra_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://voltra_test:voltra-ci-only@127.0.0.1:5432/voltra_test?sslmode=disable
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -22,7 +38,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci --prefix web
       - run: npm run build --prefix web
-      - run: node --experimental-strip-types --test web/tests/*.test.mjs
+      - run: node --experimental-strip-types --test web/tests/*.test.mjs web/tests/*.test.cjs
       - run: python3 -m unittest discover -s tools/release -p 'test_*.py'
       - run: bash tools/ci/test-linux.sh ./...
       - run: go build ./cmd/panel ./cmd/node

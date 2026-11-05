@@ -3,8 +3,6 @@ package panel
 import (
 	"context"
 	"encoding/json"
-	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +13,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestWave85UnmanagedSocketPower(t *testing.T) {
-	cfg, err := pgxpool.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
-	if err != nil || cfg.ConnConfig.Host != "127.0.0.1" || cfg.ConnConfig.Port != 55439 {
-		t.Fatal("requires isolated local PostgreSQL 55439")
+	_, err := pgxpool.ParseConfig(isolatedTestDatabaseURL(t))
+	if err != nil {
+		t.Fatal("invalid isolated test database")
 	}
 	for _, action := range []string{"start", "restart"} {
 		for _, change := range []string{"none", "revoke", "suspend", "maintenance", "disabled", "disabled_owner", "transfer", "missing"} {

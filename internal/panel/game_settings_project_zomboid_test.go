@@ -43,8 +43,8 @@ func TestProjectZomboidExistingOnly(t *testing.T) {
 
 func TestProjectZomboidEmittedAuthority(t *testing.T) {
 	// Use actual frozen pending installer output, without executing its shell/Python.
-	root := filepath.Join("..", "..")
-	b, e := os.ReadFile(filepath.Join(root, "artifacts/game-parity-20261029/wave38-project_zomboid/profile.pending.json"))
+	root := "testdata/game-settings"
+	b, e := os.ReadFile(filepath.Join(root, "game-parity-20261029/wave38-project_zomboid/profile.pending.json"))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -75,7 +75,7 @@ func TestProjectZomboidEmittedAuthority(t *testing.T) {
 		}
 		files[name] = []byte(content + "\n")
 	}
-	fixed, e := os.ReadFile(filepath.Join(root, "internal/panel/game_library/scripts/project-zomboid-runtime.py"))
+	fixed, e := os.ReadFile("game_library/scripts/project-zomboid-runtime.py")
 	if e != nil {
 		t.Fatal(e)
 	}

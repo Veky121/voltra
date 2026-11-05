@@ -1,0 +1,8 @@
+{
+ "basicServerData": {"name": "Servername", "ipv4": "0.0.0.0", "port": 16365, "saveFolderPath": "./savedata"},
+ "universeSize": "Normal", "hideConsoleWindow": false,
+ "admins": {"credentials": {"password": "fixture-only-admin"}, "canLogin": true, "canKickPlayers": true, "canModifyWorld": true, "canInteractWithLockables": true},
+ "users": {"credentials": {"password": "fixture-only-user"}, "canLogin": true, "canKickPlayers": false, "canModifyWorld": true, "canInteractWithLockables": true},
+ "guests": {"credentials": {"password": ""}, "canLogin": false, "canKickPlayers": false, "canModifyWorld": false, "canInteractWithLockables": false},
+ "unknown": {"precision": 123456789012345678901234567890, "array": [1, {"opaque": "keep\\bytes"}]}
+}

@@ -67,7 +67,7 @@ func TestGTAMTAOrdinary(t *testing.T) {
 }
 
 func TestGTAAuthorityEmitted(t *testing.T) {
-	raw, e := os.ReadFile("../../artifacts/game-parity-20261029/wave63-gta-completion/gta_pair-fragment.json")
+	raw, e := os.ReadFile("testdata/game-settings/game-parity-20261029/wave63-gta-completion/gta_pair-fragment.json")
 	if e != nil {
 		t.Fatal(e)
 	}

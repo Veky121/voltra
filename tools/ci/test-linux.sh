@@ -10,4 +10,5 @@ test_root=$(sudo mktemp -d /var/lib/voltra-ci.XXXXXX)
 trap 'sudo rm -rf -- "$test_root"' EXIT
 # Root-run tests must not leave unreadable entries in the runner's build cache.
 sudo env "TMPDIR=$test_root" "GOCACHE=$test_root/go-build" \
-  "GOMODCACHE=$(go env GOMODCACHE)" "$(command -v go)" test "$@"
+  "TEST_DATABASE_URL=${TEST_DATABASE_URL:-}" \
+  "GOMODCACHE=$(go env GOMODCACHE)" "$(command -v go)" test -timeout=20m "$@"

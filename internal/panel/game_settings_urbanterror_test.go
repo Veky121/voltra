@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestUrbanTerrorSettingsAPI(t *testing.T) {
-	control, err := pgxpool.New(context.Background(), os.Getenv("TEST_DATABASE_URL"))
+	control, err := pgxpool.New(context.Background(), isolatedTestDatabaseURL(t))
 	if err != nil {
 		t.Fatal("isolated database unavailable")
 	}
@@ -44,7 +45,7 @@ func TestUrbanTerrorSettingsAPI(t *testing.T) {
 		}
 	}()
 
-	stock, err := os.ReadFile("../../artifacts/game-parity-20261029/wave340-urbanterror-typed-settings/stock-server.cfg")
+	stock, err := os.ReadFile("testdata/game-settings/game-parity-20261029/wave340-urbanterror-typed-settings/stock-server.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}

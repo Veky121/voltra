@@ -9,7 +9,7 @@ import (
 )
 
 func TestRagecoopCapturedSettings(t *testing.T) {
-	raw, err := os.ReadFile("../../.local/gta-next/ragecoop/native-settings.xml")
+	raw, err := os.ReadFile("testdata/game-settings/ragecoop/settings.xml")
 	if err != nil {
 		t.Fatal(err)
 	}

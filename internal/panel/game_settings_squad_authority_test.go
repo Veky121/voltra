@@ -9,7 +9,7 @@ import (
 
 func squadAuthorityFixture(t *testing.T) squadAuthorityInput {
 	t.Helper()
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/squad-authority/current-emitted-fixture-console-v2.json")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/squad-authority/current-emitted-fixture-console-v2.json")
 	if err != nil {
 		t.Fatal(err)
 	}

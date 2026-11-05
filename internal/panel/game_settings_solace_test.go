@@ -55,7 +55,7 @@ func TestSolacePreservation(t *testing.T) {
 	}
 }
 func TestSolaceCanonicalAuthority(t *testing.T) {
-	root := "../../artifacts/game-parity-20261029/wave63-three-settings-integration/solace/"
+	root := "testdata/game-settings/game-parity-20261029/wave63-three-settings-integration/solace/"
 	raw, e := os.ReadFile(root + "../solace-proposal.json")
 	if e != nil {
 		t.Fatal(e)

@@ -24,7 +24,7 @@ func TestImportedMinecraftConsent(t *testing.T) {
 }
 
 func TestImportedMinecraftSpongeJavaModes(t *testing.T) {
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/minecraft-imported-consent/profiles.pending.json")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/minecraft-imported-consent/profiles.pending.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestImportedMinecraftSpongeJavaModes(t *testing.T) {
 // Wings protocol fixture. This proves delivery, never native acquisition.
 func TestImportedMinecraftConsentAPI(t *testing.T) {
 	a, _, admin, node, wings := steamGamesFixture(t)
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/minecraft-imported-consent/profiles.pending.json")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/minecraft-imported-consent/profiles.pending.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,7 +28,7 @@ import {visiblePoll} from '../hooks/visiblePoll';
 import {observeLivePath,isLivePathFresh} from '../hooks/liveEvents';
 
 type Sample={at:number;cpu:number;memory:number;rx:number;tx:number;uptime:number};
-type Telemetry={state:string;resources:Record<string,any>;samples:Sample[];updated:number;error:string;refresh:()=>void};
+type Telemetry={state:string;services?:{portal:string;game:string};resources:Record<string,any>;samples:Sample[];updated:number;error:string;refresh:()=>void};
 const TelemetryContext=createContext<Telemetry>({state:'unknown',resources:{},samples:[],updated:0,error:'',refresh:()=>{}});
 export const useServerTelemetry=()=>useContext(TelemetryContext);
 
@@ -61,7 +61,7 @@ function useTelemetry(base:string,enabled:boolean):Telemetry{
       const response=value(payload);
       const r=response.resources||{},at=Date.now();
       const sample={at,cpu:number(r.cpu_absolute),memory:number(r.memory_bytes),rx:number(r.network_rx_bytes),tx:number(r.network_tx_bytes),uptime:number(r.uptime)};
-      setData(old=>({base,value:{state:response.is_suspended?'suspended':response.current_state||'unknown',resources:r,samples:[...(old.base===base?old.value.samples:[]),sample].slice(-60),updated:at,error:''}}));
+      setData(old=>({base,value:{state:response.is_suspended?'suspended':response.current_state||'unknown',services:response.fs25_services,resources:r,samples:[...(old.base===base?old.value.samples:[]),sample].slice(-60),updated:at,error:''}}));
     };
     const unsubscribe=observeLivePath(path,sample=>{
       if(!active||document.hidden)return;
@@ -174,11 +174,15 @@ export function ServerStateLine({compact=false}:{compact?:boolean}){
   const statusText=operationError?'Action failed':stateText;
   const statusDetail=operationError||(pending?powerOperationDetail(pending,operationElapsed,!!telemetry.error):stateText);
   const statusState=operationError?'install_failed':telemetry.error&&!server.status?'unknown':pending?'starting':state;
+  const fs25=Array.isArray(server.egg_features)&&server.egg_features.includes('voltra_fs25');
+  const services=telemetry.error?undefined:telemetry.services;
+  const serviceLabels:Record<string,string>={online:'Online',offline:'Offline',starting:'Starting',stopping:'Stopping',unknown:'Unknown'};
   return <div className="server-state-line">
     <span className={`server-state state-${statusState}`} title={statusDetail} role={operationError?'alert':compact?'status':undefined} aria-live={compact?'polite':undefined}>
-      <span className="server-meta-label">Status:</span><span className="status-dot"/>
+      <span className="server-meta-label">{fs25?'Container:':'Status:'}</span><span className="status-dot"/>
       <span className="server-state-text">{statusText}</span>
     </span>
+    {fs25&&(['portal','game'] as const).map(key=>{const service=services?.[key]||'unknown';return <span key={key} className={`server-state state-${service==='online'?'running':service}`} title={service==='unknown'?'No recent service check. The monitoring helper may need updating.':key==='game'?'Game session state reported by the GIANTS portal.':'Local web portal response. Public access is checked separately.'}><span className="server-meta-label">{key==='portal'?'Web portal:':'Game server:'}</span><span className="status-dot"/><span>{serviceLabels[service]||'Unknown'}</span></span>})}
     <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}>Uptime: <strong>{telemetry.error?'\u2014':formatUptime(elapsed)}</strong></span>
   </div>;
 }

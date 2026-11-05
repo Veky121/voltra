@@ -51,7 +51,7 @@ func TestNuclearSettingsPreservation(t *testing.T) {
 func TestNuclearCandidateAuthority(t *testing.T) {
 	files := map[string][]byte{}
 	for name, digest := range nuclearAuthoritySources {
-		data, e := os.ReadFile(filepath.Join("../../artifacts/game-parity-20261029/wave63-three-settings-integration/nuclear", filepath.Base(name)))
+		data, e := os.ReadFile(filepath.Join("testdata/game-settings/game-parity-20261029/wave63-three-settings-integration/nuclear", filepath.Base(name)))
 		if e != nil {
 			t.Fatal(e)
 		}

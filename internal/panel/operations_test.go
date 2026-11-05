@@ -745,7 +745,7 @@ func TestOperationsArchiveExplicitTimeoutOverride(t *testing.T) {
 			t.Fatal("archive response did not exercise the configured daemon timeout")
 		}
 	}
-	operationsExpect(t, f.request("GET", f.serverPath("/resources"), nil, f.owner), 502)
+	operationsExpect(t, f.request("GET", f.serverPath("/resources"), nil, f.owner), 504)
 	if f.a.HTTP.Timeout != 5*time.Second {
 		t.Fatal("per-request archive override mutated the shared HTTP client")
 	}

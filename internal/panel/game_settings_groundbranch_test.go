@@ -47,7 +47,7 @@ func TestGroundBranchPublisherScalars(t *testing.T) {
 	}
 }
 func TestGroundBranchEmittedAuthority(t *testing.T) {
-	raw, e := os.ReadFile("../../artifacts/game-parity-20261029/wave38-groundbranch/unapplied-profile-fragment.json")
+	raw, e := os.ReadFile("testdata/game-settings/game-parity-20261029/wave38-groundbranch/unapplied-profile-fragment.json")
 	if e != nil {
 		t.Fatal(e)
 	}

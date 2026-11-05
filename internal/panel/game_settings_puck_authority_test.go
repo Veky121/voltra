@@ -39,7 +39,7 @@ func puckAuthorityFixture(t *testing.T) settingsAuthorityInput {
 			in.Files[".voltra/"+name] = []byte(tail[:end[0]])
 		}
 	}
-	in.Files["start_server.sh"], err = os.ReadFile("../../artifacts/game-parity-20261029/wave24-puck-authority/start_server.sh")
+	in.Files["start_server.sh"], err = os.ReadFile("testdata/game-settings/game-parity-20261029/wave24-puck-authority/start_server.sh")
 	if err != nil {
 		t.Fatal(err)
 	}

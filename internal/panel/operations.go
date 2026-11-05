@@ -217,7 +217,7 @@ func (a *App) clientResources(w http.ResponseWriter, r *http.Request) {
 func clientResourceResponse(m M) M {
 	u := asMap(m["utilization"])
 	n := asMap(u["network"])
-	return item("stats", M{"current_state": opDefault(str(m["state"]), "stopped"), "is_suspended": boolean(m["is_suspended"]), "resources": M{"memory_bytes": num(u["memory_bytes"]), "cpu_absolute": u["cpu_absolute"], "disk_bytes": num(u["disk_bytes"]), "network_rx_bytes": num(n["rx_bytes"]), "network_tx_bytes": num(n["tx_bytes"]), "uptime": num(u["uptime"])}})
+	return item("stats", M{"current_state": opDefault(str(m["state"]), "stopped"), "is_suspended": boolean(m["is_suspended"]), "fs25_services": m["fs25_services"], "resources": M{"memory_bytes": num(u["memory_bytes"]), "cpu_absolute": u["cpu_absolute"], "disk_bytes": num(u["disk_bytes"]), "network_rx_bytes": num(n["rx_bytes"]), "network_tx_bytes": num(n["tx_bytes"]), "uptime": num(u["uptime"])}})
 }
 func (a *App) clientCommand(w http.ResponseWriter, r *http.Request) {
 	s, e := a.server(r, "control.console")

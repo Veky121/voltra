@@ -59,7 +59,7 @@ func TestPuckSettingsRefuseAmbiguity(t *testing.T) {
 }
 
 func TestPuckSettingsHelperEmission(t *testing.T) {
-	data, err := os.ReadFile("../../artifacts/game-parity-20261029/puck-settings-source/helper-emitted.json")
+	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/puck-settings-source/helper-emitted.json")
 	if err != nil {
 		t.Fatal(err)
 	}

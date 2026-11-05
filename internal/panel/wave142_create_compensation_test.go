@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -27,9 +26,9 @@ func (c *wave142CommitCancel) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, d 
 }
 
 func TestWave142CreateCompensation(t *testing.T) {
-	cfg, e := pgxpool.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
-	if e != nil || cfg.ConnConfig.Host != "127.0.0.1" || cfg.ConnConfig.Port != 55439 {
-		t.Fatal("requires private loopback55439")
+	cfg, e := pgxpool.ParseConfig(isolatedTestDatabaseURL(t))
+	if e != nil {
+		t.Fatal("invalid isolated test database")
 	}
 	for _, mode := range []string{"clean", "first", "second", "commit", "cancel"} {
 		t.Run(mode, func(t *testing.T) {

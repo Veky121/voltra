@@ -94,6 +94,10 @@ func (a *App) clientResourceSnapshot(ctx context.Context, server M) (M, error) {
 		if err != nil {
 			return nil, err
 		}
-		return opJSON(response)
+		snapshot, err := opJSON(response)
+		if err == nil {
+			a.attachFS25Health(shared, server, snapshot)
+		}
+		return snapshot, err
 	})
 }
