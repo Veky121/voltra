@@ -5,6 +5,8 @@ import {SettingsRow, SettingsSection, Switch} from '../ui/Settings';
 import {usePendingSetting} from '../client/PendingSettings';
 import {useDiscardSettings} from '../client/PendingSettings';
 import {confirmAction} from '../ui/ConfirmAction';
+import {RefreshCw} from 'lucide-react';
+import './runtime-management.css';
 
 type ImageState = {reference:string; approved_id:string; candidate_id:string; previous_id:string; last_checked_at?:string; next_check_at?:string; error?:string; busy:boolean; schedule_enabled:boolean};
 type ImageStatus = {version:number; check_interval_seconds:number; images:ImageState[]};
@@ -13,7 +15,7 @@ type SteamStatus = {supported:boolean; scope:string; helper_image:string; versio
 function at(value?:string) {
   if (!value || value.startsWith('0001-')) return 'Not yet';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
 }
 function shortID(value:string) { return value ? value.slice(0, 19) : 'None'; }
 function checkable(ref:string) { return !ref.startsWith('~') && !ref.startsWith('sha256:') && !ref.includes('@sha256:'); }
@@ -27,9 +29,8 @@ export default function RuntimeManagement() {
     if (!nodes.data) return;
     if (!list.some(n => String(n.id) === node)) setNode(list.length ? String(list[0].id) : '');
   }, [nodes.data, node]);
-  return <div className="admin-management-page management-ui">
+  return <div className="admin-management-page management-ui runtime-management">
     <Heading title="Runtime management" />
-    <p className="muted">Manage cached container images and SteamCMD on each node.</p>
     <ErrorMessage error={nodes.error} />
     {nodes.error && <Button variant="secondary" onClick={nodes.reload}>Retry nodes</Button>}
     <Field label="Node"><Select value={node} disabled={nodes.loading || !list.length} onChange={event => {const next=event.target.value; void discard().then(allowed=>{if(allowed)setNode(next)});}}>
@@ -81,41 +82,41 @@ function NodeRuntime({node, name, maintenance}:{node:string; name:string; mainte
     {maintenance && <p role="status">This node is in maintenance mode. Runtime changes are unavailable.</p>}
     <ErrorMessage error={error} />
     {notice && <p role="status">{notice}</p>}
-    <SettingsSection title="Container images" action={<Button variant="secondary" disabled={images.loading} onClick={images.reload}>Refresh images</Button>}>
-      <ErrorMessage error={images.error} />
-      {!images.data && images.loading && <p role="status">Loading image status…</p>}
+    <SettingsSection title="Container images" action={<Button variant="secondary" aria-label="Refresh images" title="Refresh images" disabled={images.loading} onClick={images.reload}><RefreshCw size={14} aria-hidden="true" /></Button>}>
+      {images.error && <SettingsRow label="Images unavailable" control={null}><ErrorMessage error={images.error} /></SettingsRow>}
+      {!images.data && images.loading && <SettingsRow label={<span role="status">Loading images…</span>} control={null} />}
       {images.data && <>
-        <p className="muted">Enabled checks run daily and stage updates for approval. Cached starts use the approved image. Previous versions are kept for rollback.</p>
-        {!images.data.images.length && <p>No managed images yet. Images appear when this node prepares a server or installer.</p>}
-        {images.data.images.map(image => <SettingsRow key={image.reference} label={image.reference} description={image.busy ? 'Image operation in progress.' : image.candidate_id && image.candidate_id !== image.approved_id ? 'Downloaded update ready for review.' : 'Approved image selected.'}
-          info={<><p>Approved: <code>{image.approved_id || 'None'}</code></p><p>Candidate: <code>{image.candidate_id || 'None'}</code></p><p>Previous: <code>{image.previous_id || 'None'}</code></p></>}
+        {!images.data.images.length && <SettingsRow label="No images yet" description="Images appear after a server start or install." control={null} />}
+        {images.data.images.map(image => <SettingsRow key={image.reference} label={image.reference} description={image.busy ? 'Checking…' : image.candidate_id && image.candidate_id !== image.approved_id ? 'Update ready to approve' : 'Approved'}
+          info={<><p>Updates need approval. Running servers keep their current image.</p><p>Last check: {at(image.last_checked_at)} · Next: {image.schedule_enabled ? at(image.next_check_at) : 'Off'}</p><p>Approved: <code>{image.approved_id || 'None'}</code></p><p>Candidate: <code>{image.candidate_id || 'None'}</code></p><p>Previous: <code>{image.previous_id || 'None'}</code></p></>}
           infoLabel={`Image versions for ${image.reference}`}
           control={<div className="actions">
-            <Button variant="secondary" disabled={disabled || !!images.error || image.busy || !checkable(image.reference)} onClick={()=>void act('images','check',image)}>Check and download</Button>
-            <Button disabled={disabled || !!images.error || image.busy || !image.candidate_id || image.candidate_id === image.approved_id} onClick={()=>void act('images','approve',image)}>Approve</Button>
-            <Button variant="secondary" disabled={disabled || !!images.error || image.busy || !image.previous_id} onClick={()=>void act('images','rollback',image)}>Roll back</Button>
+            {checkable(image.reference) && <Button variant="secondary" disabled={disabled || !!images.error || image.busy} onClick={()=>void act('images','check',image)}>Check updates</Button>}
+            {!!image.candidate_id && image.candidate_id !== image.approved_id && <Button disabled={disabled || !!images.error || image.busy} onClick={()=>void act('images','approve',image)}>Approve</Button>}
+            {!!image.previous_id && <Button variant="secondary" disabled={disabled || !!images.error || image.busy} onClick={()=>void act('images','rollback',image)}>Roll back</Button>}
           </div>}>
-          <p className="muted">Last successful check: {at(image.last_checked_at)} · Next check: {image.schedule_enabled ? at(image.next_check_at) : 'Disabled'}</p>
-          {checkable(image.reference) ? <ScheduleToggle endpoint={`${base}/images`} reference={image.reference} enabled={image.schedule_enabled} blocked={disabled || !!images.error || image.busy} reload={images.reload} /> : <p className="muted">This image is pinned or local. Automatic update checks are unavailable.</p>}
+          {checkable(image.reference) && <ScheduleToggle endpoint={`${base}/images`} reference={image.reference} enabled={image.schedule_enabled} blocked={disabled || !!images.error || image.busy} reload={images.reload} />}
           <ErrorMessage error={image.error || ''} />
         </SettingsRow>)}
       </>}
     </SettingsSection>
-    <SettingsSection title="SteamCMD" action={<Button variant="secondary" disabled={steam.loading} onClick={steam.reload}>Refresh SteamCMD</Button>}>
-      <ErrorMessage error={steam.error} />
-      {!steam.data && steam.loading && <p role="status">Loading SteamCMD status…</p>}
-      {steam.data && <SettingsRow label="Metadata client" description={steam.data.busy ? 'SteamCMD check/update in progress.' : `Last observed client version: ${steam.data.version || 'Not yet observed'}.`}
-        info={<><p>This is the shared metadata client. Game maintenance keeps separate caches and account sessions. The first check enables daily checks. SteamCMD may update itself during those checks.</p><p>Helper image: <code>{steam.data.helper_image}</code></p><p>Version observed: {at(steam.data.version_observed_at)}</p><p>Last attempt: {at(steam.data.last_attempt_at)}</p></>}
-        control={<Button disabled={disabled || !!steam.error || !steam.data.supported || steam.data.busy} onClick={()=>void act('steamcmd','check')}>Check/update now</Button>}>
-        <p className="muted">Last successful check: {at(steam.data.last_checked_at)} · Next check: {steam.data.schedule_enabled ? at(steam.data.next_check_at) : 'Disabled'}</p>
-        <ScheduleToggle endpoint={`${base}/steamcmd`} enabled={steam.data.schedule_enabled} blocked={disabled || !!steam.error || !steam.data.supported || !steam.data.initialized || steam.data.recovery_required} reload={steam.reload} />
-        <ErrorMessage error={steam.data.last_error || ''} />
-      </SettingsRow>}
+    <SettingsSection title="SteamCMD" action={<Button variant="secondary" aria-label="Refresh SteamCMD" title="Refresh SteamCMD" disabled={steam.loading} onClick={steam.reload}><RefreshCw size={14} aria-hidden="true" /></Button>}>
+      {steam.error && <SettingsRow label="SteamCMD unavailable" control={null}><ErrorMessage error={steam.error} /></SettingsRow>}
+      {!steam.data && steam.loading && <SettingsRow label={<span role="status">Loading SteamCMD…</span>} control={null} />}
+      {steam.data && <>
+        <SettingsRow label={steam.data.version ? `Version ${steam.data.version}` : 'Not checked yet'} description={steam.data.busy ? 'Checking for updates…' : steam.data.last_checked_at ? `Checked ${at(steam.data.last_checked_at)}` : 'Run a check to get started.'}
+          infoLabel="SteamCMD details"
+          info={<><p>Checks update the shared SteamCMD client. Game files and logins stay separate.</p><p>Helper image: <code>{steam.data.helper_image}</code></p><p>Version observed: {at(steam.data.version_observed_at)} · Last attempt: {at(steam.data.last_attempt_at)}</p></>}
+          control={<Button disabled={disabled || !!steam.error || !steam.data.supported || steam.data.busy} onClick={()=>void act('steamcmd','check')}>{steam.data.busy ? 'Checking…' : 'Check updates'}</Button>}>
+          {steam.data.last_error && <ErrorMessage error={steam.data.last_error} />}
+        </SettingsRow>
+        <ScheduleToggle endpoint={`${base}/steamcmd`} enabled={steam.data.schedule_enabled} blocked={disabled || !!steam.error || !steam.data.supported || !steam.data.initialized || steam.data.recovery_required} reload={steam.reload} row description={steam.data.schedule_enabled ? `Next check ${at(steam.data.next_check_at)}` : undefined} />
+      </>}
     </SettingsSection>
   </>;
 }
 
-function ScheduleToggle({endpoint,reference,enabled,blocked,reload}:{endpoint:string;reference?:string;enabled:boolean;blocked:boolean;reload:()=>void}) {
+function ScheduleToggle({endpoint,reference,enabled,blocked,reload,row=false,description}:{endpoint:string;reference?:string;enabled:boolean;blocked:boolean;reload:()=>void;row?:boolean;description?:string}) {
   const [draft,setDraft]=useState(enabled), [baseline,setBaseline]=useState(enabled), [saving,setSaving]=useState(false);
   const dirty=draft!==baseline;
   useEffect(()=>{if(!dirty){setDraft(enabled);setBaseline(enabled)}},[enabled]);
@@ -125,5 +126,6 @@ function ScheduleToggle({endpoint,reference,enabled,blocked,reload}:{endpoint:st
     discard:()=>{setDraft(enabled);setBaseline(enabled)},
     afterSave:reload,
   });
-  return <label className="actions"><Switch checked={draft} disabled={blocked || saving} onCheckedChange={setDraft} />Daily checks</label>;
+  const toggle=<Switch aria-label={reference ? `Daily checks for ${reference}` : 'Daily checks'} checked={draft} disabled={blocked || saving} onCheckedChange={setDraft} />;
+  return row ? <SettingsRow label="Daily checks" description={description} control={toggle} /> : <label className="actions">{toggle}Daily checks</label>;
 }

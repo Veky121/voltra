@@ -1,0 +1,6 @@
+.app-content .runtime-management{width:100%;max-width:880px;min-width:0}
+.runtime-management>.field{margin-bottom:24px}
+.runtime-management .settings-row-control>.actions{flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:600px){
+ .runtime-management .settings-row-control>.actions{justify-content:flex-start}
+}
