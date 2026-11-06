@@ -8,8 +8,9 @@ const bundled=await build({
   entryPoints:[fileURLToPath(new URL('../src/client/FileExplorer.tsx',import.meta.url))],
   bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',loader:{'.css':'empty'},
   plugins:[{name:'explorer-fixture',setup(builder){
-    builder.onResolve({filter:/^\.\.\/ui\/IconButton$|^\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
+    builder.onResolve({filter:/notifications$|^\.\.\/ui\/IconButton$|^\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
     builder.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',contents:
+      path.endsWith('notifications')?`export const Feedback=({message})=>message;`:
       path==='react'?`export const memo=component=>component; export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
       path==='react/jsx-runtime'?`export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`:
       path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);`:

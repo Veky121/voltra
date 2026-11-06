@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 // In-memory TSX fixtures. No browser, server, real fetch, or dist output.
 const fixtureKey = '__serverAdminToolsFixture';
 const modules = {
+  notifications: `export const Feedback=({message})=>message;`,
   icons: `export const Info='svg';`,
   pending: `export const usePendingSetting=(key,dirty,change)=>globalThis.${fixtureKey}.pending.set(key,{...change,dirty}); export const useDiscardSettings=()=>async()=>{const f=globalThis.${fixtureKey};const entries=[...f.pending.values()].filter(x=>x.dirty);if(!entries.length)return true;f.confirmations.push('Discard changes?');if(!f.confirm)return false;for(const item of entries)item.discard();return true};`,
   confirm: `export const confirmAction=async options=>{const f=globalThis.${fixtureKey};f.confirmations.push(options.description);return f.confirm;};`,
@@ -57,6 +58,7 @@ const bundled = await build({
   stdin: {contents:`export * from './src/client/ServerAdminTools'; export {default} from './src/client/ServerAdminTools'; export {Server,Startup,Manage,DeleteServer,ServerSettingsTabs} from './src/admin/servers'; export {GameLicences} from './src/admin/GameLicences';`, resolveDir:fileURLToPath(new URL('..', import.meta.url)), loader:'tsx'},
   bundle:true, write:false, platform:'node', format:'esm', jsx:'automatic', loader:{'.css':'empty'},
   plugins:[{name:'isolated-ui-fixtures', setup(builder) {
+    builder.onResolve({filter:/notifications$/},()=>({path:'notifications',namespace:'fixture'}));
     builder.onResolve({filter:/client\/ReinstallServerButton$/},()=>({path:'reinstall',namespace:'fixture'}));
     builder.onResolve({filter:/^lucide-react$/},()=>({path:'icons',namespace:'fixture'}));
     builder.onResolve({filter:/PendingSettings$/},()=>({path:'pending',namespace:'fixture'}));
