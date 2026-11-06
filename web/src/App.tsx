@@ -7,6 +7,7 @@ import {Loading,useAPI,unwrap} from './lib';
 import {SidebarTarget} from './Navigation';
 import SetupGate from './setup';
 import RouteRecovery from './RouteRecovery';
+import DesktopResume from './DesktopResume';
 import {ServerNavigationProvider} from './ServerNavigation';
 import {ThemeProvider} from './ThemeProvider';
 import AppSidebar,{SidebarRouteEffects} from './components/AppSidebar';
@@ -29,7 +30,7 @@ function AuthenticatedShell(){
  const account=data?unwrap(data):null;
  if(error&&!account)return <div className="page"><Feedback tone="error" message={<>{error}</>}/><MiraAction onClick={reload}>Retry</MiraAction></div>;
  if(!account)return <Loading/>;
- return <ThemeProvider key={account.uuid||account.id} account={String(account.uuid||account.id)}><ServerNavigationProvider><ArtworkProvider><AppShell account={account}/></ArtworkProvider></ServerNavigationProvider></ThemeProvider>;
+ return <DesktopResume key={account.uuid||account.id}><ThemeProvider account={String(account.uuid||account.id)}><ServerNavigationProvider><ArtworkProvider><AppShell account={account}/></ArtworkProvider></ServerNavigationProvider></ThemeProvider></DesktopResume>;
 }
 function AppShell({account}:{account:Record<string,any>}){
  const location=useLocation(),site=useAPI('/api/client/settings');

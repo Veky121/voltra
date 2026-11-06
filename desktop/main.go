@@ -89,6 +89,7 @@ func main() {
 		}
 		return window.IsMaximised(), nil
 	})
+	rememberWindow(app, window, dir)
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
 		if exe, err := os.Executable(); err == nil {
 			if err := acceptPreviousExecutable(exe); err != nil {

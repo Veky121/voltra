@@ -154,6 +154,10 @@ func (h *desktopHost) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.FS(h.assets)).ServeHTTP(w, clone)
 }
 func (h *desktopHost) desktop(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/desktop/resume" {
+		h.serveResume(w, r)
+		return
+	}
 	if r.URL.Path == "/desktop/theme" {
 		h.serveTheme(w, r)
 		return

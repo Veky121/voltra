@@ -22,7 +22,7 @@ import './powerProgress.css';
 import {ServerConnection} from './ServerConnection';
 import './shadcn-cards.css';
 import './dashboard-ui.css';
-import {fallbackArtwork,getServerArtwork,type ServerArtwork} from './serverArtwork';
+import {fallbackArtwork,getServerBannerArtwork,type ServerArtwork} from './serverArtwork';
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {FavoriteButton} from '../ServerNavigation';
 import {visiblePoll} from '../hooks/visiblePoll';
@@ -203,7 +203,7 @@ function DashboardArtwork({art}:{art:ServerArtwork}){
 export function ServerWorkspace({children}:{children:ReactNode}){
   const {server,base}=useServer();
   useArtworkLibrary();
-  const art=getServerArtwork({...server,name:server.name});
+  const art=getServerBannerArtwork({...server,name:server.name});
   const pathname=useLocation().pathname;
   const dashboardPage=/^\/server\/[^/]+\/?$/.test(pathname);
   const telemetry=useTelemetry(base,(!server.status||server.status==='reinstall_failed')&&!server.is_installing);

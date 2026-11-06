@@ -1,10 +1,11 @@
+import type {ServerIdentityArtwork} from './client/serverArtwork';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {api,rows} from './lib';
 import {Icon} from './Icons';
 import {observeLiveNavigation} from './hooks/liveEvents';
 
-export type NavigationServer={uuid:string;identifier:string;name:string;egg_name?:string;status:string|null;favorite:boolean;last_visited_at:string|null};
+export type NavigationServer={uuid:string;identifier:string;name:string;egg_name?:string;artwork?:ServerIdentityArtwork;status:string|null;favorite:boolean;last_visited_at:string|null};
 type NavigationState={servers:NavigationServer[];loading:boolean;error:string;pending:Set<string>;reload:()=>void;visit:(id:string)=>void;favorite:(id:string,value:boolean)=>Promise<void>};
 const Context=createContext<NavigationState>({servers:[],loading:true,error:'',pending:new Set(),reload:()=>{},visit:()=>{},favorite:async()=>{}});
 export const useServerNavigation=()=>useContext(Context);

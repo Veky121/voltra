@@ -1,11 +1,11 @@
-import {getServerArtwork} from './serverArtwork.ts';
+import {getServerBannerArtwork} from './serverArtwork.ts';
 import communityArtwork from './minecraftCommunityArtwork.json' with {type:'json'};
 
-type Server = Parameters<typeof getServerArtwork>[0];
+type Server = Parameters<typeof getServerBannerArtwork>[0];
 export type ServerSoftwareArtwork = {id:string;name:string;src:string};
 
 export function getServerSoftwareArtwork(server:Server):ServerSoftwareArtwork|undefined{
-  if(getServerArtwork(server).id!=='minecraft')return;
+  if(getServerBannerArtwork(server).id!=='minecraft')return;
   const variables=server.relationships?.variables?.data?.map(variable=>variable.attributes??{})??[];
   const declared=variables.find(variable=>variable.env_variable==='MINECRAFT_LOADER');
   // An explicit unknown loader must not borrow a badge from the launch command.

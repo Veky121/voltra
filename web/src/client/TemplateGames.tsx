@@ -21,7 +21,7 @@ import {GamePorts, useGamePortPlan} from './GamePorts';
 import {GameLibraryCard,gameArtwork} from './GameLibraryCard';
 import {compareGamePopularity} from './gameLibraryOrder';
 import {isMinecraftTemplate, minecraftProjectKey} from './minecraftCommunityModel';
-import communityArtwork from './minecraftCommunityArtwork.json';
+import communityArtwork from './minecraftCommunityArtwork.json' with {type:'json'};
 import type {GameArtwork} from './GameLibraryCard';
 import {clearTemplateSteamSecrets, templateSteamDefault, templateSteamEnvironment, templateSteamRole, type TemplateSteamInstallation} from './privateSteamTemplateModel';
 

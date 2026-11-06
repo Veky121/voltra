@@ -12,13 +12,13 @@ import {AccountSessionContext} from '../setup';
 import {useServerNavigation,type NavigationServer} from '../ServerNavigation';
 import {accountNickname} from '../client/accountProfile';
 import {useArtworkLibrary} from '../client/ArtworkProvider';
-import {fallbackArtwork,getServerArtwork} from '../client/serverArtwork';
+import {fallbackArtwork,getServerArtwork,getServerBannerArtwork} from '../client/serverArtwork';
 import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton,useSidebar} from './ui/sidebar';
 import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuGroup,DropdownMenuLabel,DropdownMenuItem,DropdownMenuSeparator} from './ui/dropdown-menu';
 
-function ServerPickerArtwork({server}:{server:NavigationServer}){
+function ServerPickerArtwork({server,className="voltra-server-picker-artwork"}:{server:NavigationServer;className?:string}){
  const artwork=getServerArtwork(server);
- return <img key={artwork.src} className="voltra-server-picker-artwork" src={artwork.src} alt="" aria-hidden="true" onError={event=>{if(event.currentTarget.getAttribute('src')!==fallbackArtwork.src)event.currentTarget.src=fallbackArtwork.src}}/>;
+ return <img key={artwork.src} className={className} src={artwork.src} alt="" aria-hidden="true" onError={event=>{const fallback=getServerBannerArtwork(server).src;const current=event.currentTarget.getAttribute('src');if(current!==fallback&&current!==fallbackArtwork.src)event.currentTarget.src=fallback;else if(current!==fallbackArtwork.src)event.currentTarget.src=fallbackArtwork.src}}/>;
 }
 
 function ServerPicker({servers}:{servers:NavigationServer[]}){
@@ -41,7 +41,7 @@ function ServerPicker({servers}:{servers:NavigationServer[]}){
 
 function Shortcuts({label,servers,view}:{label:string;servers:NavigationServer[];view:'favorites'|'recent'}){
  useArtworkLibrary();
- return <div className="voltra-shortcuts" data-shortcut={view}><NavigationGroup label={label}>{servers.slice(0,5).map(server=><Link key={server.uuid} to={`/server/${server.identifier||server.uuid}`} title={server.name}><img className="voltra-shortcut-artwork" src={getServerArtwork(server).src} alt="" aria-hidden="true" loading="lazy" onError={event=>{if(event.currentTarget.getAttribute('src')!==fallbackArtwork.src)event.currentTarget.src=fallbackArtwork.src}}/><span>{server.name}</span>{server.status&&<span className="voltra-shortcut-status" title={server.status.replaceAll('_',' ')} aria-label={server.status.replaceAll('_',' ')}/>}</Link>)}</NavigationGroup>{!servers.length&&<p className="voltra-shortcut-empty">{view==='favorites'?'No favorites yet':'No recent servers'}</p>}</div>;
+ return <div className="voltra-shortcuts" data-shortcut={view}><NavigationGroup label={label}>{servers.slice(0,5).map(server=><Link key={server.uuid} to={`/server/${server.identifier||server.uuid}`} title={server.name}><ServerPickerArtwork server={server} className="voltra-shortcut-artwork"/><span>{server.name}</span>{server.status&&<span className="voltra-shortcut-status" title={server.status.replaceAll('_',' ')} aria-label={server.status.replaceAll('_',' ')}/>}</Link>)}</NavigationGroup>{!servers.length&&<p className="voltra-shortcut-empty">{view==='favorites'?'No favorites yet':'No recent servers'}</p>}</div>;
 }
 
 function AccountMenu({account}:{account:Record<string,any>}){

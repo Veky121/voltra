@@ -18,6 +18,7 @@ func (a *App) serverNavigationList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entries, err := a.query(r.Context(), `SELECT s.uuid,s.uuid_short AS identifier,s.name,s.status,e.name AS egg_name,
+ s.minecraft_pack,e.uuid AS artwork_egg_uuid,e.features AS artwork_egg_features,
  COALESCE(p.favorite,false) AS favorite,p.last_visited_at
  FROM servers s LEFT JOIN eggs e ON e.id=s.egg_id LEFT JOIN user_server_navigation p ON p.server_id=s.id AND p.user_id=$1
  WHERE $2 OR s.owner_id=$1 OR EXISTS(SELECT 1 FROM subusers su WHERE su.server_id=s.id AND su.user_id=$1)
@@ -26,7 +27,31 @@ func (a *App) serverNavigationList(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	for _, entry := range entries {
+		entry["artwork"] = navigationArtwork(entry)
+		delete(entry, "minecraft_pack")
+		delete(entry, "artwork_egg_uuid")
+		delete(entry, "artwork_egg_features")
+	}
 	writeJSON(w, 200, collection("server_navigation", entries))
+}
+
+// Navigation only needs pack identity, without reading server files or exposing provider URLs.
+func navigationArtwork(server M) M {
+	out := M{}
+	egg := M{"uuid": server["artwork_egg_uuid"], "features": server["artwork_egg_features"]}
+	if !serverArtworkMinecraftWorkload(server, egg) {
+		return out
+	}
+	out["game"] = "minecraft"
+	pack := asMap(server["minecraft_pack"])
+	if str(pack["name"]) != "" {
+		out["pack_name"] = pack["name"]
+	}
+	if mcContentIcon(str(pack["icon_url"])) != "" {
+		out["pack_icon"] = "/api/client/servers/" + str(server["uuid"]) + "/artwork/pack"
+	}
+	return out
 }
 
 func (a *App) serverNavigationFavorite(w http.ResponseWriter, r *http.Request) {
