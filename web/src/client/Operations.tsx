@@ -201,10 +201,10 @@ export function Backups() {
           onClose={() => setRestore(null)}
         >
           <Notice action={a} />
-          <Feedback tone="warning" message={<>
+          <p>
             The server will stop. Existing files may be overwritten by this
             backup.
-          </>}/>
+          </p>
           <Check
             label="Delete all existing files before restoring"
             checked={truncate}

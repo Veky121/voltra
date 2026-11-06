@@ -80,7 +80,7 @@ function NodeRuntime({node, name, maintenance}:{node:string; name:string; mainte
 
   const disabled = maintenance || !!pending;
   return <>
-    {maintenance && <><Feedback tone="error" message={<>This node is in maintenance mode. Runtime changes are unavailable.</>}/></>}
+    {maintenance && <p className="muted">This node is in maintenance mode. Runtime changes are unavailable.</p>}
     <ErrorMessage error={error} />
     {notice && <><Feedback tone="warning" message={<>{notice}</>}/></>}
     <SettingsSection title="Container images" action={<Button variant="secondary" aria-label="Refresh images" title="Refresh images" disabled={images.loading} onClick={images.reload}><RefreshCw size={14} aria-hidden="true" /></Button>}>

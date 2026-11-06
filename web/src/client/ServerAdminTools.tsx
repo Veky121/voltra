@@ -242,7 +242,7 @@ export function ServerConfigurationEditor({ serverID, onSaved, onDirtyChange }: 
   };
   return <form className="server-configuration-editor" onSubmit={event=>{event.preventDefault();void saveConfiguration().catch(()=>{})}}>
     <div className="server-configuration-notice">
-      {!configuration.can_update && <><Feedback tone="error" message={<>{configuration.update_unavailable_reason || "Stop the server, then reopen this tab to edit."}</>}/></>}
+      {!configuration.can_update && <p className="muted">{configuration.update_unavailable_reason || "Stop the server, then reopen this tab to edit."}</p>}
       <ErrorBox>{error || query.error}</ErrorBox>
       {success && <Feedback tone="success" message={<>{success}</>}/>}
     </div>

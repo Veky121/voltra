@@ -43,6 +43,7 @@ export function ServerOperationNotice(){
     if(telemetry.state==='running'&&!telemetry.error&&!pathname.endsWith('/runtime'))return null;
     return <><Feedback tone="error" message={<>The last reinstall attempt failed.  {telemetry.state==='running'&&!telemetry.error?'The existing installation is running. ':''} Review the installation output before retrying Reinstall server under Server settings &gt; General.</>}/></>;
   }
+  if(!server.status.includes("failed"))return null;
   return <Feedback title={server.name} eventKey={`server-state:${server.uuid}`} tone={server.status.includes("failed")?"error":"info"} message={`Server state: ${server.status.replaceAll("_"," ")}. ${server.status==="installing"?"Installation output is available in the console.":""}`}/>;
 }
 

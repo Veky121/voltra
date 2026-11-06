@@ -1,7 +1,7 @@
 import './notifications.css';
-import { createContext, isValidElement, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+import { createContext, isValidElement, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
-import {Bell,CheckCircle2,Info,TriangleAlert,X} from 'lucide-react';
+import {CheckCircle2,Info,TriangleAlert,X} from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { notifications } from './notificationEvents';
 import type { NotificationEvent, NotificationTone } from './notificationEvents';
@@ -37,7 +37,7 @@ export function Feedback({ message, tone = 'info', title, eventKey, id: descript
   return descriptionId ? <span id={descriptionId} className="sr-only">{content}</span> : null;
 }
 
-function Island({ entry, pending, showHistory }: { entry: NotificationEvent; pending: number; showHistory: () => void }) {
+function Island({ entry }: { entry: NotificationEvent }) {
   const bar = useRef<HTMLDivElement>(null);
   const paused = useRef(new Set<string>());
   useEffect(() => {
@@ -75,7 +75,6 @@ function Island({ entry, pending, showHistory }: { entry: NotificationEvent; pen
     </div>
     <div className="notification-controls">
       <button type="button" className="notification-close" aria-label="Dismiss notification" onClick={() => notifications.dismiss(entry.id)}>×</button>
-      {pending > 0 && <button type="button" className="notification-more" onClick={showHistory} aria-label={`${pending} more notifications`}>+{pending}</button>}
     </div>
     <div className="notification-track" aria-hidden="true"><div ref={bar} /></div>
   </section>;
@@ -83,7 +82,6 @@ function Island({ entry, pending, showHistory }: { entry: NotificationEvent; pen
 
 export function Notifications() {
   const { events, activeId } = useSyncExternalStore(notifications.subscribe, notifications.getSnapshot);
-  const [open, setOpen] = useState(false);
   const [container,setContainer] = useState<HTMLElement>(document.body);
   const layer=useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -101,22 +99,15 @@ export function Notifications() {
     if(element&&typeof element.showPopover==='function'&&!element.matches(':popover-open'))element.showPopover();
   },[container]);
   useEffect(()=>{
-    const clear=()=>{notifications.clear();setOpen(false)};
+    const clear=()=>{notifications.clear();};
     window.addEventListener('panel-auth-changed',clear);
     window.addEventListener('desktop-session-rejected',clear);
     return()=>{window.removeEventListener('panel-auth-changed',clear);window.removeEventListener('desktop-session-rejected',clear)};
   },[]);
   const active = events.find(event => event.id === activeId);
-  const pending = events.filter(event => !event.dismissed && event.id !== activeId).length;
   return <>
     {createPortal(<div ref={layer} popover="manual" className="notification-layer">
-      {events.length>0&&<div className="notification-history"><button type="button" className="text-button" aria-label="Notification history" aria-expanded={open} onClick={() => setOpen(!open)}><Bell/> {events.length}</button></div>}
-      {active && <Island key={active.id} entry={active} pending={pending} showHistory={() => setOpen(true)} />}
-      {open && <section aria-label="Notification history" className="notification-history-panel">
-        <div className="toolbar"><strong>Recent notifications</strong><button className="text-button" onClick={() => notifications.clear()}>Clear</button><button className="text-button" onClick={() => setOpen(false)}>Close</button></div>
-        {!events.length && <p className="muted">No notifications this session.</p>}
-        {[...events].reverse().map(entry => <div className="notification-history-item" key={entry.id}><strong>{entry.title}</strong><p className={entry.tone === 'error' ? 'danger' : ''}>{entry.message}</p><small className="muted">{entry.time} · {entry.path}</small></div>)}
-      </section>}
+      {active && <Island key={active.id} entry={active} />}
     </div>, container)}
   </>;
 }

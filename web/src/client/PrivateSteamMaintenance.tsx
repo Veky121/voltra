@@ -82,7 +82,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
     {status.recovery_job_id && <div className="steam-job">
       <p>Recover the result of a finished download after a connection interruption, without signing in again.</p>
       {!status.recovery_ready && <p className="muted">{status.recovery_reason || 'Download recovery is not enabled on this node.'}</p>}
-      {!stopped && <><Feedback tone="warning" message={<>Stop the server before checking its downloaded files.</>}/></>}
+      {!stopped && <p className="muted">Stop the server before checking its downloaded files.</p>}
       <Button variant="secondary" disabled={recoveryBlocked} onClick={() => void recover()}>{recovering ? 'Checking downloaded files…' : 'Recover download result'}</Button>
       {recovering && <Button variant="secondary" onClick={() => recovery.current?.abort()}>Cancel check</Button>}
     </div>}
@@ -93,7 +93,7 @@ export default function PrivateSteamMaintenance({status, unavailable, reload}: {
       <Field label={privateOriginalLabel(status.original_controls?.branch, 'Branch')}><Input value={branch} onChange={event => setBranch(event.target.value)} disabled={blocked}/></Field>
       <Field label={privateOriginalLabel(status.original_controls?.beta_password, 'Branch password, if required')}><Input type="password" autoComplete="off" value={betaPassword} onChange={event => setBetaPassword(event.target.value)} disabled={blocked}/></Field>
       <div className="actions"><Button disabled={blocked || !selected || !stopped} onClick={() => void run('install')}>Install</Button><Button variant="secondary" disabled={blocked || !selected || !stopped} onClick={() => void run('update')}>Update</Button><Button variant="secondary" disabled={blocked || !selected || !stopped} onClick={() => void run('verify')}>Verify</Button></div>
-      {!stopped && <><Feedback tone="warning" message={<>Stop the server before installing or maintaining private game files.</>}/></>}
+      {!stopped && <p className="muted">Stop the server before installing or maintaining private game files.</p>}
     </div>}
     <Disclosure className="steam-advanced steam-authorization"><DisclosureTrigger>Add or update Steam account authorization</DisclosureTrigger><form onSubmit={create}>
       <Field label="Authorization action"><Select value={profileAction} onChange={event => {setProfileAction(event.target.value); setUsername(''); setPassword(''); setSavePassword(false);}} disabled={busy}><option value="create">Add account</option><option value="update" disabled={!selected}>Update selected authorization</option></Select></Field>
