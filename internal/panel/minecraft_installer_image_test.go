@@ -58,7 +58,7 @@ func TestMinecraftPreDotVoltraInstallerIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !minecraftKnownHistoricalInstaller(string(old)) || !minecraftKnownHistoricalInstaller(strings.ReplaceAll(string(old), "\n", "\r\n")) {
+	if !minecraftKnownHistoricalInstaller(string(old)) || !minecraftKnownHistoricalInstaller(strings.ReplaceAll(strings.ReplaceAll(string(old), "\r\n", "\n"), "\n", "\r\n")) {
 		t.Fatal("previous published installer not recognized")
 	}
 	if minecraftKnownHistoricalInstaller(string(old) + "\necho custom\n") {
