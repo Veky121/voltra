@@ -13,7 +13,7 @@ const bundled=await build({
       path.endsWith('notifications')?`export const Feedback=({message})=>message;`:
       path==='react'?`export const memo=component=>component; export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
       path==='react/jsx-runtime'?`export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`:
-      path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);`:
+      path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);export const api=async path=>globalThis.${key}.query(path).data||{data:[]};`:
       path==='../components/ui/checkbox'?`export const Checkbox='input';`:
       path==='../ui/IconButton'?`export const IconButton='button';`:
       path==='../Icons'?`export const Icon=()=>null;`:
@@ -58,11 +58,13 @@ test('initial folder load exposes one loading status and replaces it with the re
  assert.equal(f.nodes().filter(n=>n.props?.role==='status').length,0);assert.ok(f.button('Open /server.properties'));
 });
 
-test('sorting and filtering reuse memoized results on selection and background state changes',()=>{
+test('sorting and filtering reuse memoized results and hide folders without matching files',async()=>{
   const f=fixture(),q=f.listing('/',[entry('z.txt'),entry('a10.txt'),entry('a2.txt'),entry('mods',false)]);q.loading=false;f.render();
   const labels=f.nodes().filter(n=>n.type==='button').map(n=>n.props['aria-label']).filter(x=>x?.startsWith('Open /'));assert.deepEqual(labels,['Open /a2.txt','Open /a10.txt','Open /z.txt']);
   const before=f.memos;f.props.dirty=true;q.loading=true;f.render();assert.equal(f.memos,before);
-  f.nodes().find(n=>n.type==='input'&&n.props.type==='search').props.onChange({target:{value:'A2'}});f.render();assert.equal(f.memos,before+2);assert.ok(f.button('Open /a2.txt'));assert.equal(f.button('Open /z.txt'),undefined);assert.ok(f.button('Browse /mods'));
+  f.nodes().find(n=>n.type==='input'&&n.props.type==='search').props.onChange({target:{value:'A2'}});f.render();
+  await new Promise(resolve=>setTimeout(resolve,350));f.render();
+  assert.ok(f.button('Open /a2.txt'));assert.equal(f.button('Open /z.txt'),undefined);assert.equal(f.button('Browse /mods'),undefined);
 });
 
 
@@ -70,6 +72,29 @@ test('server changes do not expose previous rows and initial failure keeps retry
   const f=fixture(),old=f.listing('/',[entry('private.txt')]);old.loading=false;f.render();assert.ok(f.button('Open /private.txt'));
   f.props.base='/server/b';f.render();assert.equal(f.button('Open /private.txt'),undefined);
   const q=f.listing('/');q.loading=false;q.error='denied';f.render();assert.match(f.text(),/Could not load this folder/);const retry=f.nodes().find(n=>n.type==='button'&&n.props.children==='Retry');retry.props.onClick();assert.equal(q.calls,1);
+});
+
+test('recursive search reveals matching descendant files and calculates folder contents',async()=>{
+  const f=fixture();
+  f.listing('/',[entry('mods',false),entry('empty',false)]).loading=false;
+  f.listing('/mods',[{...entry('target.jar'),size:1024}]).loading=false;
+  f.listing('/empty',[]).loading=false;
+  f.render();
+  await f.button('Calculate size of /mods').props.onClick();
+  await new Promise(resolve=>setTimeout(resolve,0));f.render();
+  assert.equal(f.button('Calculate size of /mods').props.children,'1024');
+  f.nodes().find(n=>n.type==='input'&&n.props.type==='search').props.onChange({target:{value:'TARGET'}});f.render();
+  await new Promise(resolve=>setTimeout(resolve,350));f.render();
+  assert.ok(f.button('Browse /mods'));assert.ok(f.button('Open /mods/target.jar'));assert.equal(f.button('Browse /empty'),undefined);
+});
+
+test('date header cycles newest, oldest and default in the rendered explorer',()=>{
+  const f=fixture();f.listing('/',[{...entry('old'),modified_at:'2026-11-01T00:00:00Z'},{...entry('new'),modified_at:'2026-11-06T00:00:00Z'}]).loading=false;f.render();
+  const header=()=>f.nodes().find(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Date modified:'));
+  const files=()=>f.nodes().filter(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Open /')).map(n=>n.props['aria-label']);
+  header().props.onClick();f.render();assert.deepEqual(files(),['Open /new','Open /old']);assert.match(header().props['aria-label'],/descending/);
+  header().props.onClick();f.render();assert.deepEqual(files(),['Open /old','Open /new']);
+  header().props.onClick();f.render();assert.match(header().props['aria-label'],/default order/);
 });
 
 // Memoization is measured with the compiled app; this fixture checks row behavior.
