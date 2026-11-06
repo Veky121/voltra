@@ -1,0 +1,32 @@
+Voltra Companion Nightly
+
+INSTALL IN BRAVE, CHROME OR EDGE
+
+1. Download voltra-companion-0.1.0-nightly.6.zip from the GitHub release.
+2. Extract it into a permanent folder named Voltra Companion.
+3. Open brave://extensions, chrome://extensions or edge://extensions.
+4. Turn on Developer mode.
+5. Click Load unpacked and select the extracted folder containing manifest.json.
+6. Pin Voltra Companion from the browser's Extensions menu.
+7. Click the Voltra icon. Enter your Voltra API address and normal API key
+   from Account > API keys, then Connect. Bare domains get https:// added.
+
+For the njimgang.org panel, use api.njimgang.org as the API address.
+Your key stays in this browser profile. No separate extension key is needed.
+
+ADD MODS
+
+Open an FS25 mod on www.farming-simulator.com and click Add to Voltra.
+Collect more mods, select a compatible server in the sidebar, and click
+Add N mods to server. The domain, key, server and queue stay remembered.
+Completed means the ZIP was downloaded. Activate it in the game when ready.
+
+UPDATE WITHOUT LOSING SETTINGS
+
+Extract the next ZIP over the SAME permanent folder. Keep the existing
+extension installed. Click Reload on its card in the browser's Extensions
+page, then refresh any open ModHub tabs. Do not remove and reinstall it.
+GitHub ZIP installations do not update automatically.
+
+This Nightly supports Chromium browsers. Firefox is not supported yet.
+Use the named extension ZIP, not GitHub's automatically generated Source code ZIP.
