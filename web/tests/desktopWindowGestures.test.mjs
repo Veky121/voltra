@@ -13,7 +13,7 @@ function fixture() {
   };
   const cleanup = installDesktopWindowGestures(target,message=>messages.push(message),()=>!maximized,()=>{maximizeCalls++;});
   const fire = (type, values={}) => {
-    const event = {type,clientX:500,clientY:300,button:0,buttons:0,target:{nodeType:1},preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=true;},...values};
+    const event = {type,clientX:500,clientY:300,button:0,buttons:0,target:{nodeType:1,closest:()=>null},preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=true;},...values};
     listeners.get(type)?.(event);return event;
   };
   return {fire,document,css,messages,listeners,cleanup,setMaximized:value=>{maximized=value;},maximized:()=>maximizeCalls};
@@ -76,7 +76,7 @@ test('maximized and fullscreen windows neither show resize cursors nor dispatch 
 });
 
 test('titlebar drag threshold and double click remain intact, controls stay non-draggable', () => {
-  const f=fixture(),title={nodeType:1,draggable:true};
+  const f=fixture(),title={nodeType:1,draggable:true,closest:()=>null};
   f.fire('mousedown',{target:title,buttons:1});f.fire('mousemove',{target:title,clientX:501,buttons:1});assert.deepEqual(f.messages,[]);
   f.fire('mousemove',{target:title,clientX:504,buttons:1});assert.deepEqual(f.messages,['wails:drag']);
   f.fire('dblclick',{target:title});assert.equal(f.maximized(),1);
@@ -89,4 +89,23 @@ test('blur, resize, fullscreen changes and teardown clear cursors and armed gest
     if(event==='fullscreenchange')f.document.dispatchEvent(new Event(event));else f.fire(event);
     f.fire('mousemove',{clientX:3,buttons:1});assert.deepEqual(f.messages,[]);f.cleanup();assert.equal(f.css.size,0);assert.equal(f.listeners.size,0);
   }
+});
+
+test('the full top area drags and double clicks, but interactive controls and dialogs do not',()=>{
+ const f=fixture();
+ for(const y of [12,24,39]){
+  f.fire('mousedown',{clientY:y,buttons:1});
+  f.fire('mousemove',{clientY:y,clientX:505,buttons:1});
+ }
+ assert.deepEqual(f.messages,['wails:drag','wails:drag','wails:drag']);
+ f.fire('dblclick',{clientY:24});assert.equal(f.maximized(),1);
+ const control={nodeType:1,closest:()=>({})};
+ f.fire('mousedown',{target:control,clientY:24,buttons:1});
+ f.fire('mousemove',{target:control,clientY:24,clientX:505,buttons:1});
+ f.fire('dblclick',{target:control,clientY:24});
+ assert.equal(f.messages.length,3);assert.equal(f.maximized(),1);
+ f.fire('mousedown',{clientY:40,buttons:1});f.fire('mousemove',{clientY:40,clientX:505,buttons:1});
+ assert.equal(f.messages.length,3);
+ f.document.fullscreenElement={};f.fire('dblclick',{clientY:24});assert.equal(f.maximized(),1);
+ f.cleanup();
 });

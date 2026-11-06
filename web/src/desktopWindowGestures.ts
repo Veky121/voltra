@@ -1,5 +1,6 @@
 export const desktopResizeBorder = 8;
 export const desktopResizeCorner = 18;
+export const desktopDragHeight = 40;
 export type ResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 const resizeCursors: Record<ResizeEdge, string> = {n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'};
 
@@ -16,7 +17,7 @@ export function desktopResizeEdge(x: number, y: number, width: number, height: n
 
 // External localhost pages receive Wails Core but not its drag.ts listeners.
 // Keep the native gesture protocol, with CSS cursor feedback for the same hit
-// region. No overlay is needed, so dialogs and scrollbars keep their layout.
+// region. The right-edge strip keeps the native scrollbar out of the hit area.
 export function installDesktopWindowGestures(target: Window, invoke: (message: string) => void, isResizable: () => boolean, maximize: () => void) {
   const root = target.document.documentElement;
   let origin: {x: number; y: number; edge: ResizeEdge | ''} | null = null;
@@ -31,7 +32,9 @@ export function installDesktopWindowGestures(target: Window, invoke: (message: s
   }
   const draggable = (event: MouseEvent) => {
     const element = event.target as Element | null;
-    return element?.nodeType === 1 && target.getComputedStyle(element).getPropertyValue('--wails-draggable').trim() === 'drag';
+    if(element?.nodeType !== 1 || target.document.fullscreenElement)return false;
+    if(element.closest('button,a,input,select,textarea,[role="button"],[role="slider"],[role="separator"],[contenteditable]:not([contenteditable="false"]),dialog,[role="dialog"],[role="menu"],.desktop-window-controls'))return false;
+    return (event.clientY>=0 && event.clientY<desktopDragHeight) || target.getComputedStyle(element).getPropertyValue('--wails-draggable').trim() === 'drag';
   };
   const down = (event: MouseEvent) => {
     origin = null; suppressClick = false;

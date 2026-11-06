@@ -68,13 +68,13 @@ function Island({ entry }: { entry: NotificationEvent }) {
     onLostPointerCapture={() => paused.current.delete('hold')}
     onFocus={event => { if ((event.target as HTMLElement).matches(':focus-visible')) paused.current.add('focus'); }}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) paused.current.delete('focus'); }}>
-    <span className="notification-icon" aria-hidden="true">{entry.tone === 'success' ? '✓' : entry.tone === 'info' ? 'i' : '!'}</span>
+    <span className="notification-icon" aria-hidden="true">{entry.tone==='success'?<CheckCircle2/>:entry.tone==='info'?<Info/>:<TriangleAlert/>}</span>
     <div className="notification-content" role={entry.tone === 'error' ? 'alert' : 'status'}>
-      <strong>{entry.title}</strong><p>{entry.message}</p>
+      {!(entry.tone==='success'&&entry.title==='Done')&&<strong>{entry.title}</strong>}<p>{entry.message}</p>
       {entry.progress !== undefined && <progress aria-label="Operation progress" value={Math.max(0, Math.min(1, entry.progress))} max={1} />}
     </div>
     <div className="notification-controls">
-      <button type="button" className="notification-close" aria-label="Dismiss notification" onClick={() => notifications.dismiss(entry.id)}>×</button>
+      <button type="button" className="notification-close" aria-label="Dismiss notification" onClick={() => notifications.dismiss(entry.id)}><X aria-hidden="true"/></button>
     </div>
     <div className="notification-track" aria-hidden="true"><div ref={bar} /></div>
   </section>;

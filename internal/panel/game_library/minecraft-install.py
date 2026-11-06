@@ -258,24 +258,38 @@ def pack_content_transaction(staging, root):
                 for child in path.rglob("*"):
                     if child.is_symlink() or not (child.is_file() or child.is_dir()):
                         raise ValueError("Pack-owned directory contains links or special files")
-    overrides = safe_target(root, 'VOLTRA_OVERRIDE')
-    if overrides.exists() and not overrides.is_dir():
-        raise ValueError('VOLTRA_OVERRIDE must be a directory')
-    for source in overrides.rglob('*'):
-        relative = source.relative_to(overrides).as_posix()
-        safe_target(overrides, relative)
-        if source.is_symlink() or not (source.is_file() or source.is_dir()):
-            raise ValueError('VOLTRA_OVERRIDE contains links or special files')
-        if relative.split('/')[0] not in {'config', 'defaultconfigs'}:
-            raise ValueError('VOLTRA_OVERRIDE supports only config/ and defaultconfigs/')
+    # .voltra was validated above; archive paths must still reject this namespace.
+    overrides = safe_target(state.parent, 'overrides')
+    legacy_overrides = safe_target(root, 'VOLTRA_OVERRIDE')
+    for folder in (legacy_overrides, overrides):
+        if folder.exists() and not folder.is_dir():
+            raise ValueError(str(folder.relative_to(root)) + ' must be a directory')
+        for source in folder.rglob('*'):
+            relative = source.relative_to(folder).as_posix()
+            safe_target(folder, relative)
+            if source.is_symlink() or not (source.is_file() or source.is_dir()):
+                raise ValueError('Config overrides contain links or special files')
+            if relative.split('/')[0] not in {'config', 'defaultconfigs'}:
+                raise ValueError('Config overrides support only config/ and defaultconfigs/')
     with tempfile.TemporaryDirectory(prefix=".voltra-pack-rollback-", dir=root) as temporary:
         rollback = Path(temporary)
         changed = []
         prepared_overrides = rollback / 'prepared-overrides'
-        if overrides.exists():
-            shutil.copytree(overrides, prepared_overrides)
-        else:
-            prepared_overrides.mkdir()
+        prepared_overrides.mkdir()
+        for folder in (legacy_overrides, overrides):
+            for source in sorted(folder.rglob('*')):
+                relative = source.relative_to(folder).as_posix()
+                destination = safe_target(prepared_overrides, relative)
+                if source.is_dir():
+                    if destination.exists() and not destination.is_dir():
+                        raise ValueError('Conflicting override paths: ' + relative)
+                    destination.mkdir(parents=True, exist_ok=True)
+                elif destination.exists():
+                    if not destination.is_file() or checksum(source) != checksum(destination):
+                        raise ValueError('Conflicting overrides in VOLTRA_OVERRIDE and .voltra/overrides: ' + relative)
+                else:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, destination)
         try:
             for name in sorted(PACK_REPLACE):
                 destination = root / name
@@ -319,18 +333,23 @@ def pack_content_transaction(staging, root):
                     if relative not in retained:
                         retained.append(relative)
             yield
+            overrides.parent.mkdir(parents=True, exist_ok=True)
             old_overrides = rollback / 'old-overrides' if overrides.exists() else None
             if old_overrides:
                 os.replace(overrides, old_overrides)
             changed.append((overrides, old_overrides))
             os.replace(prepared_overrides, overrides)
+            if legacy_overrides.exists():
+                legacy_backup = rollback / 'legacy-overrides'
+                os.replace(legacy_overrides, legacy_backup)
+                changed.append((legacy_overrides, legacy_backup))
             state.parent.mkdir(parents=True, exist_ok=True)
             pending = rollback / 'content-receipt.json'
             pending.write_text(json.dumps({'config_files': config_files,
                 'retained_user_configs': retained}, sort_keys=True) + '\n')
             os.replace(pending, state)
             if retained:
-                print('Applied VOLTRA_OVERRIDE configs; review compatibility: ' + ', '.join(retained))
+                print('Applied .voltra/overrides configs; review compatibility: ' + ', '.join(retained))
         except BaseException:
             for destination, backup in reversed(changed):
                 if destination.exists():

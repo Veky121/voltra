@@ -1,3 +1,4 @@
+import {DesktopUpdatesEnabled} from './DesktopUpdateControl';
 import {Feedback} from './notifications';
 import {confirmAction} from './ui/ConfirmAction';
 import {ActionButton as MiraAction} from './ui/ActionButton';
@@ -6,8 +7,8 @@ import {Button,Card,ErrorBox,Field,Input,Loading,Modal,Select} from './lib';
 import './desktop.css';
 import BrandMark from './BrandMark';
 import {parseDesktopPairing} from './desktopPairing';
-import {Link,useLocation,useNavigate} from 'react-router-dom';
-import {startUpdateChecks,updateAction,updateChannels,useDesktopUpdates} from './desktopUpdates';
+import {Link} from 'react-router-dom';
+import {formatDesktopVersion,startUpdateChecks,updateAction,updateChannels,useDesktopUpdates} from './desktopUpdates';
 import {installDesktopWindowGestures} from './desktopWindowGestures';
 import {SettingsRow,SettingsSection} from './ui/Settings';
 
@@ -19,37 +20,23 @@ async function local<T=Status>(path:string,body?:unknown):Promise<T>{
   return data;
 }
 
-function DesktopUpdates({enabled}:{enabled:boolean}){
-  const {status,busy}=useDesktopUpdates();
-  useEffect(()=>{if(enabled)return startUpdateChecks()},[enabled]);
-  if(!enabled)return null;
-  return <div className="desktop-updates" aria-live="polite">
-    {status?.state==='available'&&<Button disabled={busy} onClick={()=>void updateAction('update-install')}>{busy?'Downloading...':`Update to ${status.available_version}`}</Button>}
-    {status?.state==='ready'&&<Button disabled={busy} onClick={()=>void updateAction('update-restart')}>Restart to update</Button>}
-  </div>;
-}
-
 export function DesktopAppInfo(){
-  const navigate=useNavigate();
   const [app,setApp]=useState<Status|null>(null),[error,setError]=useState('');
-  const {status,busy,error:updateError,checkedAt}=useDesktopUpdates();
+  const {status,busy,checkedAt}=useDesktopUpdates();
   useEffect(()=>{void local('status').then(setApp).catch(e=>setError(e.message))},[]);
   if(import.meta.env.VITE_DESKTOP!=='true')return null;
   return <section className="desktop-app-info settings-page">
-    <div className="toolbar"><Button variant="secondary" onClick={()=>{if((window.history.state?.idx??0)>0)navigate(-1);else navigate('/')}} aria-label="Go back">← Back</Button></div>
-    <ErrorBox>{error||updateError||status?.error}</ErrorBox>
+    <ErrorBox>{error}</ErrorBox>
     <SettingsSection title="App & updates">
-    <SettingsRow label="Version" control={<span className="settings-value">{app?`Voltra ${app.version}`:'…'}</span>}/>
+    <SettingsRow label="Version" control={<span className="settings-value">{app?formatDesktopVersion(app.version):'…'}</span>}/>
     {app?.updates_enabled?<>
-      <SettingsRow label="Update channel" description="Release includes stable and beta builds. Nightly contains nightly builds only." control={<Select aria-label="Update channel" value={status?.channel||'release'} disabled={busy||status?.state==='ready'} onChange={async e=>{const channel=e.target.value;if(await confirmAction({title:"Switch channel?",description:'Switch update channel? The selected channel may offer an older version. You must still choose Install and Restart to apply it.',confirmLabel:"Switch channel",danger:false}))void updateAction('update-channel',{channel}).then(changed=>{if(changed)void updateAction('updates')})}}>{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/>
-      <SettingsRow label="Updates" description={checkedAt?`Last checked ${new Date(checkedAt).toLocaleTimeString()}. Check now bypasses the hourly timer.`:'Check now queries the selected channel immediately.'} control={<div className="desktop-app-actions"><Button variant="secondary" disabled={busy||status?.state==='ready'} onClick={()=>void updateAction('updates')}>{busy?'Checking…':'Check now'}</Button>
-      {status?.state==='available'&&<Button disabled={busy} onClick={()=>void updateAction('update-install')}>Install {status.available_version} from {status.channel}</Button>}
+      <SettingsRow label="Update channel" description="Release includes stable and beta builds. Nightly contains nightly builds only." control={<Select aria-label="Update channel" value={status?.channel||'release'} disabled={busy||status?.state==='ready'} onChange={async e=>{const channel=e.target.value;if(await confirmAction({title:"Switch channel?",description:'Switch update channel? The selected channel may offer an older version. You must still choose Update now and restart to apply it.',confirmLabel:"Switch channel",danger:false}))void updateAction('update-channel',{channel}).then(changed=>{if(changed)void updateAction('updates')})}}>{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/>
+      <SettingsRow label="Updates" description={checkedAt?`Last checked ${new Date(checkedAt).toLocaleTimeString()}. Check now bypasses the hourly timer.`:'Check now queries the selected channel immediately.'} control={<div className="desktop-app-actions"><Button variant="secondary" disabled={busy||status?.state==='ready'} onClick={()=>void updateAction('updates')}>{busy?'Working...':'Check now'}</Button>
       {status?.state==='ready'&&<Button disabled={busy} onClick={()=>void updateAction('update-restart')}>Restart to update</Button>}</div>}>{status?.state==='up-to-date'&&<span className="settings-note" role="status">No newer build on {status.channel==='release'?'Release':'Nightly'}.{status.channel==='release'?' Nightly builds appear only on Nightly.':''}</span>}</SettingsRow>
+      {status?.state==='available'&&<SettingsRow label={`Version available ${formatDesktopVersion(status.available_version||'')}`} description="Download the update, then restart when you are ready." control={<Button disabled={busy} onClick={()=>void updateAction('update-install')}>{busy?'Downloading...':'Update now'}</Button>}/>}
     </>:<><SettingsRow label="Update channel" control={<Select aria-label="Update channel" disabled value="release">{updateChannels.map(channel=><option key={channel.value} value={channel.value}>{channel.label}</option>)}</Select>}/><SettingsRow label="Updates" description="This executable was built without signed updates. Replace it once with an updater-enabled build." control={<a href="https://github.com/Veky121/voltra/releases" target="_blank" rel="noreferrer">Download Voltra</a>}/></>}
     </SettingsSection>
-    <SettingsSection title="Connection"><SettingsRow label="Panel" control={<span className="settings-value desktop-app-panel">{app?.panel_url||'Not connected'}</span>}/>
-    {app?.linked&&<SettingsRow label="This computer" control={<Button variant="danger" onClick={requestDesktopUnlink}>Unlink panel</Button>}/>}
-    </SettingsSection>
+    <SettingsSection title="Troubleshooting"><SettingsRow label="Desktop diagnostics" description="View build details or unlink this computer. Shortcut: Ctrl+Shift+T." control={<Button variant="secondary" onClick={()=>window.dispatchEvent(new Event('desktop-troubleshoot-requested'))}>Open troubleshooting</Button>}/></SettingsSection>
   </section>;
 }
 
@@ -78,17 +65,14 @@ function WindowControls({maximized,onMaximizedChange}:{maximized:boolean;onMaxim
   </div>;
 }
 
-function DesktopTitlebar({status,maximized,onMaximizedChange,onUnlink,unlinking}:{status:Status|null;maximized:boolean;onMaximizedChange:(value:boolean)=>void;onUnlink:()=>void;unlinking:boolean}){
-  const location=useLocation();
-  return <header className="desktop-bar">
-    <div className="desktop-title"><BrandMark/><span>Voltra</span>{status&&<span className="desktop-version-label">v{status.version}</span>}</div>
-    <div className="desktop-title-actions">{status&&<DesktopUpdates enabled={status.updates_enabled}/>} {status?.linked&&<Button variant="secondary" disabled={unlinking} onClick={onUnlink}>{unlinking?'Unlinking…':'Unlink panel'}</Button>}<Link className="button secondary" to="/account/app" replace={location.pathname.replace(/\/+$/,'')==='/account/app'}>App &amp; updates</Link></div>
+function DesktopTitlebar({maximized,onMaximizedChange}:{maximized:boolean;onMaximizedChange:(value:boolean)=>void}){
+  return <header className="desktop-chrome">
+    <div className="desktop-resize-right" aria-hidden="true"/>
     <WindowControls maximized={maximized} onMaximizedChange={onMaximizedChange}/>
   </header>;
 }
 
 export default function DesktopGate({children}:{children:ReactNode}){
-  const location=useLocation();
   const [maximized,setMaximized]=useState(false);
   useEffect(()=>{
     const invoke=(message:string)=>(window as Window&{_wails?:{invoke?:(message:string)=>void}})._wails?.invoke?.(message);
@@ -98,14 +82,25 @@ export default function DesktopGate({children}:{children:ReactNode}){
   const [connection,setConnection]=useState(''),[name,setName]=useState('My computer');
   const [disconnected,setDisconnected]=useState(false);
   const [confirmUnlink,setConfirmUnlink]=useState(false);
+  const [troubleshooting,setTroubleshooting]=useState(false);
+  useEffect(()=>{if(status?.updates_enabled)return startUpdateChecks()},[status?.updates_enabled]);
+  useEffect(()=>{
+    const open=()=>setTroubleshooting(true);
+    const shortcut=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.shiftKey&&!event.altKey&&event.code==='KeyT'&&!event.repeat){event.preventDefault();open();}};
+    window.addEventListener('keydown',shortcut);window.addEventListener('desktop-troubleshoot-requested',open);
+    return()=>{window.removeEventListener('keydown',shortcut);window.removeEventListener('desktop-troubleshoot-requested',open)};
+  },[]);
   const refresh=()=>{setError('');local('status').then(s=>{setStatus(s);setName(s.device_name||'My computer')}).catch(e=>setError(e.message))};
   useEffect(()=>{refresh();const rejected=()=>setDisconnected(true),requestUnlink=()=>setConfirmUnlink(true);window.addEventListener('desktop-session-rejected',rejected);window.addEventListener('panel-auth-changed',refresh);window.addEventListener('desktop-unlink-requested',requestUnlink);return()=>{window.removeEventListener('desktop-session-rejected',rejected);window.removeEventListener('panel-auth-changed',refresh);window.removeEventListener('desktop-unlink-requested',requestUnlink)}},[]);
   async function unlink(){setBusy(true);setError('');try{await local('unlink',{});window.location.assign('/')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   const unlinkDialog=confirmUnlink&&<Modal title="Unlink panel?" onClose={()=>{if(!busy)setConfirmUnlink(false)}}><p>This removes the saved connection from this computer. You can connect to another panel with a new connection string.</p><p className="muted">{status?.panel_url}</p><ErrorBox>{error}</ErrorBox><div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setConfirmUnlink(false)}>Cancel</Button><Button variant="danger" disabled={busy} onClick={()=>void unlink()}>{busy?'Unlinking…':'Unlink panel'}</Button></div></Modal>;
-  const titlebar=<DesktopTitlebar status={status} maximized={maximized} onMaximizedChange={setMaximized} onUnlink={()=>setConfirmUnlink(true)} unlinking={busy}/>;
+  const titlebar=<><DesktopTitlebar maximized={maximized} onMaximizedChange={setMaximized}/>{troubleshooting&&<Modal title="Troubleshooting" onClose={()=>setTroubleshooting(false)}>
+    <SettingsSection title="Desktop"><SettingsRow label="Build" control={<span className="settings-value">{status?.version||'Unavailable'}</span>}/><SettingsRow label="Panel" control={<span className="desktop-app-panel">{status?.panel_url||'Not connected'}</span>}/></SettingsSection>
+    <ErrorBox>{error||status?.storage_error}</ErrorBox>
+    <div className="actions"><Button variant="secondary" onClick={()=>window.location.reload()}>Reload app</Button>{status?.linked&&<><Link className="button secondary" to="/account/app" onClick={()=>setTroubleshooting(false)}>App &amp; updates</Link><Button variant="danger" disabled={busy} onClick={()=>{setTroubleshooting(false);setConfirmUnlink(true)}}>Unlink panel</Button></>}</div>
+  </Modal>}</>;
   if(!status)return <>{titlebar}{unlinkDialog}<main className="desktop-connect"><Card><h1>Opening Voltra</h1>{error?<><ErrorBox>{error}</ErrorBox><Button onClick={refresh}>Retry</Button></>:<Loading/>}</Card></main></>;
-  if(location.pathname.replace(/\/+$/,'')==='/account/app')return <>{titlebar}{unlinkDialog}<main className="desktop-connect"><DesktopAppInfo/></main></>;
-  if(status.linked&&!disconnected)return <>{titlebar}{unlinkDialog}{error&&<div className="desktop-banner"><ErrorBox>{error}</ErrorBox></div>}{children}</>;
+  if(status.linked&&!disconnected)return <>{titlebar}{unlinkDialog}{error&&<div className="desktop-banner"><ErrorBox>{error}</ErrorBox></div>}<DesktopUpdatesEnabled.Provider value={status.updates_enabled}>{children}</DesktopUpdatesEnabled.Provider></>;
   return <>{titlebar}{unlinkDialog}<main className="desktop-connect"><Card>
     <div className="desktop-brand"><BrandMark/><span>Voltra desktop</span></div>
     <h1>{disconnected?'Link this computer again':'Connect your account'}</h1>

@@ -1,3 +1,5 @@
+import {DesktopUpdateControl} from '../DesktopUpdateControl';
+import {SidebarWidthHandle} from './SidebarWidthHandle';
 import {Feedback} from '../notifications';
 import {ActionButton as MiraAction} from '../ui/ActionButton';
 import {useContext,useEffect,useState} from 'react';
@@ -11,7 +13,7 @@ import {useServerNavigation,type NavigationServer} from '../ServerNavigation';
 import {accountNickname} from '../client/accountProfile';
 import {useArtworkLibrary} from '../client/ArtworkProvider';
 import {fallbackArtwork,getServerArtwork} from '../client/serverArtwork';
-import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarTrigger,useSidebar} from './ui/sidebar';
+import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton,useSidebar} from './ui/sidebar';
 import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuGroup,DropdownMenuLabel,DropdownMenuItem,DropdownMenuSeparator} from './ui/dropdown-menu';
 
 function ServerPickerArtwork({server}:{server:NavigationServer}){
@@ -54,7 +56,7 @@ function AccountMenu({account}:{account:Record<string,any>}){
    <DropdownMenuGroup><DropdownMenuLabel>Your account</DropdownMenuLabel><DropdownMenuItem render={<Link to="/account"/>}><Icon name="settings"/>Settings</DropdownMenuItem></DropdownMenuGroup><DropdownMenuSeparator/>
    <DropdownMenuItem variant="destructive" disabled={busy||!session.canSignOut} onClick={async()=>{if(busy||!session.canSignOut)return;setBusy(true);setError('');try{await session.signOut()}catch(failure){setError(failure instanceof Error?failure.message:String(failure))}finally{setBusy(false)}}}><Icon name="logout"/>{busy?'Logging out…':'Logout'}</DropdownMenuItem>
   </DropdownMenuContent>
- </DropdownMenu></SidebarMenuItem></SidebarMenu>{error&&<Feedback tone="error" message={<>{error}</>}/>}</>;
+ </DropdownMenu><DesktopUpdateControl/></SidebarMenuItem></SidebarMenu>{error&&<Feedback tone="error" message={<>{error}</>}/>}</>;
 }
 
 export function SidebarRouteEffects(){
@@ -63,14 +65,14 @@ export function SidebarRouteEffects(){
  return null;
 }
 
-export default function AppSidebar({account,name,setTarget}:{account:Record<string,any>;name:string;setTarget:(target:HTMLDivElement|null)=>void}){
+export default function AppSidebar({account,name,setTarget,width,onWidthChange}:{account:Record<string,any>;name:string;setTarget:(target:HTMLDivElement|null)=>void;width:number;onWidthChange:(width:number)=>void}){
  const {pathname}=useLocation(),nav=useServerNavigation(),{state,isMobile,setOpenMobile}=useSidebar();
  const admin=pathname==='/admin'||pathname.startsWith('/admin/'),serverPage=pathname.startsWith('/server/');
- const administrator=!!(account.root_admin||account.admin),collapsed=state==='collapsed';
+ const administrator=!!(account.root_admin||account.admin);
  const favorites=nav.servers.filter(server=>server.favorite);
  const recents=nav.servers.filter(server=>server.last_visited_at).sort((a,b)=>Date.parse(b.last_visited_at!)-Date.parse(a.last_visited_at!));
  return <Sidebar variant="sidebar" collapsible="icon" className="voltra-sidebar" aria-label="Main navigation">
-  <SidebarHeader className="voltra-sidebar-header"><div className="voltra-sidebar-brand-row"><Link className="voltra-sidebar-brand" to={admin?'/admin':'/'} title={name}><BrandMark/><span>{name}</span></Link>{isMobile?<MiraAction type="button" className="voltra-sidebar-close" aria-label="Close navigation" onClick={()=>setOpenMobile(false)}><Icon name="close"/></MiraAction>:<SidebarTrigger className="voltra-sidebar-collapse" title={collapsed?'Expand sidebar':'Collapse sidebar'} aria-label={collapsed?'Expand sidebar':'Collapse sidebar'} aria-expanded={!collapsed}/>}</div><PanelSwitcher admin={admin} administrator={administrator}/>{serverPage&&!admin&&<ServerPicker servers={nav.servers}/>}</SidebarHeader>
+  <SidebarHeader className="voltra-sidebar-header"><div className="voltra-sidebar-brand-row"><Link className="voltra-sidebar-brand" to={admin?'/admin':'/'} title={name}><BrandMark/><span>{name}</span></Link>{isMobile?<MiraAction type="button" className="voltra-sidebar-close" aria-label="Close navigation" onClick={()=>setOpenMobile(false)}><Icon name="close"/></MiraAction>:null}</div><PanelSwitcher admin={admin} administrator={administrator}/>{serverPage&&!admin&&<ServerPicker servers={nav.servers}/>}</SidebarHeader>
   <SidebarContent className="voltra-sidebar-scroll" id="sidebar-scroll">
    {admin?administrator&&<AdminNavigation/>:serverPage?<SidebarMenu className="voltra-sidebar-back"><SidebarMenuItem><SidebarMenuButton render={<Link to="/"/>} tooltip="All servers"><ArrowLeft/><span>All servers</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>:<NavigationGroup label="Workspace"><Link to="/" title="Overview"><NavIcon name="dashboard"/><span>Overview</span><span className="voltra-sidebar-count">{nav.servers.length}</span></Link><Link to="/game-library" title="Game Library"><NavIcon name="eggs"/><span>Game Library</span></Link></NavigationGroup>}
    <div className="voltra-sidebar-sections" ref={setTarget}/>
@@ -78,5 +80,6 @@ export default function AppSidebar({account,name,setTarget}:{account:Record<stri
    {nav.error&&<><Feedback tone="error" message={<><span>{nav.error}</span></>}/><MiraAction type="button" onClick={nav.reload}><Icon name="restart"/>Retry</MiraAction></>}
   </SidebarContent>
   <SidebarFooter className="voltra-sidebar-footer"><AccountMenu account={account}/></SidebarFooter>
+  {!isMobile&&<SidebarWidthHandle width={width} onChange={onWidthChange}/>}
  </Sidebar>;
 }

@@ -23,6 +23,6 @@ ln -s libraries/fixture/args.txt "$SERVER_DIR/unix_args.txt"
    subprocess.run(['bash',str(script)],env=env,check=True,stdout=subprocess.PIPE)
    self.assertEqual([p.name for p in (root/'mods').iterdir()],['new-0.6.10.jar'])
    self.assertEqual((root/'config/example.toml').read_bytes(),b'user')
-   self.assertEqual((root/'VOLTRA_OVERRIDE/config/example.toml').read_bytes(),b'user')
+   self.assertEqual((root/'.voltra/overrides/config/example.toml').read_bytes(),b'user')
    self.assertTrue((root/'unix_args.txt').is_file())
 if __name__=='__main__':unittest.main()

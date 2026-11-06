@@ -79,10 +79,10 @@ button.voltra-account-trigger:hover,button.voltra-account-trigger[data-popup-ope
 .voltra-picker-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .voltra-mobile-toolbar{display:none}
 .legacy-card{gap:0;overflow:visible}
-body.voltra-desktop .voltra-shadcn-shell{min-height:0;height:calc(100dvh - 40px);margin-top:40px}
-body.voltra-desktop .voltra-shadcn-shell [data-slot=sidebar-container]{top:40px;height:calc(100dvh - 40px)}
-body.voltra-desktop .voltra-sidebar[data-mobile=true]{top:40px;height:calc(100dvh - 40px)}
-body.voltra-desktop [data-slot=sheet-overlay]{top:40px}
+body.voltra-desktop .voltra-shadcn-shell{min-height:0;height:100dvh;margin-top:0}
+body.voltra-desktop .voltra-shadcn-shell [data-slot=sidebar-container]{top:0;height:100dvh}
+body.voltra-desktop .voltra-sidebar[data-mobile=true]{top:0;height:100dvh}
+body.voltra-desktop [data-slot=sheet-overlay]{top:0}
 @media(min-width:768px){
  .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-header{padding:16px 4px 8px;gap:12px}
  .voltra-shadcn-shell [data-collapsible=icon] .voltra-sidebar-brand-row{flex-direction:column;gap:12px;align-items:center}
@@ -155,3 +155,24 @@ button.voltra-account-trigger{transition:background-color 160ms ease,border-colo
 .voltra-nav-link:focus-visible,.voltra-sidebar-back [data-slot=sidebar-menu-button]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 @media(hover:hover){.voltra-nav-link:not([data-active]):hover::before{transform:scaleX(1);opacity:.45}.voltra-nav-link:not([data-active]):hover{background:transparent}}
 @media(prefers-reduced-motion:reduce){.voltra-nav-link::before{transition:none}.voltra-nav-link:active,.voltra-sidebar-back [data-slot=sidebar-menu-button]:active{transform:none}}
+
+/* Keep desktop updates beside the account trigger, including admin navigation. */
+.voltra-account-row{display:flex;align-items:center;gap:6px}
+.voltra-account-row .voltra-account-trigger{flex:1;min-width:0}
+button.desktop-account-update{width:30px;height:30px;min-height:30px;flex:0 0 30px;padding:6px;border-radius:50%;border:1px solid var(--ui-border);background:transparent;color:var(--muted);box-shadow:none}
+button.desktop-account-update:hover{background:var(--ui-hover);color:var(--text)}
+button.desktop-account-update[data-available]{color:var(--accent);border-color:currentColor;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.desktop-account-update svg{width:16px;height:16px}
+.desktop-update-spinner{animation:desktop-update-spin 1s linear infinite}
+@keyframes desktop-update-spin{to{transform:rotate(360deg)}}
+@media(min-width:768px){.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-row{flex-direction:column}.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-row .voltra-account-trigger{flex:none}}
+@media(prefers-reduced-motion:reduce){.desktop-update-spinner{animation:none}}
+
+.voltra-sidebar-width-handle{position:absolute;inset:0 -4px 0 auto;width:8px;z-index:20;cursor:col-resize;touch-action:none;user-select:none;--wails-draggable:no-drag}
+.voltra-sidebar-width-handle::after{content:"";position:absolute;inset:0 auto 0 3px;width:1px;background:transparent;pointer-events:none;transition:background-color 160ms ease}
+.voltra-sidebar-width-handle:hover::after{background:color-mix(in srgb,var(--text) 18%,transparent)}
+.voltra-sidebar-width-handle:focus-visible{outline:none}
+.voltra-sidebar-width-handle:focus-visible::after{background:color-mix(in srgb,var(--text) 40%,transparent)}
+.voltra-shadcn-shell [data-slot=sidebar-gap],.voltra-shadcn-shell [data-slot=sidebar-container]{transition:none}
+
+@media(prefers-reduced-motion:reduce){.voltra-sidebar-width-handle::after{transition:none}}

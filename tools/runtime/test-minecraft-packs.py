@@ -68,7 +68,7 @@ class Publication(unittest.TestCase):
         self.publish()
         self.assertEqual([p.name for p in (self.root / 'mods').iterdir()], ['mezz-0.6.10.jar'])
         self.assertEqual((self.root / 'config/edited.toml').read_bytes(), b'user edit')
-        self.assertEqual((self.root / 'VOLTRA_OVERRIDE/config/edited.toml').read_bytes(), b'user edit')
+        self.assertEqual((self.root / '.voltra/overrides/config/edited.toml').read_bytes(), b'user edit')
         self.assertEqual((self.root / 'config/default.toml').read_bytes(), b'new default')
         self.publish()
         self.assertEqual((self.root / 'config/edited.toml').read_bytes(), b'user edit')
@@ -84,23 +84,48 @@ class Publication(unittest.TestCase):
             self.assertEqual((self.root / name).read_bytes(), b'user')
 
     def test_explicit_override_wins_and_cannot_be_supplied_by_pack(self):
-        self.put(self.root, 'VOLTRA_OVERRIDE/config/x.toml', b'user override')
+        self.put(self.root, '.voltra/overrides/config/x.toml', b'user override')
         self.put(self.root, 'config/x.toml', b'old effective config')
         self.put(self.stage, 'config/x.toml', b'new pack')
         self.put(self.stage, 'VOLTRA_OVERRIDE/config/x.toml', b'pack override')
         self.publish()
         self.assertEqual((self.root / 'config/x.toml').read_bytes(), b'user override')
-        self.assertEqual((self.root / 'VOLTRA_OVERRIDE/config/x.toml').read_bytes(), b'user override')
-        self.put(self.root, 'VOLTRA_OVERRIDE/config/x.toml', b'next user override')
+        self.assertEqual((self.root / '.voltra/overrides/config/x.toml').read_bytes(), b'user override')
+        self.put(self.root, '.voltra/overrides/config/x.toml', b'next user override')
         self.publish()
         self.assertEqual((self.root / 'config/x.toml').read_bytes(), b'next user override')
 
     def test_override_cannot_reintroduce_mod_jars(self):
-        self.put(self.root, 'VOLTRA_OVERRIDE/mods/old.jar', b'old')
+        self.put(self.root, '.voltra/overrides/mods/old.jar', b'old')
         self.put(self.root, 'mods/current.jar', b'current')
-        with self.assertRaisesRegex(ValueError, 'supports only'):
+        with self.assertRaisesRegex(ValueError, 'support only'):
             self.publish()
         self.assertEqual((self.root / 'mods/current.jar').read_bytes(), b'current')
+
+    def test_legacy_overrides_migrate_and_merge_without_losing_files(self):
+        self.put(self.root, 'VOLTRA_OVERRIDE/config/legacy.toml', b'legacy')
+        self.put(self.root, 'VOLTRA_OVERRIDE/config/shared.toml', b'same')
+        self.put(self.root, '.voltra/overrides/config/shared.toml', b'same')
+        self.put(self.root, '.voltra/overrides/defaultconfigs/new.toml', b'new')
+        self.publish()
+        self.assertFalse((self.root / 'VOLTRA_OVERRIDE').exists())
+        for relative, content in [('config/legacy.toml', b'legacy'),
+                                  ('config/shared.toml', b'same'),
+                                  ('defaultconfigs/new.toml', b'new')]:
+            self.assertEqual((self.root / '.voltra/overrides' / relative).read_bytes(), content)
+            self.assertEqual((self.root / relative).read_bytes(), content)
+        self.publish()
+        self.assertFalse((self.root / 'VOLTRA_OVERRIDE').exists())
+
+    def test_conflicting_legacy_override_fails_before_pack_changes(self):
+        self.put(self.root, 'VOLTRA_OVERRIDE/config/x.toml', b'legacy')
+        self.put(self.root, '.voltra/overrides/config/x.toml', b'new')
+        self.put(self.root, 'mods/old.jar', b'old')
+        with self.assertRaisesRegex(ValueError, 'Conflicting overrides'):
+            self.publish()
+        self.assertEqual((self.root / 'mods/old.jar').read_bytes(), b'old')
+        self.assertEqual((self.root / 'VOLTRA_OVERRIDE/config/x.toml').read_bytes(), b'legacy')
+        self.assertEqual((self.root / '.voltra/overrides/config/x.toml').read_bytes(), b'new')
 
     def test_tracked_program_upgraded_modified_program_retained(self):
         self.publish()

@@ -20,8 +20,8 @@ function TransferDock({base,queue}:{base:string;queue:ReturnType<typeof useRemot
   const [expanded,setExpanded]=useState(false),[dismissed,setDismissed]=useState<Set<string>>(()=>new Set());
   const [clock,setClock]=useState(Date.now);
   useEffect(()=>{if(!queue.operations.some(operationPending)&&!queue.transfers.some(transferActive))return;const timer=setInterval(()=>setClock(Date.now()),15000);return()=>clearInterval(timer)},[queue.operations,queue.transfers]);
-  const visible=queue.transfers.filter(entry=>transferActive(entry)||!dismissed.has(entry.identifier));
-  const operations=queue.operations.filter(entry=>operationPending(entry)||!dismissed.has(`operation:${entry.id}`));
+  const visible=queue.transfers.filter(entry=>transferActive(entry)||(entry.state==='failed'&&!dismissed.has(entry.identifier)));
+  const operations=queue.operations.filter(entry=>operationPending(entry)||((entry.state==='failed'||entry.restart_required)&&!dismissed.has(`operation:${entry.id}`)));
   const active=visible.filter(entry=>transferRecentlyActive(entry,Math.max(clock,Date.now()))).length+operations.filter(entry=>operationRecentlyActive(entry,Math.max(clock,Date.now()))).length;
   const count=visible.length+operations.length;
   useEffect(()=>{if(active)setExpanded(true)},[active]);
@@ -31,9 +31,9 @@ function TransferDock({base,queue}:{base:string;queue:ReturnType<typeof useRemot
     <div className="server-transfer-heading">
       <Button variant="secondary" aria-expanded={expanded} aria-controls="server-transfer-list" onClick={()=>setExpanded(value=>!value)}>
         {active>0&&<span className="server-transfer-pulse" aria-hidden="true"/>}
-        Transfers <span>{queue.error&&!count?'Progress unavailable':active?`${active} active`:`${count} recent`}</span><span>{expanded?'Hide':'Show'}</span>
+        Transfers <span>{queue.error&&!count?'Progress unavailable':active?`${active} active`:`${count} pending`}</span><span>{expanded?'Hide':'Show'}</span>
       </Button>
-      {(visible.some(entry=>!transferActive(entry))||operations.some(entry=>!operationPending(entry)))&&<Button variant="secondary" onClick={()=>setDismissed(current=>new Set([...current,...visible.filter(entry=>!transferActive(entry)).map(entry=>entry.identifier),...operations.filter(entry=>!operationPending(entry)).map(entry=>`operation:${entry.id}`)]))}>Clear finished</Button>}
+      {(visible.some(entry=>!transferActive(entry))||operations.some(entry=>!operationPending(entry)))&&<Button variant="secondary" onClick={()=>setDismissed(current=>new Set([...current,...visible.filter(entry=>!transferActive(entry)).map(entry=>entry.identifier),...operations.filter(entry=>!operationPending(entry)).map(entry=>`operation:${entry.id}`)]))}>Dismiss</Button>}
     </div>
     {expanded&&<div id="server-transfer-list" className="server-transfer-list">
       <p className="server-transfer-help">Transfers and reported game tasks for this server, including other users. Server downloads continue when you change pages.</p>

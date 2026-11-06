@@ -60,16 +60,16 @@ function AppShell({account}:{account:Record<string,any>}){
  const serverPage=location.pathname.startsWith('/server/');
  const preserveDensity=location.pathname==='/'||/^\/server\/[^/]+(?:\/(?:files|console)(?:\/.*)?)?\/?$/.test(location.pathname);
  const [sidebarTarget,setSidebarTarget]=useState<HTMLDivElement|null>(null);
- const storageKey=`voltra.sidebar.collapsed.${account.uuid||account.id}`;
- const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem(storageKey)==='true'}catch{return false}});
+ const storageKey=`voltra.sidebar.width.${account.uuid||account.id}`;
+ const [sidebarWidth,setSidebarWidth]=useState(()=>{try{const saved=Number(localStorage.getItem(storageKey));return saved?Math.max(220,Math.min(420,saved)):260}catch{return 260}});
  useEffect(()=>{document.title=admin?`${name} | Admin`:name},[name,admin]);
  useEffect(()=>{window.addEventListener('panel-settings-changed',site.reload);return()=>window.removeEventListener('panel-settings-changed',site.reload)},[site.reload]);
- function changeOpen(open:boolean){setCollapsed(!open);try{localStorage.setItem(storageKey,String(!open))}catch{}}
+ function changeWidth(width:number){setSidebarWidth(width);try{localStorage.setItem(storageKey,String(width))}catch{}}
  return <SidebarTarget.Provider value={sidebarTarget}><TooltipProvider delay={250}>
-  <SidebarProvider open={!collapsed} onOpenChange={changeOpen} style={{'--sidebar-width':'260px','--sidebar-width-icon':'56px'} as CSSProperties} className={`app-shell voltra-shadcn-shell ${admin?'app-shell--admin':'app-shell--main'}${serverPage?' app-shell--server':''}${collapsed?' is-collapsed':''}`}>
+  <SidebarProvider open={true} allowDesktopCollapse={false} style={{'--sidebar-width':`${sidebarWidth}px`,'--sidebar-width-icon':'56px'} as CSSProperties} className={`app-shell voltra-shadcn-shell ${admin?'app-shell--admin':'app-shell--main'}${serverPage?' app-shell--server':''}`}>
    <SidebarRouteEffects/>
    <a className="skip-link" href="#main-content">Skip to content</a>
-   <AppSidebar account={account} name={name} setTarget={setSidebarTarget}/>
+   <AppSidebar account={account} name={name} setTarget={setSidebarTarget} width={sidebarWidth} onWidthChange={changeWidth}/>
    <SidebarInset ref={contentRef} data-mira-density={preserveDensity?undefined:'compact'} id="main-content" className="app-content voltra-shadcn-content" tabIndex={-1}>
     <div className="voltra-mobile-toolbar"><SidebarTrigger aria-label="Open navigation"/><span>{name}</span></div>
     <RouteRecovery resetKey={location.pathname}><Suspense fallback={<Loading/>}>{admin?<Admin/>:<Client/>}</Suspense></RouteRecovery>

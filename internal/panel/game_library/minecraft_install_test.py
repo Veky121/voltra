@@ -66,6 +66,7 @@ class MinecraftInstallerTests(unittest.TestCase):
             for base, name, content in [(root, 'mods/old.jar', b'old'),
                     (stage, 'mods/new.jar', b'new'),
                     (root, 'VOLTRA_OVERRIDE/config/x.toml', b'override'),
+                    (root, '.voltra/overrides/config/new.toml', b'new override'),
                     (root, 'config/x.toml', b'old effective')]:
                 path = base / name
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,6 +83,8 @@ class MinecraftInstallerTests(unittest.TestCase):
             self.assertEqual((root / 'mods/old.jar').read_bytes(), b'old')
             self.assertEqual((root / 'config/x.toml').read_bytes(), b'old effective')
             self.assertEqual((root / 'VOLTRA_OVERRIDE/config/x.toml').read_bytes(), b'override')
+            self.assertEqual((root / '.voltra/overrides/config/new.toml').read_bytes(), b'new override')
+            self.assertFalse((root / '.voltra/overrides/config/x.toml').exists())
 
     def test_archive_download_streams_verifies_and_extracts_from_disk(self):
         data = archive({'mods/server.jar': b'content', 'run.sh': b'never execute'})

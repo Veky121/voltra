@@ -1,3 +1,4 @@
+import {pickUploadFolder,type DirectoryPickerWindow} from './folderPicker';
 import {Feedback} from '../notifications';
 import {confirmAction} from '../ui/ConfirmAction';
 import {transferDestination} from './fileTransferPaths';
@@ -69,6 +70,15 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
   function show(kind:Dialog['kind'],paths=selected){setDialog({kind,paths:[...paths],target:destination()});setError('');setName(kind==='rename'?fileName(paths[0]):kind==='move'?directory:'');setMode(records.current.get(paths[0])?.mode_bits||'644');setURL('');setUseHeader(false);}
   const uploadDirectory=useRef(directory);
   function destination(){return transferDestination(latest.current.directory,selected,path=>records.current.get(path)?.is_file===false)}
+  async function chooseUploadFolder(){
+    const target=destination();uploadDirectory.current=target;setError('');
+    if(import.meta.env.VITE_DESKTOP!=='true'){folderInput.current?.click();return}
+    try{
+      const files=await pickUploadFolder(window as Window&DirectoryPickerWindow);
+      if(files===null){folderInput.current?.click();return}
+      if(active.current&&allowed('file.create')&&files.length)await transfers.current?.addFiles(files,true,target);
+    }catch{if(active.current)setError('Could not read the selected folder. Try again and allow folder access.')}
+  }
   function nativeDownload(path:string){const link=document.createElement('a');link.href=`${base}/files/download-stream?file=${encodeURIComponent(path)}`;link.download=fileName(path);document.body.append(link);link.click();link.remove()}
   async function dropFiles(data:DataTransfer){
     const target=destination();
@@ -112,12 +122,12 @@ function Workspace({base,permissions}:{base:string;permissions:string[]}){
     <div className="fm-actions" role="toolbar" aria-label="File tools">
       {!opened&&selected.length>0&&allowed('file.delete')&&<Button variant="danger" disabled={busy} onClick={()=>void deletePaths(selected)}><Icon name="trash"/>Delete{selected.length>1?` (${selected.length})`:''}</Button>}
       <Button variant="secondary" disabled={busy} onClick={refresh}><Icon name="restart"/>Refresh</Button>
-      {allowed('file.create')&&<><Button variant="secondary" disabled={busy} onClick={()=>show('folder',[])}><Icon name="folderPlus"/>New folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('new',[])}><Icon name="newFile"/>New file</Button><Button onClick={()=>{uploadDirectory.current=destination();fileInput.current?.click()}}><Icon name="upload"/>Upload files</Button><Button variant="secondary" onClick={()=>{uploadDirectory.current=destination();folderInput.current?.click()}}>Upload folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('pull',[])}><Icon name="download"/>From URL</Button></>}
+      {allowed('file.create')&&<><Button variant="secondary" disabled={busy} onClick={()=>show('folder',[])}><Icon name="folderPlus"/>New folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('new',[])}><Icon name="newFile"/>New file</Button><Button onClick={()=>{uploadDirectory.current=destination();fileInput.current?.click()}}><Icon name="upload"/>Upload files</Button><Button variant="secondary" onClick={()=>void chooseUploadFolder()}>Upload folder</Button><Button variant="secondary" disabled={busy} onClick={()=>show('pull',[])}><Icon name="download"/>From URL</Button></>}
       <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),false,uploadDirectory.current);e.target.value=''}}/>
       <input ref={folderInput} type="file" multiple hidden {...{webkitdirectory:'',directory:''}} aria-label="Choose folder to upload" onChange={e=>{void transfers.current?.addFiles(Array.from(e.target.files||[]),true,uploadDirectory.current);e.target.value=''}}/>
     </div>
     </header>
-    <PageError error={error}/>{notice&&<><Feedback tone="warning" message={<>{notice}</>}/></>}
+    <PageError error={error}/>{notice&&<><Feedback tone="success" message={<>{notice}</>}/></>}
     <div className={`fm-file-layout${opened?' is-editing':''}`} onDragOverCapture={event=>{if(allowed('file.create')&&event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(true)}}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDragging(false)}} onDropCapture={event=>{if(event.dataTransfer.types.includes('Files')){event.preventDefault();event.stopPropagation();setDragging(false);if(allowed('file.create'))void dropFiles(event.dataTransfer)}}}>
       <FileExplorer base={base} activeFile={opened||''} activeDirectory={directory} dirty={documentDirty} permissions={permissions} onOpen={open} onBrowse={browse} onDirectory={navigate} refreshKey={epoch} onEntries={rememberEntries} controls={explorerControls}/>
       <div className="fm-file-content" aria-hidden={!opened||undefined} inert={!opened}>

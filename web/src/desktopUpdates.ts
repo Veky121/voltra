@@ -1,23 +1,25 @@
 import {useSyncExternalStore} from 'react';
+// Display only; signed versions and updater requests retain their original values.
+export function formatDesktopVersion(version:string){return version.replace(/^v(?=\d)/,'').replace(/-nightly\.(?=\d{8}\.)/,'-');}
 export const updateChannels=[{value:'release',label:'Release'},{value:'nightly',label:'Nightly'}] as const;
 export type UpdateChannel=typeof updateChannels[number]['value'];
 export type UpdateStatus={channel:UpdateChannel;state:string;version:string;available_version?:string;error?:string};
-type Snapshot={status:UpdateStatus|null;busy:boolean;error:string;checkedAt:number|null};
-let snapshot:Snapshot={status:null,busy:false,error:'',checkedAt:null};
+type Snapshot={status:UpdateStatus|null;busy:boolean;operation:string|null;error:string;checkedAt:number|null};
+let snapshot:Snapshot={status:null,busy:false,operation:null,error:'',checkedAt:null};
 const listeners=new Set<()=>void>();
 const publish=(value:Partial<Snapshot>)=>{snapshot={...snapshot,...value};listeners.forEach(listener=>listener());};
 export function useDesktopUpdates(){return useSyncExternalStore(listener=>{listeners.add(listener);return()=>{listeners.delete(listener)}},()=>snapshot,()=>snapshot);}
 export async function updateAction(path:string,body:unknown={},automatic=false){
  if(snapshot.busy)return false;
  if(automatic&&(snapshot.status?.state==='ready'||snapshot.status?.state==='available'||(snapshot.checkedAt!==null&&Date.now()-snapshot.checkedAt<60*60*1000)))return false;
- publish({busy:true,error:''});
+ publish({busy:true,operation:path,error:''});
  try{
   const response=await fetch(`/desktop/${path}`,{method:path==='update-status'?'GET':'POST',headers:{'Content-Type':'application/json'},body:path==='update-status'?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json();if(!response.ok){if(data.state)publish({status:data});throw new Error(data.error||'Update request failed.');}
   publish({status:data,...(path==='updates'?{checkedAt:Date.now()}:{}),...(path==='update-channel'?{checkedAt:null}:{})});
   return true;
  }catch(error){publish({error:(error as Error).message,...(path==='updates'?{checkedAt:Date.now()}: {})});return false;}
- finally{publish({busy:false});}
+ finally{publish({busy:false,operation:null});}
 }
 export function startUpdateChecks(){
  let active=true;
