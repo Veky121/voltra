@@ -73,9 +73,9 @@ test('account refresh failure retains shell only while account data exists',asyn
  const source=await readFile(new URL('../src/App.tsx',import.meta.url),'utf8');
  const shell=source.slice(source.indexOf('function AuthenticatedShell()'),source.indexOf('function AppShell('));
  const compiled=await transform(shell,{loader:'tsx',jsx:'transform'});
- const render=new Function('React','useAPI','useEffect','unwrap','Loading','ThemeProvider','ServerNavigationProvider','ArtworkProvider','AppShell','MiraAction','Feedback',compiled.code+';return AuthenticatedShell();');
- const run=data=>render(React,()=>({data,error:'offline',reload(){}}),()=>{},x=>x,'loading','theme','navigation','artwork','shell','button','feedback');
- assert.equal(run({id:1}).type,'theme');assert.equal(run(null).type,'div');
+ const render=new Function('React','useAPI','useEffect','unwrap','Loading','ThemeProvider','ServerNavigationProvider','ArtworkProvider','AppShell','MiraAction','Feedback','DesktopResume',compiled.code+';return AuthenticatedShell();');
+ const run=data=>render(React,()=>({data,error:'offline',reload(){}}),()=>{},x=>x,'loading','theme','navigation','artwork','shell','button','feedback','resume');
+ assert.equal(run({id:1}).type,'resume');assert.equal(run({id:1}).props.children.type,'theme');assert.equal(run(null).type,'div');
 });
 test('60 second timer uses the same non-destructive refresh path',async()=>{
  const original=setInterval;let callback;
