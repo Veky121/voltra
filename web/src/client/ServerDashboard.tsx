@@ -170,7 +170,7 @@ function ServerUptime(){
   return <span className={`server-uptime${online&&elapsed>0?' is-online':''}`}><span className="server-meta-label">Uptime:</span> <strong>{telemetry.error?'\u2014':formatUptime(elapsed)}</strong></span>;
 }
 
-export function ServerStateLine({compact=false}:{compact?:boolean}){
+export function ServerStateLine({compact=false,showUptime=compact}:{compact?:boolean;showUptime?:boolean}){
   const {server}=useServer(),telemetry=useServerTelemetry();
   const action=useContext(PowerContext);
   const pending=compact?action.pending:null;
@@ -191,7 +191,7 @@ export function ServerStateLine({compact=false}:{compact?:boolean}){
       <span className="server-state-text">{statusText}</span>
     </span>
     {fs25&&(['game'] as const).map(key=>{const service=services?.[key]||'unknown';return <span key={key} className={`server-state state-${service==='online'?'running':service}`} title={service==='unknown'?'No recent service check. The monitoring helper may need updating.':'Game lifecycle log confirmed against the running process. Public reachability is checked separately.'}><span className="server-meta-label">Game server:</span><span className="status-dot"/><span>{serviceLabels[service]||'Unknown'}</span></span>})}
-    {compact&&<ServerUptime/>}
+    {showUptime&&<ServerUptime/>}
   </div>;
 }
 
@@ -215,7 +215,7 @@ export function ServerWorkspace({children}:{children:ReactNode}){
       <CardHeader className="server-hero-info">
         <div className="server-hero-title"><CardTitle><div className="server-identity-heading"><ServerIdentityIcon artwork={server.artwork}/><div><h1>{server.name}</h1>{server.artwork?.pack_name&&<p className="server-pack-name">{server.artwork.pack_name}</p>}</div></div></CardTitle></div>
         {server.description&&<CardDescription className="server-description">{server.description}</CardDescription>}
-        <div className="server-hero-meta"><ServerStateLine/><ServerConnection key={base} leading={<ServerUptime/>}/></div>
+        <div className="server-hero-meta"><ServerStateLine showUptime/><ServerConnection key={base}/></div>
       </CardHeader>
       <CardAction className="server-hero-controls"><PowerControls/></CardAction>
     </Card></header>}
