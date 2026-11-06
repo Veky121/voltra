@@ -52,3 +52,16 @@ func TestMinecraftManagedInstallerUpgradePreservesCustomizations(t *testing.T) {
 		})
 	}
 }
+
+func TestMinecraftPreDotVoltraInstallerIdentity(t *testing.T) {
+	old, err := os.ReadFile("testdata/minecraft-install-pre-dotvoltra.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !minecraftKnownHistoricalInstaller(string(old)) || !minecraftKnownHistoricalInstaller(strings.ReplaceAll(string(old), "\n", "\r\n")) {
+		t.Fatal("previous published installer not recognized")
+	}
+	if minecraftKnownHistoricalInstaller(string(old) + "\necho custom\n") {
+		t.Fatal("custom installer must not be upgraded")
+	}
+}
