@@ -1,2 +1,8 @@
 dist/
+dist-firefox/
+node_modules/
+web-ext-artifacts/
+*.xpi
+SHA256SUMS.txt
+__pycache__/
 *.zip

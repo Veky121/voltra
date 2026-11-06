@@ -1,10 +1,10 @@
 # Voltra Companion
 
-Version 0.1.0-nightly.6. Chromium Manifest V3 extension for Brave, Chrome and Edge.
+Version 0.1.0-nightly.7. Manifest V3 extension for Firefox desktop 142+, Brave, Chrome and Edge.
 
 ## Download and install
 
-Download [voltra-companion-0.1.0-nightly.6.zip](https://github.com/Veky121/voltra/releases/download/companion-v0.1.0-nightly.6/voltra-companion-0.1.0-nightly.6.zip). This is the ready-to-load extension. GitHub's automatic Source code ZIP is for developers.
+Download [voltra-companion-0.1.0-nightly.7.zip](https://github.com/Veky121/voltra/releases/download/companion-v0.1.0-nightly.7/voltra-companion-0.1.0-nightly.7.zip). This is the ready-to-load extension. GitHub's automatic Source code ZIP is for developers.
 
 1. Extract the ZIP into a permanent folder.
 2. Open `brave://extensions`, `chrome://extensions` or `edge://extensions` and enable **Developer mode**.
@@ -25,13 +25,14 @@ The extension uses the account's existing permissions. All compatible accessible
 From ptero-go, with the web workspace dependencies installed:
 
 ```powershell
+npm ci --prefix browser-addon
 node --test browser-addon/tests/*.test.mjs
 node browser-addon/build.mjs
 ```
 
 Load browser-addon/dist once using Load unpacked in brave://extensions, chrome://extensions or edge://extensions. After rebuilding, click Reload on the extension, refresh ModHub and click the Voltra toolbar icon. Keep using the same folder and extension installation; removing the extension clears its saved data. Unpacked extensions do not update automatically.
 
-The toolbar and Add to Voltra button open a native browser side panel. The extension reuses the app's existing Voltra icons in the toolbar, extension manager and panel header.
+The toolbar opens a native browser sidebar. In Chromium, Add to Voltra also opens it. Firefox does not treat webpage clicks as privileged browser gestures, so Add to Voltra queues the mod and updates an already-open sidebar. Click the toolbar icon to open it. The extension reuses the app's existing Voltra icons in the toolbar, extension manager and panel header.
 
 ## Remembered settings and queue
 
@@ -53,7 +54,7 @@ The FS25 module identifies the reviewed profile through egg_features containing 
 
 ## Credentials and gateway
 
-The API key stays in local extension storage restricted to trusted extension contexts. It is never exposed to website scripts or returned to the extension UI. It is an ordinary client API key with the account's normal authority. Forget saved key removes saved credentials; revocation in Voltra blocks future requests.
+The API key stays in this browser profile. Chromium uses local extension storage restricted to trusted contexts; Firefox uses extension-origin IndexedDB because Firefox cannot restrict storage.local access. It is never exposed to website scripts or returned to the extension UI. It is an ordinary client API key with the account's normal authority. Forget saved key removes saved credentials; revocation in Voltra blocks future requests.
 
 The website can only open a validated mod request. Installation requires an explicit action in the extension window. The background worker validates the module, link, server metadata and permissions, and constructs the API path and destination. It is not a generic website-controlled fetch proxy. Requests omit cookies and do not follow redirects.
 
@@ -75,10 +76,30 @@ A live check on 2026-11-06 used an ordinary key created through Account > API ke
 
 src/modules/index.js registers bundled modules. FS25 owns page extraction, mod validation, server matching and the destination directory. Credentials, API requests and transfer tracking are shared. UI feedback uses Voltra's notification event store.
 
-GitHub can host source and Nightly ZIPs for testers. Normal installation and automatic updates should use Chrome Web Store / Microsoft Edge Add-ons. Firefox compatibility and signing have not been implemented. No publication occurs during a build.
+GitHub can host source and Nightly ZIPs for testers. Normal installation and automatic updates should use Chrome Web Store / Microsoft Edge Add-ons. Firefox uses a separate Mozilla-signed XPI for permanent installation. No publication occurs during a build.
 
 ```powershell
-Compress-Archive -Path browser-addon/dist/* -DestinationPath browser-addon/voltra-companion-0.1.0-nightly.6.zip -Force
+Compress-Archive -Path browser-addon/dist/* -DestinationPath browser-addon/voltra-companion-0.1.0-nightly.7.zip -Force
 ```
 
 Future Modrinth and CurseForge modules should use the existing Minecraft content-install API with project/version IDs and respect its compatibility, dependency and stopped-server rules.
+
+## Firefox
+
+Use the Mozilla-signed Firefox XPI from the Nightly release. Open `about:addons`,
+choose the gear menu and **Install Add-on From File**. Select the signed XPI.
+For development only, load the unsigned Firefox ZIP through
+`about:debugging#/runtime/this-firefox` > **Load Temporary Add-on**. Temporary
+installations are removed when Firefox exits.
+
+Build outputs stay separate: `dist` for Chromium and `dist-firefox` for Firefox.
+Run `npm run lint:firefox --prefix browser-addon` to validate with Mozilla's
+validator and `python browser-addon/package.py` to package both builds and the
+reviewer source archive. See [reviewer instructions](REVIEWER.md).
+
+The native Firefox test passed on Firefox Nightly 162.0a1 with an isolated
+profile and loopback API fixture. It verified the actual toolbar sidebar,
+connection, private credential storage, queued submission, completion tracking,
+and preservation of credentials and queue after a full browser restart.
+The test auto-accepts optional permissions only in its isolated profile. It
+uses an API fixture, not a live game-server download.

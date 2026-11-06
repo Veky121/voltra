@@ -1,3 +1,4 @@
+import {extension} from './platform.js';
 import {notifications} from '../../web/src/notificationEvents.ts';
 import {moduleFor} from './modules/index.js';
 import {panelURL, panelPermission, transferProgress} from './config.js';
@@ -6,6 +7,7 @@ const $ = id => document.getElementById(id);
 let id = new URL(location.href).searchParams.get('id');
 let connected = false, busy = false, timer;
 const explanations = {
+  'storage-unavailable': 'Could not save extension settings. Check browser storage permissions and reopen Voltra Companion.',
   'queue-full': 'The queue holds 100 mods. Remove completed items before adding more.',
   'batch-running': 'Wait for the current queue submission to finish.',
   'side-panel-unavailable': 'Open Voltra Companion from the browser toolbar to view your saved queue.',
@@ -47,7 +49,7 @@ notifications.subscribe(() => {
 });
 async function send(type, extra = {}) {
   let reply;
-  try { reply = await chrome.runtime.sendMessage({type, id, ...extra}); }
+  try { reply = await extension.runtime.sendMessage({type, id, ...extra}); }
   catch { throw new Error('extension-unavailable'); }
   if (!reply || typeof reply !== 'object') throw new Error('extension-unavailable');
   if (reply.error) throw new Error(reply.error);
@@ -166,7 +168,7 @@ $('connection').onsubmit = async event => {
     const panel = panelURL($('panel').value);
     $('panel').value = panel;
     // Request the host permission in the click gesture, before awaiting saved drafts.
-    const permission = chrome.permissions.request({origins:[panelPermission(panel)]});
+    const permission = extension.permissions.request({origins:[panelPermission(panel)]});
     $('connection-fields').disabled = true;
     await rememberDraft();
     if (!await permission) throw new Error('permission-required');
@@ -230,10 +232,16 @@ async function poll() {
   } catch(error) { clearTimeout(timer); failure(error); }
   finally { polling = false; }
 }
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local' || !Object.keys(changes).some(key=>key.startsWith('request:') || key === 'lastRequest')) return;
+function queueChanged() {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(()=>refreshState().catch(failure), 100);
+}
+extension.runtime.onMessage.addListener(message => {
+  if (message?.type === 'queue-changed') queueChanged();
+});
+extension.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !Object.keys(changes).some(key=>key.startsWith('request:') || key === 'lastRequest')) return;
+  queueChanged();
 });
 async function init() { await refreshState(); await targets(); await poll(); }
 init().catch(failure);

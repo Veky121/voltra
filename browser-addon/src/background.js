@@ -1,19 +1,16 @@
+import {extension, openSidebar, configureSidebar} from './platform.js';
 import {moduleFor, modules} from './modules/index.js';
 import {panelURL, panelPermission} from './config.js';
 
-// Content scripts cannot read credentials or pending account/server information.
-const ready = Promise.all([
-  chrome.storage.local.setAccessLevel({accessLevel: 'TRUSTED_CONTEXTS'}),
-  chrome.storage.session.setAccessLevel({accessLevel: 'TRUSTED_CONTEXTS'}),
-]);
-chrome.sidePanel.setPanelBehavior({openPanelOnActionClick: true})
-  .catch(() => console.error('Could not configure the Voltra side panel toolbar action.'));
+import {local, storageReady} from './privateStorage.js';
+const ready = storageReady;
+configureSidebar();
 // Extension windows are tabs too. Authenticate the extension document URL,
 // rather than rejecting every sender with tab metadata.
 const trusted = sender => {
   try {
     const actual = new URL(sender.url);
-    const expected = new URL(chrome.runtime.getURL('app.html'));
+    const expected = new URL(extension.runtime.getURL('app.html'));
     return actual.protocol === expected.protocol && actual.host === expected.host &&
       actual.pathname === expected.pathname && (sender.frameId === undefined || sender.frameId === 0);
   } catch { return false; }
@@ -32,26 +29,26 @@ const serializeQueue = action => {
   return result;
 };
 const requestKey = id => `request:${id}`;
-const queueItems = async () => Object.entries(await chrome.storage.local.get(null))
+const queueItems = async () => Object.entries(await local.get(null))
   .filter(([key, value]) => key.startsWith('request:') && value?.mod)
   .map(([key, value]) => ({...value, id: key.slice(8)})).sort((a, b) => a.created - b.created);
-const readRequest = async id => (await chrome.storage.local.get(requestKey(id)))[requestKey(id)];
-const writeRequest = (id, value) => chrome.storage.local.set({[requestKey(id)]: value});
+const readRequest = async id => (await local.get(requestKey(id)))[requestKey(id)];
+const writeRequest = (id, value) => local.set({[requestKey(id)]: value});
 // Preserve requests from the previous session-only build, as well as its unchanged connection key.
 const migrated = ready.then(async () => {
-  const local = await chrome.storage.local.get(null);
-  if (local.queueMigrated) return;
-  const session = await chrome.storage.session.get(null);
+  const snapshot = await local.get(null);
+  if (snapshot.queueMigrated) return;
+  const session = extension.storage.session ? await extension.storage.session.get(null) : {};
   const update = {queueMigrated: true};
   for (const [id, value] of Object.entries(session)) {
-    if (!value?.mod || local[requestKey(id)]) continue;
+    if (!value?.mod || snapshot[requestKey(id)]) continue;
     try {
       const mod = moduleFor(value.mod.module)?.validateMod(value.mod);
-      if (mod) update[requestKey(id)] = {...value, mod, job: value.job && {...value.job, panel: local.connection?.panel}};
+      if (mod) update[requestKey(id)] = {...value, mod, job: value.job && {...value.job, panel: snapshot.connection?.panel}};
     } catch { /* Ignore invalid legacy requests, never discard saved credentials. */ }
   }
-  if (!local.lastRequest && session.lastRequest) update.lastRequest = session.lastRequest;
-  await chrome.storage.local.set(update);
+  if (!snapshot.lastRequest && session.lastRequest) update.lastRequest = session.lastRequest;
+  await local.set(update);
 });
 
 function pageMod(message, sender) {
@@ -63,7 +60,7 @@ function pageMod(message, sender) {
 }
 
 async function savedAccount() {
-  const {connection, connectionDraft, lastServers = {}} = await chrome.storage.local.get(null);
+  const {connection, connectionDraft, lastServers = {}} = await local.get(null);
   return {connection, draft: connectionDraft, lastServers};
 }
 
@@ -72,12 +69,12 @@ async function saveDraft(message) {
   const next = {...(draft || connection || {})};
   if (typeof message.panel === 'string') next.panel = message.panel.slice(0, 2048);
   if (typeof message.key === 'string' && message.key.trim()) next.key = message.key.trim().slice(0, 512);
-  await chrome.storage.local.set({connectionDraft: next});
+  await local.set({connectionDraft: next});
   return {hasSavedKey: !!next.key};
 }
 
 async function api(path, body, connection) {
-  connection ||= (await chrome.storage.local.get('connection')).connection;
+  connection ||= (await local.get('connection')).connection;
   if (!connection) throw new Error('connect-first');
   const origin = panelURL(connection.panel);
   let response;
@@ -184,12 +181,13 @@ async function handle(message, sender) {
         if (queue.length >= 100) throw new Error('queue-full');
         await writeRequest(id, {mod, created: Date.now()});
       }
-      await chrome.storage.local.set({lastRequest: id});
+      await local.set({lastRequest: id});
+      if (extension.sidebarAction) extension.action.setBadgeText({text:String(queue.length + (existing ? 0 : 1))}).catch(() => {});
       return {id};
     });
   }
   if (!trusted(sender)) throw new Error('forbidden');
-  const id = message.id || (await chrome.storage.local.get('lastRequest')).lastRequest;
+  const id = message.id || (await local.get('lastRequest')).lastRequest;
   const pending = id && await readRequest(id);
   if (message.type === 'init') {
     await accountWrites;
@@ -214,13 +212,13 @@ async function handle(message, sender) {
       const {draft} = await savedAccount();
       const panel = panelURL(draft.panel);
       if (!/^[\x21-\x7e]{20,512}$/.test(draft.key || '')) throw new Error('invalid-key');
-      if (!await chrome.permissions.contains({origins: [panelPermission(panel)]})) throw new Error('permission-required');
+      if (!await extension.permissions.contains({origins: [panelPermission(panel)]})) throw new Error('permission-required');
       const candidate = {panel, key: draft.key};
       // Test separately; failed edits must never replace the working connection.
       const result = await api('/api/client?per_page=1&page=1', undefined, candidate);
       if (!Array.isArray(result?.data)) throw new Error('invalid-response');
-      await chrome.storage.local.set({connection: candidate});
-      await chrome.storage.local.remove('connectionDraft');
+      await local.set({connection: candidate});
+      await local.remove('connectionDraft');
       return {panel};
     });
   }
@@ -228,8 +226,8 @@ async function handle(message, sender) {
     return serializeAccount(async () => {
       if (batchRunning || submitting.size) throw new Error('batch-running');
       const {connection, draft} = await savedAccount();
-      await chrome.storage.local.set({connectionDraft: {panel: draft?.panel ?? connection?.panel ?? ''}});
-      await chrome.storage.local.remove('connection');
+      await local.set({connectionDraft: {panel: draft?.panel ?? connection?.panel ?? ''}});
+      await local.remove('connection');
       return {};
     });
   }
@@ -238,7 +236,7 @@ async function handle(message, sender) {
       const {connection, lastServers} = await savedAccount();
       if (!connection || typeof message.server !== 'string' || message.server.length > 100) throw new Error('server-unavailable');
       lastServers[`${connection.panel}|${pending?.mod?.module || 'fs25'}`] = message.server;
-      await chrome.storage.local.set({lastServers});
+      await local.set({lastServers});
       return {};
     });
   }
@@ -246,7 +244,7 @@ async function handle(message, sender) {
   if (message.type === 'remove-request') {
     if (batchRunning || submitting.has(id)) throw new Error('batch-running');
     if (pending?.job && !['complete','failed','exists','unknown'].includes(pending.job.state)) throw new Error('check-voltra-files');
-    await chrome.storage.local.remove(requestKey(id));
+    await local.remove(requestKey(id));
     return {};
   }
   if (message.type === 'install-all') {
@@ -283,13 +281,13 @@ async function handle(message, sender) {
   }
   throw new Error('unsupported-action');
 }
-chrome.runtime.onMessage.addListener((message, sender, reply) => {
+extension.runtime.onMessage.addListener((message, sender, reply) => {
   let opening = Promise.resolve();
   if (message.type === 'open') {
     try {
       pageMod(message, sender);
       // Preserve the content-script click gesture: open before any storage await.
-      opening = chrome.sidePanel.open({windowId: sender.tab.windowId})
+      opening = openSidebar(sender.tab.windowId)
         .catch(() => { throw new Error('side-panel-unavailable'); });
     } catch (error) { reply({error: error.message}); return false; }
   }

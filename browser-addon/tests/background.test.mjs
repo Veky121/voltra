@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {webcrypto} from 'node:crypto';
+import {IDBFactory} from 'fake-indexeddb';
 const require = createRequire(new URL('../../web/package.json', import.meta.url));
 const {build} = require('esbuild');
 const bundle = await build({entryPoints: [fileURLToPath(new URL('../src/background.js', import.meta.url))], bundle: true, write: false, format: 'iife'});
@@ -13,7 +14,10 @@ const page = {url: mod.source, tab: {id: 7, windowId: 3}, frameId: 0};
 const secondMod = {...mod, source:mod.source.replace('373433','373434'), url:mod.url.replace('FS25_test','FS25_other'), filename:'FS25_other.zip'};
 function fixture(responseOverride, scenario = {}) {
   let listener;
-  const calls = [], levels = [], panels = [];
+  const calls = [], levels = [], panels = [], broadcasts = [];
+  let toolbar;
+  const protocol = scenario.firefox ? 'moz-extension://test/' : 'chrome-extension://test/';
+  const indexedDB = scenario.indexedDB || new IDBFactory();
   const storage = (initial = {}) => {
     const data = structuredClone(initial);
     return {data, setAccessLevel: async value => levels.push(value.accessLevel),
@@ -23,8 +27,15 @@ function fixture(responseOverride, scenario = {}) {
   };
   const local = storage(scenario.local), session = storage(scenario.session);
   const chrome = {storage: {local, session}, permissions: {contains: async () => scenario.hostPermission !== false},
-    runtime: {getURL: path => 'chrome-extension://test/' + path, onMessage: {addListener: fn => { listener = fn; }}},
+    runtime: {getURL: path => protocol + path, sendMessage: async message => broadcasts.push(message), onMessage: {addListener: fn => { listener = fn; }}},
     sidePanel: {setPanelBehavior: async value => panels.push({behavior:value}), open: async value => panels.push({open:value})}};
+  if (scenario.firefox) {
+    delete chrome.storage.local.setAccessLevel;
+    delete chrome.storage.session.setAccessLevel;
+    delete chrome.sidePanel;
+    chrome.sidebarAction = {open:async () => panels.push({firefoxOpen:true})};
+    chrome.action = {onClicked:{addListener:fn=>{toolbar=fn;}},setBadgeText:async value=>panels.push({badge:value})};
+  }
   const fetch = async (url, options) => {
     calls.push({url, options});
     if (scenario.failPost && options.method === 'POST') throw new Error('network lost after acceptance');
@@ -39,9 +50,41 @@ function fixture(responseOverride, scenario = {}) {
     else data = {attributes:server,meta:{user_permissions:scenario.permissions || ['file.read','file.create']}};
     return {ok:true,json:async()=>data};
   };
-  vm.runInNewContext(bundle.outputFiles[0].text, {chrome, fetch, URL, AbortSignal, crypto: webcrypto, console});
-  return {calls, levels, local, session, panels, send: (message, sender = ui) => new Promise(resolve => listener(message, sender, resolve))};
+  vm.runInNewContext(bundle.outputFiles[0].text, {...(scenario.firefox ? {browser:chrome} : {chrome}), indexedDB, fetch, URL, AbortSignal, crypto: webcrypto, console});
+  return {calls, levels, local, session, panels, indexedDB, broadcasts, toolbar:()=>toolbar(), send: (message, sender = {url:protocol+'app.html'}) => new Promise(resolve => listener(message, sender, resolve))};
 }
+
+test('Firefox uses its native toolbar sidebar and private durable storage across background reload', async () => {
+  const f = fixture(undefined,{firefox:true});
+  assert.equal((await f.send({type:'connect',panel:'panel.test',key:'ptlc_firefox-private-test-key'})).error,undefined);
+  const id = (await f.send({type:'open',mod},page)).data.id;
+  assert.equal(f.panels.some(item=>item.firefoxOpen),false,'webpage clicks cannot open the Firefox sidebar');
+  f.toolbar();
+  assert.equal(f.panels.some(item=>item.firefoxOpen),true);
+  await f.send({type:'remember-server',server:'server-1'});
+  assert.deepEqual(f.local.data,{},'no credentials or queue in content-script-accessible storage.local');
+  assert.equal(JSON.stringify(f.broadcasts).includes('ptlc_'),false);
+  const restarted=fixture(undefined,{firefox:true,indexedDB:f.indexedDB});
+  const init=(await restarted.send({type:'init'})).data;
+  assert.equal(init.connected,true);
+  assert.equal(init.lastServer,'server-1');
+  assert.equal(init.queue[0].id,id);
+  assert.equal(JSON.stringify(init).includes('ptlc_'),false);
+  assert.equal((await restarted.send({type:'install-all',ids:[id],server:'server-1'})).data.results[0].job.state,'queued');
+  await restarted.send({type:'disconnect'});
+  assert.equal((await restarted.send({type:'init'})).data.hasSavedKey,false);
+  assert.equal((await restarted.send({type:'init'})).data.queue.length,1);
+});
+
+test('Firefox rejects content scripts and foreign extension senders for every private action', async () => {
+  const f=fixture(undefined,{firefox:true});
+  for (const sender of [page,{url:'moz-extension://other/app.html'},ui]) {
+    for(const type of ['init','connect','save-draft','install-all','queue-progress']) {
+      assert.equal((await f.send({type},sender)).error,'forbidden');
+    }
+  }
+  assert.equal(f.calls.length,0);
+});
 test('content scripts cannot connect, enumerate servers, poll or install', async () => {
   const f = fixture();
   for (const type of ['connect', 'save-draft', 'remember-server', 'remove-request', 'install-all', 'queue-progress', 'targets', 'progress', 'install', 'init']) assert.equal((await f.send({type}, page)).error, 'forbidden');

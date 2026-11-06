@@ -1,3 +1,4 @@
+import {extension} from './platform.js';
 import {modules} from './modules/index.js';
 
 function attach() {
@@ -15,7 +16,12 @@ function attach() {
   button.addEventListener('click', async event => {
     if (!event.isTrusted) return;
     const mod = module.readMod(document, location.href);
-    if (mod) await chrome.runtime.sendMessage({type: 'open', mod});
+    if (mod) {
+      try {
+        const reply = await extension.runtime.sendMessage({type: 'open', mod});
+        if (reply?.data?.id) button.textContent = globalThis.browser ? 'In queue - open Voltra sidebar' : 'In Voltra queue';
+      } catch { /* The toolbar provides recovery after an extension reload. */ }
+    }
   });
   anchor.append(button);
 }

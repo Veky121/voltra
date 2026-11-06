@@ -2,7 +2,7 @@ Voltra Companion Nightly
 
 INSTALL IN BRAVE, CHROME OR EDGE
 
-1. Download voltra-companion-0.1.0-nightly.6.zip from the GitHub release.
+1. Download the Chromium ZIP from the GitHub release.
 2. Extract it into a permanent folder named Voltra Companion.
 3. Open brave://extensions, chrome://extensions or edge://extensions.
 4. Turn on Developer mode.
@@ -21,6 +21,22 @@ Collect more mods, select a compatible server in the sidebar, and click
 Add N mods to server. The domain, key, server and queue stay remembered.
 Completed means the ZIP was downloaded. Activate it in the game when ready.
 
+FIREFOX DESKTOP 142 OR NEWER
+
+Normal installation requires a Mozilla-signed XPI. In about:addons, open
+the gear menu, choose Install Add-on From File, and select the signed XPI.
+Only packages explicitly labelled signed are ready for permanent installation.
+
+For development/testing of the unsigned Firefox ZIP: extract it, open
+about:debugging#/runtime/this-firefox, click Load Temporary Add-on, and
+select manifest.json in that folder. Firefox removes temporary add-ons on exit.
+Do not use this testing method as a permanent user installation.
+
+Click the Voltra toolbar icon to open the native sidebar.
+Firefox requires this browser action to open a sidebar. Add to Voltra on
+ModHub queues the mod and updates the sidebar if it is already open.
+The API key and queue are stored privately in this Firefox profile.
+
 UPDATE WITHOUT LOSING SETTINGS
 
 Extract the next ZIP over the SAME permanent folder. Keep the existing
@@ -28,5 +44,4 @@ extension installed. Click Reload on its card in the browser's Extensions
 page, then refresh any open ModHub tabs. Do not remove and reinstall it.
 GitHub ZIP installations do not update automatically.
 
-This Nightly supports Chromium browsers. Firefox is not supported yet.
 Use the named extension ZIP, not GitHub's automatically generated Source code ZIP.
