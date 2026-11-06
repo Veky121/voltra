@@ -32,6 +32,7 @@ import (
 )
 
 func (a *App) registerOperations(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/client/servers/{server}/files/folder-size", a.clientFolderSize)
 	a.registerFileTransfers(mux)
 	mux.HandleFunc("GET /api/client/servers/{server}/files/pulls", a.clientRemoteTransfers)
 	mux.HandleFunc("GET /api/client/{$}", a.clientServers)
@@ -591,6 +592,7 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 	if op == "pull" && trackedPull {
+		a.folderSizes.invalidate(str(s["uuid"]))
 		var result M
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			fail(w, err)
@@ -630,6 +632,7 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if op == "compress" {
+		a.folderSizes.invalidate(str(s["uuid"]))
 		var m M
 		if e = json.NewDecoder(resp.Body).Decode(&m); e != nil {
 			fail(w, e)
@@ -637,6 +640,7 @@ func (a *App) clientFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, 200, item("file_object", opFileTransform(m)))
 	} else {
+		a.folderSizes.invalidate(str(s["uuid"]))
 		w.WriteHeader(204)
 	}
 	if auditEvent != "" {

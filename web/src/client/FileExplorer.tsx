@@ -2,9 +2,9 @@ import {Feedback} from '../notifications';
 import {CollectionSkeleton} from '../ui/CollectionSkeleton';
 import {IconButton} from '../ui/IconButton';
 import {Checkbox} from '../components/ui/checkbox';
-import {memo,useEffect,useMemo,useRef,useState} from 'react';
+import {memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api,useAPI} from '../lib';
-import {nextFileSort,scanFolder,searchFileTree,sortFiles} from './fileListing';
+import {nextFileSort,searchFileTree,sortFiles} from './fileListing';
 import type {FileSort} from './fileListing';
 import {Icon} from '../Icons';
 import {bytes,can,items,type RecordData} from './common';
@@ -14,15 +14,15 @@ import './fileMetadata.css';
 
 type Controls={selected:string[];onSelect:(path:string)=>void;onMenu:(path:string,anchor:HTMLButtonElement)=>void};
 type SearchResult={term:string;entries:Map<string,FileEntry[]>;folders:Set<string>};
-type ScanControls={sizes:Record<string,number>;busy:string;calculate:(path:string)=>void};
+type ScanControls={sizes:Record<string,number>;setSize:(path:string,size:number|undefined)=>void};
 type Shared={sort:FileSort;scan:ScanControls;searchResult:SearchResult;base:string;activeFile:string;activeDirectory?:string;refreshToken:string;dirty:boolean;filter:string;permissions:string[];onOpen:(path:string)=>void;onDirectory?:(path:string)=>void;onEntries?:(path:string,files:FileEntry[])=>void;controls?:Controls&{membership:ReadonlySet<string>}};
 function EntryCheck({path,controls}:{path:string;controls?:Controls&{membership:ReadonlySet<string>}}){return controls&&<label className="explorer-check-target" title={`Select ${path}`}><Checkbox className="explorer-check" aria-label={`Select ${path}`} checked={controls.membership.has(path)} onCheckedChange={()=>controls.onSelect(path)}/></label>}
 function EntryMenu({path,controls}:{path:string;controls?:Controls}){return controls&&<IconButton type="button" className="explorer-menu" aria-label={`Options for ${path}`} aria-haspopup="menu" onClick={event=>controls.onMenu(path,event.currentTarget)}><Icon name="more"/></IconButton>}
 const modifiedFormat=new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const modifiedTitleFormat=new Intl.DateTimeFormat(undefined,{dateStyle:'short',timeStyle:'medium'});
-const EntryMetadata=memo(function EntryMetadata({entry,path,scan}:{entry:FileEntry;path?:string;scan?:ScanControls}){
+const EntryMetadata=memo(function EntryMetadata({entry,path,folderSize,folderError}:{entry:FileEntry;path?:string;folderSize?:number;folderError?:boolean}){
   const modified=fileModifiedDate(entry.modified_at),size=fileEntrySize(entry),type=fileEntryType(entry);
-  return <span className="explorer-metadata"><span className="explorer-modified" title={modified?modifiedTitleFormat.format(modified):'Date modified unavailable'}>{modified?<time dateTime={modified.toISOString()}>{modifiedFormat.format(modified)}</time>:'—'}</span><span className="explorer-type" title={type}>{type}</span><span className="explorer-size" title={size===null?'Folder size excludes symbolic links':`${size.toLocaleString()} bytes`}>{!entry.is_file&&!entry.is_symlink&&path&&scan?<button type="button" className="explorer-size-button" disabled={!!scan.busy} onClick={()=>scan.calculate(path)} aria-label={`Calculate size of ${path}`}>{scan.busy===path?'Calculating…':scan.sizes[path]===undefined?'Calculate':bytes(scan.sizes[path])}</button>:size===null?'—':bytes(size)}</span></span>;
+  return <span className="explorer-metadata"><span className="explorer-modified" title={modified?modifiedTitleFormat.format(modified):'Date modified unavailable'}>{modified?<time dateTime={modified.toISOString()}>{modifiedFormat.format(modified)}</time>:'—'}</span><span className="explorer-type" title={type}>{type}</span><span className="explorer-size" aria-label={path?`Folder size for ${path}`:undefined} title={folderError?'Folder size unavailable. Refresh to retry.':path?'Total nested file size, excluding symbolic links. Cached for one minute.':size===null?'Size unavailable':`${size.toLocaleString()} bytes`}>{!entry.is_file&&!entry.is_symlink&&path?folderError?'—':folderSize===undefined?'…':bytes(folderSize):size===null?'—':bytes(size)}</span></span>;
 });
 
 // Keep unchanged file rows out of selection, draft and parent status updates.
@@ -42,6 +42,13 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
   const open=expanded||searching;
   useEffect(()=>{if(containsActive)setExpanded(true)},[activePath,containsActive]);
   const listing=useAPI(expanded&&!searching?`${shared.base}/files/list?directory=${encodeURIComponent(path)}`:null);
+  const sizePath=entry&&!entry.is_symlink&&!shared.activeFile?`${shared.base}/files/folder-size?directory=${encodeURIComponent(path)}`:null;
+  const folderSize=useAPI(sizePath);
+  const total=folderSize.error?undefined:folderSize.data?.attributes?.size;
+  useEffect(()=>{if(typeof total==='number'||folderSize.error)shared.scan.setSize(path,total)},[total,folderSize.error,path,shared.scan.setSize]);
+  const sizeRefresh=useRef(shared.refreshToken);
+  useEffect(()=>{if(sizeRefresh.current===shared.refreshToken)return;sizeRefresh.current=shared.refreshToken;if(sizePath)folderSize.reload()},[shared.refreshToken,sizePath,folderSize.reload]);
+
   // Refresh expanded listings in place so rows and nested expansion survive.
   const refreshed=useRef(shared.refreshToken);
   useEffect(()=>{
@@ -58,13 +65,14 @@ function Folder({path,label,entry,depth=0,...shared}:Shared&{path:string;label:s
     return sortFiles(entries.filter(entry=>!filter||(entry.is_file?entry.name.toLocaleLowerCase().includes(filter):searchReady&&shared.searchResult.folders.has(`${path==='/'?'':path}/${entry.name}`))),shared.sort,sizes);
   },[entries,shared.filter,shared.sort,shared.scan.sizes,shared.searchResult,searchReady,path]);
   return <li className="explorer-folder">
+    <Feedback tone="error" message={folderSize.error?`Could not load the size of ${path}. Refresh to retry.`:''}/>
     <div className={`explorer-folder-row${shared.activeDirectory===path&&!shared.activeFile?' is-current':''}${shared.controls?.membership.has(path)?' is-selected':''}`}>
       {path!=='/'&&<EntryCheck path={path} controls={shared.controls}/>}
       {shared.onDirectory&&<button type="button" className="explorer-toggle" style={{left:10+depth*14+(shared.controls&&path!=='/'?40:0)}} aria-expanded={expanded} aria-label={`${expanded?'Collapse':'Expand'} ${path}`} onClick={()=>setExpanded(v=>!v)}><span className={`explorer-chevron${expanded?' is-expanded':''}`} aria-hidden="true">›</span></button>}
       <button type="button" className={`explorer-row explorer-folder-button${path==='/'?' explorer-root':''}`} aria-expanded={shared.onDirectory?undefined:expanded} aria-label={shared.onDirectory?`Browse ${path}`:`${expanded?'Collapse':'Expand'} ${path}`} aria-current={shared.activeDirectory===path&&!shared.activeFile?'page':undefined} style={{paddingLeft:shared.onDirectory?28+depth*14:10+depth*14}} title={path} onClick={event=>{if(shared.controls&&!plainFileClick(event)&&path!=='/'){shared.controls.onSelect(path);return}if(shared.onDirectory){setExpanded(value=>shared.activeDirectory===path?!value:true);shared.onDirectory(path)}else setExpanded(v=>!v)}}>
         {!shared.onDirectory&&<span className={`explorer-chevron${expanded?' is-expanded':''}`} aria-hidden="true">›</span>}<Icon name="files"/><span>{label}</span>
       </button>
-      {entry&&!shared.activeFile&&<EntryMetadata entry={entry} path={path} scan={shared.scan}/>}
+      {entry&&!shared.activeFile&&<EntryMetadata entry={entry} path={path} folderSize={total} folderError={!!folderSize.error}/>}
       {path!=='/'&&<EntryMenu path={path} controls={shared.controls}/>}
     </div>
     {open&&<ul>
@@ -86,10 +94,13 @@ const FileExplorer=memo(function FileExplorer({base,activeFile,activeDirectory,d
   const membership=useMemo(()=>new Set(controls?.selected),[controls?.selected]);
   const treeControls=useMemo(()=>controls?{...controls,membership}:undefined,[controls,membership]);
   const [filter,setFilter]=useState(''),[version,setVersion]=useState(0);
-  const [sort,setSort]=useState<FileSort>(null),[sizes,setSizes]=useState<Record<string,number>>({}),[sizeBusy,setSizeBusy]=useState(''),[scanError,setScanError]=useState('');
+  const [sort,setSort]=useState<FileSort>(null),[sizes,setSizes]=useState<Record<string,number>>({});
   const [searchResult,setSearchResult]=useState<SearchResult>({term:'',entries:new Map(),folders:new Set()}),[searching,setSearching]=useState(false),[searchError,setSearchError]=useState('');
-  const sizeController=useRef<AbortController|null>(null);
-  useEffect(()=>{setSizes(old=>Object.keys(old).length?{}:old);setSizeBusy('');setScanError('');return()=>sizeController.current?.abort()},[base,version,refreshKey]);
+  const setSize=useCallback((path:string,size:number|undefined)=>setSizes(old=>{
+    if(old[path]===size)return old;
+    const next={...old};if(size===undefined)delete next[path];else next[path]=size;return next;
+  }),[]);
+  useEffect(()=>{setSizes(old=>Object.keys(old).length?{}:old)},[base,version,refreshKey]);
   const list=async(path:string,signal:AbortSignal)=>items(await api(`${base}/files/list?directory=${encodeURIComponent(path)}`,{signal})) as FileEntry[];
   useEffect(()=>{
     const controller=new AbortController(),term=filter.trim().toLocaleLowerCase();
@@ -104,22 +115,15 @@ const FileExplorer=memo(function FileExplorer({base,activeFile,activeDirectory,d
     },300);
     return()=>{globalThis.clearTimeout(timer);controller.abort()};
   },[base,filter,version,refreshKey]);
-  async function calculate(path:string){
-    sizeController.current?.abort();const controller=new AbortController();sizeController.current=controller;setSizeBusy(path);setScanError('');
-    try{const result=await scanFolder(path,list,controller.signal);if(!controller.signal.aborted)setSizes(old=>({...old,[path]:result.size}))}
-    catch{if(!controller.signal.aborted)setScanError(`Could not calculate the size of ${path}. Check folder access, or open a smaller folder and try again.`)}
-    finally{if(!controller.signal.aborted)setSizeBusy('')}
-  }
-  const scan:ScanControls={sizes,busy:sizeBusy,calculate};
+  const scan:ScanControls={sizes,setSize};
   const header=(key:NonNullable<FileSort>['key'],label:string)=><button type="button" className="explorer-sort" onClick={()=>setSort(nextFileSort(sort,key))} aria-label={`${label}: ${sort?.key===key?sort.direction==='asc'?'ascending':'descending':'default order'}. Click to change sorting.`} title="Cycle ascending, descending and default order">{label}{sort?.key===key?sort.direction==='asc'?' ↑':' ↓':''}</button>;
 
   return <aside className={`file-explorer ${activeFile?'is-compact':'has-metadata'}`} aria-label="File explorer">
     <div className="file-explorer-header"><span>Explorer</span><div><button type="button" className="file-icon-button" aria-label="Refresh file explorer" title="Refresh files" onClick={()=>setVersion(v=>v+1)}><Icon name="restart"/></button><button type="button" className="file-icon-button" aria-label="Open full file browser" title="Open full file browser" onClick={onBrowse}><Icon name="files"/></button></div></div>
     <div className="file-explorer-search"><Icon name="search"/><input type="search" aria-label="Filter explorer files" placeholder="Filter files…" value={filter} onChange={event=>setFilter(event.target.value)}/></div>
-    <Feedback tone="error" message={searchError}/><Feedback tone="error" message={scanError}/>
+    <Feedback tone="error" message={searchError}/>
     {searching&&<p className="explorer-message" role="status">Searching inside folders…</p>}
     {filter.trim()&&<p className="explorer-message">Matching files and their folders. Symbolic links are not searched.</p>}
-    {sizeBusy&&<button type="button" className="explorer-size-button" onClick={()=>{sizeController.current?.abort();setSizeBusy('')}}>Cancel size calculation</button>}
     <nav aria-label="Server files" className="file-explorer-tree"><div className="explorer-columns"><span>{header("name","Name")}</span><span className="explorer-metadata"><span>{header("modified_at","Date modified")}</span><span>Type</span><span className="explorer-size">{header("size","Size")}</span></span><span className="explorer-action-space"/></div><ul><Folder key={base} sort={sort} scan={scan} searchResult={searchResult} refreshToken={`${version}:${refreshKey}`} path="/" label="/ home / container" base={base} activeFile={activeFile} activeDirectory={activeDirectory} dirty={dirty} filter={filter} permissions={permissions} onOpen={onOpen} onDirectory={onDirectory} onEntries={onEntries} controls={treeControls}/></ul></nav>
   </aside>;
 });

@@ -42,6 +42,7 @@ type Config struct {
 	ConsoleHistoryLines                                                                    int
 }
 type App struct {
+	folderSizes        folderSizeCache
 	readChanges        liveReadChanges
 	liveSnapshots      liveSnapshotHub
 	resourceReads      sharedResourceReads

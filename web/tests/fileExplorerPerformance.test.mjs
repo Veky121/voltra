@@ -11,7 +11,7 @@ const bundled=await build({
     builder.onResolve({filter:/notifications$|^\.\.\/ui\/IconButton$|^\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
     builder.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',contents:
       path.endsWith('notifications')?`export const Feedback=({message})=>message;`:
-      path==='react'?`export const memo=component=>component; export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
+      path==='react'?`export const memo=component=>component; export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useCallback=(fn,deps)=>globalThis.${key}.useMemo(()=>fn,deps); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
       path==='react/jsx-runtime'?`export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`:
       path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);export const api=async path=>globalThis.${key}.query(path).data||{data:[]};`:
       path==='../components/ui/checkbox'?`export const Checkbox='input';`:
@@ -29,6 +29,7 @@ function fixture(){
   const f={props:{base:'/server/a',activeFile:'',dirty:false,permissions:['*'],onOpen:()=>{},onBrowse:()=>{},onDirectory:()=>{}},tree:null,memos:0,
     query(path){if(!path)return {data:null,loading:false,error:'',reload:()=>{}};if(!queries.has(path))queries.set(path,{data:null,loading:true,error:'',calls:0,reload(){this.calls++}});const q=queries.get(path);q.reloadBound??=q.reload.bind(q);return {...q,reload:q.reloadBound};},
     listing(path,files){const url=`${f.props.base}/files/list?directory=${encodeURIComponent(path)}`;f.query(url);const q=queries.get(url);if(files)q.data=response(files);return q;},
+    folderSize(path,size){const url=`${f.props.base}/files/folder-size?directory=${encodeURIComponent(path)}`;f.query(url);const q=queries.get(url);q.data={attributes:{size}};q.loading=false;return q;},
     useState(initial){const i=active.index++;const h=active.hooks[i]??=( {value:typeof initial==='function'?initial():initial} );return [h.value,v=>{h.value=typeof v==='function'?v(h.value):v}];},
     useRef(initial){return f.useState(()=>({current:initial}))[0];},
     useMemo(fn,deps){const i=active.index++,old=active.hooks[i];if(!old||deps.some((x,j)=>!Object.is(x,old.deps[j]))){f.memos++;active.hooks[i]={deps,value:fn()}}return active.hooks[i].value;},
@@ -74,15 +75,15 @@ test('server changes do not expose previous rows and initial failure keeps retry
   const q=f.listing('/');q.loading=false;q.error='denied';f.render();assert.match(f.text(),/Could not load this folder/);const retry=f.nodes().find(n=>n.type==='button'&&n.props.children==='Retry');retry.props.onClick();assert.equal(q.calls,1);
 });
 
-test('recursive search reveals matching descendant files and calculates folder contents',async()=>{
+test('folder sizes load automatically from the shared server endpoint and search reveals descendants',async()=>{
   const f=fixture();
   f.listing('/',[entry('mods',false),entry('empty',false)]).loading=false;
   f.listing('/mods',[{...entry('target.jar'),size:1024}]).loading=false;
   f.listing('/empty',[]).loading=false;
   f.render();
-  await f.button('Calculate size of /mods').props.onClick();
-  await new Promise(resolve=>setTimeout(resolve,0));f.render();
-  assert.equal(f.button('Calculate size of /mods').props.children,'1024');
+  assert.equal(f.button('Calculate size of /mods'),undefined);
+  f.folderSize('/mods',1024);f.render();
+  assert.equal(f.nodes().find(n=>n.props['aria-label']==='Folder size for /mods').props.children,'1024');
   f.nodes().find(n=>n.type==='input'&&n.props.type==='search').props.onChange({target:{value:'TARGET'}});f.render();
   await new Promise(resolve=>setTimeout(resolve,350));f.render();
   assert.ok(f.button('Browse /mods'));assert.ok(f.button('Open /mods/target.jar'));assert.equal(f.button('Browse /empty'),undefined);

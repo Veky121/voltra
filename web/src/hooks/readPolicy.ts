@@ -10,6 +10,7 @@ export function readPolicy(path:string):{domains:string[];reconcileMs:number}|nu
   if(/\/servers\/[^/]+\/settings(?:\/|$)/.test(p))return null;
   if(/^\/api\/admin\/(?:settings|integrations)(?:\/|$)/.test(p))return null;
   if(/^\/api\/client\/?$/.test(p))return {domains:['servers','access','navigation'],reconcileMs:60000};
+  if(/\/files\/folder-size$/.test(p))return {domains:['files','access','servers'],reconcileMs:60000};
   const families:[RegExp,string][]=[
     [/\/backups(?:\/|$)/,'backups'],[/\/schedules(?:\/|$)/,'schedules'],
     [/\/files\//,'files'],[/\/steam(?:\/|$)/,'steam'],[/\/activity(?:\/|$)/,'activity'],

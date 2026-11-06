@@ -265,6 +265,7 @@ func (m *fileTransferManager) serve(w http.ResponseWriter, r *http.Request, scop
 				fail(w, err)
 				return
 			}
+			m.app.folderSizes.invalidate(str(scope.server["uuid"]))
 			m.writeCompleted(w, info)
 			return
 		}
