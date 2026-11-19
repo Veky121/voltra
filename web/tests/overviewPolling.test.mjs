@@ -19,9 +19,9 @@ function harness(count,resource,initial){
   signals.push(options.signal);
   return resource(path,options.signal);
  };
- const run=new Function('useState','useEffect','api','items','value','document','setTimeout','clearTimeout','Date','unusedErrorHook','observeLivePath','observeLiveNavigation','isLivePathFresh','queryCacheEpoch','readOverviewSnapshot','writeOverviewSnapshot','observeReadInvalidation',compiled+';return useOverview();');
+ const run=new Function('useState','useEffect','api','items','value','document','setTimeout','clearTimeout','Date','unusedErrorHook','observeLivePath','observeLiveNavigation','isLivePathFresh','queryCacheEpoch','readOverviewSnapshot','writeOverviewSnapshot','observeReadInvalidation','snapshotOwner',compiled+';return useOverview();');
  let stateIndex=0;
- run(initial=>{const index=stateIndex++;if(typeof initial==='function')initial=initial();if(index===0)servers=initial;return [initial,value=>{if(index===0){servers=value;writes++;}}];},fn=>effect=fn,api,r=>r.data.map(s=>s.attributes),r=>r.attributes,document,(fn,delay)=>{timers.set(++id,{fn,at:now+delay});return id;},key=>timers.delete(key),{now:()=>now},()=>['',()=>{}],()=>()=>{},()=>()=>{},()=>false,()=>0,()=>snapshot,value=>snapshot=value,(_path,callback)=>{readChanged=callback;return ()=>{readChanged=undefined}});
+ run(initial=>{const index=stateIndex++;if(typeof initial==='function')initial=initial();if(index===0)servers=initial;return [initial,value=>{if(index===0){servers=value;writes++;}}];},fn=>effect=fn,api,r=>r.data.map(s=>s.attributes),r=>r.attributes,document,(fn,delay)=>{timers.set(++id,{fn,at:now+delay});return id;},key=>timers.delete(key),{now:()=>now},()=>['',()=>{}],()=>()=>{},()=>()=>{},()=>false,()=>0,()=>snapshot,value=>snapshot=value,(_path,callback)=>{readChanged=callback;return ()=>{readChanged=undefined}},()=>1);
  const cleanup=effect();
  return {requests,signals,timers,cleanup,invalidate:()=>readChanged(),get servers(){return servers;},get writes(){return writes;},setStates(value){states=value;},get states(){return states;},
   async advance(ms){const end=now+ms;await settle();while(true){const next=[...timers.entries()].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;now=next[1].at;timers.delete(next[0]);next[1].fn();await settle();}now=end;await settle();},

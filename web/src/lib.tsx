@@ -6,35 +6,68 @@ import {useCallback} from 'react';
 import {invalidateQueryCache,purgeQueryCache,normalizedQueryPath,setQueryCacheScope} from './hooks/queryCache';
 export {invalidateQueryCache,purgeQueryCache,setQueryCacheScope} from './hooks/queryCache';
 import {useAPIRequest} from './hooks/useAPIRequest';
+import {bootReadsRevision,discardBootReads,rememberSignedIn,takeBootRead} from './bootReads';
+import {clearAccountSnapshots,identifySnapshotAccount,releaseSnapshotAccount,snapshotRevisionInTurn,snapshotStoreIsShared} from './accountSnapshots';
+import {moveSessionRevision,signedOutCount} from './signedOut';
 import type {ButtonHTMLAttributes,InputHTMLAttributes,SelectHTMLAttributes,TextareaHTMLAttributes,HTMLAttributes,ReactNode} from 'react';
 import {Button as ShadcnButton} from './components/ui/button';
 import {Input as ShadcnInput} from './components/ui/input';
 import {Textarea as ShadcnTextarea} from './components/ui/textarea';
 import {Card as ShadcnCard} from './components/ui/card';
 export function queryCacheSessionIdentity(session:any):string{return JSON.stringify([!!session?.authenticated,session?.user?.id??null,!!session?.user?.root_admin]);}
+let sessionIdentity:string|undefined;
 export async function api<T=any>(path:string,options:RequestInit={}):Promise<T>{
 
   const headers=new Headers(options.headers);
   headers.set('Accept','application/json');
   if(options.body&&!(options.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
-  const response=await fetch(path,{...options,headers});
+  const method=(options.method||'GET').toUpperCase();
+  // A write may change what the reads started by startup.js describe.
+  if(method!=='GET')discardBootReads();
   const mutationPath=normalizedQueryPath(path).split('?')[0];
+  // An account read names who the saved pages belong to. Note what the store looked like
+  // when the read began, here or in startup.js, so a late answer cannot name the wrong account.
+  const identifying=mutationPath==='/api/client/account'&&method==='GET';
+  const startedHere=identifying?snapshotRevisionInTurn():undefined,startedEarly=identifying?bootReadsRevision():undefined;
+  const signOutsAtStart=signedOutCount();
+  const early=method==='GET'?await takeBootRead(path,options.signal):undefined;
+  const response=early??await fetch(path,{...options,headers});
   if(response.status===401)purgeQueryCache();
   if(response.ok&&mutationPath.startsWith('/api/auth/')&&mutationPath!=='/api/auth/session')purgeQueryCache();
   if(response.ok&&!['GET','HEAD','OPTIONS'].includes((options.method||'GET').toUpperCase())&&!mutationPath.startsWith('/api/auth/'))invalidateQueryCache(path);
   if(response.status===401)window.dispatchEvent(new Event('desktop-session-rejected'));
+  // A sign-in starts from nothing, whatever an earlier session left behind unseen.
+  if(response.ok&&mutationPath==='/api/auth/login'){moveSessionRevision();clearAccountSnapshots();}
   if(response.ok&&path==='/api/auth/logout')window.dispatchEvent(new Event('panel-auth-changed'));
   if(response.status===204){return undefined as T;}
   const contentType=response.headers.get('content-type')||'';
   let data:any;
   try{data=contentType.includes('json')?await response.json():await response.text()}
-  catch(error){if(error instanceof SyntaxError)throw Object.assign(new Error('The panel returned an invalid JSON response.'),{status:response.status});throw error}
+  catch(error){if(error instanceof SyntaxError)throw Object.assign(new Error('The panel returned an invalid JSON response.'),{status:response.status,code:'invalid_json'});throw error}
   if(!response.ok){
     const message=typeof data==='object'?(data.errors?.map((e:any)=>e.detail||e.message).join('\n')||data.message||(typeof data.error==='string'?data.error:undefined)):data;
     throw Object.assign(new Error(message||`Request failed (${response.status})`),{status:response.status,code:data?.errors?.[0]?.code,requestId:response.headers.get("X-Request-ID")||data?.errors?.[0]?.request_id});
   }
   if(path==='/api/admin/settings'&&options.method&&options.method.toUpperCase()!=='GET')window.dispatchEvent(new Event('panel-settings-changed'));
-  if(mutationPath==='/api/auth/session'){setQueryCacheScope(queryCacheSessionIdentity(data));}
+  if(mutationPath==='/api/auth/session'){
+    const identity=queryCacheSessionIdentity(data);
+    // Someone else is signed in now. This tab stops saving until the account is identified again.
+    if(sessionIdentity!==undefined&&sessionIdentity!==identity)releaseSnapshotAccount();
+    sessionIdentity=identity;
+    setQueryCacheScope(identity);
+  }
+  if(identifying){
+    // Names whose saved copies may be shown, and lets the next start ask for account reads early.
+    const account=unwrap(data),id=account?.uuid??account?.id;
+    // Waited for, so that whatever is drawn with this answer already knows whose saved pages it may read.
+    if(id!==undefined&&id!==null&&id!==''){
+      // An early answer began when startup.js noted the shared store's revision. A store that is
+      // this page's own was not what startup.js looked at, so its revision at this call is used.
+      await identifySnapshotAccount(String(id),early&&snapshotStoreIsShared()?startedEarly:await startedHere);
+      // The note says account reads succeed. It is not written by an answer that a sign-out overtook.
+      if(signOutsAtStart===signedOutCount())rememberSignedIn(true);
+    }
+  }
 
   return data as T;
 }

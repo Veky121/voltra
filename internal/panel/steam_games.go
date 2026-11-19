@@ -82,7 +82,7 @@ func (a *App) steamGameCatalog(w http.ResponseWriter, r *http.Request) {
 	for _, spec := range steamGameSpecs {
 		games = append(games, steamGameSummary(spec))
 	}
-	writeJSON(w, 200, item("steam_game_catalog", M{"games": games}))
+	writeRevalidatedJSON(w, r, item("steam_game_catalog", M{"games": games}))
 }
 
 func steamGameHelp(game string) []M {

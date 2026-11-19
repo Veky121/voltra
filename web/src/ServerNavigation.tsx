@@ -4,14 +4,18 @@ import {createContext,useCallback,useContext,useEffect,useRef,useState,type Reac
 import {api,rows} from './lib';
 import {Icon} from './Icons';
 import {observeLiveNavigation} from './hooks/liveEvents';
+import {snapshotOwner} from './accountSnapshots';
+import {savedNavigation,saveNavigation} from './navigationSnapshot';
 
 export type NavigationServer={uuid:string;identifier:string;name:string;egg_name?:string;artwork?:ServerIdentityArtwork;status:string|null;favorite:boolean;last_visited_at:string|null};
 type NavigationState={servers:NavigationServer[];loading:boolean;error:string;pending:Set<string>;reload:()=>void;visit:(id:string)=>void;favorite:(id:string,value:boolean)=>Promise<void>};
 const Context=createContext<NavigationState>({servers:[],loading:true,error:'',pending:new Set(),reload:()=>{},visit:()=>{},favorite:async()=>{}});
 export const useServerNavigation=()=>useContext(Context);
 
+// The sidebar draws the last known list at once; the panel's answer replaces it.
 export function ServerNavigationProvider({children}:{children:ReactNode}){
- const [servers,setServers]=useState<NavigationServer[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,setRevision]=useState(0),[pending,setPending]=useState(new Set<string>());
+ const [saved]=useState(savedNavigation);
+ const [servers,setServers]=useState<NavigationServer[]>(saved??[]),[loading,setLoading]=useState(!saved),[error,setError]=useState(''),[revision,setRevision]=useState(0),[pending,setPending]=useState(new Set<string>());
  const busy=useRef(new Set<string>());
  const writeVersion=useRef(0);
  const reload=useCallback(()=>setRevision(v=>v+1),[]);
@@ -20,8 +24,9 @@ export function ServerNavigationProvider({children}:{children:ReactNode}){
   const abort=new AbortController();
   let timer:ReturnType<typeof setTimeout>;
   async function load(){
-   const version=writeVersion.current;
-   try{const data=await api('/api/client/account/server-navigation',{signal:abort.signal});if(!abort.signal.aborted){if(version!==writeVersion.current){reload();return;}setServers(rows(data));setError('');}}
+   // The answer is saved only for the account that asked for it.
+   const version=writeVersion.current,owner=snapshotOwner();
+   try{const data=await api('/api/client/account/server-navigation',{signal:abort.signal});if(!abort.signal.aborted){if(version!==writeVersion.current){reload();return;}const next=rows(data);setServers(next);saveNavigation(next,owner);setError('');}}
    catch(e){if(!abort.signal.aborted)setError(e instanceof Error?e.message:String(e));}
    finally{if(!abort.signal.aborted){setLoading(false);timer=setTimeout(load,60000);}}
   }

@@ -12,7 +12,7 @@ async function load(entry) {
  b.onResolve({filter:/.*/},args=>args.kind==='entry-point'?undefined:{path:args.path,namespace:'fixture'});
  b.onLoad({filter:/.*/,namespace:'fixture'},({path})=>{
  let contents;
- if(path==='react')contents=['useState','useEffect','useCallback','useRef'].map(n=>`export const ${n}=(...a)=>globalThis.__gate.${n}(...a);`).join('\n')+'\nexport const createContext=globalThis.__recoveryReact.createContext; export const Component=globalThis.__recoveryReact.Component;';
+ if(path==='react')contents=['useState','useEffect','useCallback','useRef'].map(n=>`export const ${n}=(...a)=>globalThis.__gate.${n}(...a);`).join('\n')+'\nexport const createContext=globalThis.__recoveryReact.createContext; export const Component=globalThis.__recoveryReact.Component; export const lazy=globalThis.__recoveryReact.lazy; export const Suspense=globalThis.__recoveryReact.Suspense;';
  else if(path==='react/jsx-runtime')contents='export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx;export const Fragment="fragment";';
  else if(path==='react-router-dom')contents='export const Link="a";export const useLocation=()=>({pathname:"/"});export const useNavigate=()=>()=>{};';
  else if(path==='./lib')contents='export const api=(...a)=>globalThis.__gate.request(...a);export const queryCacheSessionIdentity=s=>JSON.stringify(s);'+['Select','Button','Card','ErrorBox','Field','Loading'].map(n=>`export const ${n}="${n}";`).join('');
@@ -21,6 +21,8 @@ async function load(entry) {
  else if(path==='./notifications')contents='export const Feedback="Feedback";';
  else if(path==='./ui/ActionButton')contents='export const ActionButton="button";';
  else if(path==='./desktop')contents='export const DesktopRecoveryActions="recovery";';
+ else if(path==='./signedOut')contents='export const forgetSignedInAccount=()=>{globalThis.__forgotAccount=(globalThis.__forgotAccount||0)+1};';
+ else if(path==='./RouteRecovery')contents='export default "RouteRecovery";';
  else contents='export default "stub";';
  return {contents,loader:'js'};
  });
@@ -94,4 +96,20 @@ test('navigation resets a failed boundary without reloading the document',()=>{
  const rendered=boundary.render();
  assert.equal(rendered.props.children[1],'new route');
  assert.equal(rendered.props.children[0].props.hidden,true);
+});
+test('a session that ended without sign-out removes the saved pages; an open development panel keeps them',async()=>{
+ globalThis.__forgotAccount=0;
+ let f=fixture();f.requests[0].resolve(status);f.requests[1].resolve({authenticated:false});await f.settle();
+ try{assert(!protectedPage(f));assert.equal(globalThis.__forgotAccount,1);}finally{f.close();}
+ globalThis.__forgotAccount=0;
+ f=fixture();f.requests[0].resolve({...status,auth_enabled:false,dev_mode:true});f.requests[1].resolve({authenticated:false});await f.settle();
+ try{assert(protectedPage(f));assert.equal(globalThis.__forgotAccount,0);}finally{f.close();}
+ f=await ready();try{assert.equal(globalThis.__forgotAccount,0);}finally{f.close();}
+});
+test('the setup wizard and HTTPS check load inside the reload recovery',async()=>{
+ const inside=element=>element.type==='RouteRecovery'&&typeof element.props.children.type!=='string'&&!!element.props.children.props.fallback;
+ let f=fixture();f.requests[0].resolve({...status,needs_setup:true,setup_allowed:true});f.requests[1].resolve({authenticated:false});await f.settle();
+ try{assert(inside(f.value),'first-run setup');}finally{f.close();}
+ f=fixture();f.requests[0].resolve({...status,https_pending:true});f.requests[1].resolve(session);await f.settle();
+ try{assert(inside(f.value.props.children[0]),'pending HTTPS');}finally{f.close();}
 });

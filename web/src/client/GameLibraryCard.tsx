@@ -6,6 +6,7 @@ import {useArtworkLibrary} from './ArtworkProvider';
 import {useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Icon} from '../Icons';
+import {Skeleton} from '../components/ui/skeleton';
 import artworkCatalog from './gameArtwork.json';
 import './gameLibraryCards.css';
 
@@ -37,6 +38,17 @@ export function GameLibraryCard({name,subtitle,artwork,to,onClick,note,noteTitle
   return <article className="library-card games-ui">
     {to&&!disabledReason?<Link className="library-card-main" to={to}>{content}</Link>:onClick&&!disabledReason?<MiraAction type="button" className="library-card-main" onClick={onClick} aria-haspopup="dialog">{content}</MiraAction>:<div className="library-card-main library-card-main--disabled" aria-disabled="true">{content}</div>}
     {(note||source)&&<div className="library-card-foot"><span title={noteTitle}>{note}</span>{source&&<a href={source} target="_blank" rel="noreferrer" aria-label={`View recipe for ${name}`}>Recipe<Icon name="chevron"/></a>}</div>}
+  </article>;
+}
+
+// Same box as a real card, so the grid does not move when the games arrive.
+export function GameLibraryCardPlaceholder(){
+  return <article className="library-card library-card--placeholder games-ui" aria-hidden="true">
+    <div className="library-card-main library-card-main--disabled">
+      <div className="library-card-art"/>
+      <div className="library-card-copy"><h3><Skeleton className="library-card-line"/></h3><p><Skeleton className="library-card-line library-card-line--short"/></p></div>
+    </div>
+    <div className="library-card-foot"><span>&nbsp;</span></div>
   </article>;
 }
 

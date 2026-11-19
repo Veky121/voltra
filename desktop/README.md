@@ -81,10 +81,67 @@ Windows DPAPI encrypts the saved connection for the current Windows user in
 directory for development or testing. Protected connections remain tied to the
 Windows account even when a custom directory is used.
 
-An ephemeral loopback HTTP listener serves the embedded UI and supports native
-WebSocket forwarding. A random HttpOnly launch cookie, strict origin checks,
-and a local Host check protect it from unrelated browser pages. Only one app
-instance runs at a time. A second launch focuses the existing window.
+A loopback HTTP listener serves the embedded UI and supports native WebSocket
+forwarding. It prefers `127.0.0.1:47613`, so the WebView keeps one origin and
+with it the HTTP cache, compiled scripts and localStorage between launches. If
+that port is taken the listener uses any free port and that launch starts
+cold. A random HttpOnly launch cookie, strict origin checks, and a local Host
+check protect it from unrelated browser pages whichever port is used. Only one
+app instance runs at a time. A second launch focuses the existing window.
+
+When a connection is saved, the host asks the panel for the reads every start
+needs (setup state, session, account, settings, navigation, the artwork
+catalog and the first read of the page being reopened) as soon as the process
+starts. The first matching request from the page is answered from memory. An
+answer is used once, only for the connection it was fetched with, only within
+20 seconds of launch, and never after a write. Anything else goes to the panel
+as usual. Against a panel that is slow or offline the app behaves as before,
+except that a request for one of these reads first waits for the early read
+already on its way, never beyond those 20 seconds. If that read never reached
+the panel, a request that waited some seconds for it is told so, instead of
+trying for as long again. In the desktop app the page starts no reads of its own before its
+code runs: the host's are already on their way, and the WebView's few
+connections stay free for the window's own controls.
+
+The host also keeps a copy of what the linked account last saw, so the server
+list and sidebar can be drawn before the panel answers. It is stored beside
+the connection in `%APPDATA%\Voltra\pages-*.json`, one file per connection,
+named by a hash and containing no credential. Only what a server card or the
+sidebar draws is saved: server names, descriptions, node names, limits,
+status, and the image and egg names used to pick artwork, plus the Game
+Library's catalog of installable games. Live readings,
+allocations, startup commands and other variable values are never saved.
+Copies older than seven days are not used. Unlinking, signing out or linking
+another connection deletes the file, whichever port the app is running on.
+So does the panel rejecting the connection: the host deletes the file as
+soon as it hears that answer, on any request it makes, without waiting for
+the page. If the file cannot be deleted at that moment, it is not read or
+written again and the deletion is finished at the next request or start.
+An app that starts without a readable connection deletes any that remain.
+On every launch the saved pages are handed to the page only after the panel
+has accepted the connection in that launch, so a connection revoked while
+the app was closed shows nothing it saved earlier. Accepted means the panel
+answered an account read made with the connection by naming the account, or
+issued the connection in this launch; a bare 200, which a sign-in or
+maintenance page in front of the panel can also give, is not enough. Until
+then the host hands over nothing and accepts no save, so a launch that
+begins while the panel is unreachable cannot replace what was saved before.
+The page asks again once it has identified its account, and the saved pages
+of that account join what it has loaded since. Answers the host fetched
+early in a launch are dropped the moment it hears the panel refuse. The WebView's own localStorage
+holds nothing about the account's servers: a note that account reads
+succeeded last time, a random marker that changes at each sign-in and
+sign-out, and the sidebar width, filed under the account's id.
+
+Every request the host makes for the page belongs to one connection. The
+page is told which connection it was loaded for, in an HttpOnly cookie sent
+with its document, and says so with each request; the app reloads the page
+whenever it links or unlinks. A request from a page loaded for an earlier
+connection is refused rather than sent to another panel. When the app is
+unlinked, relinked or closed, that connection ends: requests still waiting
+are refused, requests already on their way to the panel are abandoned, and a
+late save of the page's copies is rejected instead of landing in the next
+connection's file.
 
 Remote panels require HTTPS. HTTP is allowed only for loopback development.
 Web account login stays with the panel. No Google or Cloudflare credentials

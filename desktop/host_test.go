@@ -44,7 +44,7 @@ func TestDesktopProxyCompressedWebsocketMetadata(t *testing.T) {
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	req.Header.Set("Cookie", "local-only=test")
 	w := httptest.NewRecorder()
-	h.proxy(w, req)
+	h.proxy(w, req, h.connection())
 	if w.Code != http.StatusOK {
 		t.Fatalf("compressed metadata returned %d", w.Code)
 	}
@@ -63,7 +63,7 @@ func TestDesktopProxyCompressedWebsocketMetadata(t *testing.T) {
 	req = httptest.NewRequest("GET", "http://localhost/api/client/artwork/test.png", nil)
 	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
 	w = httptest.NewRecorder()
-	h.proxy(w, req)
+	h.proxy(w, req, h.connection())
 	if w.Code != http.StatusOK || w.Header().Get("Content-Encoding") != "gzip" {
 		t.Fatal("ordinary compressed response was changed")
 	}

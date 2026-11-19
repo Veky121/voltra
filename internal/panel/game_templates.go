@@ -333,6 +333,7 @@ func (a *App) gameTemplateProbePlatform(ctx context.Context, node M) (string, er
 }
 
 func (a *App) registerGameTemplates(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/client/game-library/catalog", a.gameCatalog)
 	mux.HandleFunc("GET /api/client/game-library/templates", a.gameTemplateList)
 	mux.HandleFunc("GET /api/client/game-library/templates/{template}", a.gameTemplateOptions)
 	mux.HandleFunc("POST /api/client/game-library/templates/{template}/install", a.gameTemplateInstall)
@@ -345,11 +346,12 @@ func (a *App) gameTemplateList(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	out := []M{}
-	for _, entry := range gameTemplates().Entries {
-		out = append(out, templateSummary(entry))
+	responses, err := gameCatalogResponses()
+	if err != nil {
+		fail(w, err)
+		return
 	}
-	writeJSON(w, 200, item("game_templates", M{"games": out, "revision": gameTemplates().Revision, "can_install": boolean(user["root_admin"])}))
+	responses.templates[catalogAudience(user)].write(w, r)
 }
 
 func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {

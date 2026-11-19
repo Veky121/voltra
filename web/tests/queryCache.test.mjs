@@ -89,3 +89,10 @@ test('exact invalidations coalesce across consumers and fence the previous reque
  c.invalidateExactQuery(path);c.purgeQueryCache();await tick();assert.equal(n.calls.length,2);
  a.unsubscribe();b.unsubscribe();assert.equal(c.invalidateExactQuery('/not-cached'),false);
 });
+test('a console command leaves cached server reads alone while a power action refreshes them',async()=>{
+ c.purgeQueryCache();const n=network();let server;
+ const a=c.observeQuery(path,n.request,s=>server=s);await tick();
+ n.calls[0].resolve({name:'one'});await tick();
+ c.invalidateQueryCache(path+'/command');await tick();assert.equal(n.calls.length,1);assert.equal(server.data.name,'one');
+ c.invalidateQueryCache(path+'/power');await tick();assert.equal(n.calls.length,2);a.unsubscribe();
+});

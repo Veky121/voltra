@@ -18,7 +18,7 @@ func themeRequest(h *desktopHost, method, account, body string) *httptest.Respon
 	r := httptest.NewRequest(method, h.origin+"/desktop/theme", strings.NewReader(body))
 	r.Header.Set("Origin", h.origin)
 	r.Header.Set("X-Voltra-Account", account)
-	r.AddCookie(&http.Cookie{Name: "voltra_desktop", Value: h.launch})
+	asPage(h, r)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	return w

@@ -1,7 +1,7 @@
 import {Feedback} from './notifications';
 import {ActionButton as MiraAction} from './ui/ActionButton';
 import {ArtworkProvider} from './client/ArtworkProvider';
-import {Suspense,lazy,useEffect,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
+import {Suspense,useEffect,useLayoutEffect,useRef,useState,type CSSProperties} from 'react';
 import {useLocation} from 'react-router-dom';
 import {Loading,useAPI,unwrap} from './lib';
 import {SidebarTarget} from './Navigation';
@@ -13,15 +13,16 @@ import {ThemeProvider} from './ThemeProvider';
 import AppSidebar,{SidebarRouteEffects} from './components/AppSidebar';
 import {SidebarProvider,SidebarInset,SidebarTrigger} from './components/ui/sidebar';
 import {TooltipProvider} from './components/ui/tooltip';
-import {preloadRoute} from './hooks/preloadRoute';
-const loadClient=preloadRoute(()=>import('./Client'));
-const loadAdmin=preloadRoute(()=>import('./Admin'));
-const Client=lazy(loadClient);
-const Admin=lazy(loadAdmin);
+import {readyRoute} from './hooks/readyRoute';
+const Client=readyRoute(()=>import('./Client'));
+const Admin=readyRoute(()=>import('./Admin'));
+const inAdmin=(pathname:string)=>pathname==='/admin'||pathname.startsWith('/admin/');
+// Started with the bundle, so the section is in memory before the shell asks for it.
+void (inAdmin(window.location.pathname)?Admin:Client).preload().catch(()=>{});
 export default function App(){
  const location=useLocation();
- const admin=location.pathname==='/admin'||location.pathname.startsWith('/admin/');
- useEffect(()=>{void (admin?loadAdmin:loadClient)().catch(()=>{})},[admin]);
+ const admin=inAdmin(location.pathname);
+ useEffect(()=>{void (admin?Admin:Client).preload().catch(()=>{})},[admin]);
  return <SetupGate><AuthenticatedShell/></SetupGate>
 }
 function AuthenticatedShell(){

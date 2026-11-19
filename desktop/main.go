@@ -66,6 +66,8 @@ func main() {
 			},
 		},
 	})
+	// A second launch has already handed over to the running instance above.
+	host.startBootReads()
 	if err = configureUpdater(app, host); err != nil {
 		log.Printf("Updater disabled: %v", err)
 	}

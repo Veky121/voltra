@@ -11,6 +11,8 @@ import {Link} from 'react-router-dom';
 import {formatDesktopVersion,startUpdateChecks,updateAction,updateChannels,useDesktopUpdates} from './desktopUpdates';
 import {installDesktopWindowGestures} from './desktopWindowGestures';
 import {SettingsRow,SettingsSection} from './ui/Settings';
+import {forgetSignedInAccount} from './signedOut';
+import {desktopSnapshotsReady} from './desktopSnapshots';
 
 type Status={linked:boolean;panel_url:string;device_name:string;version:string;updates_enabled:boolean;storage_error?:string};
 async function local<T=Status>(path:string,body?:unknown):Promise<T>{
@@ -84,15 +86,21 @@ export default function DesktopGate({children}:{children:ReactNode}){
   const [confirmUnlink,setConfirmUnlink]=useState(false);
   const [troubleshooting,setTroubleshooting]=useState(false);
   useEffect(()=>{if(status?.updates_enabled)return startUpdateChecks()},[status?.updates_enabled]);
+  // An unlinked app keeps none of the last account's saved pages, and drops the note in
+  // this origin's storage that account reads succeeded last time. Only the sidebar width
+  // stays, filed under the account's id.
+  const unlinked=status?.linked===false;
+  useEffect(()=>{if(unlinked)forgetSignedInAccount()},[unlinked]);
   useEffect(()=>{
     const open=()=>setTroubleshooting(true);
     const shortcut=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.shiftKey&&!event.altKey&&event.code==='KeyT'&&!event.repeat){event.preventDefault();open();}};
     window.addEventListener('keydown',shortcut);window.addEventListener('desktop-troubleshoot-requested',open);
     return()=>{window.removeEventListener('keydown',shortcut);window.removeEventListener('desktop-troubleshoot-requested',open)};
   },[]);
-  const refresh=()=>{setError('');local('status').then(s=>{setStatus(s);setName(s.device_name||'My computer')}).catch(e=>setError(e.message))};
+  // The saved pages are read before the app renders, so its first paint can use them.
+  const refresh=()=>{setError('');local('status').then(async s=>{if(s.linked)await desktopSnapshotsReady();setStatus(s);setName(s.device_name||'My computer')}).catch(e=>setError(e.message))};
   useEffect(()=>{refresh();const rejected=()=>setDisconnected(true),requestUnlink=()=>setConfirmUnlink(true);window.addEventListener('desktop-session-rejected',rejected);window.addEventListener('panel-auth-changed',refresh);window.addEventListener('desktop-unlink-requested',requestUnlink);return()=>{window.removeEventListener('desktop-session-rejected',rejected);window.removeEventListener('panel-auth-changed',refresh);window.removeEventListener('desktop-unlink-requested',requestUnlink)}},[]);
-  async function unlink(){setBusy(true);setError('');try{await local('unlink',{});window.location.assign('/')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+  async function unlink(){setBusy(true);setError('');try{await local('unlink',{});forgetSignedInAccount();window.location.assign('/')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   const unlinkDialog=confirmUnlink&&<Modal title="Unlink panel?" onClose={()=>{if(!busy)setConfirmUnlink(false)}}><p>This removes the saved connection from this computer. You can connect to another panel with a new connection string.</p><p className="muted">{status?.panel_url}</p><ErrorBox>{error}</ErrorBox><div className="actions"><Button variant="secondary" disabled={busy} onClick={()=>setConfirmUnlink(false)}>Cancel</Button><Button variant="danger" disabled={busy} onClick={()=>void unlink()}>{busy?'Unlinking…':'Unlink panel'}</Button></div></Modal>;
   const titlebar=<><DesktopTitlebar maximized={maximized} onMaximizedChange={setMaximized}/>{troubleshooting&&<Modal title="Troubleshooting" onClose={()=>setTroubleshooting(false)}>
     <SettingsSection title="Desktop"><SettingsRow label="Build" control={<span className="settings-value">{status?.version||'Unavailable'}</span>}/><SettingsRow label="Panel" control={<span className="desktop-app-panel">{status?.panel_url||'Not connected'}</span>}/></SettingsSection>

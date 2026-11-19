@@ -23,6 +23,9 @@
 .library-card-foot>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .library-card-foot a{display:inline-flex;align-items:center;gap:2px;flex-shrink:0;color:var(--muted)}
 .library-card-foot svg{width:11px;height:11px}
+.library-card--placeholder:hover{border-color:var(--ui-border);box-shadow:none}
+.library-card--placeholder .library-card-line{display:block;height:.8em;width:72%;margin-top:.35em;border-radius:3px;background:color-mix(in srgb,var(--text) 9%,transparent)}
+.library-card--placeholder .library-card-line--short{width:54%}
 .game-template-catalog{margin-top:36px}
 .game-template-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);align-items:start;gap:32px}
 .game-template-intro h2{font-size:calc(16px * var(--ui-font-scale,1));margin:0 0 8px}

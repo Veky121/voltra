@@ -17,13 +17,25 @@ function harness(reduced=false){
 test('holds over initial gate and lazy route, then releases input after 150ms fade',()=>{
  const h=harness();h.tick(1000);assert.equal(h.removed,false);assert.equal(h.root.inert,true);
  h.render(true);h.tick(1000);assert.equal(h.removed,false);
- h.render(false);h.tick(400);assert.equal(h.classes.has('settled'),true);assert.equal(h.removed,false);
- h.tick(140);assert.equal(h.classes.has('leaving'),true);assert.equal(h.removed,false);
+ h.render(false);h.tick(90);assert.equal(h.classes.size,0);
+ h.tick(160);assert.equal(h.classes.has('settled'),true);assert.equal(h.classes.has('leaving'),false);assert.equal(h.removed,false);
+ h.tick(100);assert.equal(h.classes.has('leaving'),true);assert.equal(h.removed,false);
  h.tick(150);assert.equal(h.removed,true);assert.equal(h.root.inert,false);
 });
 test('a chained loading gate cancels early completion',()=>{
  const h=harness();h.tick(20);h.render(false);h.tick(200);h.render(true);h.tick(1000);assert.equal(h.removed,false);
  h.render(false);h.tick(700);assert.equal(h.removed,true);
+});
+test('a page that keeps changing once it has loaded does not hold the splash',()=>{
+ // Live readings and artwork touch the page every few milliseconds from here on.
+ const h=harness();h.tick(20);h.render(false);
+ for(let i=0;i<14;i++){h.tick(30);h.render(false);if(i===2)assert.equal(h.removed,false);}
+ assert.equal(h.classes.has('leaving'),true);h.tick(40);assert.equal(h.removed,true);
+});
+test('a loading state that returns during the exit undoes it',()=>{
+ const h=harness();h.tick(20);h.render(false);h.tick(150);assert.equal(h.classes.has('settled'),true);
+ h.render(true);assert.equal(h.classes.size,0);h.tick(1000);assert.equal(h.removed,false);
+ h.render(false);h.tick(90);assert.equal(h.classes.size,0);h.tick(360);assert.equal(h.removed,true);
 });
 test('real recovery error is revealed even if a loading marker remains',()=>{
  const h=harness();h.tick(20);h.render(true,true);h.tick(700);assert.equal(h.removed,true);

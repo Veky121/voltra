@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -10,15 +11,21 @@ func TestResumeSurvivesHostRestartAndIsolatesConnections(t *testing.T) {
 	dir := t.TempDir()
 	s := session{PanelURL: "https://panel.example", DeviceID: "first", Token: "linked"}
 	h := &desktopHost{dir: dir, session: s}
+	// page is a request from the page loaded for the host's connection as it is now.
+	page := func(method, body string) *http.Request {
+		r := httptest.NewRequest(method, "/desktop/resume", strings.NewReader(body))
+		r.AddCookie(&http.Cookie{Name: pageCookie, Value: h.connection().id})
+		return r
+	}
 	w := httptest.NewRecorder()
-	h.serveResume(w, httptest.NewRequest("POST", "/desktop/resume", strings.NewReader(`{"path":"/server/abc/files"}`)))
+	h.serveResume(w, page("POST", `{"path":"/server/abc/files"}`))
 	if w.Code != 200 {
 		t.Fatal(w.Body.String())
 	}
 	h = &desktopHost{dir: dir, session: s}
 	get := func() string {
 		w := httptest.NewRecorder()
-		h.serveResume(w, httptest.NewRequest("GET", "/desktop/resume", nil))
+		h.serveResume(w, page("GET", ""))
 		return w.Body.String()
 	}
 	if !strings.Contains(get(), "/server/abc/files") {

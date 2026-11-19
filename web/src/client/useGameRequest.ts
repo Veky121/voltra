@@ -3,8 +3,10 @@ import {api, unwrap} from '../lib';
 import {useAPIRequest} from '../hooks/useAPIRequest';
 import {isLivePathFresh} from '../hooks/liveEvents';
 
-export function useGameRequest<T>(path:string|null,poll=0){
-  const result=useAPIRequest<any>(path,api);
+type Request=<R>(path:string,options?:RequestInit)=>Promise<R>;
+// Pass a module-level `request`: the shared cache only reuses a read for the same function.
+export function useGameRequest<T>(path:string|null,poll=0,request:Request=api){
+  const result=useAPIRequest<any>(path,request);
   // Schedule after completion, so a slow response never overlaps the next poll.
   useEffect(()=>{
     if(!path||!poll||result.loading)return;

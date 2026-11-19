@@ -1,6 +1,7 @@
 import {AdminResourceSummary} from '../admin/FleetSummary';
 import {ResourceSummary,ResourceMetric} from '../ui/ResourceSummary';
 import {queryCacheEpoch} from '../hooks/queryCache';
+import {snapshotOwner} from '../accountSnapshots';
 import {readOverviewSnapshot,writeOverviewSnapshot} from './overviewSnapshot';
 import {formatMiBGB} from '../resourceUnits';
 import {compareServers} from './serverOrder';
@@ -34,6 +35,9 @@ function useOverview(){
     let stateTimer:ReturnType<typeof setTimeout>,resourceTimer:ReturnType<typeof setTimeout>,flushTimer:ReturnType<typeof setTimeout>|undefined;
     let stateAbort=new AbortController(),resourceAbort=new AbortController();
     let records:ServerRecord[]=readOverviewSnapshot()??[];
+    // Who the list in `records` was asked for. A saved copy is written only for that account,
+    // and nothing is written for a list that was restored rather than fetched.
+    let listOwner:number|undefined;
     let statePolling=false,resourcePolling=false;
     const generations=new Map<string,object>();
     for(const server of records)generations.set(server.uuid,{});
@@ -64,7 +68,7 @@ function useOverview(){
       for(const s of next)if(!generations.has(s.uuid)||previous.get(s.uuid)?.status!==s.status)generations.set(s.uuid,{});
       records=next;
       syncSubscriptions();
-      writeOverviewSnapshot(records,epoch);
+      writeOverviewSnapshot(records,epoch,listOwner);
       setServers(records);
     }
     function flush(){
@@ -74,7 +78,7 @@ function useOverview(){
           const update=pending.get(s.uuid);
           return update&&update.generation===generations.get(s.uuid)&&!s.status&&!s.is_installing?{...s,...update.patch}:s;
         });
-        writeOverviewSnapshot(records,epoch);
+        writeOverviewSnapshot(records,epoch,listOwner);
         setServers(records);
       }
       pending.clear();
@@ -128,7 +132,7 @@ function useOverview(){
       const controller=stateAbort=new AbortController();
       try{
         if(metadataAt===0||Date.now()-metadataAt>=60000){
-          const version=metadataVersion;
+          const version=metadataVersion,owner=snapshotOwner();
           let response=await api('/api/client?summary=overview&per_page=100',{signal:controller.signal});
           const all=items(response);
           const pages=Number(response.meta?.pagination?.total_pages??1);
@@ -138,6 +142,7 @@ function useOverview(){
           }
           if(!active||controller.signal.aborted||version!==metadataVersion)return;
           const previous=new Map(records.map(s=>[s.uuid,s]));
+          listOwner=owner;
           publish(all.map(s=>({...s,liveState:s.status||(s.is_installing?'installing':previous.get(s.uuid)?.liveState||'unknown'),resources:previous.get(s.uuid)?.resources,resourceError:previous.get(s.uuid)?.resourceError})));
           metadataAt=Date.now();
         }else if(!isLivePathFresh(statesPath)){
@@ -238,12 +243,14 @@ export default function Overview(){
     {administrator?<AdminResourceSummary/>:<ResourceSummary>{(['cpu','memory','disk'] as const).map(key=>{
       const available=q.servers.filter(s=>s.resources&&!s.resourceError);
       const complete=!q.loading&&!q.error&&available.length===q.servers.length;
+      // A list drawn from the saved copy has no readings yet; that is loading, not a failure.
+      const checking=!q.error&&q.servers.some(s=>s.liveState==='unknown');
       const used=available.reduce((total,s)=>total+Number(s.resources?.[key==='cpu'?'cpu_absolute':key==='memory'?'memory_bytes':'disk_bytes']||0),0)/(key==='cpu'?100:1024**2);
       const limit=q.servers.reduce((total,s)=>total+Number(s.limits?.[key]||0),0)/(key==='cpu'?100:1);
       const unlimited=q.servers.some(s=>!s.limits?.[key]);
       const format=(amount:number)=>key==='cpu'?`${amount.toFixed(2)} vCPUs`:formatMiBGB(amount);
       return <ResourceMetric key={key} label={key==='cpu'?'CPU':key==='memory'?'Memory':'Storage'}
-        value={complete?format(used):q.loading?'Loading':'Unavailable'}
+        value={complete?format(used):q.loading||checking?'Loading':'Unavailable'}
         percent={complete&&!unlimited&&limit>0?used/limit*100:undefined}
         title="Live usage across your accessible servers. Limits are server allocations, not node capacity."
         note={!complete?`Readings from ${available.length}/${q.servers.length} servers`:<>{unlimited?'Unlimited server limits':`${format(limit)} allocated`} {"\u00b7"} {running} online / {q.servers.length} servers</>}/>;

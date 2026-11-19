@@ -38,10 +38,26 @@ func acceptsGzip(value string) bool {
 	return wildcard
 }
 
+// Shipped artwork, icons and fonts keep their names between releases, so they
+// cannot be immutable. A day of reuse with background revalidation stops a
+// library page from re-checking every image on each visit. The page shell and
+// start-up files stay no-cache so a new build is picked up at once.
+func shippedMedia(path string) bool {
+	for _, prefix := range []string{"/artwork/", "/game-artwork/", "/game-icons/", "/backgrounds/", "/fonts/", "/brand/"} {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *App) serveWebFile(w http.ResponseWriter, r *http.Request, name string, info os.FileInfo) {
 	hashed := strings.HasPrefix(r.URL.Path, "/assets/") && immutableWebAsset.MatchString(filepath.Base(name))
 	if !hashed {
 		w.Header().Set("Cache-Control", "no-cache")
+		if shippedMedia(r.URL.Path) {
+			w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800")
+		}
 		http.ServeFile(w, r, name)
 		return
 	}

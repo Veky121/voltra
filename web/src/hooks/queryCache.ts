@@ -25,7 +25,7 @@ export function queryTTL(path:string):number {
   if(/^\/api\/application\/(nodes|servers)\?per_page=100$/.test(path))return 5000;
   if(/^\/api\/client(?:\?[^#]*)?$/.test(path))return 5000;
   if(/^\/api\/client\/servers\/[^/?#]+$/.test(path))return 5000;
-  if(/^\/api\/client\/game-library\/(templates|steam)(?:\?[^#]*)?$/.test(path))return 30000;
+  if(/^\/api\/client\/game-library\/(catalog|templates|steam)(?:\?[^#]*)?$/.test(path))return 30000;
   return 0;
 }
 function emit(entry:Entry){for(const listener of entry.listeners)listener();}
@@ -79,6 +79,9 @@ export function fenceQueryResponse(path:string){
 export function invalidateQueryCache(mutationPath?:string){
   const path=mutationPath===undefined?undefined:normalizedQueryPath(mutationPath).split('?')[0];
   if(path&&/\/(navigation|favorite|favourite)(?:\/|$)/.test(path))return;
+  // A console command reaches the game, not the panel: its output arrives on the
+  // console socket and no cached read changes. Power actions still refresh.
+  if(path&&/^\/api\/client\/servers\/[^/]+\/command$/.test(path))return;
   const server=path?.match(/^\/api\/client\/servers\/([^/]+)/)?.[1];
   for(const entry of entries.values()){
     if(path!==undefined){

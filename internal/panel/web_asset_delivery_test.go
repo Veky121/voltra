@@ -96,3 +96,32 @@ func TestAcceptsGzip(t *testing.T) {
 		}
 	}
 }
+
+func TestServeWebCachesShippedMediaButNotTheShell(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"/game-artwork/rust.webp": "public, max-age=86400, stale-while-revalidate=604800",
+		"/game-icons/paper.png":   "public, max-age=86400, stale-while-revalidate=604800",
+		"/fonts/inter.woff2":      "public, max-age=86400, stale-while-revalidate=604800",
+		"/index.html":             "no-cache",
+		"/startup.js":             "no-cache",
+		"/manifest.json":          "no-cache",
+	}
+	for path := range files {
+		name := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(name), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, []byte("content"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a := &App{Config: Config{WebDir: root}}
+	for path, want := range files {
+		w := httptest.NewRecorder()
+		a.serveWeb(w, httptest.NewRequest("GET", path, nil))
+		if got := w.Header().Get("Cache-Control"); (w.Code != 200 && w.Code != 301) || got != want {
+			t.Fatalf("%s: status %d, Cache-Control %q, want %q", path, w.Code, got, want)
+		}
+	}
+}

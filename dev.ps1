@@ -125,7 +125,19 @@ function Start-DevProcess([string]$Name,[string]$Executable,[string[]]$Arguments
     $start = @{FilePath=$Executable; WorkingDirectory=$root; WindowStyle='Hidden'; PassThru=$true; RedirectStandardOutput=(Join-Path $logsDir "$Name.out.log"); RedirectStandardError=(Join-Path $logsDir "$Name.err.log")}
     if ($Arguments.Count) { $start.ArgumentList=$Arguments }
     $process = Start-Process @start
-    Write-Json (Join-Path $stateDir "$Name.json") @{workspace=$workspace;pid=$process.Id;started_ticks=$process.StartTime.ToUniversalTime().Ticks.ToString();executable=$process.Path;started_at=[DateTime]::UtcNow.ToString('o')}
+    # Windows can report no image path for a process that has only just started.
+    # An empty path in the record would make every later ownership check fail.
+    $executable = $process.Path
+    for ($attempt = 0; -not $executable -and $attempt -lt 30; $attempt++) {
+        Start-Sleep -Milliseconds 100
+        $executable = (Get-Process -Id $process.Id -ErrorAction SilentlyContinue).Path
+    }
+    if (-not $executable) {
+        # An unrecorded process would keep its port and block the next start.
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        throw "$Name started as PID $($process.Id), but Windows did not report its executable. It was stopped and not recorded; check the $Name log."
+    }
+    Write-Json (Join-Path $stateDir "$Name.json") @{workspace=$workspace;pid=$process.Id;started_ticks=$process.StartTime.ToUniversalTime().Ticks.ToString();executable=$executable;started_at=[DateTime]::UtcNow.ToString('o')}
 }
 function Start-Database {
     $existing = Get-Container $containers.database

@@ -17,6 +17,7 @@ import {managedSteamServer} from "./client/gameSetupModel";
 import {useServerNavigation} from './ServerNavigation';
 import {isLivePathFresh} from './hooks/liveEvents';
 import {ServerTransfers} from './client/ServerTransfers';
+import {readyRoute} from './hooks/readyRoute';
 
 const Account = lazy(() => import("./client/Account").then(module => ({default: module.Account})));
 const Activity = lazy(() => import("./client/Account").then(module => ({default: module.Activity})));
@@ -27,7 +28,10 @@ const ServerSettings = lazy(() => import("./client/ServerSettings"));
 const ServerAdminTools = lazy(() => import("./client/ServerAdminTools"));
 const Schedules = lazy(() => import("./client/Collaboration").then(module => ({default: module.Schedules})));
 const Users = lazy(() => import("./client/Collaboration").then(module => ({default: module.Users})));
-const Overview = lazy(() => import("./client/Overview"));
+// The page most starts land on. Loading it with this module lets it be drawn
+// with the shell instead of after a loading state.
+const Overview = readyRoute(() => import("./client/Overview"));
+void Overview.preload().catch(() => {});
 const GameLibrary = lazy(() => import("./client/GameLibrary").then(module => ({default: module.GameLibrary})));
 const MinecraftSetup = lazy(() => import("./client/GameLibrary").then(module => ({default: module.MinecraftSetup})));
 const MinecraftContent = lazy(() => import("./client/MinecraftContent").then(module => ({default: module.MinecraftContent})));

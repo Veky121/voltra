@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS allocations (
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(node_id,ip,port)
 );
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='servers_allocation_fk' AND conrelid='servers'::regclass) THEN ALTER TABLE servers ADD CONSTRAINT servers_allocation_fk FOREIGN KEY(allocation_id) REFERENCES allocations(id); END IF; END $$;
+-- PostgreSQL does not index foreign keys. Server pages read these by server.
+CREATE INDEX IF NOT EXISTS allocations_server ON allocations(server_id) WHERE server_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS server_variables (
  id bigserial PRIMARY KEY,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,variable_id bigint NOT NULL REFERENCES egg_variables(id) ON DELETE CASCADE,variable_value text NOT NULL DEFAULT '',
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(server_id,variable_id)
@@ -119,18 +121,21 @@ CREATE TABLE IF NOT EXISTS subusers (
  id bigserial PRIMARY KEY,user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,permissions jsonb NOT NULL DEFAULT '[]',
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(server_id,user_id)
 );
+CREATE INDEX IF NOT EXISTS subusers_user ON subusers(user_id);
 CREATE TABLE IF NOT EXISTS backups (
  id bigserial PRIMARY KEY,uuid text NOT NULL UNIQUE,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,name text NOT NULL,ignored_files jsonb NOT NULL DEFAULT '[]',disk text NOT NULL DEFAULT 'wings',
  checksum text,bytes bigint NOT NULL DEFAULT 0,is_successful boolean NOT NULL DEFAULT false,is_locked boolean NOT NULL DEFAULT false,completed_at timestamptz,upload_id text,deleted_at timestamptz,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE backups ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+CREATE INDEX IF NOT EXISTS backups_server_created ON backups(server_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS schedules (
  id bigserial PRIMARY KEY,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,name text NOT NULL,cron_minute text NOT NULL DEFAULT '*',cron_hour text NOT NULL DEFAULT '*',cron_day_of_month text NOT NULL DEFAULT '*',cron_month text NOT NULL DEFAULT '*',cron_day_of_week text NOT NULL DEFAULT '*',
  is_active boolean NOT NULL DEFAULT true,is_processing boolean NOT NULL DEFAULT false,only_when_online boolean NOT NULL DEFAULT false,last_run_at timestamptz,next_run_at timestamptz,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS schedules_due ON schedules(next_run_at) WHERE is_active;
+CREATE INDEX IF NOT EXISTS schedules_server ON schedules(server_id);
 CREATE TABLE IF NOT EXISTS tasks (
  id bigserial PRIMARY KEY,schedule_id bigint NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,sequence_id bigint NOT NULL,action text NOT NULL,payload text NOT NULL DEFAULT '',time_offset bigint NOT NULL DEFAULT 0,
  continue_on_failure boolean NOT NULL DEFAULT false,is_queued boolean NOT NULL DEFAULT false,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(schedule_id,sequence_id)
@@ -150,6 +155,7 @@ CREATE TABLE IF NOT EXISTS databases (
  id bigserial PRIMARY KEY,server_id bigint NOT NULL REFERENCES servers(id) ON DELETE CASCADE,database_host_id bigint NOT NULL REFERENCES database_hosts(id),database text NOT NULL,username text NOT NULL,remote text NOT NULL DEFAULT '%',password text NOT NULL,max_connections bigint NOT NULL DEFAULT 0,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(database_host_id,database),UNIQUE(database_host_id,username)
 );
+CREATE INDEX IF NOT EXISTS databases_server ON databases(server_id);
 CREATE TABLE IF NOT EXISTS mounts (
  id bigserial PRIMARY KEY,uuid text NOT NULL UNIQUE,name text NOT NULL,description text NOT NULL DEFAULT '',source text NOT NULL,target text NOT NULL,read_only boolean NOT NULL DEFAULT true,user_mountable boolean NOT NULL DEFAULT false,
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
@@ -185,6 +191,7 @@ ALTER TABLE server_transfers DROP CONSTRAINT IF EXISTS server_transfers_old_node
 ALTER TABLE server_transfers DROP CONSTRAINT IF EXISTS server_transfers_new_node_fkey;
 ALTER TABLE server_transfers DROP CONSTRAINT IF EXISTS server_transfers_old_allocation_fkey;
 ALTER TABLE server_transfers DROP CONSTRAINT IF EXISTS server_transfers_new_allocation_fkey;
+CREATE INDEX IF NOT EXISTS server_transfers_pending ON server_transfers(server_id) WHERE successful IS NULL;
 ALTER TABLE database_hosts DROP CONSTRAINT IF EXISTS database_hosts_node_id_fkey;
 ALTER TABLE database_hosts ADD CONSTRAINT database_hosts_node_id_fkey FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE SET NULL;
 -- Outbound panel email was removed. Retire its queue and transport credentials.

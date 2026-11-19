@@ -15,7 +15,13 @@ import (
 var resumePath = regexp.MustCompile(`^/(?:$|(?:server|account|admin|game-library)(?:/[A-Za-z0-9_-]+)*/?$)`)
 
 func writePreference(dir, name string, data []byte) error {
-	f, err := os.CreateTemp(dir, ".preference-*")
+	return writeAtomically(dir, ".preference-*", name, data)
+}
+
+// writeAtomically replaces dir/name with data through a temporary file named
+// by pattern, so a reader never sees half a file.
+func writeAtomically(dir, pattern, name string, data []byte) error {
+	f, err := os.CreateTemp(dir, pattern)
 	if err != nil {
 		return err
 	}
@@ -36,6 +42,25 @@ func writePreference(dir, name string, data []byte) error {
 	return os.Rename(f.Name(), filepath.Join(dir, name))
 }
 
+func resumeFile(s session) string {
+	sum := sha256.Sum256([]byte(s.PanelURL + "\x00" + s.DeviceID))
+	return "resume-" + hex.EncodeToString(sum[:]) + ".json"
+}
+
+// savedPath is the page this connection reopens on.
+func (h *desktopHost) savedPath(s session) string {
+	var state struct {
+		Path string `json:"path"`
+	}
+	if data, err := os.ReadFile(filepath.Join(h.dir, resumeFile(s))); err == nil {
+		_ = json.Unmarshal(data, &state)
+	}
+	if !resumePath.MatchString(state.Path) {
+		return "/"
+	}
+	return state.Path
+}
+
 func (h *desktopHost) serveResume(w http.ResponseWriter, r *http.Request) {
 	// Holding the session lock prevents an unlink/relink from saving into another profile.
 	h.mu.Lock()
@@ -44,20 +69,17 @@ func (h *desktopHost) serveResume(w http.ResponseWriter, r *http.Request) {
 		desktopError(w, 401, "Link your account first.")
 		return
 	}
-	sum := sha256.Sum256([]byte(h.session.PanelURL + "\x00" + h.session.DeviceID))
-	name := "resume-" + hex.EncodeToString(sum[:]) + ".json"
+	if !h.connectionLocked().loadedFor(r) {
+		connectionChanged(w)
+		return
+	}
+	name := resumeFile(h.session)
 	var state struct {
 		Path string `json:"path"`
 	}
 	switch r.Method {
 	case http.MethodGet:
-		data, err := os.ReadFile(filepath.Join(h.dir, name))
-		if err == nil {
-			_ = json.Unmarshal(data, &state)
-		}
-		if !resumePath.MatchString(state.Path) {
-			state.Path = "/"
-		}
+		state.Path = h.savedPath(h.session)
 		desktopJSON(w, 200, state)
 	case http.MethodPost:
 		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2048))
