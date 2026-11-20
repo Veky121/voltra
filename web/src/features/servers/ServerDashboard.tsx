@@ -1,6 +1,5 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
-import {serverStatusIsPending, serverStatusKey, serverStatusVocabulary} from '../../serverStatus';
+import {serverStatusKey, serverStatusVocabulary} from '../../serverStatus';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {ButtonFeedback} from '../../ui/ButtonFeedback';
 import ServerStorageSummary from './ServerStorageSummary';
@@ -45,6 +44,7 @@ import {Item, ItemMedia, ItemContent, ItemDescription} from '../../components/ui
 import {Icon, type IconName} from '../../Icons';
 import {bytes, resourceUsageGB, resourceLimitGB, can, items, PageError, useServer, value} from '../shared/common';
 import './serverHeader.css';
+import './powerProgress.css';
 import {ServerConnection} from './ServerConnection';
 import './shadcn-cards.css';
 import './dashboard-ui.css';
@@ -493,12 +493,7 @@ export function ServerStateLine({compact = false, showUptime = compact}: {compac
         aria-live={compact ? 'polite' : undefined}
       >
         <span className="server-meta-label">Status:</span>
-        {(action.pending && !telemetry.error) ||
-        (statusText !== 'Connection unavailable' && serverStatusIsPending(serverStatusKey(statusState))) ? (
-          <TerminalSpinner />
-        ) : (
-          <span className="status-dot" />
-        )}
+        <span className="status-dot" />
         <span className="server-state-text">{statusText}</span>
       </span>
       {fs25 &&
@@ -515,7 +510,7 @@ export function ServerStateLine({compact = false, showUptime = compact}: {compac
               }
             >
               <span className="server-meta-label">Game server:</span>
-              {service === 'starting' || service === 'stopping' ? <TerminalSpinner /> : <span className="status-dot" />}
+              <span className="status-dot" />
               <span>{serviceLabels[service] || 'Unknown'}</span>
             </span>
           );
@@ -568,11 +563,20 @@ export function ServerWorkspace({children}: {children: ReactNode}) {
     (!server.status || server.status === 'reinstall_failed') && !server.is_installing
   );
   const power = usePowerOperation(base, telemetry);
+  const transition =
+    power.pending?.signal ||
+    (!telemetry.error
+      ? telemetry.state === 'starting'
+        ? 'start'
+        : telemetry.state === 'stopping'
+          ? 'stop'
+          : undefined
+      : undefined);
   return (
     <TelemetryContext.Provider value={telemetry}>
       <PowerContext.Provider value={power}>
         {!dashboardPage ? (
-          <header className="server-topbar">
+          <header className="server-topbar" data-power-transition={transition} data-power-paused={!!telemetry.error}>
             <div className="server-summary">
               <ServerTitle />
               <ServerStateLine compact />
@@ -581,7 +585,12 @@ export function ServerWorkspace({children}: {children: ReactNode}) {
           </header>
         ) : (
           <header>
-            <Card className="server-hero server-hero-with-artwork shadcn-card" data-artwork={art.id}>
+            <Card
+              className="server-hero server-hero-with-artwork shadcn-card"
+              data-artwork={art.id}
+              data-power-transition={transition}
+              data-power-paused={!!telemetry.error}
+            >
               <DashboardArtwork key={art.src} art={art} />
               <CardHeader className="server-hero-info">
                 <div className="server-hero-title">

@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {SettingsSection, SettingsRow} from '../../../ui/Settings';
 import {useState} from 'react';
@@ -27,11 +26,7 @@ export function FS25Licences({serverID}: {serverID: number}) {
           <Feedback tone="success" message={<>{success}</>} />
         </>
       )}
-      {!data && !query.error && (
-        <p role="status">
-          <TerminalSpinner /> Loading assigned licences...
-        </p>
-      )}
+      {!data && !query.error && <p>Loading assigned licences...</p>}
       {data && (
         <>
           <div className="settings-options-grid">

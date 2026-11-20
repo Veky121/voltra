@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
 import {miBToGB} from '../../resourceUnits.ts';
@@ -70,11 +69,7 @@ export function SteamGameTiles() {
           Retry games
         </Button>
       )}
-      {request.loading && !request.data && (
-        <p role="status">
-          <TerminalSpinner /> Loading games...
-        </p>
-      )}
+      {request.loading && !request.data && <p role="status">Loading games...</p>}
       {request.data?.games.map(game => (
         <GameLibraryCard
           key={game.id}
@@ -106,11 +101,7 @@ export default function SteamGames() {
               Retry game options
             </Button>
           )}
-          {request.loading && !request.data && (
-            <p role="status">
-              <TerminalSpinner /> Loading setup options...
-            </p>
-          )}
+          {request.loading && !request.data && <p role="status">Loading setup options...</p>}
           {request.data && <SteamSetupForm key={game} game={game} options={request.data} />}
         </>
       )}

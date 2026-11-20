@@ -1,4 +1,4 @@
-import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
+import {TerminalProgress} from '../../ui/TerminalProgress';
 import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {BackupOverview, backupDisplayName, backupOriginLabel, backupCreated} from './BackupOverview';
 import {LockKeyhole} from 'lucide-react';
@@ -116,15 +116,13 @@ export function Backups() {
               <div className="backup-card-heading">
                 <div className="backup-card-title">
                   <h3 title={backupDisplayName(b.name)}>{backupDisplayName(b.name)}</h3>
-                  {active ? (
-                    <div className="backup-card-feedback" role="status" title={active.label}>
-                      <TerminalProgress label={active.label} />
-                    </div>
-                  ) : (
-                    <p className="backup-card-feedback" role="status" title={backupOriginLabel(b.origin)}>
-                      {pending ? 'Creating backup...' : backupOriginLabel(b.origin)}
-                    </p>
-                  )}
+                  <p
+                    className="backup-card-feedback"
+                    role="status"
+                    title={active?.label || backupOriginLabel(b.origin)}
+                  >
+                    {active?.label || (pending ? 'Creating backup...' : backupOriginLabel(b.origin))}
+                  </p>
                 </div>
                 <div className="backup-card-status">
                   <span
@@ -233,7 +231,6 @@ export function Backups() {
             </Field>
             <Check label="Lock backup against deletion" checked={locked} onChange={setLocked} />
             <Button type="submit" disabled={a.busy}>
-              {a.busy && <TerminalSpinner />}
               Start backup
             </Button>
           </form>
@@ -244,7 +241,6 @@ export function Backups() {
           <p>The server will stop. Existing files may be overwritten by this backup.</p>
           <Check label="Delete all existing files before restoring" checked={truncate} onChange={setTruncate} />
           <Button variant="danger" disabled={a.busy} onClick={() => perform(restore.uuid, 'restore', {truncate})}>
-            {activeAction && <TerminalSpinner />}
             Restore backup
           </Button>
         </Modal>

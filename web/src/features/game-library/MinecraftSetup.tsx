@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {PageHeading} from '../../ui/PageHeading';
 import {RadioGroup, RadioGroupItem} from '../../components/ui/radio-group';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
@@ -97,7 +96,7 @@ export function MinecraftSetup() {
       )}
       {request.loading && (
         <div className="mc-state" role="status">
-          <TerminalSpinner />
+          <span className="spinner" />
           Loading Minecraft options...
         </div>
       )}
@@ -401,7 +400,7 @@ function MinecraftSetupForm({
                   )}
                   {loaderRequest.loading ? (
                     <p className="muted" role="status">
-                      <TerminalSpinner /> Loading {loaderName} versions...
+                      Loading {loaderName} versions...
                     </p>
                   ) : (
                     loaderRequest.data &&
@@ -471,7 +470,7 @@ function MinecraftSetupForm({
           <p className="muted mc-help">Automatic selects the Java version required by the game and loader.</p>
           {runtimeRequest.loading && (
             <p className="muted" role="status">
-              <TerminalSpinner /> Loading registered Java runtimes...
+              Loading registered Java runtimes...
             </p>
           )}
           <ErrorBox>{runtimeRequest.error}</ErrorBox>

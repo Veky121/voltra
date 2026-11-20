@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {Input as MiraInput} from '../../components/ui/input';
 import {
@@ -363,7 +362,7 @@ function SessionCheck({error, onRetry}: {error: string; onRetry: () => void}) {
     >
       <Card>
         <p id="session-check-title" role="status">
-          <TerminalSpinner /> Checking who is signed in…
+          Checking who is signed in…
         </p>
         {error ? (
           <>
@@ -402,7 +401,6 @@ function SessionControls({session, onSignedOut}: {session: Session; onSignedOut:
           }
         }}
       >
-        {busy && <TerminalSpinner />}
         {busy ? 'Signing out...' : 'Sign out'}
       </Button>
     </div>
@@ -471,7 +469,6 @@ function Login({session, onAuthenticated}: {session: Session; onAuthenticated: (
         </Field>
         <ErrorBox>{error}</ErrorBox>
         <Button type="submit" disabled={busy}>
-          {busy && <TerminalSpinner />}
           {busy ? 'Signing in...' : 'Sign in'}
         </Button>
       </form>

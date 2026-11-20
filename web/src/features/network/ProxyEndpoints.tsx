@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {ButtonFeedback} from '../../ui/ButtonFeedback';
 import {RefreshCw, Link2} from 'lucide-react';
@@ -25,19 +24,14 @@ export function ProxyEndpoints({base, revision = 0}: {base: string; revision?: n
   const account = useAPI<Resource<Account>>('/api/client/account'),
     admin = value(account.data)?.root_admin === true;
   const query = useAPI<ResourceList<ProxyRoute>>(!account.loading && !admin ? `${base}/proxy-routes` : null);
-  if (account.loading)
-    return (
-      <p role="status">
-        <TerminalSpinner /> Loading proxy settings...
-      </p>
-    );
+  if (account.loading) return <p role="status">Loading proxy settings...</p>;
   if (admin) return <ServerProxyManager key={`${base}:${revision}`} base={base} />;
   return (
     <SettingsSection title="Public connections">
       <PageError error={account.error || query.error} />
       {query.error ? null : query.loading ? (
         <p className="server-proxy-note" role="status">
-          <TerminalSpinner /> Loading connections...
+          Loading connections...
         </p>
       ) : (
         <RouteTable routes={items(query.data)} />
@@ -209,7 +203,7 @@ function ServerProxyManager({base}: {base: string}) {
         <PageError error={error} onDismiss={() => setError('')} />
         {query.error && !data ? null : query.loading && !data ? (
           <p className="server-proxy-note" role="status">
-            <TerminalSpinner /> Loading connections...
+            Loading connections...
           </p>
         ) : (
           <>

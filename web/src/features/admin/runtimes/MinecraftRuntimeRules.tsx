@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {usePendingSetting} from '../../shared/PendingSettings';
 import {Badge as MiraBadge} from '../../../components/ui/badge';
@@ -120,11 +119,7 @@ export function MinecraftRuntimeRules() {
         </Button>
       </div>
       {(query.error || error) && <Feedback tone="error" message={<>{query.error || error}</>} />}
-      {query.loading && (
-        <p role="status">
-          <TerminalSpinner /> Loading runtime rules...
-        </p>
-      )}
+      {query.loading && <p role="status">Loading runtime rules...</p>}
       {!query.loading && !query.error && rules.length === 0 && (
         <p className="muted">No overrides. Minecraft and loader metadata choose Java automatically.</p>
       )}

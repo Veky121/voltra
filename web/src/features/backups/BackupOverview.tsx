@@ -3,7 +3,6 @@ import type {ResourceList, Schedule} from '../../types/api';
 import {can, date, items, useServer} from '../shared/common';
 import {backupProtection} from '../servers/serverProtection';
 import {backupStorage} from '../servers/serverStorage';
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {formatBytesGB} from '../../resourceUnits';
 import {formatDateTime, parseDateTime} from '../../format';
 
@@ -37,15 +36,11 @@ export function BackupOverview({response, error}: {response: any; error: string}
     <div className="backup-overview">
       <div className="backup-summary">
         <span>
-          {typeof count === 'number' ? (
-            `${count}${typeof limit === 'number' ? ` / ${limit}` : ''} backups`
-          ) : error ? (
-            'Usage unavailable'
-          ) : (
-            <>
-              <TerminalSpinner /> Loading usage…
-            </>
-          )}
+          {typeof count === 'number'
+            ? `${count}${typeof limit === 'number' ? ` / ${limit}` : ''} backups`
+            : error
+              ? 'Usage unavailable'
+              : 'Loading usage…'}
         </span>
         {storage && (
           <span>
@@ -56,19 +51,15 @@ export function BackupOverview({response, error}: {response: any; error: string}
         {readable && (
           <>
             <span>
-              {schedules.error ? (
-                'Schedule unavailable'
-              ) : !schedules.data ? (
-                <>
-                  <TerminalSpinner /> Loading schedule…
-                </>
-              ) : protection.next ? (
-                `Next backup: ${date(protection.next)}`
-              ) : protection.count ? (
-                'Next backup pending'
-              ) : (
-                'No scheduled backups'
-              )}
+              {schedules.error
+                ? 'Schedule unavailable'
+                : !schedules.data
+                  ? 'Loading schedule…'
+                  : protection.next
+                    ? `Next backup: ${date(protection.next)}`
+                    : protection.count
+                      ? 'Next backup pending'
+                      : 'No scheduled backups'}
             </span>
             {!schedules.error && protection.onlineOnly && <span>Only when online</span>}
             {schedules.error && (

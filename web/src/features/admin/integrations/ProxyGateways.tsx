@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {usePendingSetting, useDiscardSettings} from '../../shared/PendingSettings';
 import {IntegrationLayout, IntegrationField as Field} from './IntegrationLayout';
@@ -645,7 +644,7 @@ function Gateway({gateway, onChanged, onDeleted}: {gateway: RecordItem; onChange
       </fieldset>
       {busy && (
         <p className="proxy-gateways__status" role="status">
-          <TerminalSpinner /> {busy}...
+          {busy}...
         </p>
       )}
     </>

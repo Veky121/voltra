@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {TextPanelSkeleton} from '../../ui/ServerPageSkeleton';
 import {confirmAction} from '../../ui/ConfirmAction';
@@ -477,7 +476,6 @@ function DocumentSession({
               Discard changes
             </Button>
             <Button disabled={busy || !writable} onClick={() => void save()}>
-              {busy && <TerminalSpinner />}
               {busy ? 'Saving...' : 'Save changes'}
             </Button>
           </div>

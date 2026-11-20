@@ -1,4 +1,3 @@
-import {TerminalProgress, TerminalSpinner} from '../../../ui/TerminalProgress';
 import {ReinstallServerButton} from '../../server-settings/ReinstallServerButton';
 import {accountNickname} from '../../account/accountProfile';
 import {confirmAction} from '../../../ui/ConfirmAction';
@@ -225,12 +224,7 @@ export function Startup({
     ])
   );
   if (contextual) {
-    if (q.loading)
-      return (
-        <p role="status">
-          <TerminalSpinner /> Loading runtime settings...
-        </p>
-      );
+    if (q.loading) return <p role="status">Loading runtime settings...</p>;
     if (!egg || q.error) return <ErrorMessage error={q.error || 'Runtime settings are unavailable.'} />;
     if (restrictedOnly && vars.length === 0) return null;
     const current = {...environment, ...record.container?.environment};
@@ -449,10 +443,7 @@ export function Transfer({record, onSaved}: {record: any; onSaved: () => void}) 
             }
           />
           <div className="actions admin-form-actions">
-            <MiraAction disabled={busy}>
-              {busy && <TerminalSpinner />}
-              {busy ? 'Transferring…' : 'Start transfer'}
-            </MiraAction>
+            <MiraAction disabled={busy}>{busy ? 'Transferring…' : 'Start transfer'}</MiraAction>
           </div>
         </form>
       </Panel>
@@ -469,15 +460,13 @@ export function Transfer({record, onSaved}: {record: any; onSaved: () => void}) 
             {
               label: 'Status',
               render: x =>
-                x.successful == null && x.archived ? (
-                  'Cancelled'
-                ) : (
-                  <TerminalProgress
-                    label={x.successful === true ? 'Completed' : x.successful === false ? 'Failed' : 'In progress'}
-                    state={x.successful === true ? 'done' : x.successful === false ? 'failed' : 'running'}
-                    value={null}
-                  />
-                ),
+                x.successful === true
+                  ? 'Completed'
+                  : x.successful === false
+                    ? 'Failed'
+                    : x.archived
+                      ? 'Cancelled'
+                      : 'In progress',
             },
           ]}
         />
@@ -546,7 +535,7 @@ export function ServerMounts({record, contextual = false}: {record: any; context
         <SettingsSection title="Mounts" className="server-mounts-section">
           {q.loading ? (
             <p className="settings-section-note" role="status">
-              <TerminalSpinner /> Loading mounts...
+              Loading mounts...
             </p>
           ) : !mounts.length ? (
             <p className="settings-section-note">No mounts available for this server.</p>

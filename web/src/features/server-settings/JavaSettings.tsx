@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {gbToMiB, miBToGB} from '../../resourceUnits.ts';
 import '../game-library/games-ui.css';
 import {SettingsRow, SettingsSection, Switch} from '../../ui/Settings';
@@ -297,10 +296,7 @@ export function JavaSettings({
           </SettingsSection>
           {data.can_update && (
             <div className="java-settings-actions">
-              <Button type="submit">
-                {action.busy && <TerminalSpinner />}
-                {action.busy ? 'Saving...' : 'Save Java settings'}
-              </Button>
+              <Button type="submit">{action.busy ? 'Saving...' : 'Save Java settings'}</Button>
             </div>
           )}
         </fieldset>

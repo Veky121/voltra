@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import './minecraftSetup.css';
 import {GameSwitch} from '../shared/GameSwitch';
 import './games-ui.css';
@@ -143,7 +142,7 @@ export function MinecraftCatalog({
       )}
       {request.loading || pendingSearch ? (
         <div className="mc-state" role="status">
-          <TerminalSpinner />
+          <span className="spinner" />
           Loading modpacks...
         </div>
       ) : (
@@ -264,7 +263,7 @@ function PackVersions({
       )}
       {request.loading ? (
         <div className="mc-state" role="status">
-          <TerminalSpinner /> Loading pack versions...
+          Loading pack versions...
         </div>
       ) : (
         request.data && (

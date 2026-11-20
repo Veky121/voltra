@@ -5,7 +5,7 @@ import {ActionButton} from '../../ui/ActionButton';
 import {Feedback} from '../../notifications';
 import {notifications} from '../../notificationEvents';
 import {formatDesktopVersion, updateAction, useDesktopUpdates} from './desktopUpdates';
-import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
+import {TerminalProgress} from '../../ui/TerminalProgress';
 import {bytesProgressValue, formatBytesProgress} from '../../ui/terminalProgressModel';
 
 export const DesktopUpdatesEnabled = createContext(false);
@@ -25,9 +25,10 @@ function activityLabel(operation: string | null, stage?: string) {
 
 export function DesktopUpdateProgress() {
   const {status, busy, operation, error, progress} = useDesktopUpdates();
-  const downloading = operation === 'update-install' && progress?.stage === 'downloading';
+  if (busy && operation !== 'update-install') return null;
+  const downloading = progress?.stage === 'downloading';
   const total = downloading && progress.total > 0 ? progress.total : undefined;
-  const failed = !!error || status?.state === 'error';
+  const failed = !!progress && (!!error || status?.state === 'error');
   const label = busy
     ? activityLabel(operation, progress?.stage)
     : failed
@@ -99,7 +100,7 @@ export function DesktopUpdateControl() {
         onClick={() => void check()}
       >
         {busy ? (
-          <TerminalSpinner />
+          <RefreshCw className="desktop-update-spinner" aria-hidden="true" />
         ) : ready ? (
           <RotateCw aria-hidden="true" />
         ) : available ? (

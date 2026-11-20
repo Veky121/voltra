@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {settingDescription} from '../server-settings/settingDescription';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
@@ -156,11 +155,7 @@ export function GameTemplateCatalog({minecraftOnly = false}: {minecraftOnly?: bo
           Retry catalog
         </Button>
       )}
-      {request.loading && !request.data && (
-        <p role="status">
-          <TerminalSpinner /> Loading game catalog...
-        </p>
-      )}
+      {request.loading && !request.data && <p role="status">Loading game catalog...</p>}
       {request.data && (
         <p role="status" className="muted">
           {matches.length} of {games.length} recipes
@@ -235,11 +230,7 @@ export default function GameTemplateSetup() {
           Retry setup
         </Button>
       )}
-      {request.loading && !request.data && (
-        <p role="status">
-          <TerminalSpinner /> Loading game requirements...
-        </p>
-      )}
+      {request.loading && !request.data && <p role="status">Loading game requirements...</p>}
       {request.data &&
         (request.data.managed_game ? (
           <ManagedTemplateSetup key={template} template={request.data} game={request.data.managed_game} />
@@ -260,11 +251,7 @@ function ManagedTemplateSetup({template, game}: {template: Template; game: Steam
           Retry setup
         </Button>
       )}
-      {request.loading && !request.data && (
-        <p role="status">
-          <TerminalSpinner /> Loading game requirements...
-        </p>
-      )}
+      {request.loading && !request.data && <p role="status">Loading game requirements...</p>}
       {request.data && (
         <SteamSetupForm game={game} options={request.data} about={<TemplateSetupAbout template={template} />} />
       )}

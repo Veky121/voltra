@@ -18,6 +18,7 @@ export function ReinstallServerButton({
   const [reinstallOpen, setReinstallOpen] = useState(false);
   const [backupFirst, setBackupFirst] = useState(true);
   const [reinstallStage, setReinstallStage] = useState('');
+  const requestingReinstall = reinstallStage === 'Requesting reinstall?';
   const reinstallAbort = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -50,16 +51,14 @@ export function ReinstallServerButton({
         <Modal
           title={`Reinstall ${server.name}?`}
           onClose={() => {
-            if (reinstallStage === 'Requesting reinstall?') return;
+            if (requestingReinstall) return;
             reinstallAbort.current?.abort();
             setReinstallOpen(false);
           }}
         >
           <Notice action={a} />
           {r.loading ? (
-            <div role="status">
-              <TerminalProgress label="Loading backup options..." />
-            </div>
+            <p role="status">Loading backup options...</p>
           ) : (
             <>
               <p>
@@ -100,15 +99,20 @@ export function ReinstallServerButton({
               )}
             </>
           )}
-          {reinstallStage && (
-            <div role="status" aria-live="polite">
-              <TerminalProgress label={reinstallStage} />
-            </div>
-          )}
+          {reinstallStage &&
+            (requestingReinstall ? (
+              <p role="status" aria-live="polite">
+                {reinstallStage}
+              </p>
+            ) : (
+              <div role="status" aria-live="polite">
+                <TerminalProgress label={reinstallStage} />
+              </div>
+            ))}
           <div className="settings-actions">
             <Button
               variant="secondary"
-              disabled={reinstallStage === 'Requesting reinstall?'}
+              disabled={requestingReinstall}
               onClick={() => {
                 reinstallAbort.current?.abort();
                 setReinstallOpen(false);

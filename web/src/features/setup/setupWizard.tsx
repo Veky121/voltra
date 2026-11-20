@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 // First-run setup and the HTTPS check that follows it. Loaded on demand: a
 // configured panel never shows either screen.
 import {Feedback} from '../../notifications';
@@ -82,7 +81,6 @@ export function PendingHTTPS({
             }
           }}
         >
-          {busy && <TerminalSpinner />}
           {busy ? 'Checking HTTPS...' : 'Check again'}
         </Button>
       </div>
@@ -359,7 +357,7 @@ export function SetupWizard({
               <p className="setup-address">{publicURL}</p>
               {busy === 'check' && (
                 <p role="status" className="muted">
-                  <TerminalSpinner /> Checking panel reachability and HTTPS...
+                  Checking panel reachability and HTTPS...
                 </p>
               )}
               {validation && <SetupChecks validation={validation} />}
@@ -392,12 +390,10 @@ export function SetupWizard({
           )}
           {step === 4 && (
             <Button variant="secondary" disabled={!!busy} onClick={validate}>
-              {busy === 'check' && <TerminalSpinner />}
               {busy === 'check' ? 'Checking...' : 'Check again'}
             </Button>
           )}
           <Button type="submit" disabled={!!busy || (step === 4 && !checksOK && !canStage)}>
-            {busy === 'save' && <TerminalSpinner />}
             {busy === 'save' ? 'Saving...' : step < 4 ? 'Continue' : checksOK ? 'Finish setup' : 'Save pending setup'}
           </Button>
         </div>

@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {useState, type ComponentProps, type ReactNode} from 'react';
 import {Link} from 'react-router-dom';
 import {Button, Card, ErrorBox} from '../../lib';
@@ -185,7 +184,6 @@ export function GameSetupSummary({
         <ErrorBox>{error}</ErrorBox>
         {children}
         <Button type="submit" disabled={disabled || busy} aria-busy={busy} aria-describedby={describedBy}>
-          {busy && <TerminalSpinner />}
           {busy ? 'Creating server...' : install}
         </Button>
         <p className="muted game-setup-install-note">{note}</p>

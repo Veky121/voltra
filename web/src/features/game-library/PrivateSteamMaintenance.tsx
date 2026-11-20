@@ -1,4 +1,4 @@
-import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
+import {TerminalProgress} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
 import {GameSwitch} from '../shared/GameSwitch';
@@ -230,7 +230,6 @@ export default function PrivateSteamMaintenance({
           )}
           {!stopped && <p className="muted">Stop the server before checking its downloaded files.</p>}
           <Button variant="secondary" disabled={recoveryBlocked} onClick={() => void recover()}>
-            {recovering && <TerminalSpinner />}
             {recovering ? 'Checking downloaded files…' : 'Recover download result'}
           </Button>
           {recovering && (

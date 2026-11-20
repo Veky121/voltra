@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {useState} from 'react';
 import {api, Button, Input, useAPI, unwrap} from '../../lib';
@@ -88,7 +87,7 @@ export default function DesktopApps() {
         >
           {devices.loading && (
             <p className="operations-empty" role="status">
-              <TerminalSpinner /> Loading devices...
+              Loading devices...
             </p>
           )}
           {!devices.loading && !items(devices.data).length && (

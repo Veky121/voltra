@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import './games-ui.css';
 import {useMemo, useState, type ReactNode} from 'react';
 import {Link, useSearchParams} from 'react-router-dom';
@@ -136,7 +135,7 @@ export function GameCatalog({minecraftCard, search}: {minecraftCard: ReactNode; 
       ) : (
         catalog.loading && (
           <p className="game-family-count muted" role="status">
-            <TerminalSpinner /> Loading games...
+            Loading games...
           </p>
         )
       )}

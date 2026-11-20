@@ -30,7 +30,6 @@ function load() {
       Feedback: ({message, id}) => React.createElement('span', {'data-notification': true, id}, message),
     },
     '../server-settings/settingDescription': settingDescription,
-    '../../ui/TerminalProgress': {TerminalSpinner: 'terminal-spinner'},
     '../../ui/PageHeading': {PageHeading: ({children}) => React.createElement('header', null, children)},
     '../../ui/Disclosure': {
       Disclosure: ({open, onOpenChange, ...props}) => React.createElement('details', {...props, open}),

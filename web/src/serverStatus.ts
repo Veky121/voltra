@@ -56,9 +56,6 @@ export function serverStatusKey(state: unknown): ServerStatus {
   return typeof state === 'string' && Object.hasOwn(names, state) ? names[state] : 'unknown';
 }
 
-export const serverStatusIsPending = (state: ServerStatus): boolean =>
-  ['starting', 'stopping', 'installing', 'restoring', 'transferring', 'checking'].includes(state);
-
 export type ServerStatusInput = {
   /** The panel's server status (installing, suspended, restoring_backup...), or null. */
   status?: string | null;

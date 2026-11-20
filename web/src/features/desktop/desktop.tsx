@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {DesktopUpdateProgress, DesktopUpdatesEnabled} from './DesktopUpdateControl';
 import {Feedback} from '../../notifications';
 import {confirmAction} from '../../ui/ConfirmAction';
@@ -398,7 +397,6 @@ export default function DesktopGate({children}: {children: ReactNode}) {
           Cancel
         </Button>
         <Button variant="danger" disabled={busy} onClick={() => void unlink()}>
-          {busy && <TerminalSpinner />}
           {busy ? 'Unlinking…' : 'Unlink panel'}
         </Button>
       </div>
@@ -527,7 +525,6 @@ export default function DesktopGate({children}: {children: ReactNode}) {
               <Input required maxLength={100} value={name} onChange={e => setName(e.target.value)} disabled={busy} />
             </Field>
             <Button type="submit" disabled={busy}>
-              {busy && <TerminalSpinner />}
               {busy ? 'Connecting...' : 'Connect account'}
             </Button>
             {status.linked && (

@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {usePendingSetting} from '../shared/PendingSettings';
 import {confirmAction} from '../../ui/ConfirmAction';
@@ -312,7 +311,7 @@ function APIKeys() {
           ))}
           {r.loading && (
             <p className="operations-empty" role="status">
-              <TerminalSpinner /> Loading API keys...
+              Loading API keys...
             </p>
           )}
           {!r.loading && !items(r.data).length && <Card className="operations-empty">No API keys yet.</Card>}
@@ -413,7 +412,7 @@ function SSHKeys() {
           ))}
           {r.loading && (
             <p className="operations-empty" role="status">
-              <TerminalSpinner /> Loading SSH keys...
+              Loading SSH keys...
             </p>
           )}
           {!r.loading && !items(r.data).length && <Card className="operations-empty">No SSH keys yet.</Card>}

@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
 import './games-ui.css';
 import {useEffect, useState} from 'react';
@@ -69,11 +68,7 @@ export function GamePorts({
         <strong>Ports</strong>
         <span>Automatic</span>
       </div>
-      {loading && (
-        <p role="status">
-          <TerminalSpinner /> Finding available game ports...
-        </p>
-      )}
+      {loading && <p role="status">Finding available game ports...</p>}
       {!loading && !plan && !error && (
         <p className="muted">
           The game’s preferred ports are assigned during installation. If occupied, Voltra tries the next available

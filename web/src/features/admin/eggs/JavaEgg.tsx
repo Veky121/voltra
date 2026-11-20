@@ -1,4 +1,3 @@
-import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {useEffect, useState} from 'react';
 import {Button, Field, Input, Select, Textarea, api} from '../../../lib';
@@ -176,10 +175,7 @@ export function JavaEgg({
             </p>
           </fieldset>
           <div className="actions admin-form-actions">
-            <Button type="submit">
-              {busy && <TerminalSpinner />}
-              {busy ? 'Saving...' : 'Save Java settings'}
-            </Button>
+            <Button type="submit">{busy ? 'Saving...' : 'Save Java settings'}</Button>
           </div>
         </fieldset>
       </form>

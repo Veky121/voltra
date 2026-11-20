@@ -364,8 +364,9 @@ test('uploads keep a single named progress bar above the dashboard and per-file 
 
 test('desktop update bytes stay outside the phase announcement', () => {
   const sample = {stage: 'downloading', total: 1000, written: 370};
+  const snapshot = {busy: true, operation: 'update-install', progress: sample};
   const {DesktopUpdateProgress} = loadModule(url('features/desktop/DesktopUpdateControl.tsx'), {
-    './desktopUpdates': {useDesktopUpdates: () => ({busy: true, operation: 'update-install', progress: sample})},
+    './desktopUpdates': {useDesktopUpdates: () => snapshot},
     '../../ui/TerminalProgress': terminalProgress,
     '../../ui/terminalProgressModel': {
       ...progress,
@@ -384,9 +385,17 @@ test('desktop update bytes stay outside the phase announcement', () => {
   const preparing = render(DesktopUpdateProgress);
   assert.match(preparing, /role="status">Verifying and preparing update<\/span>/);
   assert.match(preparing, /role="progressbar" aria-label="Installing app update"/);
+
+  snapshot.progress = null;
+  for (const operation of ['update-status', 'updates', 'update-channel', 'update-restart']) {
+    snapshot.operation = operation;
+    assert.equal(render(DesktopUpdateProgress), '');
+  }
+  Object.assign(snapshot, {busy: false, operation: null, error: 'Unable to check for updates'});
+  assert.equal(render(DesktopUpdateProgress), '');
 });
 
-test('busy SteamCMD status renders one check spinner', () => {
+test('busy SteamCMD status uses the original check text', () => {
   const {default: RuntimeManagement} = loadModule(url('features/admin/runtimes/RuntimeManagement.tsx'), {
     react: {...react, useState: initial => react.useState(initial === '' ? '1' : initial)},
     '../../../lib': {
@@ -409,11 +418,11 @@ test('busy SteamCMD status renders one check spinner', () => {
       Switch: nil,
     },
     '../../shared/PendingSettings': {useDiscardSettings: nil, usePendingSetting: nil},
-    '../../../ui/TerminalProgress': terminalProgress,
     '../../../format': {formatDateTime: nil},
     '../../../notifications': {Feedback: nil},
   });
   const markup = render(RuntimeManagement);
-  assert.match(markup, /Checking…/);
-  assert.equal(markup.match(/class="terminal-spinner"/g)?.length, 1);
+  assert.match(markup, /Checking for updates…/);
+  assert.match(markup, /<button[^>]* disabled=""[^>]*>Checking…<\/button>/);
+  assert.doesNotMatch(markup, /terminal-spinner|terminal-progress/);
 });
