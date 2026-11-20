@@ -5,11 +5,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
-func squadAuthorityFixture(t *testing.T) squadAuthorityInput {
+func squadAuthorityFixture(t *testing.T) gamesettings.SquadAuthorityInput {
 	t.Helper()
-	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/squad-authority/current-emitted-fixture-console-v2.json")
+	data, err := os.ReadFile("../gamesettings/testdata/game-settings/game-parity-20261029/squad-authority/current-emitted-fixture-console-v2.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +22,7 @@ func squadAuthorityFixture(t *testing.T) squadAuthorityInput {
 	if err := json.Unmarshal(data, &f); err != nil {
 		t.Fatal(err)
 	}
-	in := squadAuthorityInput{Recipe: squadSettingsRecipe, Path: squadSettingsPath, Startup: f.Startup, EggStartup: f.Startup, ConfigFiles: json.RawMessage(f.ConfigFiles), Environment: map[string]string{"VOLTRA_TACTICAL": "squad", "SRCDS_APPID": "403240", "WINDOWS_INSTALL": "0"}, Helpers: map[string][]byte{}}
+	in := gamesettings.SquadAuthorityInput{Recipe: gamesettings.SquadSettingsRecipe, Path: gamesettings.SquadSettingsPath, Startup: f.Startup, EggStartup: f.Startup, ConfigFiles: json.RawMessage(f.ConfigFiles), Environment: map[string]string{"VOLTRA_TACTICAL": "squad", "SRCDS_APPID": "403240", "WINDOWS_INSTALL": "0"}, Helpers: map[string][]byte{}}
 	for k, v := range f.Helpers {
 		in.Helpers[k] = []byte(v)
 	}
@@ -32,50 +33,53 @@ func TestSquadAuthorityReviewedEmitted(t *testing.T) {
 	in := squadAuthorityFixture(t)
 	// Conflicting file/env counts are safe: env only seeds absent keys.
 	in.Environment["maxplayers"] = "80"
-	if err := validateSquadSettingsAuthority(in); err != nil {
+	if err := gamesettings.ValidateSquadSettingsAuthority(in); err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := parseSquadSettings([]byte("MaxPlayers=21\nNumReservedSlots=2\n"))
+	parsed, err := gamesettings.ParseSquadSettings([]byte("MaxPlayers=21\nNumReservedSlots=2\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := parsed.patch(map[string]string{"MaxPlayers": "22"})
+	result, err := parsed.Patch(map[string]string{"MaxPlayers": "22"})
 	if err != nil || !strings.Contains(string(result), "MaxPlayers=22") {
 		t.Fatalf("%s %v", result, err)
 	}
 }
 
 func TestSquadAuthorityRefusals(t *testing.T) {
-	cases := map[string]func(*squadAuthorityInput){
-		"direct canonical launcher": func(i *squadAuthorityInput) {
+	cases := map[string]func(*gamesettings.SquadAuthorityInput){
+		"direct canonical launcher": func(i *gamesettings.SquadAuthorityInput) {
 			i.Startup = "/home/container/SquadGame/Binaries/Linux/SquadGameServer SquadGame Port={{SERVER_PORT}} QueryPort={{QUERY_PORT}} -beaconport={{BEACON_PORT}}"
 		},
-		"fixed appended": func(i *squadAuthorityInput) { i.Startup += " FIXEDMAXPLAYERS=80" },
-		"egg drift":      func(i *squadAuthorityInput) { i.EggStartup += " -log" },
-		"inactive path":  func(i *squadAuthorityInput) { i.Path = "/SquadGame/Saved/Config/LinuxServer/Server.cfg" },
-		"recipe":         func(i *squadAuthorityInput) { i.Recipe = "post_scriptum/egg-post-scriptum.json" },
-		"original rewrite": func(i *squadAuthorityInput) {
+		"fixed appended": func(i *gamesettings.SquadAuthorityInput) { i.Startup += " FIXEDMAXPLAYERS=80" },
+		"egg drift":      func(i *gamesettings.SquadAuthorityInput) { i.EggStartup += " -log" },
+		"inactive path":  func(i *gamesettings.SquadAuthorityInput) { i.Path = "/SquadGame/Saved/Config/LinuxServer/Server.cfg" },
+		"recipe":         func(i *gamesettings.SquadAuthorityInput) { i.Recipe = "post_scriptum/egg-post-scriptum.json" },
+		"original rewrite": func(i *gamesettings.SquadAuthorityInput) {
 			i.ConfigFiles = json.RawMessage(`{"SquadGame/ServerConfig/Server.cfg":{"parser":"file","find":{"MaxPlayers":"MaxPlayers={{server.build.env.maxplayers}}"}}}`)
 		},
-		"null mappings":      func(i *squadAuthorityInput) { i.ConfigFiles = json.RawMessage(`null`) },
-		"malformed mappings": func(i *squadAuthorityInput) { i.ConfigFiles = json.RawMessage(`{`) },
-		"helper drift": func(i *squadAuthorityInput) {
+		"null mappings":      func(i *gamesettings.SquadAuthorityInput) { i.ConfigFiles = json.RawMessage(`null`) },
+		"malformed mappings": func(i *gamesettings.SquadAuthorityInput) { i.ConfigFiles = json.RawMessage(`{`) },
+		"helper drift": func(i *gamesettings.SquadAuthorityInput) {
 			i.Helpers[".voltra/squad_owner.py"] = append(i.Helpers[".voltra/squad_owner.py"], byte(' '))
 		},
-		"missing dependency": func(i *squadAuthorityInput) { delete(i.Helpers, ".voltra/tactical_runtime.py") },
-		"alias conflict":     func(i *squadAuthorityInput) { i.Environment["maxplayers"] = "20"; i.Environment["MAXPLAYERS"] = "80" },
-		"wrong app":          func(i *squadAuthorityInput) { i.Environment["SRCDS_APPID"] = "393380" },
-		"wrong selection":    func(i *squadAuthorityInput) { i.Environment["VOLTRA_TACTICAL"] = "postscriptum" },
+		"missing dependency": func(i *gamesettings.SquadAuthorityInput) { delete(i.Helpers, ".voltra/tactical_runtime.py") },
+		"alias conflict": func(i *gamesettings.SquadAuthorityInput) {
+			i.Environment["maxplayers"] = "20"
+			i.Environment["MAXPLAYERS"] = "80"
+		},
+		"wrong app":       func(i *gamesettings.SquadAuthorityInput) { i.Environment["SRCDS_APPID"] = "393380" },
+		"wrong selection": func(i *gamesettings.SquadAuthorityInput) { i.Environment["VOLTRA_TACTICAL"] = "postscriptum" },
 	}
 	for _, key := range []string{"FIXEDMAXPLAYERS", "fixedmaxplayers", "EXTRA_ARGS", "STARTUP_FLAGS", "LD_PRELOAD", "PYTHONPATH"} {
 		k := key
-		cases[k] = func(i *squadAuthorityInput) { i.Environment[k] = "override" }
+		cases[k] = func(i *gamesettings.SquadAuthorityInput) { i.Environment[k] = "override" }
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
 			in := squadAuthorityFixture(t)
 			mutate(&in)
-			if validateSquadSettingsAuthority(in) == nil {
+			if gamesettings.ValidateSquadSettingsAuthority(in) == nil {
 				t.Fatal("unsafe authority accepted")
 			}
 		})
@@ -98,7 +102,7 @@ func TestSquadAuthorityFixtureMatchesCurrentProfile(t *testing.T) {
 	if err = json.Unmarshal(data, &profiles); err != nil {
 		t.Fatal(err)
 	}
-	egg := profiles[squadSettingsRecipe].Egg
+	egg := profiles[gamesettings.SquadSettingsRecipe].Egg
 	if egg.Startup != in.Startup || egg.Config.Files != string(in.ConfigFiles) {
 		t.Fatal("reviewed profile changed")
 	}

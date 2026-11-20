@@ -3,10 +3,7 @@ package panel
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,57 +12,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode/utf16"
+	"voltra/internal/gamesettings"
 )
 
 const palworldSettingsPath = "/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
 const quickFileLimit = 1 << 20
-
-type quickField struct {
-	Key, Label, Type string
-	Min, Max         float64
-	Options          []string
-	Secret           bool
-}
-
-func quickSingleLine(value string) bool {
-	return strings.IndexFunc(value, func(r rune) bool { return r < 32 || r == 127 }) < 0
-}
-
-func quickFields(game string) []quickField {
-	switch game {
-	case "7days":
-		return []quickField{{Key: "ServerName", Label: "Server name", Type: "text", Max: 100}, {Key: "ServerDescription", Label: "Description", Type: "text", Max: 512}, {Key: "ServerPassword", Label: "Join password", Type: "text", Max: 128, Secret: true}, {Key: "ServerMaxPlayerCount", Label: "Player limit", Type: "number", Min: 1, Max: 32}, {Key: "GameDifficulty", Label: "Difficulty", Type: "select", Options: []string{"0", "1", "2", "3", "4", "5"}}, {Key: "DayNightLength", Label: "Minutes per game day", Type: "number", Min: 10, Max: 240}, {Key: "DayLightLength", Label: "Daylight hours", Type: "number", Min: 0, Max: 24}, {Key: "BloodMoonFrequency", Label: "Days between blood moons", Type: "number", Min: 0, Max: 365}, {Key: "LootAbundance", Label: "Loot abundance (%)", Type: "number", Min: 25, Max: 300}}
-	case "valheim":
-		return []quickField{{Key: "name", Label: "Server name", Type: "text", Max: 100}, {Key: "password", Label: "Join password", Type: "text", Max: 20, Secret: true}, {Key: "world", Label: "World name", Type: "text", Max: 20}, {Key: "public", Label: "Show in server browser", Type: "boolean"}}
-	case "minecraft":
-		return []quickField{
-			{Key: "motd", Label: "Server message", Type: "text", Max: 512},
-			{Key: "max-players", Label: "Player limit", Type: "number", Min: 1, Max: 200},
-			{Key: "gamemode", Label: "Game mode", Type: "select", Options: []string{"survival", "creative", "adventure", "spectator"}},
-			{Key: "difficulty", Label: "Difficulty", Type: "select", Options: []string{"peaceful", "easy", "normal", "hard"}},
-			{Key: "pvp", Label: "Player combat", Type: "boolean"},
-			{Key: "white-list", Label: "Require allowlist", Type: "boolean"},
-			{Key: "view-distance", Label: "View distance", Type: "number", Min: 2, Max: 32},
-			{Key: "simulation-distance", Label: "Simulation distance", Type: "number", Min: 2, Max: 32},
-			{Key: "spawn-protection", Label: "Spawn protection radius", Type: "number", Min: 0, Max: 1000},
-			{Key: "allow-flight", Label: "Allow flight", Type: "boolean"},
-		}
-	case "palworld", "palworld-native", "palworld-proton":
-		return []quickField{
-			{Key: "ServerName", Label: "Server name", Type: "text", Max: 100},
-			{Key: "ServerDescription", Label: "Description", Type: "text", Max: 512},
-			{Key: "ServerPassword", Label: "Join password", Type: "text", Max: 128, Secret: true},
-			{Key: "AdminPassword", Label: "Admin password", Type: "text", Max: 128, Secret: true},
-			{Key: "ServerPlayerMaxNum", Label: "Player limit", Type: "number", Min: 1, Max: 32},
-			{Key: "ExpRate", Label: "Experience multiplier", Type: "number", Min: 0.1, Max: 20},
-			{Key: "CollectionDropRate", Label: "Gathering multiplier", Type: "number", Min: 0.1, Max: 20},
-			{Key: "DeathPenalty", Label: "Death penalty", Type: "select", Options: []string{"None", "Item", "ItemAndEquipment", "All"}},
-			{Key: "bIsUseBackupSaveData", Label: "Built-in world backups", Type: "boolean"},
-		}
-	}
-	return []quickField{}
-}
 
 func (a *App) registerGameQuickSetup(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/client/servers/{server}/game-settings", a.gameSettings)
@@ -86,15 +37,15 @@ func (a *App) quickGame(ctx context.Context, s M) (string, error) {
 	if javaMinecraftEgg(egg) {
 		return "minecraft", nil
 	}
-	return "", APIError{404, "QuickSetupUnavailable", "Quick setup is not available for this game template."}
+	return "", APIError{Status: 404, Code: "QuickSetupUnavailable", Detail: "Quick setup is not available for this game template."}
 }
 
 func quickConfigPath(game string) string {
 	if game == "7days" {
-		return sevenDaysSettingsPath
+		return gamesettings.SevenDaysSettingsPath
 	}
 	if game == "valheim" {
-		return valheimSettingsPath
+		return gamesettings.ValheimSettingsPath
 	}
 	if game == "minecraft" {
 		return "/server.properties"
@@ -103,13 +54,6 @@ func quickConfigPath(game string) string {
 		return steamPalworldSettingsPath(game)
 	}
 	return ""
-}
-
-func quickRevision(game, file string, content []byte, exists bool) string {
-	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%s\x00%t\x00", game, file, exists)
-	h.Write(content)
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
@@ -217,23 +161,23 @@ func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if revision != quickRevision(game, file, content, exists) {
-			fail(w, APIError{409, "QuickSetupRevisionConflict", "These settings changed since you opened Quick setup. Reload before saving."})
+		if revision != gamesettings.QuickRevision(game, file, content, exists) {
+			fail(w, APIError{Status: 409, Code: "QuickSetupRevisionConflict", Detail: "These settings changed since you opened Quick setup. Reload before saving."})
 			return
 		}
 		if !exists {
-			fail(w, APIError{409, "QuickSetupConfigMissing", "The game has not created its configuration yet. Start it once, stop it, then reload Quick setup."})
+			fail(w, APIError{Status: 409, Code: "QuickSetupConfigMissing", Detail: "The game has not created its configuration yet. Start it once, stop it, then reload Quick setup."})
 			return
 		}
 		var updated []byte
 		if game == "7days" {
-			updated, e = quickPatchXMLProperties(content, "ServerSettings", patch)
+			updated, e = gamesettings.QuickPatchXMLProperties(content, "ServerSettings", patch)
 		} else if game == "valheim" {
-			updated, e = valheimPatch(content, patch)
+			updated, e = gamesettings.ValheimPatch(content, patch)
 		} else if game == "minecraft" {
-			updated, e = quickPatchProperties(content, patch)
+			updated, e = gamesettings.QuickPatchProperties(content, patch)
 		} else if game == "palworld" || steamPalworldVariant(game) {
-			updated, e = quickPatchPalworld(content, patch)
+			updated, e = gamesettings.QuickPatchPalworld(content, patch)
 		} else {
 			e = bad("Manage Satisfactory settings in the game's built-in Server Manager.")
 		}
@@ -271,8 +215,8 @@ func (a *App) gameQuickSetup(w http.ResponseWriter, r *http.Request) {
 }
 
 func quickValidateSettings(game string, settings M) (map[string]string, error) {
-	allowed := map[string]quickField{}
-	for _, field := range quickFields(game) {
+	allowed := map[string]gamesettings.QuickField{}
+	for _, field := range gamesettings.QuickFields(game) {
 		allowed[field.Key] = field
 	}
 	out := map[string]string{}
@@ -285,7 +229,7 @@ func quickValidateSettings(game string, settings M) (map[string]string, error) {
 		switch field.Type {
 		case "text":
 			v, ok := value.(string)
-			if !ok || len([]rune(v)) > int(field.Max) || !quickSingleLine(v) {
+			if !ok || len([]rune(v)) > int(field.Max) || !gamesettings.QuickSingleLine(v) {
 				return nil, bad("Enter a valid " + strings.ToLower(field.Label) + " without line breaks.")
 			}
 			if game == "7days" {
@@ -299,9 +243,9 @@ func quickValidateSettings(game string, settings M) (map[string]string, error) {
 				}
 				encoded = v
 			} else if game == "palworld" || steamPalworldVariant(game) {
-				encoded = quickUnrealQuote(v)
+				encoded = gamesettings.QuickUnrealQuote(v)
 			} else {
-				encoded = quickPropertyEscape(v)
+				encoded = gamesettings.QuickPropertyEscape(v)
 			}
 		case "select":
 			v, ok := value.(string)
@@ -347,7 +291,7 @@ func quickValidateSettings(game string, settings M) (map[string]string, error) {
 
 func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game string) (M, error) {
 	// Share listings only within this view. Saves must always read fresh state.
-	ctx = context.WithValue(ctx, quickListingContextKey{}, map[string][]M{})
+	ctx = context.WithValue(ctx, gamesettings.QuickListingContextKey{}, map[string][]M{})
 	file := quickConfigPath(game)
 	var content []byte
 	exists := true
@@ -360,7 +304,7 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 	}
 	values := map[string]string{}
 	if exists && game == "7days" {
-		records, _, e := quickXMLProperties(content, "ServerSettings")
+		records, _, e := gamesettings.QuickXMLProperties(content, "ServerSettings")
 		if e != nil {
 			return nil, e
 		}
@@ -369,13 +313,13 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 		}
 	}
 	if exists && game == "valheim" {
-		values, err = valheimValues(content)
+		values, err = gamesettings.ValheimValues(content)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if exists && game == "minecraft" {
-		records, e := quickPropertyRecords(content)
+		records, e := gamesettings.QuickPropertyRecords(content)
 		if e != nil {
 			return nil, e
 		}
@@ -386,7 +330,7 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 		}
 	}
 	if exists && (game == "palworld" || steamPalworldVariant(game)) {
-		_, values, err = quickPalworldOptions(content)
+		_, values, err = gamesettings.QuickPalworldOptions(content)
 		if err != nil {
 			return nil, err
 		}
@@ -397,12 +341,12 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 		if e != nil {
 			return nil, e
 		}
-		canvas = nativeSettingsIsRecipe(egg, canvasSettingsRecipe)
-		paper = nativeSettingsIsRecipe(egg, paperDifficultyRecipe)
+		canvas = gamesettings.IsRecipe(egg, gamesettings.CanvasSettingsRecipe)
+		paper = gamesettings.IsRecipe(egg, gamesettings.PaperDifficultyRecipe)
 	}
 	fields := []M{}
 	if exists {
-		for _, field := range quickFields(game) {
+		for _, field := range gamesettings.QuickFields(game) {
 			var value any
 			raw, found := values[field.Key]
 			if found {
@@ -444,10 +388,10 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 				row["options"] = options
 			}
 			if canvas {
-				canvasDifficultyPresentation(row)
+				gamesettings.CanvasDifficultyPresentation(row)
 			}
 			if paper {
-				paperDifficultyPresentation(row)
+				gamesettings.PaperDifficultyPresentation(row)
 			}
 			fields = append(fields, row)
 		}
@@ -457,10 +401,10 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 		help = []M{{"label": "Minecraft properties", "text": "Changes take effect on the next start. Properties outside this form are preserved. Empty values mean the property is absent or could not be parsed; the game applies its defaults."}}
 	}
 	if canvas {
-		help = []M{{"label": "Minecraft properties", "text": "Most properties take effect on the next start. Difficulty applies to newly created worlds. Properties outside this form are preserved."}, canvasDifficultyHelp()}
+		help = []M{{"label": "Minecraft properties", "text": "Most properties take effect on the next start. Difficulty applies to newly created worlds. Properties outside this form are preserved."}, gamesettings.CanvasDifficultyHelp()}
 	}
 	if paper {
-		help = []M{{"label": "Minecraft properties", "text": "Most properties take effect on the next start. Existing worlds may keep their saved difficulty. Properties outside this form are preserved."}, paperDifficultyHelp()}
+		help = []M{{"label": "Minecraft properties", "text": "Most properties take effect on the next start. Existing worlds may keep their saved difficulty. Properties outside this form are preserved."}, gamesettings.PaperDifficultyHelp()}
 	}
 	if !exists {
 		help = append(help, M{"label": "Configuration not created yet", "text": "Start the game once, stop it, then reload Quick setup."})
@@ -476,11 +420,11 @@ func (a *App) quickSetupView(ctx context.Context, r *http.Request, s M, game str
 			return nil, err
 		}
 	}
-	return M{"game": game, "fields": fields, "folders": folders, "help": help, "requires_stop": true, "revision": quickRevision(game, file, content, exists)}, nil
+	return M{"game": game, "fields": fields, "folders": folders, "help": help, "requires_stop": true, "revision": gamesettings.QuickRevision(game, file, content, exists)}, nil
 }
 
 func (a *App) quickSetupRead(ctx context.Context, s M, file string) ([]byte, bool, error) {
-	parts, err := quickPathParts(file)
+	parts, err := gamesettings.QuickPathParts(file)
 	if err != nil {
 		return nil, false, err
 	}
@@ -491,11 +435,11 @@ func (a *App) quickSetupRead(ctx context.Context, s M, file string) ([]byte, boo
 	if err != nil || !exists {
 		return nil, false, err
 	}
-	entry, exists, err := quickFindEntry(entries, parts[len(parts)-1])
+	entry, exists, err := gamesettings.QuickFindEntry(entries, parts[len(parts)-1])
 	if err != nil || !exists {
 		return nil, false, err
 	}
-	if !quickFileEntry(entry) {
+	if !gamesettings.QuickFileEntry(entry) {
 		return nil, false, bad("Quick setup cannot read a configuration that is a directory, symlink or unknown file type.")
 	}
 	res, err := a.daemonServer(ctx, s, "GET", "/files/contents?"+url.Values{"file": {file}}.Encode(), nil)
@@ -531,12 +475,12 @@ func (a *App) quickSetupStopped(ctx context.Context, s M) error {
 	}
 	state := str(info["state"])
 	if state != "offline" && state != "stopped" {
-		return APIError{409, "QuickSetupServerRunning", "Stop the server before changing Quick setup settings."}
+		return APIError{Status: 409, Code: "QuickSetupServerRunning", Detail: "Stop the server before changing Quick setup settings."}
 	}
 	return nil
 }
 func (a *App) quickSetupList(ctx context.Context, s M, folder string) ([]M, bool, error) {
-	parts, err := quickPathParts(folder)
+	parts, err := gamesettings.QuickPathParts(folder)
 	if err != nil {
 		return nil, false, err
 	}
@@ -546,14 +490,14 @@ func (a *App) quickSetupList(ctx context.Context, s M, folder string) ([]M, bool
 		return nil, false, err
 	}
 	for _, part := range parts {
-		entry, exists, e := quickFindEntry(entries, part)
+		entry, exists, e := gamesettings.QuickFindEntry(entries, part)
 		if e != nil {
 			return nil, false, e
 		}
 		if !exists {
 			return []M{}, false, nil
 		}
-		if !quickDirectoryEntry(entry) {
+		if !gamesettings.QuickDirectoryEntry(entry) {
 			return nil, false, bad("A Quick setup folder path contains a file, symlink or unknown directory type.")
 		}
 		current = path.Join(current, part)
@@ -565,13 +509,8 @@ func (a *App) quickSetupList(ctx context.Context, s M, folder string) ([]M, bool
 	return entries, true, nil
 }
 
-// Only list a directory whose existence was established by its parent's
-// successful listing. Stock Wings may return 500 for an absent intermediate
-// parent through openat2. No HTTP error, including 404/500, proves absence.
-type quickListingContextKey struct{}
-
 func (a *App) quickSetupListExisting(ctx context.Context, s M, folder string) ([]M, error) {
-	cache, _ := ctx.Value(quickListingContextKey{}).(map[string][]M)
+	cache, _ := ctx.Value(gamesettings.QuickListingContextKey{}).(map[string][]M)
 	key := str(s["uuid"]) + "\x00" + folder
 	if entries, ok := cache[key]; ok {
 		return entries, nil
@@ -597,7 +536,7 @@ func (a *App) quickSetupListExisting(ctx context.Context, s M, folder string) ([
 
 // A shortcut needs the directory entry, not a listing of its contents.
 func (a *App) quickSetupFolderExists(ctx context.Context, s M, folder string) (bool, error) {
-	parts, err := quickPathParts(folder)
+	parts, err := gamesettings.QuickPathParts(folder)
 	if err != nil {
 		return false, err
 	}
@@ -609,71 +548,13 @@ func (a *App) quickSetupFolderExists(ctx context.Context, s M, folder string) (b
 	if err != nil || !exists {
 		return false, err
 	}
-	entry, exists, err := quickFindEntry(entries, parts[len(parts)-1])
+	entry, exists, err := gamesettings.QuickFindEntry(entries, parts[len(parts)-1])
 	if err != nil || !exists {
 		return false, err
 	}
-	return quickDirectoryEntry(entry), nil
+	return gamesettings.QuickDirectoryEntry(entry), nil
 }
 
-func quickPathParts(name string) ([]string, error) {
-	if !strings.HasPrefix(name, "/") || path.Clean(name) != name || len(name) > 4096 {
-		return nil, bad("Invalid Quick setup file path.")
-	}
-	if name == "/" {
-		return []string{}, nil
-	}
-	parts := strings.Split(strings.TrimPrefix(name, "/"), "/")
-	for _, part := range parts {
-		if !quickSafeDirectory(part) {
-			return nil, bad("Invalid Quick setup file path.")
-		}
-	}
-	return parts, nil
-}
-func quickFindEntry(entries []M, name string) (M, bool, error) {
-	var found M
-	for _, entry := range entries {
-		if str(entry["name"]) == name {
-			if found != nil {
-				return nil, false, bad("The node returned ambiguous file entries.")
-			}
-			found = entry
-		}
-	}
-	return found, found != nil, nil
-}
-func quickSafeDirectory(name string) bool {
-	return name != "" && name != "." && name != ".." && len(name) <= 255 && !strings.ContainsAny(name, "/\\\x00\r\n")
-}
-
-func quickDirectoryEntry(entry M) bool {
-	if boolean(entry["symlink"]) || boolean(entry["is_symlink"]) {
-		return false
-	}
-	// Wings returns directory/file/symlink; the client file API transforms
-	// those names to is_file/is_symlink. Prefer the real daemon shape.
-	if directory, ok := entry["directory"].(bool); ok {
-		return directory
-	}
-	if isFile, ok := entry["is_file"].(bool); ok {
-		return !isFile
-	}
-	return false
-}
-
-func quickFileEntry(entry M) bool {
-	if boolean(entry["symlink"]) || boolean(entry["is_symlink"]) || boolean(entry["directory"]) {
-		return false
-	}
-	if file, ok := entry["file"].(bool); ok {
-		return file
-	}
-	if file, ok := entry["is_file"].(bool); ok {
-		return file
-	}
-	return false
-}
 func (a *App) quickSetupFolders(ctx context.Context, s M, game string, values map[string]string) ([]M, error) {
 	out := []M{}
 	add := func(label, folder, description string) error {
@@ -696,7 +577,7 @@ func (a *App) quickSetupFolders(ctx context.Context, s M, game string, values ma
 			return nil, err
 		}
 		for _, entry := range entries {
-			if quickDirectoryEntry(entry) && quickSafeDirectory(str(entry["name"])) {
+			if gamesettings.QuickDirectoryEntry(entry) && gamesettings.QuickSafeDirectory(str(entry["name"])) {
 				folder := base + "/blueprints/" + str(entry["name"])
 				if err = add("Blueprints: "+str(entry["name"]), folder, "Upload .sbp and .sbpcfg files for this session while stopped."); err != nil {
 					return nil, err
@@ -732,7 +613,7 @@ func (a *App) quickSetupFolders(ctx context.Context, s M, game string, values ma
 		if world == "" {
 			world = "world"
 		}
-		if quickSafeDirectory(world) {
+		if gamesettings.QuickSafeDirectory(world) {
 			for _, name := range []string{world, world + "_nether", world + "_the_end"} {
 				if err := add("World: "+name, "/"+name, "Stop the server before replacing a world. Back it up first."); err != nil {
 					return nil, err
@@ -744,7 +625,7 @@ func (a *App) quickSetupFolders(ctx context.Context, s M, game string, values ma
 }
 
 func (a *App) quickSetupMkdirAll(ctx context.Context, s M, folder string) error {
-	parts, err := quickPathParts(folder)
+	parts, err := gamesettings.QuickPathParts(folder)
 	if err != nil {
 		return err
 	}
@@ -755,11 +636,11 @@ func (a *App) quickSetupMkdirAll(ctx context.Context, s M, folder string) error 
 	}
 	for _, part := range parts {
 		target := path.Join(current, part)
-		entry, exists, e := quickFindEntry(entries, part)
+		entry, exists, e := gamesettings.QuickFindEntry(entries, part)
 		if e != nil {
 			return e
 		}
-		if exists && !quickDirectoryEntry(entry) {
+		if exists && !gamesettings.QuickDirectoryEntry(entry) {
 			return bad("Cannot prepare a game folder over a file, symlink or unknown directory type.")
 		}
 		if !exists {
@@ -776,329 +657,4 @@ func (a *App) quickSetupMkdirAll(ctx context.Context, s M, folder string) error 
 		}
 	}
 	return nil
-}
-
-// Java properties are edited by logical record, retaining unknown physical
-// lines, comments, whitespace and line endings exactly, including continuations.
-type quickPropertyRecord struct{ Raw, Key, Value string }
-
-func quickPropertyRecords(data []byte) ([]quickPropertyRecord, error) {
-	lines := strings.SplitAfter(string(data), "\n")
-	out := []quickPropertyRecord{}
-	for i := 0; i < len(lines); i++ {
-		raw := lines[i]
-		logical := strings.TrimSuffix(strings.TrimSuffix(lines[i], "\n"), "\r")
-		comment := strings.TrimLeft(logical, " \t\f")
-		// Java comments end at the physical newline even when the last byte is
-		// a backslash; they cannot consume the following property's record.
-		if comment == "" || comment[0] == '#' || comment[0] == '!' {
-			out = append(out, quickPropertyRecord{Raw: raw})
-			continue
-		}
-		for quickContinued(logical) {
-			logical = logical[:len(logical)-1]
-			i++
-			if i >= len(lines) {
-				return nil, bad("The properties file ends in an incomplete continuation.")
-			}
-			raw += lines[i]
-			logical += strings.TrimLeft(strings.TrimSuffix(strings.TrimSuffix(lines[i], "\n"), "\r"), " \t\f")
-		}
-		trimmed := strings.TrimLeft(logical, " \t\f")
-		record := quickPropertyRecord{Raw: raw}
-		if trimmed != "" && trimmed[0] != '#' && trimmed[0] != '!' {
-			end := 0
-			escaped := false
-			for end < len(trimmed) {
-				c := trimmed[end]
-				if !escaped && (c == '=' || c == ':' || c == ' ' || c == '\t' || c == '\f') {
-					break
-				}
-				if c == '\\' && !escaped {
-					escaped = true
-				} else {
-					escaped = false
-				}
-				end++
-			}
-			rest := strings.TrimLeft(trimmed[end:], " \t\f")
-			if len(rest) > 0 && (rest[0] == '=' || rest[0] == ':') {
-				rest = strings.TrimLeft(rest[1:], " \t\f")
-			}
-			var err error
-			record.Key, err = quickPropertyUnescape(trimmed[:end])
-			if err != nil {
-				return nil, err
-			}
-			record.Value, err = quickPropertyUnescape(rest)
-			if err != nil {
-				return nil, err
-			}
-		}
-		out = append(out, record)
-	}
-	return out, nil
-}
-func quickContinued(s string) bool {
-	count := 0
-	for i := len(s) - 1; i >= 0 && s[i] == '\\'; i-- {
-		count++
-	}
-	return count%2 == 1
-}
-func quickPropertyUnescape(s string) (string, error) {
-	var out strings.Builder
-	for i := 0; i < len(s); i++ {
-		if s[i] != '\\' {
-			out.WriteByte(s[i])
-			continue
-		}
-		i++
-		if i >= len(s) {
-			return "", bad("Invalid properties escape.")
-		}
-		switch s[i] {
-		case 't':
-			out.WriteByte('\t')
-		case 'r':
-			out.WriteByte('\r')
-		case 'n':
-			out.WriteByte('\n')
-		case 'f':
-			out.WriteByte('\f')
-		case 'u':
-			if i+4 >= len(s) {
-				return "", bad("Invalid properties Unicode escape.")
-			}
-			n, e := strconv.ParseUint(s[i+1:i+5], 16, 16)
-			if e != nil {
-				return "", bad("Invalid properties Unicode escape.")
-			}
-			i += 4
-			r := rune(n)
-			if utf16.IsSurrogate(r) && i+6 < len(s) && s[i+1:i+3] == "\\u" {
-				next, e := strconv.ParseUint(s[i+3:i+7], 16, 16)
-				if e == nil {
-					decoded := utf16.DecodeRune(r, rune(next))
-					if decoded != '\uFFFD' {
-						r = decoded
-						i += 6
-					}
-				}
-			}
-			out.WriteRune(r)
-		default:
-			out.WriteByte(s[i])
-		}
-	}
-	return out.String(), nil
-}
-func quickPropertyEscape(s string) string {
-	var out strings.Builder
-	for i, r := range s {
-		switch r {
-		case '\\':
-			out.WriteString("\\\\")
-		case '\t':
-			out.WriteString("\\t")
-		case '\n':
-			out.WriteString("\\n")
-		case '\r':
-			out.WriteString("\\r")
-		case '\f':
-			out.WriteString("\\f")
-		case ' ':
-			if i == 0 {
-				out.WriteByte('\\')
-			}
-			out.WriteRune(r)
-		default:
-			if r < 32 || r > 126 {
-				for _, unit := range utf16.Encode([]rune{r}) {
-					fmt.Fprintf(&out, "\\u%04x", unit)
-				}
-			} else {
-				out.WriteRune(r)
-			}
-		}
-	}
-	return out.String()
-}
-func quickPatchProperties(data []byte, patch map[string]string) ([]byte, error) {
-	records, err := quickPropertyRecords(data)
-	if err != nil {
-		return nil, err
-	}
-	newline := "\n"
-	if bytes.Contains(data, []byte("\r\n")) {
-		newline = "\r\n"
-	}
-	seen := map[string]bool{}
-	var out strings.Builder
-	for _, record := range records {
-		if value, ok := patch[record.Key]; ok {
-			if !seen[record.Key] {
-				out.WriteString(record.Key + "=" + value + newline)
-				seen[record.Key] = true
-			}
-		} else {
-			out.WriteString(record.Raw)
-		}
-	}
-	keys := []string{}
-	for key := range patch {
-		if !seen[key] {
-			keys = append(keys, key)
-		}
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if out.Len() > 0 && !strings.HasSuffix(out.String(), "\n") {
-			out.WriteString(newline)
-		}
-		out.WriteString(key + "=" + patch[key] + newline)
-	}
-	return []byte(out.String()), nil
-}
-
-func quickUnrealQuote(s string) string {
-	return `"` + strings.ReplaceAll(strings.ReplaceAll(s, `\`, `\\`), `"`, `\"`) + `"`
-}
-
-type quickPalTuple struct {
-	Start, End int
-	Segments   []string
-}
-
-func quickSplitTuple(value string) ([]string, error) {
-	segments := []string{}
-	start, depth := 0, 0
-	quoted, escaped := false, false
-	for i, c := range value {
-		if quoted {
-			if escaped {
-				escaped = false
-			} else if c == '\\' {
-				escaped = true
-			} else if c == '"' {
-				quoted = false
-			}
-			continue
-		}
-		switch c {
-		case '"':
-			quoted = true
-		case '(':
-			depth++
-		case ')':
-			depth--
-			if depth < 0 {
-				return nil, bad("The Palworld settings tuple is malformed.")
-			}
-		case ',':
-			if depth == 0 {
-				segments = append(segments, value[start:i])
-				start = i + 1
-			}
-		}
-	}
-	if quoted || depth != 0 {
-		return nil, bad("The Palworld settings tuple is malformed.")
-	}
-	if strings.TrimSpace(value[start:]) != "" {
-		segments = append(segments, value[start:])
-	}
-	return segments, nil
-}
-func quickPalworldOptions(data []byte) (quickPalTuple, map[string]string, error) {
-	content := string(data)
-	section := ""
-	offset := 0
-	tuple := quickPalTuple{Start: -1}
-	values := map[string]string{}
-	for _, line := range strings.SplitAfter(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-			section = trimmed
-		}
-		if section == "[/Script/Pal.PalGameWorldSettings]" && !strings.HasPrefix(trimmed, ";") && !strings.HasPrefix(trimmed, "#") {
-			key, value, ok := strings.Cut(trimmed, "=")
-			if ok && strings.TrimSpace(key) == "OptionSettings" {
-				if tuple.Start != -1 {
-					return tuple, nil, bad("The Palworld configuration has multiple OptionSettings entries. Resolve them in Files before using Quick setup.")
-				}
-				value = strings.TrimSpace(value)
-				if len(value) < 2 || value[0] != '(' || value[len(value)-1] != ')' {
-					return tuple, nil, bad("The Palworld settings tuple is malformed.")
-				}
-				start := strings.Index(line, "=") + 1
-				for start < len(line) && (line[start] == ' ' || line[start] == '\t') {
-					start++
-				}
-				tuple.Start = offset + start
-				tuple.End = tuple.Start + len(value)
-				segments, err := quickSplitTuple(value[1 : len(value)-1])
-				if err != nil {
-					return tuple, nil, err
-				}
-				tuple.Segments = segments
-				for _, segment := range segments {
-					key, raw, ok := strings.Cut(segment, "=")
-					if !ok {
-						return tuple, nil, bad("The Palworld settings tuple is malformed.")
-					}
-					key = strings.TrimSpace(key)
-					raw = strings.TrimSpace(raw)
-					if strings.HasPrefix(raw, `"`) {
-						unquoted, e := strconv.Unquote(raw)
-						if e != nil {
-							return tuple, nil, bad("The Palworld settings contain an invalid quoted value.")
-						}
-						raw = unquoted
-					}
-					values[key] = raw
-				}
-			}
-		}
-		offset += len(line)
-	}
-	if tuple.Start == -1 {
-		return tuple, nil, bad("No Palworld OptionSettings entry was found. Restore the native default configuration or edit it in Files.")
-	}
-	return tuple, values, nil
-}
-func quickPatchPalworld(data []byte, patch map[string]string) ([]byte, error) {
-	tuple, _, err := quickPalworldOptions(data)
-	if err != nil {
-		return nil, err
-	}
-	segments := []string{}
-	seen := map[string]bool{}
-	for _, segment := range tuple.Segments {
-		key, _, _ := strings.Cut(segment, "=")
-		key = strings.TrimSpace(key)
-		if value, ok := patch[key]; ok {
-			if !seen[key] {
-				prefix := segment[:len(segment)-len(strings.TrimLeft(segment, " \t"))]
-				segments = append(segments, prefix+key+"="+value)
-				seen[key] = true
-			}
-		} else {
-			segments = append(segments, segment)
-		}
-	}
-	keys := []string{}
-	for key := range patch {
-		if !seen[key] {
-			keys = append(keys, key)
-		}
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		segments = append(segments, key+"="+patch[key])
-	}
-	out := append([]byte{}, data[:tuple.Start]...)
-	out = append(out, []byte("("+strings.Join(segments, ",")+")")...)
-	out = append(out, data[tuple.End:]...)
-	return out, nil
 }

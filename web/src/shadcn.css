@@ -45,4 +45,3 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
-:root{--radius:10px;--scn-background:#10141b;--scn-sidebar:#0d1118;--scn-popover:#1b2029;--scn-sidebar-accent:color-mix(in srgb,var(--accent) 10%,transparent);--background:var(--scn-background);--foreground:var(--text);--secondary:var(--surface-raised);--secondary-foreground:var(--text);--input:var(--line-strong)}

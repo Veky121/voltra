@@ -3,18 +3,19 @@ package panel
 import (
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestRustStagingTagsPreserve(t *testing.T) {
 	input := "// fixture\r\nserver.tags \"weekly,vanilla,EU\" // keep\r\nrcon.password \"fixture-secret\"\r\nserver.seed 9007199254740993\r\nunknown.precision 0.1234567890123456789"
-	p, err := parseRustStagingSettings([]byte(input))
+	p, err := gamesettings.ParseRustStagingSettings([]byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.fields) != 1 || p.fields[0].key != "server.tags" {
+	if len(p.Fields) != 1 || p.Fields[0].Key != "server.tags" {
 		t.Fatal("protected values exposed")
 	}
-	next, err := p.patch(map[string]string{"server.tags": "monthly,roleplay,NA"})
+	next, err := p.Patch(map[string]string{"server.tags": "monthly,roleplay,NA"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,12 +23,12 @@ func TestRustStagingTagsPreserve(t *testing.T) {
 		t.Fatal("unrelated bytes changed")
 	}
 	for _, key := range []string{"rcon.password", "server.seed", "server.identity", "server.port", "server.hostname", "server_tags"} {
-		if _, err := p.patch(map[string]string{key: "x"}); err == nil {
+		if _, err := p.Patch(map[string]string{key: "x"}); err == nil {
 			t.Fatal("protected key accepted", key)
 		}
 	}
 	for _, value := range []string{"weekly,monthly", "EU,NA", "hardcore,softcore", "unknown", "weekly;quit", "weekly\nquit", "weekly\\x", "weekly\"", "weekly,weekly"} {
-		if _, err := p.patch(map[string]string{"server.tags": value}); err == nil {
+		if _, err := p.Patch(map[string]string{"server.tags": value}); err == nil {
 			t.Fatal("unsafe tags accepted", value)
 		}
 	}
@@ -36,27 +37,27 @@ func TestRustStagingTagsPreserve(t *testing.T) {
 func TestRustStagingAmbiguityRefused(t *testing.T) {
 	for _, tail := range []string{"server.tags monthly", "SERVER.TAGS monthly", "server_tags monthly", "exec other.cfg", "server.tags \"unterminated", "quit", "unknown.value 1;quit", "unknown.value \"a\\b\"", "unknown.value \"\u2028\"", "unknown.value \"\xff\""} {
 		input := []byte("server.tags weekly\n" + tail)
-		p, err := parseRustStagingSettings(input)
+		p, err := gamesettings.ParseRustStagingSettings(input)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := p.patch(map[string]string{"server.tags": "monthly"}); err == nil {
+		if _, err := p.Patch(map[string]string{"server.tags": "monthly"}); err == nil {
 			t.Fatal("ambiguous document accepted", tail)
 		}
-		next, err := p.patch(nil)
+		next, err := p.Patch(nil)
 		if err != nil || string(next) != string(input) {
 			t.Fatal("no-op did not preserve bytes")
 		}
 	}
-	p, _ := parseRustStagingSettings([]byte("server.seed 42\n"))
-	if _, err := p.patch(map[string]string{"server.tags": "weekly"}); err == nil {
+	p, _ := gamesettings.ParseRustStagingSettings([]byte("server.seed 42\n"))
+	if _, err := p.Patch(map[string]string{"server.tags": "weekly"}); err == nil {
 		t.Fatal("missing setting invented")
 	}
 }
 
 func TestRustStagingCurrentProfileContract(t *testing.T) {
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path != rustStagingSettingsRecipe {
+		if entry.Path != gamesettings.RustStagingSettingsRecipe {
 			continue
 		}
 		if entry.Profile != "rust-native-v1" || entry.RequiredPorts != 4 {

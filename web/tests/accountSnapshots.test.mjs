@@ -6,13 +6,31 @@ import {fileURLToPath} from 'node:url';
 // One bundle, so the overview snapshot, the account store and the sign-out
 // handling share state as they do in the app. Loading it again under another
 // name gives a second, independent copy: another tab.
-const bundle = await build({stdin: {contents: "export * from './src/accountSnapshots'; export * from './src/signedOut'; export {takeBootRead} from './src/bootReads'; export * from './src/navigationSnapshot'; export * from './src/desktopSnapshots'; export * from './src/client/overviewSnapshot'; export * from './src/hooks/queryCache';", resolveDir: fileURLToPath(new URL('..', import.meta.url)), loader: 'ts'}, bundle: true, write: false, format: 'esm', platform: 'node'});
+const bundle = await build({
+  stdin: {
+    contents:
+      "export * from './src/accountSnapshots'; export * from './src/signedOut'; export {takeBootRead} from './src/bootReads'; export * from './src/navigationSnapshot'; export * from './src/features/desktop/desktopSnapshots'; export * from './src/features/servers/overviewSnapshot'; export * from './src/hooks/queryCache';",
+    resolveDir: fileURLToPath(new URL('..', import.meta.url)),
+    loader: 'ts',
+  },
+  bundle: true,
+  write: false,
+  format: 'esm',
+  platform: 'node',
+});
 // A lock that is always free: each change runs at once, as it does in a
 // browser when no other tab is changing the store. Tests that are about
 // waiting for a turn supply their own.
-const free = {request: (name, change) => { change(); return Promise.resolve(); }};
+const free = {
+  request: (name, change) => {
+    change();
+    return Promise.resolve();
+  },
+};
 const load = async tag => {
-  const instance = await import(`data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n// ${tag}`).toString('base64')}`);
+  const instance = await import(
+    `data:text/javascript;base64,${Buffer.from(`${bundle.outputFiles[0].text}\n// ${tag}`).toString('base64')}`
+  );
   instance.setSnapshotLocks(free);
   return instance;
 };
@@ -21,12 +39,24 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 
 function memory() {
   const values = new Map();
-  return {values, get length() { return values.size; }, key: index => [...values.keys()][index] ?? null, getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key)};
+  return {
+    values,
+    get length() {
+      return values.size;
+    },
+    key: index => [...values.keys()][index] ?? null,
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: key => values.delete(key),
+  };
 }
 function useStorage(storage) {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   Object.defineProperty(globalThis, 'localStorage', {value: storage, configurable: true, writable: true});
-  return () => { if (original) Object.defineProperty(globalThis, 'localStorage', original); else delete globalThis.localStorage; };
+  return () => {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original);
+    else delete globalThis.localStorage;
+  };
 }
 const week = 7 * 24 * 60 * 60 * 1000;
 const owner = 'voltra.snapshot-owner';
@@ -34,7 +64,8 @@ const revision = 'voltra.snapshot-session';
 // The saved copies alone, and everything the store holds about an account.
 const copies = storage => [...storage.values.keys()].filter(key => key !== owner && key !== revision);
 const kept = storage => [...storage.values.keys()].filter(key => key !== revision);
-const write = (page, name, value, storage, now) => page.writeAccountSnapshot(name, value, page.snapshotOwner(), storage, now);
+const write = (page, name, value, storage, now) =>
+  page.writeAccountSnapshot(name, value, page.snapshotOwner(), storage, now);
 
 test('a saved copy is read only by the account that wrote it', () => {
   const storage = memory();
@@ -48,7 +79,11 @@ test('a saved copy is read only by the account that wrote it', () => {
   storage.setItem('voltra.game-library.v1.account-a', 'kept');
   c.setSnapshotAccount('account-b', storage, 2000);
   assert.equal(c.readAccountSnapshot('navigation', storage, 2000), undefined);
-  assert.deepEqual(copies(storage), ['voltra.game-library.v1.account-a'], 'another account removes the copies, and only the copies');
+  assert.deepEqual(
+    copies(storage),
+    ['voltra.game-library.v1.account-a'],
+    'another account removes the copies, and only the copies'
+  );
   assert.equal(storage.values.get(owner), 'account-b');
 });
 
@@ -93,7 +128,11 @@ test('an account answer names the owner only if nobody signed out or in while it
   // Asked as A, then a sign-out: the late answer must not sign A back in.
   started = c.snapshotRevision(storage);
   c.clearAccountSnapshots(storage);
-  assert.equal(await c.identifySnapshotAccount('account-a', started, storage, 1000), false, 'a sign-out alone changes the revision');
+  assert.equal(
+    await c.identifySnapshotAccount('account-a', started, storage, 1000),
+    false,
+    'a sign-out alone changes the revision'
+  );
   assert.equal(storage.values.has(owner), false);
   write(c, 'navigation', ['late'], storage, 1000);
   assert.deepEqual(copies(storage), []);
@@ -132,7 +171,13 @@ test('a request that began while nobody was identified saves nothing, whoever is
   c.setSnapshotAccount('account-a', storage, 1000);
   assert.notEqual(c.snapshotOwner(), undefined);
   // The answer, which is B's list, arrives.
-  c.writeAccountSnapshot('navigation', [{uuid: 'b-server', identifier: 'b', name: "B's server"}], askedAsNobody, storage, 1000);
+  c.writeAccountSnapshot(
+    'navigation',
+    [{uuid: 'b-server', identifier: 'b', name: "B's server"}],
+    askedAsNobody,
+    storage,
+    1000
+  );
   assert.deepEqual(copies(storage), [], "B's list is not filed under A");
   assert.equal(c.readAccountSnapshot('navigation', storage, 1000), undefined);
   // The overview keeps the same rule: it notes its owner once, when its reads begin.
@@ -165,7 +210,23 @@ test('old, future, damaged and oversized copies only lose the head start', () =>
   c.setSnapshotAccount('account-a', storage, 1000 + week);
   assert.deepEqual(copies(storage), ['voltra.snapshot.v1.overview.account-a']);
 
-  const blocked = {get length() { throw new Error('blocked'); }, key() { throw new Error('blocked'); }, getItem() { throw new Error('blocked'); }, setItem() { throw new Error('full'); }, removeItem() { throw new Error('blocked'); }};
+  const blocked = {
+    get length() {
+      throw new Error('blocked');
+    },
+    key() {
+      throw new Error('blocked');
+    },
+    getItem() {
+      throw new Error('blocked');
+    },
+    setItem() {
+      throw new Error('full');
+    },
+    removeItem() {
+      throw new Error('blocked');
+    },
+  };
   assert.doesNotThrow(() => c.setSnapshotAccount('account-a', blocked));
   assert.doesNotThrow(() => write(c, 'navigation', [1], blocked));
   assert.equal(c.readAccountSnapshot('navigation', blocked), undefined);
@@ -178,47 +239,116 @@ test('a saved list is used only when every record has the fields the page reads'
   const server = {uuid: 'u1', identifier: 's1', name: 'Survival', favorite: true};
   write(c, 'navigation', [server], storage, 1000);
   assert.deepEqual(c.readSavedList('navigation', ['uuid', 'identifier', 'name'], storage, 1000), [server]);
-  for (const damaged of [[server, {uuid: 'u2', identifier: 's2'}], [server, null], [server, 'text'], {uuid: 'u1'}, 'text', null, [{...server, name: 7}]]) {
+  for (const damaged of [
+    [server, {uuid: 'u2', identifier: 's2'}],
+    [server, null],
+    [server, 'text'],
+    {uuid: 'u1'},
+    'text',
+    null,
+    [{...server, name: 7}],
+  ]) {
     write(c, 'navigation', damaged, storage, 1000);
-    assert.equal(c.readSavedList('navigation', ['uuid', 'identifier', 'name'], storage, 1000), undefined, JSON.stringify(damaged));
+    assert.equal(
+      c.readSavedList('navigation', ['uuid', 'identifier', 'name'], storage, 1000),
+      undefined,
+      JSON.stringify(damaged)
+    );
   }
   write(c, 'navigation', [], storage, 1000);
-  assert.deepEqual(c.readSavedList('navigation', ['uuid'], storage, 1000), [], 'an account with no servers has an empty list, not a missing one');
+  assert.deepEqual(
+    c.readSavedList('navigation', ['uuid'], storage, 1000),
+    [],
+    'an account with no servers has an empty list, not a missing one'
+  );
 });
 
 test('only what a card or the sidebar draws is saved, whatever the panel sends', () => {
   const secret = 'SENTINEL-SECRET';
   // A detailed server answer, as an older or different panel might send for the list.
   const detailed = {
-    uuid: 'u1', identifier: 's1', name: 'Survival', description: 'Friends', node: 'home', status: null, is_installing: false,
+    uuid: 'u1',
+    identifier: 's1',
+    name: 'Survival',
+    description: 'Friends',
+    node: 'home',
+    status: null,
+    is_installing: false,
     limits: {cpu: 200, memory: 4096, disk: 10240, swap: 0, io: 500, oom_disabled: secret},
-    game: 'minecraft', egg_name: 'Paper', docker_image: 'ghcr.io/example/java:21',
+    game: 'minecraft',
+    egg_name: 'Paper',
+    docker_image: 'ghcr.io/example/java:21',
     artwork: {game: 'minecraft', server_icon: '/api/client/servers/u1/artwork/icon', pack_name: 'Pack', token: secret},
-    invocation: `java -jar server.jar --token ${secret}`, sftp_details: {ip: secret, port: 2022}, internal_id: secret, server_owner: true,
-    resources: {cpu_absolute: 42}, resourceError: false, liveState: 'running', favorite: true, last_visited_at: '2026-11-19T08:00:00Z',
+    invocation: `java -jar server.jar --token ${secret}`,
+    sftp_details: {ip: secret, port: 2022},
+    internal_id: secret,
+    server_owner: true,
+    resources: {cpu_absolute: 42},
+    resourceError: false,
+    liveState: 'running',
+    favorite: true,
+    last_visited_at: '2026-11-19T08:00:00Z',
     relationships: {
       allocations: {data: [{attributes: {ip: secret, port: 25565}}]},
-      variables: {data: [
-        {attributes: {env_variable: 'MINECRAFT_LOADER', server_value: 'paper', default_value: secret, description: secret}},
-        {attributes: {env_variable: 'STEAM_APP_ID', server_value: '896660'}},
-        {attributes: {env_variable: 'APP_ID', server_value: `1; ${secret}`}},
-        {attributes: {env_variable: 'RCON_PASSWORD', server_value: secret}},
-        {attributes: {env_variable: 'MINECRAFT_LOADER', server_value: secret}},
-      ]},
+      variables: {
+        data: [
+          {
+            attributes: {
+              env_variable: 'MINECRAFT_LOADER',
+              server_value: 'paper',
+              default_value: secret,
+              description: secret,
+            },
+          },
+          {attributes: {env_variable: 'STEAM_APP_ID', server_value: '896660'}},
+          {attributes: {env_variable: 'APP_ID', server_value: `1; ${secret}`}},
+          {attributes: {env_variable: 'RCON_PASSWORD', server_value: secret}},
+          {attributes: {env_variable: 'MINECRAFT_LOADER', server_value: secret}},
+        ],
+      },
     },
   };
   const card = c.savedServerCard(detailed);
   assert.ok(!JSON.stringify(card).includes(secret), JSON.stringify(card));
   assert.deepEqual(JSON.parse(JSON.stringify(card)), {
-    uuid: 'u1', identifier: 's1', name: 'Survival', description: 'Friends', node: 'home', status: null, is_installing: false,
-    limits: {cpu: 200, memory: 4096, disk: 10240}, game: 'minecraft', egg_name: 'Paper', docker_image: 'ghcr.io/example/java:21',
+    uuid: 'u1',
+    identifier: 's1',
+    name: 'Survival',
+    description: 'Friends',
+    node: 'home',
+    status: null,
+    is_installing: false,
+    limits: {cpu: 200, memory: 4096, disk: 10240},
+    game: 'minecraft',
+    egg_name: 'Paper',
+    docker_image: 'ghcr.io/example/java:21',
     artwork: {game: 'minecraft', server_icon: '/api/client/servers/u1/artwork/icon', pack_name: 'Pack'},
-    relationships: {variables: {data: [{attributes: {env_variable: 'MINECRAFT_LOADER', server_value: 'paper'}}, {attributes: {env_variable: 'STEAM_APP_ID', server_value: '896660'}}]}},
+    relationships: {
+      variables: {
+        data: [
+          {attributes: {env_variable: 'MINECRAFT_LOADER', server_value: 'paper'}},
+          {attributes: {env_variable: 'STEAM_APP_ID', server_value: '896660'}},
+        ],
+      },
+    },
   });
   const entry = c.savedNavigationEntry(detailed);
   assert.ok(!JSON.stringify(entry).includes(secret), JSON.stringify(entry));
-  assert.deepEqual(JSON.parse(JSON.stringify(entry)), {uuid: 'u1', identifier: 's1', name: 'Survival', egg_name: 'Paper', artwork: {game: 'minecraft', server_icon: '/api/client/servers/u1/artwork/icon', pack_name: 'Pack'}, status: null, favorite: true, last_visited_at: '2026-11-19T08:00:00Z'});
-  assert.doesNotThrow(() => { c.savedServerCard(null); c.savedServerCard({relationships: {variables: {data: [null, 'text']}}}); c.savedNavigationEntry(undefined); });
+  assert.deepEqual(JSON.parse(JSON.stringify(entry)), {
+    uuid: 'u1',
+    identifier: 's1',
+    name: 'Survival',
+    egg_name: 'Paper',
+    artwork: {game: 'minecraft', server_icon: '/api/client/servers/u1/artwork/icon', pack_name: 'Pack'},
+    status: null,
+    favorite: true,
+    last_visited_at: '2026-11-19T08:00:00Z',
+  });
+  assert.doesNotThrow(() => {
+    c.savedServerCard(null);
+    c.savedServerCard({relationships: {variables: {data: [null, 'text']}}});
+    c.savedNavigationEntry(undefined);
+  });
 });
 
 test('the sidebar is saved when it changes, not every time it is read again', () => {
@@ -230,7 +360,9 @@ test('the sidebar is saved when it changes, not every time it is read again', ()
     const servers = [{uuid: 'u1', identifier: 's1', name: 'Survival', favorite: true, internal: 'dropped'}];
     c.saveNavigation(servers, c.snapshotOwner(), 1000);
     const first = storage.values.get(key);
-    assert.deepEqual(JSON.parse(first).value, [{uuid: 'u1', identifier: 's1', name: 'Survival', status: null, favorite: true, last_visited_at: null}]);
+    assert.deepEqual(JSON.parse(first).value, [
+      {uuid: 'u1', identifier: 's1', name: 'Survival', status: null, favorite: true, last_visited_at: null},
+    ]);
     // The same list a minute later: on the desktop every save is sent to the host, so none is made.
     c.saveNavigation(servers, c.snapshotOwner(), 61_000);
     assert.equal(storage.values.get(key), first);
@@ -259,7 +391,14 @@ test('the overview list is saved without live readings and restored as being che
     c.setSnapshotAccount('account-a');
     const epoch = c.queryCacheEpoch();
     const servers = [
-      {uuid: 'u1', name: 'Survival', status: null, liveState: 'running', resources: {cpu_absolute: 42}, resourceError: false},
+      {
+        uuid: 'u1',
+        name: 'Survival',
+        status: null,
+        liveState: 'running',
+        resources: {cpu_absolute: 42},
+        resourceError: false,
+      },
       {uuid: 'u2', name: 'Creative', status: 'suspended', liveState: 'suspended'},
       {uuid: 'u3', name: 'New', status: null, is_installing: true, liveState: 'installing'},
     ];
@@ -268,7 +407,14 @@ test('the overview list is saved without live readings and restored as being che
     c.writeOverviewSnapshot(servers, epoch, asked);
     const key = 'voltra.snapshot.v1.overview.account-a';
     const first = storage.values.get(key);
-    assert.deepEqual(JSON.parse(first).value.map(s => [s.uuid, s.name, s.status, s.is_installing, s.resources, s.liveState]), [['u1', 'Survival', null, false, undefined, undefined], ['u2', 'Creative', 'suspended', false, undefined, undefined], ['u3', 'New', null, true, undefined, undefined]]);
+    assert.deepEqual(
+      JSON.parse(first).value.map(s => [s.uuid, s.name, s.status, s.is_installing, s.resources, s.liveState]),
+      [
+        ['u1', 'Survival', null, false, undefined, undefined],
+        ['u2', 'Creative', 'suspended', false, undefined, undefined],
+        ['u3', 'New', null, true, undefined, undefined],
+      ]
+    );
     assert.equal(c.readOverviewSnapshot(), servers, 'a recent in-memory view still wins');
 
     // Readings change every second; the saved list follows at its own pace
@@ -279,10 +425,18 @@ test('the overview list is saved without live readings and restored as being che
     t.mock.timers.tick(8999);
     assert.equal(storage.values.get(key), first);
     t.mock.timers.tick(1);
-    assert.equal(JSON.parse(storage.values.get(key)).value[0].name, 'Renamed', 'the latest list is saved when the interval ends');
+    assert.equal(
+      JSON.parse(storage.values.get(key)).value[0].name,
+      'Renamed',
+      'the latest list is saved when the interval ends'
+    );
     const second = storage.values.get(key);
     t.mock.timers.tick(10_000);
-    c.writeOverviewSnapshot(renamed.map(s => ({...s, resources: {cpu_absolute: 7}})), epoch, asked);
+    c.writeOverviewSnapshot(
+      renamed.map(s => ({...s, resources: {cpu_absolute: 7}})),
+      epoch,
+      asked
+    );
     assert.equal(storage.values.get(key), second, 'an unchanged list is not rewritten');
     // A list is waiting to be saved when the overview is left and reopened.
     // The reopened page first publishes the list it restored, which has no
@@ -306,7 +460,14 @@ test('the overview list is saved without live readings and restored as being che
 
     // After a restart only the saved list exists.
     t.mock.timers.tick(300_001);
-    assert.deepEqual(c.readOverviewSnapshot().map(s => [s.name, s.liveState, s.resources]), [['Renamed', 'unknown', undefined], ['Creative', 'suspended', undefined], ['New', 'installing', undefined]]);
+    assert.deepEqual(
+      c.readOverviewSnapshot().map(s => [s.name, s.liveState, s.resources]),
+      [
+        ['Renamed', 'unknown', undefined],
+        ['Creative', 'suspended', undefined],
+        ['New', 'installing', undefined],
+      ]
+    );
     storage.setItem(key, JSON.stringify({at: Date.now(), value: [{name: 'no uuid'}]}));
     assert.equal(c.readOverviewSnapshot(), undefined, 'a copy of the wrong shape is ignored');
 
@@ -346,7 +507,11 @@ test('the overview list is never saved for an account identified after it was re
     // Once this page asks again, as B, the list it gets is B's and is saved.
     t.mock.timers.tick(10_000);
     c.writeOverviewSnapshot([{uuid: 'u2', name: "B's server"}], epoch, c.snapshotOwner());
-    assert.deepEqual(copies(storage), ['voltra.snapshot.v1.overview.account-b'], 'a re-identified page saves again without a reload');
+    assert.deepEqual(
+      copies(storage),
+      ['voltra.snapshot.v1.overview.account-b'],
+      'a re-identified page saves again without a reload'
+    );
   } finally {
     t.mock.timers.reset();
     c.clearAccountSnapshots();
@@ -398,7 +563,11 @@ test('two tabs share one store: a tab left on the previous account can neither s
     one.setSnapshotAccount('account-a');
     two.setSnapshotAccount('account-a');
     write(two, 'navigation', [{uuid: 'a-server'}]);
-    assert.deepEqual(one.readAccountSnapshot('navigation'), [{uuid: 'a-server'}], 'tabs of one account share its copies');
+    assert.deepEqual(
+      one.readAccountSnapshot('navigation'),
+      [{uuid: 'a-server'}],
+      'tabs of one account share its copies'
+    );
 
     // Tab one signs out. Tab two has not noticed; its next poll runs with no session.
     const askedAsA = two.snapshotOwner();
@@ -425,7 +594,11 @@ test('two tabs share one store: a tab left on the previous account can neither s
     windowOne.dispatchEvent(new Event('panel-auth-changed'));
     await one.identifySnapshotAccount('account-b', one.snapshotRevision());
     write(one, 'navigation', [{uuid: 'b-server'}]);
-    assert.equal(await two.identifySnapshotAccount('account-a', askedBeforeTheSwitch), false, 'the late answer is refused');
+    assert.equal(
+      await two.identifySnapshotAccount('account-a', askedBeforeTheSwitch),
+      false,
+      'the late answer is refused'
+    );
     assert.equal(storage.values.get(owner), 'account-b');
     assert.deepEqual(one.readAccountSnapshot('navigation'), [{uuid: 'b-server'}], "B's copies survive it");
     write(two, 'navigation', [{uuid: 'b-server', name: 'polled with the session of B'}]);
@@ -439,9 +612,19 @@ test('two tabs share one store: a tab left on the previous account can neither s
     windowTwo.dispatchEvent(Object.assign(new Event('storage'), {key: owner, newValue: 'account-c'}));
     assert.equal(two.snapshotOwner(), undefined);
     assert.ok(globalThis.__voltraBoot, 'the owner key alone does not end early answers');
+    let suspended = 0;
+    windowTwo.addEventListener('panel-session-elsewhere', () => suspended++);
+    windowTwo.dispatchEvent(Object.assign(new Event('storage'), {key: owner, newValue: 'account-d'}));
+    assert.equal(suspended, 0, 'the owner key alone does not suspend the page');
     windowTwo.dispatchEvent(Object.assign(new Event('storage'), {key: revision, newValue: 'next'}));
-    assert.equal(globalThis.__voltraBoot, undefined, 'a sign-out or sign-in in another tab ends the early answers held here');
+    assert.equal(
+      globalThis.__voltraBoot,
+      undefined,
+      'a sign-out or sign-in in another tab ends the early answers held here'
+    );
+    assert.equal(suspended, 1, 'and suspends the page until the session is read again');
     windowTwo.dispatchEvent(Object.assign(new Event('storage'), {key: 'voltra.unrelated', newValue: null}));
+    assert.equal(suspended, 1, 'other keys change nothing');
     one.clearAccountSnapshots();
   } finally {
     globalThis.window = oldWindow;
@@ -466,9 +649,17 @@ test('a tab that finds another account signed in lets go without taking the copi
   c.releaseSnapshotAccount(storage);
   assert.equal(c.snapshotOwner(), undefined, 'this tab stops saving');
   assert.equal(storage.values.get(owner), 'account-b');
-  assert.deepEqual(copies(storage), ['voltra.snapshot.v1.navigation.account-b'], "and leaves the next account's copies alone");
+  assert.deepEqual(
+    copies(storage),
+    ['voltra.snapshot.v1.navigation.account-b'],
+    "and leaves the next account's copies alone"
+  );
   c.releaseSnapshotAccount(storage);
-  assert.deepEqual(copies(storage), ['voltra.snapshot.v1.navigation.account-b'], 'a tab that believes in no one changes nothing');
+  assert.deepEqual(
+    copies(storage),
+    ['voltra.snapshot.v1.navigation.account-b'],
+    'a tab that believes in no one changes nothing'
+  );
   storage.values.clear();
 });
 
@@ -486,22 +677,40 @@ test('a browser that cannot serialize changes to shared storage keeps nothing in
     assert.equal(storage.values.size, 0, 'nothing reaches the shared storage');
     assert.equal(page.savedNavigation(), undefined);
     storage.setItem(owner, 'account-a');
-    storage.setItem('voltra.snapshot.v1.navigation.account-a', JSON.stringify({at: Date.now(), value: [{uuid: 'u1', identifier: 's1', name: 'Left by an earlier build'}]}));
+    storage.setItem(
+      'voltra.snapshot.v1.navigation.account-a',
+      JSON.stringify({at: Date.now(), value: [{uuid: 'u1', identifier: 's1', name: 'Left by an earlier build'}]})
+    );
     assert.equal(page.savedNavigation(), undefined, 'and nothing is read from it');
 
     // Other tabs still judge their early answers by the revision, so a
     // sign-out moves it even though no copies exist here.
     storage.values.clear();
+    storage.setItem('voltra.signed-in', '1');
     page.forgetSignedInAccount();
     const moved = storage.values.get(revision);
     assert.ok(moved, 'a sign-out is announced to other tabs without a lock');
     assert.deepEqual(kept(storage), []);
+    // A tab that only learns the session already ended, usually from that very
+    // announcement, does not announce it back: two signed-out tabs would
+    // otherwise wake each other forever.
+    page.forgetSignedInAccount();
+    assert.equal(storage.values.get(revision), moved, 'nothing recorded as signed in: no echo');
 
     // A sign-in over a session that is still live has the same duty, and a
     // store too full to take a new value still gives up the old one.
     page.moveSessionRevision();
     assert.notEqual(storage.values.get(revision), moved, 'a sign-in is announced too');
-    const full = {getItem: () => 'old', setItem() { throw new Error('quota'); }, removed: [], removeItem(key) { this.removed.push(key); }};
+    const full = {
+      getItem: () => 'old',
+      setItem() {
+        throw new Error('quota');
+      },
+      removed: [],
+      removeItem(key) {
+        this.removed.push(key);
+      },
+    };
     const restoreFull = useStorage(full);
     page.moveSessionRevision();
     restoreFull();
@@ -514,18 +723,34 @@ test('a browser that cannot serialize changes to shared storage keeps nothing in
     // bundle only starts now, so it never saw the change happen.
     const loading = await load('still loading, no locks');
     loading.setSnapshotLocks(undefined);
-    const asked = new Response('{"attributes":{"uuid":"account-a"}}', {status: 200, headers: {'content-type': 'application/json'}});
+    const asked = new Response('{"attributes":{"uuid":"account-a"}}', {
+      status: 200,
+      headers: {'content-type': 'application/json'},
+    });
     const cancelled = [];
-    globalThis.__voltraBoot = {at: performance.now(), revision: announced, take: () => Promise.resolve(asked), cancel: () => cancelled.push(1)};
+    globalThis.__voltraBoot = {
+      at: performance.now(),
+      revision: announced,
+      take: () => Promise.resolve(asked),
+      cancel: () => cancelled.push(1),
+    };
+    storage.setItem('voltra.signed-in', '1'); // as an account read leaves it
     page.forgetSignedInAccount(); // tab two signs out again, through the app
     assert.notEqual(storage.values.get(revision), announced);
-    assert.equal(await loading.takeBootRead('/api/client/account'), undefined, 'the previous account is not drawn under the next session');
+    assert.equal(
+      await loading.takeBootRead('/api/client/account'),
+      undefined,
+      'the previous account is not drawn under the next session'
+    );
     assert.equal(globalThis.__voltraBoot, undefined);
     assert.equal(cancelled.length, 1);
 
     // The desktop app's own store belongs to one page and needs no lock.
     const sent = [];
-    await page.loadDesktopSnapshots(async (path, options = {}) => { sent.push(options.method || 'GET'); return new Response('{"connection":"c","entries":{}}'); }, 0);
+    await page.loadDesktopSnapshots(async (path, options = {}) => {
+      sent.push(options.method || 'GET');
+      return new Response('{"connection":"c","entries":{}}');
+    }, 0);
     assert.equal(await page.identifySnapshotAccount('account-a', page.snapshotRevision()), true);
     write(page, 'navigation', [{uuid: 'u1', identifier: 's1', name: 'Kept by the host'}]);
     assert.equal(page.savedNavigation()[0].name, 'Kept by the host');
@@ -545,7 +770,9 @@ test('a lock the browser never grants does not keep the page waiting', async t =
   try {
     const identified = page.identifySnapshotAccount('account-a', null);
     let settled = false;
-    identified.then(() => { settled = true; });
+    identified.then(() => {
+      settled = true;
+    });
     await settle();
     assert.equal(settled, false, 'it waits its turn at first');
     t.mock.timers.tick(2000);
@@ -586,7 +813,11 @@ test('the same account signed in again after someone else is a different session
       one.saveNavigation(b, asked);
       assert.deepEqual(copies(storage), [], `B's sidebar is not filed under A (re-identified first: ${reidentifies})`);
       if (!reidentifies) {
-        assert.equal(one.readAccountSnapshot('navigation'), undefined, 'and a tab still in the earlier session reads nothing');
+        assert.equal(
+          one.readAccountSnapshot('navigation'),
+          undefined,
+          'and a tab still in the earlier session reads nothing'
+        );
         assert.equal(one.snapshotOwner(), undefined);
       }
       // A fresh page that identifies A finds nothing of B's.
@@ -595,7 +826,11 @@ test('the same account signed in again after someone else is a different session
       assert.equal(fresh.savedNavigation(), undefined);
       // What the reawakened tab asks for from now on is A's, and is saved.
       if (reidentifies) {
-        one.writeAccountSnapshot('navigation', [{uuid: 'a-server', identifier: 'a', name: "A's server"}], one.snapshotOwner());
+        one.writeAccountSnapshot(
+          'navigation',
+          [{uuid: 'a-server', identifier: 'a', name: "A's server"}],
+          one.snapshotOwner()
+        );
         assert.equal(fresh.savedNavigation()[0].name, "A's server");
       }
       fresh.clearAccountSnapshots();
@@ -613,7 +848,10 @@ test('changes to the shared store are made one at a time across tabs', async () 
   // cannot be separated by the other tab.
   const queue = [];
   const locks = {request: (name, change) => new Promise(resolve => queue.push(() => resolve(change())))};
-  const turn = async () => { queue.shift()(); await settle(); };
+  const turn = async () => {
+    queue.shift()();
+    await settle();
+  };
   try {
     const one = await load('locked tab one');
     const two = await load('locked tab two');
@@ -634,9 +872,13 @@ test('changes to the shared store are made one at a time across tabs', async () 
       const steps = [
         () => one.clearAccountSnapshots(),
         // B's own account read begins after the sign-out, under the revision of that moment.
-        () => { results.b = one.identifySnapshotAccount('account-b', one.snapshotRevision()); },
+        () => {
+          results.b = one.identifySnapshotAccount('account-b', one.snapshotRevision());
+        },
       ];
-      steps.splice(lateTurn, 0, () => { results.late = two.identifySnapshotAccount('account-a', started); });
+      steps.splice(lateTurn, 0, () => {
+        results.late = two.identifySnapshotAccount('account-a', started);
+      });
       for (const step of steps) {
         step();
         while (queue.length) await turn();
@@ -690,7 +932,8 @@ test('a desktop start the host could not vouch for saves nothing until its pages
   // What the host kept from earlier launches: pages of this account the page
   // has not opened yet in this one, one it has, one too old, and another account's.
   const held = {
-    'voltra.snapshot-owner': 'account-a', 'voltra.snapshot-session': 'an-earlier-launch',
+    'voltra.snapshot-owner': 'account-a',
+    'voltra.snapshot-session': 'an-earlier-launch',
     'voltra.snapshot.v1.navigation.account-a': copy([{uuid: 'u1', identifier: 's1', name: 'Kept by the host'}]),
     'voltra.snapshot.v1.catalog.account-a': copy({games: ['kept']}),
     'voltra.snapshot.v1.overview.account-a': copy([{uuid: 'old'}], now - week - 1),
@@ -703,10 +946,17 @@ test('a desktop start the host could not vouch for saves nothing until its pages
     if (options.method === 'POST') return new Response('{"saved":true}');
     // Until the panel has accepted the connection the host hands over nothing
     // and names nothing to save under.
-    return new Response(JSON.stringify(accepted ? {connection: 'connection-1', entries: held} : {pending: true, entries: {}}));
+    return new Response(
+      JSON.stringify(accepted ? {connection: 'connection-1', entries: held} : {pending: true, entries: {}})
+    );
   };
   const posts = () => requests.filter(request => request.method === 'POST');
-  const pass = async () => { t.mock.timers.tick(500); await settle(); await settle(); await settle(); };
+  const pass = async () => {
+    t.mock.timers.tick(500);
+    await settle();
+    await settle();
+    await settle();
+  };
   try {
     await c.loadDesktopSnapshots(host, 500);
     assert.equal(c.savedNavigation(), undefined, 'nothing is drawn from pages that were not handed over');
@@ -723,12 +973,38 @@ test('a desktop start the host could not vouch for saves nothing until its pages
     assert.equal(posts().length, 1);
     const sent = JSON.parse(posts()[0].body);
     assert.equal(sent.connection, 'connection-1');
-    assert.deepEqual(Object.keys(sent.entries).filter(key => key.startsWith('voltra.snapshot.v1.')).sort(), ['voltra.snapshot.v1.catalog.account-a', 'voltra.snapshot.v1.navigation.account-a', 'voltra.snapshot.v1.overview.account-a'], 'the usable copies of this account joined the store; those of another did not');
-    assert.equal(JSON.parse(sent.entries['voltra.snapshot.v1.navigation.account-a']).value[0].name, 'From the panel', 'what the page saved in the meantime is the newer copy');
-    assert.deepEqual(JSON.parse(sent.entries['voltra.snapshot.v1.overview.account-a']).value, [{uuid: 'u2'}], 'a copy too old to use is not brought back');
+    assert.deepEqual(
+      Object.keys(sent.entries)
+        .filter(key => key.startsWith('voltra.snapshot.v1.'))
+        .sort(),
+      [
+        'voltra.snapshot.v1.catalog.account-a',
+        'voltra.snapshot.v1.navigation.account-a',
+        'voltra.snapshot.v1.overview.account-a',
+      ],
+      'the usable copies of this account joined the store; those of another did not'
+    );
+    assert.equal(
+      JSON.parse(sent.entries['voltra.snapshot.v1.navigation.account-a']).value[0].name,
+      'From the panel',
+      'what the page saved in the meantime is the newer copy'
+    );
+    assert.deepEqual(
+      JSON.parse(sent.entries['voltra.snapshot.v1.overview.account-a']).value,
+      [{uuid: 'u2'}],
+      'a copy too old to use is not brought back'
+    );
     assert.equal(sent.entries['voltra.snapshot-owner'], 'account-a');
-    assert.notEqual(sent.entries['voltra.snapshot-session'], 'an-earlier-launch', 'the store keeps the revision the account was identified under');
-    assert.deepEqual(c.readAccountSnapshot('catalog'), {games: ['kept']}, 'a page not opened yet still gets its head start');
+    assert.notEqual(
+      sent.entries['voltra.snapshot-session'],
+      'an-earlier-launch',
+      'the store keeps the revision the account was identified under'
+    );
+    assert.deepEqual(
+      c.readAccountSnapshot('catalog'),
+      {games: ['kept']},
+      'a page not opened yet still gets its head start'
+    );
     const asked = requests.length;
     write(c, 'overview', [{uuid: 'u3'}]);
     await pass();
@@ -797,7 +1073,11 @@ test('a desktop start the host could not vouch for saves nothing until its pages
     await pass();
     assert.equal(posts().length, 1);
     const afterDiscard = JSON.parse(posts()[0].body).entries;
-    assert.equal(afterDiscard['voltra.snapshot.v1.navigation.account-a'], undefined, 'the sidebar that was too large to keep did not come back as the older one');
+    assert.equal(
+      afterDiscard['voltra.snapshot.v1.navigation.account-a'],
+      undefined,
+      'the sidebar that was too large to keep did not come back as the older one'
+    );
     assert.ok(afterDiscard['voltra.snapshot.v1.catalog.account-a'], 'the rest was handed over');
     assert.equal(c.savedNavigation(), undefined);
   } finally {
@@ -816,12 +1096,29 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
   const host = async (path, options = {}) => {
     requests.push({path, method: options.method || 'GET', body: options.body});
     if (options.method === 'POST') return new Response('{"saved":true}');
-    return new Response(JSON.stringify({connection: 'connection-1', entries: {'voltra.snapshot-owner': 'account-a', 'voltra.snapshot-session': 'kept-by-the-host', 'voltra.snapshot.v1.navigation.account-a': JSON.stringify({at: Date.now(), value: [{uuid: 'u1', identifier: 's1', name: 'Saved'}]}), ignored: {not: 'text'}}}));
+    return new Response(
+      JSON.stringify({
+        connection: 'connection-1',
+        entries: {
+          'voltra.snapshot-owner': 'account-a',
+          'voltra.snapshot-session': 'kept-by-the-host',
+          'voltra.snapshot.v1.navigation.account-a': JSON.stringify({
+            at: Date.now(),
+            value: [{uuid: 'u1', identifier: 's1', name: 'Saved'}],
+          }),
+          ignored: {not: 'text'},
+        },
+      })
+    );
   };
   try {
     await c.loadDesktopSnapshots(host, 500);
     c.setSnapshotAccount('account-a');
-    assert.deepEqual(c.savedNavigation(), [{uuid: 'u1', identifier: 's1', name: 'Saved'}], 'the first paint uses what the host kept');
+    assert.deepEqual(
+      c.savedNavigation(),
+      [{uuid: 'u1', identifier: 's1', name: 'Saved'}],
+      'the first paint uses what the host kept'
+    );
     write(c, 'navigation', [{uuid: 'u2', identifier: 's2', name: 'Next'}]);
     write(c, 'overview', [{uuid: 'u2'}]);
     assert.equal(requests.length, 1, 'changes are gathered');
@@ -831,12 +1128,24 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     assert.equal(requests[1].method, 'POST');
     const sent = JSON.parse(requests[1].body);
     assert.equal(sent.connection, 'connection-1', 'a save names the connection the copies were read for');
-    assert.deepEqual(Object.keys(sent.entries).sort(), ['voltra.snapshot-owner', 'voltra.snapshot-session', 'voltra.snapshot.v1.navigation.account-a', 'voltra.snapshot.v1.overview.account-a']);
-    assert.ok(Object.values(sent.entries).every(value => typeof value === 'string'), 'the host stores text entries');
+    assert.deepEqual(Object.keys(sent.entries).sort(), [
+      'voltra.snapshot-owner',
+      'voltra.snapshot-session',
+      'voltra.snapshot.v1.navigation.account-a',
+      'voltra.snapshot.v1.overview.account-a',
+    ]);
+    assert.ok(
+      Object.values(sent.entries).every(value => typeof value === 'string'),
+      'the host stores text entries'
+    );
     c.clearAccountSnapshots();
     t.mock.timers.tick(500);
     await settle();
-    assert.deepEqual(Object.keys(JSON.parse(requests.at(-1).body).entries), [revision], 'signing out empties the host copy too');
+    assert.deepEqual(
+      Object.keys(JSON.parse(requests.at(-1).body).entries),
+      [revision],
+      'signing out empties the host copy too'
+    );
     assert.deepEqual(kept(storage), [], 'nothing was written to the WebView storage');
 
     // A host that refuses the new copy must not be left holding an older one.
@@ -844,13 +1153,19 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     await c.loadDesktopSnapshots(async (path, options = {}) => {
       if (options.method !== 'POST') return new Response('{"connection":"connection-2","entries":{}}');
       refusing.push(JSON.parse(options.body));
-      return Object.keys(refusing.at(-1).entries).length ? new Response('{"error":"Invalid saved pages."}', {status: 422}) : new Response('{"saved":true}');
+      return Object.keys(refusing.at(-1).entries).length
+        ? new Response('{"error":"Invalid saved pages."}', {status: 422})
+        : new Response('{"saved":true}');
     }, 500);
     c.setSnapshotAccount('account-a');
     write(c, 'navigation', [{uuid: 'u1', identifier: 's1', name: 'Too much'}]);
     t.mock.timers.tick(500);
     await new Promise(resolve => setImmediate(resolve));
-    assert.deepEqual(refusing.at(-1), {connection: 'connection-2', entries: {}}, 'the refused save is followed by an empty one');
+    assert.deepEqual(
+      refusing.at(-1),
+      {connection: 'connection-2', entries: {}},
+      'the refused save is followed by an empty one'
+    );
     c.clearAccountSnapshots();
     t.mock.timers.tick(500);
     await new Promise(resolve => setImmediate(resolve));
@@ -862,7 +1177,10 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     await c.loadDesktopSnapshots(async (path, options = {}) => {
       if (options.method !== 'POST') return new Response('{"connection":"connection-4","entries":{}}');
       ordered.push(JSON.parse(options.body).entries);
-      if (ordered.length === 1) return new Promise(resolve => { answerFirst = () => resolve(new Response('{"error":"Invalid saved pages."}', {status: 422})); });
+      if (ordered.length === 1)
+        return new Promise(resolve => {
+          answerFirst = () => resolve(new Response('{"error":"Invalid saved pages."}', {status: 422}));
+        });
       return new Response('{"saved":true}');
     }, 500);
     c.setSnapshotAccount('account-a');
@@ -878,7 +1196,10 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     await settle();
     assert.equal(ordered.length, 2);
     assert.match(ordered[1]['voltra.snapshot.v1.navigation.account-a'], /Second, current/);
-    assert.ok(ordered.every(entries => Object.keys(entries).length > 0), 'the refusal of the older save did not empty the host after the newer one');
+    assert.ok(
+      ordered.every(entries => Object.keys(entries).length > 0),
+      'the refusal of the older save did not empty the host after the newer one'
+    );
     c.clearAccountSnapshots();
     t.mock.timers.tick(500);
     await settle();
@@ -887,11 +1208,17 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     // A save the host could not make is tried again, so a passing fault does
     // not leave the host empty until the list next changes.
     const flaky = [];
-    await c.loadDesktopSnapshots(async (path, options = {}) => {
-      if (options.method !== 'POST') return new Response('{"connection":"connection-5","entries":{}}');
-      flaky.push(Object.keys(JSON.parse(options.body).entries).length);
-      return flaky.length === 1 ? new Response('{"error":"Could not save pages on this device."}', {status: 500}) : new Response('{"saved":true}');
-    }, 500, 5000);
+    await c.loadDesktopSnapshots(
+      async (path, options = {}) => {
+        if (options.method !== 'POST') return new Response('{"connection":"connection-5","entries":{}}');
+        flaky.push(Object.keys(JSON.parse(options.body).entries).length);
+        return flaky.length === 1
+          ? new Response('{"error":"Could not save pages on this device."}', {status: 500})
+          : new Response('{"saved":true}');
+      },
+      500,
+      5000
+    );
     c.setSnapshotAccount('account-a');
     write(c, 'navigation', [{uuid: 'u1', identifier: 's1', name: 'Kept through a fault'}]);
     t.mock.timers.tick(500);
@@ -908,15 +1235,24 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
 
     // A host that keeps failing is not left holding an older copy.
     const failing = [];
-    await c.loadDesktopSnapshots(async (path, options = {}) => {
-      if (options.method !== 'POST') return new Response('{"connection":"connection-6","entries":{}}');
-      failing.push(Object.keys(JSON.parse(options.body).entries).length);
-      return failing.at(-1) ? new Response('{"error":"Could not save pages on this device."}', {status: 500}) : new Response('{"saved":true}');
-    }, 500, 5000);
+    await c.loadDesktopSnapshots(
+      async (path, options = {}) => {
+        if (options.method !== 'POST') return new Response('{"connection":"connection-6","entries":{}}');
+        failing.push(Object.keys(JSON.parse(options.body).entries).length);
+        return failing.at(-1)
+          ? new Response('{"error":"Could not save pages on this device."}', {status: 500})
+          : new Response('{"saved":true}');
+      },
+      500,
+      5000
+    );
     c.setSnapshotAccount('account-a');
     write(c, 'navigation', [{uuid: 'u1', identifier: 's1', name: 'Cannot be saved'}]);
     t.mock.timers.tick(500);
-    for (const wait of [5000, 10000, 15000]) { await settle(); t.mock.timers.tick(wait); }
+    for (const wait of [5000, 10000, 15000]) {
+      await settle();
+      t.mock.timers.tick(wait);
+    }
     await settle();
     await settle();
     assert.equal(failing.length, 5, 'one save, three more tries, then an empty copy');
@@ -947,7 +1283,10 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
 
     // A host that does not name a connection cannot be saved to at all.
     const unnamed = [];
-    await c.loadDesktopSnapshots(async (path, options = {}) => { unnamed.push(options.method || 'GET'); return new Response('{"entries":{}}'); }, 500);
+    await c.loadDesktopSnapshots(async (path, options = {}) => {
+      unnamed.push(options.method || 'GET');
+      return new Response('{"entries":{}}');
+    }, 500);
     c.setSnapshotAccount('account-a');
     write(c, 'navigation', [{uuid: 'u1', identifier: 's1', name: 'Unsaved'}]);
     t.mock.timers.tick(500);
@@ -955,7 +1294,9 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     c.clearAccountSnapshots();
 
     // An unreachable host only loses the head start, and still keeps the WebView storage untouched.
-    await c.loadDesktopSnapshots(async () => { throw new Error('offline'); }, 500);
+    await c.loadDesktopSnapshots(async () => {
+      throw new Error('offline');
+    }, 500);
     c.setSnapshotAccount('account-a');
     write(c, 'navigation', [{uuid: 'u1', identifier: 's1', name: 'Kept in memory'}]);
     assert.equal(c.savedNavigation()[0].name, 'Kept in memory');
@@ -965,6 +1306,30 @@ test('the desktop app keeps its saved pages with the host, not in the WebView', 
     c.clearAccountSnapshots();
     c.setSnapshotStore(null);
     t.mock.timers.reset();
+    restore();
+  }
+});
+
+test('a tab that learns of a sign-out from another tab writes nothing back', async () => {
+  const storage = memory();
+  const restore = useStorage(storage);
+  try {
+    c.setSnapshotAccount('account-a');
+    storage.setItem('voltra.signed-in', '1');
+    // This tab signs out: the other tabs are told, and the store is emptied.
+    c.forgetSignedInAccount();
+    await settle();
+    const announced = storage.values.get(revision);
+    assert.equal(storage.values.has(owner), false);
+    assert.equal(storage.values.has('voltra.signed-in'), false);
+    // The other tab, woken by that, confirms the session is gone and forgets
+    // it too. It must not move the revision again, or the first tab would
+    // wake and answer in turn, without end.
+    c.forgetSignedInAccount();
+    await settle();
+    assert.equal(storage.values.get(revision), announced);
+  } finally {
+    c.clearAccountSnapshots();
     restore();
   }
 });

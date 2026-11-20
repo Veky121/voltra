@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestBepinexLoggingAPI(t *testing.T) {
@@ -14,13 +15,13 @@ func TestBepinexLoggingAPI(t *testing.T) {
 	ctx := context.Background()
 	var entry gameTemplate
 	for _, e := range gameTemplates().Entries {
-		if e.Path == bepinexLoggingRecipe {
+		if e.Path == gamesettings.BepinexLoggingRecipe {
 			entry = e
 		}
 	}
 	startup := str(entry.Egg["startup"])
 	allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-		if bepinexLoggingRecipe == starboundAuthorityRecipe {
+		if gamesettings.BepinexLoggingRecipe == gamesettings.StarboundAuthorityRecipe {
 			return 21025
 		}
 		return 29371
@@ -54,7 +55,7 @@ func TestBepinexLoggingAPI(t *testing.T) {
 		}
 		f.Files["/"+name] = []byte(expected + "\n")
 	}
-	f.Files[bepinexLoggingPath] = []byte(raw)
+	f.Files[gamesettings.BepinexLoggingPath] = []byte(raw)
 	// Replace only this isolated fixture egg's variables with canonical declarations.
 	if err := a.exec(ctx, "DELETE FROM egg_variables WHERE egg_id=$1", server["egg_id"]); err != nil {
 		t.Fatal(err)
@@ -80,15 +81,15 @@ func TestBepinexLoggingAPI(t *testing.T) {
 	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	f.State = "offline"
 	view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
-	if str(view["file"]) != bepinexLoggingPath || len(asSlice(view["fields"])) != 1 {
+	if str(view["file"]) != gamesettings.BepinexLoggingPath || len(asSlice(view["fields"])) != 1 {
 		t.Fatal("wrong default document or fields", view)
 	}
-	infraExpect(t, mux, admin, "GET", endpoint+"?file="+bepinexLoggingPath, nil, 200)
+	infraExpect(t, mux, admin, "GET", endpoint+"?file="+gamesettings.BepinexLoggingPath, nil, 200)
 	infraExpect(t, mux, admin, "GET", endpoint+"?file=/doorstop_config.ini", nil, 404)
 	for _, value := range []string{"false", "true"} {
-		infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{bepinexLoggingKey: value == "true"}}, 200)
+		infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{gamesettings.BepinexLoggingKey: value == "true"}}, 200)
 		expected := strings.Replace(raw, "Enabled = true", "Enabled = "+value, 1)
-		if !bytes.Equal(f.Files[bepinexLoggingPath], []byte(expected)) {
+		if !bytes.Equal(f.Files[gamesettings.BepinexLoggingPath], []byte(expected)) {
 			t.Fatal("bytes outside boolean changed")
 		}
 		view = asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
@@ -97,9 +98,9 @@ func TestBepinexLoggingAPI(t *testing.T) {
 			t.Fatal("wrong boolean", field)
 		}
 	}
-	input := M{"revision": view["revision"], "settings": M{bepinexLoggingKey: false}}
+	input := M{"revision": view["revision"], "settings": M{gamesettings.BepinexLoggingKey: false}}
 	before := f.Writes
-	infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": "stale", "settings": M{bepinexLoggingKey: false}}, 409)
+	infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": "stale", "settings": M{gamesettings.BepinexLoggingKey: false}}, 409)
 	f.State = "running"
 	infraExpect(t, mux, admin, "PUT", endpoint, input, 409)
 	f.State = "offline"
@@ -119,8 +120,8 @@ func TestBepinexLoggingAPI(t *testing.T) {
 			break
 		}
 	}
-	delete(f.Files, bepinexLoggingPath)
-	infraExpect(t, mux, admin, "GET", endpoint+"?file="+bepinexLoggingPath, nil, 404)
+	delete(f.Files, gamesettings.BepinexLoggingPath)
+	infraExpect(t, mux, admin, "GET", endpoint+"?file="+gamesettings.BepinexLoggingPath, nil, 404)
 	if f.Writes != before {
 		t.Fatal("rejection wrote files")
 	}
@@ -131,33 +132,33 @@ func TestBepinexLoggingAPI(t *testing.T) {
 }
 
 func TestBepinexLoggingNativeBytes(t *testing.T) {
-	raw, err := os.ReadFile("testdata/game-settings/game-parity-20261029/wave380-bepinex-logging-editor/native-BepInEx.cfg")
+	raw, err := os.ReadFile("../gamesettings/testdata/game-settings/game-parity-20261029/wave380-bepinex-logging-editor/native-BepInEx.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := parseBepinexLoggingSettings(raw)
+	parsed, err := gamesettings.ParseBepinexLoggingSettings(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := parsed.fields[0].value
+	original := parsed.Fields[0].Value
 	toggled := "false"
 	if original == "false" {
 		toggled = "true"
 	}
-	changed, err := parsed.patch(map[string]string{bepinexLoggingKey: toggled})
+	changed, err := parsed.Patch(map[string]string{gamesettings.BepinexLoggingKey: toggled})
 	if err != nil {
 		t.Fatal(err)
 	}
-	next, err := parseBepinexLoggingSettings(changed)
+	next, err := gamesettings.ParseBepinexLoggingSettings(changed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	restored, err := next.patch(map[string]string{bepinexLoggingKey: original})
+	restored, err := next.Patch(map[string]string{gamesettings.BepinexLoggingKey: original})
 	if err != nil || !bytes.Equal(raw, restored) {
 		t.Fatal("native round trip changed bytes")
 	}
 	for _, raw := range []string{"[Logging.Disk]\nEnabled = true\nEnabled = false\n", "[Logging.Disk]\nEnabled = perhaps\n", "[Logging.Disk]\nEnabled = true\nenabled = false\n"} {
-		if _, err := parseBepinexLoggingSettings([]byte(raw)); err == nil {
+		if _, err := gamesettings.ParseBepinexLoggingSettings([]byte(raw)); err == nil {
 			t.Fatal("ambiguous boolean accepted")
 		}
 	}

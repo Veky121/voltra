@@ -1,0 +1,86 @@
+{
+  "beamng/beammp/egg-beam-m-p-server.json": {
+    "settings_documents": [
+      "ServerConfig.toml"
+    ]
+  },
+  "arma/arma3/egg-arma3.json": {
+    "settings_documents": [
+      "server.cfg",
+      "basic.cfg"
+    ]
+  },
+  "counter_strike/counter_strike_2/egg-counter--strike2.json": {
+    "settings_documents": [
+      "game/csgo/cfg/voltra-native.cfg"
+    ]
+  },
+  "minecraft/java/limbo/egg-limbo.json": {
+    "settings_documents": [
+      "server.properties"
+    ]
+  },
+  "minecraft/java/spongevanilla/egg-sponge-vanilla.json": {
+    "settings_documents": [
+      "server.properties"
+    ]
+  },
+  "minecraft/java/cuberite/egg-cuberite.json": {
+    "settings_documents": [
+      "settings.ini",
+      "webadmin.ini"
+    ]
+  },
+  "spacestation_14/egg-spacestation14.json": {
+    "settings_documents": [
+      "ss14/server_config.toml"
+    ]
+  },
+  "minecraft/java/canvas-mc/egg-canvas-mc.json": {
+    "settings_documents": [
+      "server.properties"
+    ]
+  },
+  "ddnet/egg-d-d-net.json": {
+    "settings_documents": []
+  },
+  "ark_survival_evolved/egg-ark--survival-evolved.json": {
+    "settings_documents": [
+      "ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini",
+      "ShooterGame/Saved/Config/LinuxServer/Game.ini"
+    ]
+  },
+  "eco/egg-eco.json": {
+    "settings_documents": [
+      "Configs/Network.eco",
+      "Configs/Localization.eco"
+    ]
+  },
+  "arma/arma_reforger/egg-arma-reforger.json": {
+    "settings_documents": [
+      "config.json"
+    ]
+  },
+  "ark_survival_ascended/egg-ark-survival-ascended.json": {
+    "settings_documents": [
+      "ShooterGame/Saved/Config/WindowsServer/GameUserSettings.ini",
+      "ShooterGame/Saved/Config/WindowsServer/Game.ini"
+    ]
+  },
+  "astroneer/egg-astroneer-dedicated-server.json": {
+    "settings_documents": [
+      "Astro/Saved/Config/WindowsServer/AstroServerSettings.ini",
+      "Astro/Saved/Config/WindowsServer/Engine.ini"
+    ]
+  },
+  "foundry/egg-foundry.json": {
+    "settings_documents": [
+      "App.cfg"
+    ]
+  },
+  "soulmask/egg-soulmask.json": {
+    "settings_documents": [
+      "WS/Saved/GameplaySettings/GameXishu.json"
+    ]
+  }
+}

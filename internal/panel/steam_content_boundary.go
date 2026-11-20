@@ -18,7 +18,7 @@ func blockPublicSteamOwnership(ctx context.Context, q steamHistoryQuerier, serve
 		return err
 	}
 	if private {
-		return APIError{409, "PrivateSteamOwnershipConflict", "Use this server's private Steam workflow or complete an explicit content migration before public maintenance or startup."}
+		return APIError{Status: 409, Code: "PrivateSteamOwnershipConflict", Detail: "Use this server's private Steam workflow or complete an explicit content migration before public maintenance or startup."}
 	}
 	return nil
 }

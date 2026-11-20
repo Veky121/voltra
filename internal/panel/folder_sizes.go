@@ -179,19 +179,19 @@ func scanFolderSizes(ctx context.Context, root string, list func(context.Context
 	return totals, nil
 }
 
-func (a *App) clientFolderSize(w http.ResponseWriter, r *http.Request) {
-	s, err := a.server(r, "file.read")
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	directory := r.URL.Query().Get("directory")
+// folderSizeBatchLimit bounds one batched request. A listing with more child
+// folders asks in several batches.
+const folderSizeBatchLimit = 100
+
+func cleanFolderSizePath(directory string) (string, error) {
 	if strings.ContainsRune(directory, 0) {
-		fail(w, bad("Invalid directory"))
-		return
+		return "", bad("Invalid directory")
 	}
-	directory = path.Clean("/" + strings.TrimPrefix(directory, "/"))
-	size, updated, err := a.folderSizes.get(r.Context(), folderSizeKey{str(s["uuid"]), directory}, func(ctx context.Context) (map[string]int64, error) {
+	return path.Clean("/" + strings.TrimPrefix(directory, "/")), nil
+}
+
+func (a *App) folderSize(ctx context.Context, s M, directory string) (int64, time.Time, error) {
+	return a.folderSizes.get(ctx, folderSizeKey{str(s["uuid"]), directory}, func(ctx context.Context) (map[string]int64, error) {
 		return scanFolderSizes(ctx, directory, func(ctx context.Context, directory string) ([]folderSizeFile, error) {
 			response, err := a.daemonServer(ctx, s, http.MethodGet, "/files/list-directory?"+url.Values{"directory": {directory}}.Encode(), nil)
 			if err != nil {
@@ -205,10 +205,75 @@ func (a *App) clientFolderSize(w http.ResponseWriter, r *http.Request) {
 			return files, nil
 		})
 	})
+}
+
+func folderSizeAttributes(directory string, size int64, updated time.Time) M {
+	return M{"directory": directory, "size": size, "calculated_at": updated.UTC().Format(time.RFC3339), "cache_seconds": 60, "excludes_symlinks": true}
+}
+
+// clientFolderSize answers one folder, or with batch=1 every repeated
+// directory parameter in one response. The file explorer asks for all child
+// folders of a listing at once instead of one request per row. Each folder is
+// still scanned and cached on its own, so one unreadable folder does not hide
+// the sizes of its siblings.
+func (a *App) clientFolderSize(w http.ResponseWriter, r *http.Request) {
+	s, err := a.server(r, "file.read")
 	if err != nil {
-		fail(w, &APIError{Status: 503, Code: "FolderSizeUnavailable", Detail: "Could not calculate this folder size. Check folder access and try refreshing."})
+		fail(w, err)
+		return
+	}
+	query := r.URL.Query()
+	if query.Get("batch") != "1" {
+		directory, err := cleanFolderSizePath(query.Get("directory"))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		size, updated, err := a.folderSize(r.Context(), s, directory)
+		if err != nil {
+			fail(w, &APIError{Status: 503, Code: "FolderSizeUnavailable", Detail: "Could not calculate this folder size. Check folder access and try refreshing."})
+			return
+		}
+		w.Header().Set("Cache-Control", "private, no-store")
+		writeJSON(w, 200, item("folder_size", folderSizeAttributes(directory, size, updated)))
+		return
+	}
+	requested := query["directory"]
+	if len(requested) == 0 || len(requested) > folderSizeBatchLimit {
+		fail(w, bad(fmt.Sprintf("Request between 1 and %d folders.", folderSizeBatchLimit)))
+		return
+	}
+	directories := make([]string, 0, len(requested))
+	seen := map[string]bool{}
+	for _, raw := range requested {
+		directory, err := cleanFolderSizePath(raw)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if !seen[directory] {
+			seen[directory] = true
+			directories = append(directories, directory)
+		}
+	}
+	rows := make([]M, len(directories))
+	var wait sync.WaitGroup
+	for i, directory := range directories {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			size, updated, err := a.folderSize(r.Context(), s, directory)
+			if err != nil {
+				rows[i] = M{"directory": directory, "error": "Could not calculate this folder size."}
+				return
+			}
+			rows[i] = folderSizeAttributes(directory, size, updated)
+		}()
+	}
+	wait.Wait()
+	if err := r.Context().Err(); err != nil {
 		return
 	}
 	w.Header().Set("Cache-Control", "private, no-store")
-	writeJSON(w, 200, item("folder_size", M{"directory": directory, "size": size, "calculated_at": updated.UTC().Format(time.RFC3339), "cache_seconds": 60, "excludes_symlinks": true}))
+	writeJSON(w, 200, collection("folder_size", rows))
 }

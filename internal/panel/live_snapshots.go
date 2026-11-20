@@ -42,6 +42,12 @@ type liveBinding struct {
 	cancel         func()
 	resync         chan struct{}
 	worker         *liveSnapshotWorker
+	lastStatus     int
+	// Cached authorization; see clientLiveEvents.
+	authorizedAt         time.Time
+	authorizedEpoch      uint64
+	authorizedGeneration uint64
+	authorizedErr        error
 }
 type liveSnapshotWorker struct {
 	topic      liveTopic
@@ -110,6 +116,10 @@ func (a *App) liveTopic(path string) (liveTopic, bool) {
 		t.handler = a.clientResources
 		t.event = "server.resources"
 		t.interval = time.Second
+		if u.Query().Get("summary") == "overview" {
+			// Overview cards: the same shared sample, every 5 s.
+			t.interval = liveOverviewResourceInterval
+		}
 	case "steam":
 		t.handler = a.clientSteamStatus
 		t.event = "jobs.updated"
@@ -329,8 +339,8 @@ func (a *App) runLiveSnapshot(ctx context.Context, key string, w *liveSnapshotWo
 				}
 			}
 		}
+		delay := w.sampleInterval()
 		h.mu.Unlock()
-		delay := w.topic.interval
 		if w.topic.event == "console.entries" && value.status == 200 {
 			var batch struct {
 				Cursor string `json:"cursor"`
@@ -363,6 +373,33 @@ func (a *App) runLiveSnapshot(ctx context.Context, key string, w *liveSnapshotWo
 	}
 }
 func (h *liveSnapshotHub) invalidate(user int64) { h.invalidateDomains("all") }
+
+const liveOverviewResourceInterval = 5 * time.Second
+
+// Resource samples are shared by every viewer of a server; sample as often as
+// the most frequent viewer asks. Call with the hub locked.
+func (w *liveSnapshotWorker) sampleInterval() time.Duration {
+	if w.topic.event != "server.resources" || len(w.bindings) == 0 {
+		return w.topic.interval
+	}
+	var interval time.Duration
+	for b := range w.bindings {
+		if interval == 0 || b.topic.interval < interval {
+			interval = b.topic.interval
+		}
+	}
+	return interval
+}
+
+// The data generation a binding's worker is on.
+func (h *liveSnapshotHub) bindingGeneration(b *liveBinding) uint64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if b.worker == nil {
+		return 0
+	}
+	return b.worker.generation
+}
 func (h *liveSnapshotHub) close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -416,6 +453,7 @@ func liveQueryAllowed(parts []string, q url.Values) bool {
 				return false
 			}
 		case family == "schedules" && key == "include" && v == "tasks":
+		case family == "resources" && len(parts) == 2 && key == "summary" && v == "overview":
 		case (family == "backups" || family == "activity") && (key == "page" || key == "per_page"):
 			n, e := strconv.Atoi(v)
 			if e != nil || n < 1 || n > 10000 || (key == "per_page" && n > 100) {

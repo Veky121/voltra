@@ -33,7 +33,7 @@ func (a *App) serverDeleteMutationLock(ctx context.Context, server M) (func(), e
 		if err != nil {
 			return nil, err
 		}
-		return nil, APIError{409, "ServerStateConflict", "A server update or configuration change is in progress. Wait for it to finish before deleting the server."}
+		return nil, APIError{Status: 409, Code: "ServerStateConflict", Detail: "A server update or configuration change is in progress. Wait for it to finish before deleting the server."}
 	}
 	return release, nil
 }
@@ -55,7 +55,7 @@ func lockServerForDeletion(ctx context.Context, tx pgx.Tx, id any) (M, error) {
 		return nil, err
 	}
 	if transferring {
-		return nil, APIError{409, "ServerStateConflict", "Finish or cancel the active transfer before deleting this server."}
+		return nil, APIError{Status: 409, Code: "ServerStateConflict", Detail: "Finish or cancel the active transfer before deleting this server."}
 	}
 	return server, nil
 }

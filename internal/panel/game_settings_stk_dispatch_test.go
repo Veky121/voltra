@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestSTKSettingsFilenameAndDispatch(t *testing.T) {
 	for _, name := range []string{"../config.xml", "/config.xml", "a/b.xml", "config.xml/", "{{CONFIG_NAME}}", "config.json", ".xml", ""} {
-		if _, err := stkSettingsPath(name); err == nil {
+		if _, err := gamesettings.StkSettingsPath(name); err == nil {
 			t.Fatalf("accepted unsafe filename %q", name)
 		}
 	}
-	file, err := stkSettingsPath("My-server.xml")
+	file, err := gamesettings.StkSettingsPath("My-server.xml")
 	if err != nil || file != "/My-server.xml" {
 		t.Fatal(file, err)
 	}
@@ -22,17 +23,17 @@ func TestSTKSettingsFilenameAndDispatch(t *testing.T) {
 			continue
 		}
 		egg := M{"uuid": gameTemplateEggUUID(entry), "startup": entry.Egg["startup"], "_stk_settings_path": file}
-		if nativeSettingsDocuments(egg)[file] != "xml" {
+		if gamesettings.NativeDocuments(egg)[file] != "xml" {
 			t.Fatal("custom document missing")
 		}
-		p, err := parseGameSettingsForEgg(egg, file, []byte(`<server-config version="6"><chat value="true"/></server-config>`))
-		if err != nil || len(p.fields) != 1 {
+		p, err := gamesettings.ParseForEgg(egg, file, []byte(`<server-config version="6"><chat value="true"/></server-config>`))
+		if err != nil || len(p.Fields) != 1 {
 			t.Fatal("typed dispatch missing", err)
 		}
-		if _, err = p.patch(map[string]string{"chat": "false"}); err != nil {
+		if _, err = p.Patch(map[string]string{"chat": "false"}); err != nil {
 			t.Fatal(err)
 		}
-		if _, exists := nativeSettingsDocuments(egg)["/config.xml"]; exists {
+		if _, exists := gamesettings.NativeDocuments(egg)["/config.xml"]; exists {
 			t.Fatal("wrong default filename exposed")
 		}
 		return

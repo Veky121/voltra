@@ -12,7 +12,11 @@ import (
 // Vite's content hashes make these URLs safe to retain across releases.
 var immutableWebAsset = regexp.MustCompile(`^.+-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|png|webp|svg|avif)$`)
 
-func acceptsGzip(value string) bool {
+func acceptsGzip(value string) bool { return acceptsEncoding(value, "gzip") }
+
+// acceptsEncoding reports whether an Accept-Encoding value allows coding. An
+// explicit entry for the coding wins over a wildcard.
+func acceptsEncoding(value, coding string) bool {
 	wildcard := false
 	for _, encoding := range strings.Split(value, ",") {
 		parts := strings.Split(encoding, ";")
@@ -28,10 +32,10 @@ func acceptsGzip(value string) bool {
 				}
 			}
 		}
-		switch strings.ToLower(strings.TrimSpace(parts[0])) {
-		case "gzip":
+		switch name := strings.ToLower(strings.TrimSpace(parts[0])); {
+		case name == coding:
 			return quality > 0
-		case "*":
+		case name == "*":
 			wildcard = quality > 0
 		}
 	}
@@ -64,17 +68,32 @@ func (a *App) serveWebFile(w http.ResponseWriter, r *http.Request, name string, 
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	if ext := filepath.Ext(name); ext == ".js" || ext == ".css" {
 		w.Header().Add("Vary", "Accept-Encoding")
-		if acceptsGzip(r.Header.Get("Accept-Encoding")) {
-			// Compression happens at build time, never on an API or asset request.
-			if compressed, err := os.Open(name + ".gz"); err == nil {
-				defer compressed.Close()
-				if stat, err := compressed.Stat(); err == nil && !stat.IsDir() && !stat.ModTime().Before(info.ModTime()) {
-					w.Header().Set("Content-Encoding", "gzip")
-					http.ServeContent(w, r, filepath.Base(name), info.ModTime(), compressed)
-					return
-				}
+		// Compression happens at build time, never on an asset request. Brotli
+		// copies are smaller, so they are preferred when the browser takes them.
+		accept := r.Header.Get("Accept-Encoding")
+		for _, encoding := range []struct{ name, suffix string }{{"br", ".br"}, {"gzip", ".gz"}} {
+			if acceptsEncoding(accept, encoding.name) && serveCompressedWebFile(w, r, name, info, encoding.name, encoding.suffix) {
+				return
 			}
 		}
 	}
 	http.ServeFile(w, r, name)
+}
+
+// serveCompressedWebFile serves name+suffix as the encoded form of name, if
+// that copy exists and is not older than name (a copy left from an earlier
+// build must not be served for a newer file).
+func serveCompressedWebFile(w http.ResponseWriter, r *http.Request, name string, info os.FileInfo, encoding, suffix string) bool {
+	compressed, err := os.Open(name + suffix)
+	if err != nil {
+		return false
+	}
+	defer compressed.Close()
+	stat, err := compressed.Stat()
+	if err != nil || stat.IsDir() || stat.ModTime().Before(info.ModTime()) {
+		return false
+	}
+	w.Header().Set("Content-Encoding", encoding)
+	http.ServeContent(w, r, filepath.Base(name), info.ModTime(), compressed)
+	return true
 }

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestFactorioActualSettingsDiscoveryPrivacyAndPreservation(t *testing.T) {
@@ -14,7 +15,7 @@ func TestFactorioActualSettingsDiscoveryPrivacyAndPreservation(t *testing.T) {
 	if _, err := a.update(context.Background(), "eggs", num(server["egg_id"]), egg); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.update(context.Background(), "servers", num(server["id"]), M{"startup": factorioNativeStartup}); err != nil {
+	if _, err := a.update(context.Background(), "servers", num(server["id"]), M{"startup": gamesettings.FactorioNativeStartup}); err != nil {
 		t.Fatal(err)
 	}
 	file := "/data/server-settings.json"

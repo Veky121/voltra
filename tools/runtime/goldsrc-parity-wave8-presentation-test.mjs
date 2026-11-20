@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const root=process.cwd(),dir=path.resolve('.local/game-parity-20261029/goldsrc-presentation-proposal');fs.mkdirSync(dir,{recursive:true});
-const shared='internal/panel/game_settings_documents.go',before=fs.readFileSync(shared),source=before.toString('utf8');
+const shared='internal/gamesettings/documents.go',before=fs.readFileSync(shared),source=before.toString('utf8');
 const needle='\t\tfields = append(fields, field)';assert.equal(source.split(needle).length,2);
 const getter=source.replace(needle,'\t\tgoldSrcCS16SettingPresentation(egg, file, field)\n'+needle);
 const candidate=path.join(dir,'game_settings_documents.go');fs.writeFileSync(candidate,getter);

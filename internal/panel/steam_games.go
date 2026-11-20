@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"voltra/internal/gamesettings"
 	"voltra/internal/palworldloader"
 )
 
@@ -106,7 +107,7 @@ func steamGameHelp(game string) []M {
 
 func (a *App) steamNativeNode(ctx context.Context, node M, appIDs ...int64) error {
 	if !a.steamNodeAvailable(ctx, num(node["id"]), appIDs...) {
-		return APIError{409, "SteamNodeUnavailable", "Choose a connected node with Steam support. Upgrade and reconnect the node agent if needed."}
+		return APIError{Status: 409, Code: "SteamNodeUnavailable", Detail: "Choose a connected node with Steam support. Upgrade and reconnect the node agent if needed."}
 	}
 	// Options are selected from raw database rows; daemon credentials must be
 	// decrypted through the same helper as ordinary daemon requests.
@@ -237,12 +238,12 @@ func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
 		}
 		v.StartOnCompletion = value
 	}
-	if v.Name == "" || len([]rune(v.Name)) > 100 || !quickSingleLine(v.Name) {
+	if v.Name == "" || len([]rune(v.Name)) > 100 || !gamesettings.QuickSingleLine(v.Name) {
 		return v, bad("Enter a server name of at most 100 characters.")
 	}
 	if raw, exists := in["game_name"]; exists {
 		gameName, ok := raw.(string)
-		if !ok || strings.TrimSpace(gameName) == "" || len([]rune(gameName)) > 100 || !quickSingleLine(gameName) {
+		if !ok || strings.TrimSpace(gameName) == "" || len([]rune(gameName)) > 100 || !gamesettings.QuickSingleLine(gameName) {
 			return v, bad("Enter an in-game server name of at most 100 characters.")
 		}
 		v.GameName = strings.TrimSpace(gameName)
@@ -261,7 +262,7 @@ func steamParseGameInput(spec steamGameSpec, in M) (steamGameInput, error) {
 		return v, bad(fmt.Sprintf("Choose a player limit from 1 to %d.", spec.MaximumPlayers))
 	}
 	if in["server_password"] != nil {
-		if v.Password, ok = in["server_password"].(string); !ok || len([]rune(v.Password)) > 128 || !quickSingleLine(v.Password) {
+		if v.Password, ok = in["server_password"].(string); !ok || len([]rune(v.Password)) > 128 || !gamesettings.QuickSingleLine(v.Password) {
 			return v, bad("Enter a server password of at most 128 characters without line breaks.")
 		}
 	}
@@ -339,7 +340,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 	}
 	in, err := decodeRaw(r)
 	if spec.UnavailableReason != "" {
-		fail(w, APIError{409, "GameSetupUnavailable", spec.UnavailableReason})
+		fail(w, APIError{Status: 409, Code: "GameSetupUnavailable", Detail: spec.UnavailableReason})
 		return
 	}
 	if err != nil {
@@ -420,7 +421,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if hash != fingerprint || game != spec.ID {
-		fail(w, APIError{409, "InstallationRequestConflict", "This request ID was already used for different installation settings."})
+		fail(w, APIError{Status: 409, Code: "InstallationRequestConflict", Detail: "This request ID was already used for different installation settings."})
 		return
 	}
 	externalID := fmt.Sprintf("steam-library:%d:%s", num(u["id"]), v.RequestID)
@@ -434,7 +435,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 	created := false
 	if errors.Is(err, pgx.ErrNoRows) {
 		if stage != "reserved" {
-			fail(w, APIError{409, "InstallationServerRemoved", "The server for this request was removed. Start a new installation."})
+			fail(w, APIError{Status: 409, Code: "InstallationServerRemoved", Detail: "The server for this request was removed. Start a new installation."})
 			return
 		}
 		if err = steamSessionLock(ctx, conn, fmt.Sprintf("voltra:steam-node-provision:%d", v.NodeID)); err != nil {
@@ -469,7 +470,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		}
 		allocations, e := a.provisionGamePorts(ctx, node, portPlan)
 		if steamPalworldVariant(spec.ID) && !a.steamPalworldNodeAvailable(v.NodeID, spec.ID) {
-			fail(w, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node for this Palworld runtime variant."})
+			fail(w, APIError{Status: 409, Code: "SteamNodeUpgradeRequired", Detail: "Upgrade and reconnect the node for this Palworld runtime variant."})
 			return
 		}
 		if e != nil {
@@ -478,7 +479,7 @@ func (a *App) steamGameInstall(w http.ResponseWriter, r *http.Request) {
 		}
 		if v.Catalog != nil {
 			if v.Catalog.Validate && !a.steamCatalogOptionsAvailable(v.NodeID) || v.Catalog.Secrets["SRCDS_BETAPASS"] != "" && !a.steamCatalogPrivateBranchAvailable(v.NodeID) {
-				fail(w, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node to use validation or private branch credentials."})
+				fail(w, APIError{Status: 409, Code: "SteamNodeUpgradeRequired", Detail: "Upgrade and reconnect the node to use validation or private branch credentials."})
 				return
 			}
 			if spec.ID == "satisfactory" {
@@ -744,15 +745,15 @@ func (a *App) steamGameAfterInstall(ctx context.Context, server M) error {
 		if !exists {
 			return bad("Steam did not install DefaultPalWorldSettings.ini. Verify the installation before starting.")
 		}
-		patch := map[string]string{"ServerName": quickUnrealQuote(str(settings["name"])), "ServerPlayerMaxNum": fmt.Sprint(num(settings["max_players"])), "RCONEnabled": "False", "RESTAPIEnabled": "False"}
+		patch := map[string]string{"ServerName": gamesettings.QuickUnrealQuote(str(settings["name"])), "ServerPlayerMaxNum": fmt.Sprint(num(settings["max_players"])), "RCONEnabled": "False", "RESTAPIEnabled": "False"}
 		if encrypted := str(settings["password_encrypted"]); encrypted != "" {
 			password, e := a.unseal(encrypted)
 			if e != nil {
 				return e
 			}
-			patch["ServerPassword"] = quickUnrealQuote(password)
+			patch["ServerPassword"] = gamesettings.QuickUnrealQuote(password)
 		}
-		content, e := quickPatchPalworld(defaults, patch)
+		content, e := gamesettings.QuickPatchPalworld(defaults, patch)
 		if e != nil {
 			return e
 		}

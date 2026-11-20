@@ -94,7 +94,12 @@ export async function takeBootRead(path: string, signal?: AbortSignal | null): P
   const ended = Symbol('ended');
   let over = false;
   let release = () => {};
-  const discarded = new Promise<typeof ended>(resolve => { release = () => { over = true; resolve(ended); }; });
+  const discarded = new Promise<typeof ended>(resolve => {
+    release = () => {
+      over = true;
+      resolve(ended);
+    };
+  });
   waiting.add(release);
   const expiry = setTimeout(discardBootReads, left());
   let stop = () => {};

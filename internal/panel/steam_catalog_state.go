@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"voltra/internal/gamesettings"
 	"voltra/internal/steamapi"
 )
 
@@ -25,7 +26,7 @@ const steamCatalogPlayersPrefix = "-ini:Game:[/Script/Engine.GameSession]:MaxPla
 var steamCatalogPlayersFlag = regexp.MustCompile(`(?i)(^|[ \t])-ini:Game:\[/Script/Engine\.GameSession\]:MaxPlayers[^ \t]*`)
 
 func steamCatalogPlayersStartup(startup string, players int64) (string, error) {
-	if players < 1 || players > 2147483647 || !quickSingleLine(startup) {
+	if players < 1 || players > 2147483647 || !gamesettings.QuickSingleLine(startup) {
 		return "", bad("Choose a valid player limit.")
 	}
 	matches := steamCatalogPlayersFlag.FindAllString(startup, -1)
@@ -359,15 +360,15 @@ func (a *App) steamCatalogApplyConfigurationExtra(ctx context.Context, server M,
 			patch["TelnetPassword"] = configuration.Secrets["PASSWORD"]
 		}
 		if len(patch) > 0 {
-			content, err := read(sevenDaysSettingsPath)
+			content, err := read(gamesettings.SevenDaysSettingsPath)
 			if err != nil {
 				return err
 			}
-			patched, err := quickPatchXMLProperties(content, "ServerSettings", patch)
+			patched, err := gamesettings.QuickPatchXMLProperties(content, "ServerSettings", patch)
 			if err != nil {
 				return err
 			}
-			wanted[sevenDaysSettingsPath] = patched
+			wanted[gamesettings.SevenDaysSettingsPath] = patched
 		}
 		if all || selected["PASSWORD"] || selected["TELNET_PORT"] {
 			var artifacts []steamCatalogConsolePackage
@@ -479,7 +480,7 @@ func (a *App) steamCatalogMutateControls(ctx context.Context, server M, changes 
 		return true, err
 	}
 	if boolean(active["active"]) {
-		return true, APIError{409, "SteamMaintenanceActive", "Wait for Steam maintenance before changing its controls."}
+		return true, APIError{Status: 409, Code: "SteamMaintenanceActive", Detail: "Wait for Steam maintenance before changing its controls."}
 	}
 	if guard != nil {
 		if err = guard(ctx); err != nil {
@@ -547,7 +548,7 @@ func (a *App) steamCatalogMutateControls(ctx context.Context, server M, changes 
 		}
 	}
 	if next.Validate && !a.steamCatalogOptionsAvailable(num(server["node_id"])) || next.Secrets["SRCDS_BETAPASS"] != "" && !a.steamCatalogPrivateBranchAvailable(num(server["node_id"])) {
-		return true, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node to use validation or private branch credentials."}
+		return true, APIError{Status: 409, Code: "SteamNodeUpgradeRequired", Detail: "Upgrade and reconnect the node to use validation or private branch credentials."}
 	}
 	if err = a.steamCatalogValidateAllocation(ctx, server, next); err != nil {
 		return true, err

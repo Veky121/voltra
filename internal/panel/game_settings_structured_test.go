@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestGameSettingsStructuredAPI(t *testing.T) {
@@ -37,27 +38,27 @@ func TestGameSettingsStructuredAPI(t *testing.T) {
 
 func TestGameSettingsStructuredINI(t *testing.T) {
 	input := "; keep\r\n[World]\r\nOptions = ( Name = \"A, B; # C\",Enabled=True,Rate=0.5,Count=0,Password=\"private\",Unknown=(A,B)) ; trailing\r\nLiteral=\"(Name=plain)\"\r\n"
-	parsed, err := parseGameSettings("/another-game.ini", []byte(input))
+	parsed, err := gamesettings.Parse("/another-game.ini", []byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields := map[string]gameSetting{}
-	for _, f := range parsed.fields {
-		fields[f.key] = f
+	fields := map[string]gamesettings.Setting{}
+	for _, f := range parsed.Fields {
+		fields[f.Key] = f
 	}
 	for key, kind := range map[string]string{"Name": "text", "Enabled": "boolean", "Rate": "number", "Count": "number", "Password": "text", "Unknown": "readonly"} {
-		if fields["World/Options/"+key].kind != kind {
+		if fields["World/Options/"+key].Kind != kind {
 			t.Fatalf("%s: %#v", key, fields)
 		}
 	}
-	if fields["World/Literal"].value != "(Name=plain)" {
+	if fields["World/Literal"].Value != "(Name=plain)" {
 		t.Fatal("expanded quoted literal")
 	}
-	changes, err := gameSettingsChanges(parsed.fields, M{"World/Options/Name": "New, \"quoted\"; # value", "World/Options/Enabled": false, "World/Options/Count": "2"}, M{}, "/another-game.ini")
+	changes, err := gamesettings.Changes(parsed.Fields, M{"World/Options/Name": "New, \"quoted\"; # value", "World/Options/Enabled": false, "World/Options/Count": "2"}, M{}, "/another-game.ini")
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := parsed.patch(changes)
+	updated, err := parsed.Patch(changes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,41 +67,41 @@ func TestGameSettingsStructuredINI(t *testing.T) {
 			t.Fatalf("lost %q", keep)
 		}
 	}
-	next, err := parseGameSettings("/another-game.ini", updated)
+	next, err := gamesettings.Parse("/another-game.ini", updated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range next.fields {
-		if f.key == "World/Options/Name" && f.value != "New, \"quoted\"; # value" {
-			t.Fatalf("quoting: %q", f.value)
+	for _, f := range next.Fields {
+		if f.Key == "World/Options/Name" && f.Value != "New, \"quoted\"; # value" {
+			t.Fatalf("quoting: %q", f.Value)
 		}
-		if f.key == "World/Options/Enabled" && f.value != "False" {
+		if f.Key == "World/Options/Enabled" && f.Value != "False" {
 			t.Fatal("boolean representation changed")
 		}
 	}
-	if _, err := gameSettingsChanges(parsed.fields, M{"World/Options/Unknown": "replace"}, M{}, "/another-game.ini"); err == nil {
+	if _, err := gamesettings.Changes(parsed.Fields, M{"World/Options/Unknown": "replace"}, M{}, "/another-game.ini"); err == nil {
 		t.Fatal("complex value editable")
 	}
-	if !gameSettingManaged(M{}, "/another-game.ini", "World/Options/PublicPort") {
+	if !gamesettings.SettingManaged(M{}, "/another-game.ini", "World/Options/PublicPort") {
 		t.Fatal("nested managed listener editable")
 	}
-	if _, err := parsed.patch(map[string]string{"World/Options/Rate": "1,Injected=True"}); err == nil {
+	if _, err := parsed.Patch(map[string]string{"World/Options/Rate": "1,Injected=True"}); err == nil {
 		t.Fatal("tuple injection accepted")
 	}
 }
 
 func TestGameSettingsPalworldDocumentNames(t *testing.T) {
 	for _, file := range []string{"/PalWorldSettings.ini", "/palworldsettings.ini", "/DefaultPalWorldSettings.ini"} {
-		parsed, err := parseGameSettings(file, []byte("[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ServerName=\"test\",ExpRate=1.0,bEnableFastTravel=True)\n"))
+		parsed, err := gamesettings.Parse(file, []byte("[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ServerName=\"test\",ExpRate=1.0,bEnableFastTravel=True)\n"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(parsed.fields) != 3 || parsed.fields[0].key == "/Script/Pal.PalGameWorldSettings/OptionSettings" {
+		if len(parsed.Fields) != 3 || parsed.Fields[0].Key == "/Script/Pal.PalGameWorldSettings/OptionSettings" {
 			t.Fatal("packed options were not expanded")
 		}
 	}
 	for _, input := range []string{"[World]\nOptions=(A=1,A=2)\n", "[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(A=1,A=2)\n"} {
-		if _, err := parseGameSettings("/server.ini", []byte(input)); err == nil {
+		if _, err := gamesettings.Parse("/server.ini", []byte(input)); err == nil {
 			t.Fatal("duplicate member accepted")
 		}
 	}

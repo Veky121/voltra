@@ -1,4 +1,4 @@
-import {clearAccountSnapshots, snapshotRevisionKey} from './accountSnapshots';
+import {clearAccountSnapshots, releaseSnapshotAccount, snapshotOwnerKey, snapshotRevisionKey} from './accountSnapshots';
 import {discardBootReads, rememberSignedIn} from './bootReads';
 
 /**
@@ -31,10 +31,30 @@ export function moveSessionRevision() {
   }
 }
 
+/**
+ * Whether this browser still records someone as signed in. Only then does a
+ * sign-out tell other tabs; a tab that merely learns the session has already
+ * ended, often from another tab's signal, must not signal back.
+ */
+function signedInHere(): boolean {
+  try {
+    const storage = globalThis.localStorage;
+    return storage?.getItem('voltra.signed-in') === '1' || !!storage?.getItem(snapshotOwnerKey);
+  } catch {
+    return true;
+  }
+}
+
 export function forgetSignedInAccount() {
   signOuts++;
-  moveSessionRevision();
-  clearAccountSnapshots();
+  if (signedInHere()) {
+    moveSessionRevision();
+    clearAccountSnapshots();
+  } else {
+    // Another tab already ended the session and emptied the shared store.
+    // Writing to it again would wake that tab, which would write back.
+    releaseSnapshotAccount();
+  }
   rememberSignedIn(false);
   discardBootReads();
 }
@@ -43,11 +63,16 @@ if (typeof window !== 'undefined') {
   // Sign-out, and any request the panel refuses as unauthenticated.
   window.addEventListener('panel-auth-changed', forgetSignedInAccount);
   window.addEventListener('desktop-session-rejected', forgetSignedInAccount);
-  // Another tab signed out or in. Early answers this tab is still holding were
-  // asked for under the previous session.
+  // Another tab signed out or in. Nothing on this page may be used under the
+  // new session before the session has been read again: the session gate
+  // covers the page and makes it inert until it knows who is signed in now
+  // (setup.tsx). A different account then purges every cached answer and
+  // remounts the app; the same account keeps the page, drafts included, and
+  // fetches what is on screen again.
   window.addEventListener('storage', event => {
     if (event.key !== null && event.key !== snapshotRevisionKey) return;
     signOuts++;
     discardBootReads();
+    window.dispatchEvent(new Event('panel-session-elsewhere'));
   });
 }

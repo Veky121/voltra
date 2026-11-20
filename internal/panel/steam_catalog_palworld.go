@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"voltra/internal/gamesettings"
 	"voltra/internal/steamapi"
 )
 
@@ -77,7 +78,7 @@ func (a *App) steamPalworldConfigurationFiles(ctx context.Context, server M, con
 				return nil, bad("Steam did not install DefaultPalWorldSettings.ini. Verify the installation before starting.")
 			}
 		}
-		patched, err := quickPatchPalworld(content, filtered)
+		patched, err := gamesettings.QuickPatchPalworld(content, filtered)
 		if err != nil {
 			return nil, err
 		}
@@ -148,12 +149,12 @@ func steamPalworldPatch(configuration steamCatalogConfiguration, port int64, all
 		return nil, bad("Choose Steam or Xbox players.")
 	}
 	return map[string]string{
-		"ServerName":         quickUnrealQuote(str(configuration.Values["SERVER_NAME"])),
-		"ServerDescription":  quickUnrealQuote(str(configuration.Values["SERVER_DESCRIPTION"])),
+		"ServerName":         gamesettings.QuickUnrealQuote(str(configuration.Values["SERVER_NAME"])),
+		"ServerDescription":  gamesettings.QuickUnrealQuote(str(configuration.Values["SERVER_DESCRIPTION"])),
 		"ServerPlayerMaxNum": strconv.FormatInt(configuration.Players, 10),
-		"ServerPassword":     quickUnrealQuote(configuration.Secrets["SERVER_PASSWORD"]),
-		"AdminPassword":      quickUnrealQuote(configuration.Secrets["ADMIN_PASSWORD"]),
-		"PublicIP":           quickUnrealQuote(publicIP), "PublicPort": strconv.FormatInt(port, 10),
+		"ServerPassword":     gamesettings.QuickUnrealQuote(configuration.Secrets["SERVER_PASSWORD"]),
+		"AdminPassword":      gamesettings.QuickUnrealQuote(configuration.Secrets["ADMIN_PASSWORD"]),
+		"PublicIP":           gamesettings.QuickUnrealQuote(publicIP), "PublicPort": strconv.FormatInt(port, 10),
 		"RCONEnabled": "True", "RCONPort": str(configuration.Values["RCON_PORT"]),
 		// Publisher docs deprecate AllowConnectPlatform. The original Steam/Xbox
 		// selector now writes the supported one-element CrossplayPlatforms tuple.
@@ -274,11 +275,11 @@ func (a *App) steamPalworldQuickUpdate(ctx context.Context, server M, game, file
 		if err != nil {
 			return err
 		}
-		if revision != quickRevision(game, file, content, exists) {
-			return APIError{409, "QuickSetupRevisionConflict", "These settings changed since you opened Quick setup. Reload before saving."}
+		if revision != gamesettings.QuickRevision(game, file, content, exists) {
+			return APIError{Status: 409, Code: "QuickSetupRevisionConflict", Detail: "These settings changed since you opened Quick setup. Reload before saving."}
 		}
 		if !exists {
-			return APIError{409, "QuickSetupConfigMissing", "The game has not created its configuration yet. Start it once, stop it, then reload Quick setup."}
+			return APIError{Status: 409, Code: "QuickSetupConfigMissing", Detail: "The game has not created its configuration yet. Start it once, stop it, then reload Quick setup."}
 		}
 		return nil
 	}

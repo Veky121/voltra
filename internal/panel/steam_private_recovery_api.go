@@ -41,14 +41,14 @@ func (a *App) privateRecoveryAllowed(ctx context.Context, q steamHistoryQuerier,
 	err = q.QueryRow(ctx, `SELECT n.maintenance_mode OR EXISTS(SELECT 1 FROM server_transfers WHERE server_id=$1 AND successful IS NULL)
 	 OR EXISTS(SELECT 1 FROM steam_jobs WHERE server_id=$1 AND status IN('queued','running')) FROM nodes n WHERE n.id=$2`, serverID, s["node_id"]).Scan(&blocked)
 	if err != nil || blocked || str(s["status"]) != "" && str(s["status"]) != "reinstall_failed" {
-		return nil, empty, APIError{409, "PrivateSteamRecoveryBusy", "Finish the current server operation before recovering private Steam content."}
+		return nil, empty, APIError{Status: 409, Code: "PrivateSteamRecoveryBusy", Detail: "Finish the current server operation before recovering private Steam content."}
 	}
 	request, err := privateRecoveryRequest(ctx, q, s, job)
 	if err != nil {
 		return nil, empty, err
 	}
 	if !a.privateRecoveryReady(ctx, num(s["node_id"]), request.Selection.App) {
-		return nil, empty, APIError{409, "PrivateSteamRecoveryNotReady", "A separately reviewed receipt recovery worker and game policy are required on this node."}
+		return nil, empty, APIError{Status: 409, Code: "PrivateSteamRecoveryNotReady", Detail: "A separately reviewed receipt recovery worker and game policy are required on this node."}
 	}
 	return s, request, nil
 }
@@ -81,7 +81,7 @@ func (a *App) privateJobRecover(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	if h.closed || h.active[job] != nil {
 		h.mu.Unlock()
-		fail(w, APIError{409, "PrivateSteamRecoveryBusy", "A private Steam operation is already active."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamRecoveryBusy", Detail: "A private Steam operation is already active."})
 		return
 	}
 	h.active[job] = cancel
@@ -131,7 +131,7 @@ func (a *App) privateJobRecover(w http.ResponseWriter, r *http.Request) {
 	}
 	receipt, err := a.privateRecoverReceipt(ctx, num(s["node_id"]), original)
 	if err != nil {
-		fail(w, APIError{409, "PrivateSteamRecoveryFailed", "The committed private Steam receipt could not be recovered and validated. No installation was started."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamRecoveryFailed", Detail: "The committed private Steam receipt could not be recovered and validated. No installation was started."})
 		return
 	}
 	tx, err := a.DB.Begin(ctx)

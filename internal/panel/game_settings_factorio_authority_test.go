@@ -3,11 +3,12 @@ package panel
 import (
 	"context"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestFactorioInactiveStartupRefusesDiscovery(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, factorioNativeRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.FactorioNativeRecipe)
 	if _, err := a.update(context.Background(), "eggs", num(server["egg_id"]), egg); err != nil {
 		t.Fatal(err)
 	}

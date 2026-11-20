@@ -28,7 +28,7 @@ integers. Zero is not a known total. Do not estimate bytes from elapsed time.
 
 The helper emits only those fields. It does not accept raw messages, errors,
 URLs, credentials, paths, or arbitrary metadata. User-facing messages and recovery
-instructions come from the code catalog in `web/src/client/operationEvents.ts`.
+instructions come from the code catalog in `web/src/features/servers/operationEvents.ts`.
 To add a diagnosis, add its safe code there with a short message and a concrete
 recovery instruction. Emit it only when the script has evidence of that cause.
 Do not send exception messages or a provider's response body.

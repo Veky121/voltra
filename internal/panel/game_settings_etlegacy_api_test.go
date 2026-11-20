@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestETLegacyActualSettingsAPI(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, etlegacySettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.EtlegacySettingsRecipe)
 	if _, e := a.update(context.Background(), "eggs", num(server["egg_id"]), egg); e != nil {
 		t.Fatal(e)
 	}
@@ -19,12 +20,12 @@ func TestETLegacyActualSettingsAPI(t *testing.T) {
 	original := "// operator\r\nSeTa sv_hostname \"Private fixture host\"\r\nset g_friendlyFire \"1\"\r\nset g_password \"fixture-private-pass\"\r\nset rconpassword \"fixture-private-rcon\"\r\nset unknown \"preserve\"\r\n"
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[etlegacySettingsPath] = []byte(original)
+	fixture.Files[gamesettings.EtlegacySettingsPath] = []byte(original)
 	fixture.State = "offline"
 	fixture.mu.Unlock()
 	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
-	if view["file"] != etlegacySettingsPath || laneGameSettingsField(view, "g_friendlyfire")["type"] != "boolean" {
+	if view["file"] != gamesettings.EtlegacySettingsPath || laneGameSettingsField(view, "g_friendlyfire")["type"] != "boolean" {
 		t.Fatal("Exact declaration/parser dispatch missing")
 	}
 	for _, key := range []string{"g_password", "rconpassword"} {
@@ -43,7 +44,7 @@ func TestETLegacyActualSettingsAPI(t *testing.T) {
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"g_friendlyfire": "0"}}, 422)
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"g_friendlyfire": false, "sv_hostname": "Updated host", "g_password": "fixture-next-pass"}}, 200)
 	fixture.mu.Lock()
-	after := string(fixture.Files[etlegacySettingsPath])
+	after := string(fixture.Files[gamesettings.EtlegacySettingsPath])
 	fixture.mu.Unlock()
 	want := strings.Replace(original, `sv_hostname "Private fixture host"`, `sv_hostname "Updated host"`, 1)
 	want = strings.Replace(want, `g_friendlyFire "1"`, `g_friendlyFire "0"`, 1)
@@ -53,7 +54,7 @@ func TestETLegacyActualSettingsAPI(t *testing.T) {
 	}
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"g_friendlyfire": true}}, 409)
 	fixture.mu.Lock()
-	fixture.Files[etlegacySettingsPath] = []byte("set g_friendlyFire 1\nset \"g_friendlyFire\" 0\n")
+	fixture.Files[gamesettings.EtlegacySettingsPath] = []byte("set g_friendlyFire 1\nset \"g_friendlyFire\" 0\n")
 	fixture.mu.Unlock()
 	unsafe := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	if !boolean(laneGameSettingsField(unsafe, "g_friendlyfire")["readonly"]) {
@@ -62,7 +63,7 @@ func TestETLegacyActualSettingsAPI(t *testing.T) {
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": unsafe["revision"], "settings": M{"g_friendlyfire": false}}, 422)
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	if string(fixture.Files[etlegacySettingsPath]) != "set g_friendlyFire 1\nset \"g_friendlyFire\" 0\n" {
+	if string(fixture.Files[gamesettings.EtlegacySettingsPath]) != "set g_friendlyFire 1\nset \"g_friendlyFire\" 0\n" {
 		t.Fatal("Unsafe refusal changed bytes")
 	}
 }

@@ -296,7 +296,7 @@ func (a *App) queueSteamJobWithRestart(ctx context.Context, server M, operation 
 
 func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation string, startAfter, force, restart, reinstall bool) (M, error) {
 	if !a.steamNodeAvailable(ctx, num(server["node_id"])) {
-		return nil, APIError{409, "SteamNodeUnavailable", "Update and reconnect the node agent to enable Steam maintenance."}
+		return nil, APIError{Status: 409, Code: "SteamNodeUnavailable", Detail: "Update and reconnect the node agent to enable Steam maintenance."}
 	}
 	tx, err := a.DB.Begin(ctx)
 	if err != nil {
@@ -316,14 +316,14 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 			return nil, e
 		}
 		if status := str(current["status"]); status != "" && status != "reinstall_failed" || strings.HasPrefix(str(current["installation_id"]), "pending:") {
-			return nil, APIError{409, "ServerStateConflict", "Finish the current server operation before reinstalling."}
+			return nil, APIError{Status: 409, Code: "ServerStateConflict", Detail: "Finish the current server operation before reinstalling."}
 		}
 		var transferring bool
 		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM server_transfers WHERE server_id=$1 AND successful IS NULL)", id).Scan(&transferring); e != nil {
 			return nil, e
 		}
 		if transferring {
-			return nil, APIError{409, "ServerStateConflict", "Finish the server transfer before reinstalling."}
+			return nil, APIError{Status: 409, Code: "ServerStateConflict", Detail: "Finish the server transfer before reinstalling."}
 		}
 		server = current
 	}
@@ -333,7 +333,7 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 		return nil, err
 	}
 	if !a.steamNodeAvailable(ctx, num(server["node_id"]), appID) {
-		return nil, APIError{409, "SteamGameUnsupported", "Update the node agent to enable maintenance for this game."}
+		return nil, APIError{Status: 409, Code: "SteamGameUnsupported", Detail: "Update the node agent to enable maintenance for this game."}
 	}
 	if reinstall {
 		current, e := a.steamServerState(ctx, server)
@@ -341,7 +341,7 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 			return nil, e
 		}
 		if current != "offline" {
-			return nil, APIError{409, "SteamServerRunning", "Stop the server before reinstalling files."}
+			return nil, APIError{Status: 409, Code: "SteamServerRunning", Detail: "Stop the server before reinstalling files."}
 		}
 	}
 	active, err := queryRowMap(tx.QueryRow(ctx, "SELECT row_to_json(j) FROM steam_jobs j WHERE server_id=$1 AND status IN ('queued','running')", id))
@@ -354,10 +354,10 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 	}
 	if err == nil {
 		if reinstall && (str(active["operation"]) != "install" || !boolean(active["force"]) || boolean(active["start_after"]) || boolean(active["restart"])) {
-			return nil, APIError{409, "SteamJobActive", "A different Steam maintenance job is already in progress."}
+			return nil, APIError{Status: 409, Code: "SteamJobActive", Detail: "A different Steam maintenance job is already in progress."}
 		}
 		if operation != str(active["operation"]) && operation != "start" {
-			return nil, APIError{409, "SteamJobActive", "A Steam maintenance job is already in progress."}
+			return nil, APIError{Status: 409, Code: "SteamJobActive", Detail: "A Steam maintenance job is already in progress."}
 		}
 		if startAfter {
 			if _, err = tx.Exec(ctx, "UPDATE steam_jobs SET start_after=true,restart=restart OR $2,updated_at=now() WHERE id=$1", active["id"], restart); err != nil {
@@ -371,7 +371,7 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 		return nil, err
 	}
 	if operation == "start" && repair {
-		return nil, APIError{409, "SteamRepairRequired", "Verify and repair files before starting this server."}
+		return nil, APIError{Status: 409, Code: "SteamRepairRequired", Detail: "Verify and repair files before starting this server."}
 	}
 	if operation == "update" || operation == "verify" {
 		state, e := a.steamServerState(ctx, server)
@@ -379,7 +379,7 @@ func (a *App) queueSteamJobPolicy(ctx context.Context, server M, operation strin
 			return nil, e
 		}
 		if state != "offline" {
-			return nil, APIError{409, "SteamServerRunning", "Stop the server before updating or verifying files."}
+			return nil, APIError{Status: 409, Code: "SteamServerRunning", Detail: "Stop the server before updating or verifying files."}
 		}
 	}
 	jobID := newUUID()
@@ -462,7 +462,7 @@ func (a *App) unmanagedServerPower(ctx context.Context, server M, action string,
 		return nil, err
 	}
 	if (str(fresh["status"]) != "" && !(str(fresh["status"]) == "reinstall_failed" && fresh["installed_at"] != nil)) || boolean(fresh["maintenance_mode"]) || boolean(fresh["transferring"]) {
-		return nil, APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance or suspension."}
+		return nil, APIError{Status: 409, Code: "ServerStateConflict", Detail: "The server is unavailable during installation, maintenance or suspension."}
 	}
 	if len(socketUser) > 0 {
 		current, e := a.one(ctx, "SELECT * FROM users WHERE id=$1", socketUser[0]["id"])
@@ -534,7 +534,7 @@ func (a *App) steamSocketPower(ctx context.Context, user, server M, raw []byte) 
 		return true, err
 	}
 	if (str(fresh["status"]) != "" && !(str(fresh["status"]) == "reinstall_failed" && fresh["installed_at"] != nil)) || boolean(fresh["maintenance_mode"]) {
-		return true, APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance or suspension."}
+		return true, APIError{Status: 409, Code: "ServerStateConflict", Detail: "The server is unavailable during installation, maintenance or suspension."}
 	}
 	var response *http.Response
 	if !managed && (action == "start" || action == "restart") {
@@ -895,7 +895,7 @@ func (a *App) executeSteam(ctx context.Context, server, state, job M, token, ope
 	request.StreamOutput = a.steamConsoleAvailable(num(server["node_id"]))
 	if steamPalworldVariant(str(state["game"])) {
 		if !a.steamPalworldNodeAvailable(num(server["node_id"]), str(state["game"])) {
-			return steamapi.Event{}, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node for this Palworld runtime variant."}
+			return steamapi.Event{}, APIError{Status: 409, Code: "SteamNodeUpgradeRequired", Detail: "Upgrade and reconnect the node for this Palworld runtime variant."}
 		}
 		if str(state["game"]) == "palworld-proton" {
 			request.Platform = "windows"
@@ -909,7 +909,7 @@ func (a *App) executeSteam(ctx context.Context, server, state, job M, token, ope
 		request.BetaPassword = secret
 	}
 	if request.Validate && !a.steamCatalogOptionsAvailable(num(server["node_id"])) || request.BetaPassword != "" && !a.steamCatalogPrivateBranchAvailable(num(server["node_id"])) {
-		return steamapi.Event{Type: "error"}, APIError{409, "SteamNodeUpgradeRequired", "Upgrade and reconnect the node to use validation or private branch credentials."}
+		return steamapi.Event{Type: "error"}, APIError{Status: 409, Code: "SteamNodeUpgradeRequired", Detail: "Upgrade and reconnect the node to use validation or private branch credentials."}
 	}
 	stage := map[string]string{"check": "checking", "install": "installing", "update": "updating", "verify": "verifying"}[operation]
 	mutation := operation != "check"

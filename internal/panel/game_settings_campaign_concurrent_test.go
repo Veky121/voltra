@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestHL2DMStartupChangedDuringSave(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, hl2dmSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.Hl2dmSettingsRecipe)
 	egg["java_config"] = M{}
 	ctx := context.Background()
 	if _, err := a.update(ctx, "eggs", num(server["egg_id"]), egg); err != nil {
@@ -23,10 +24,10 @@ func TestHL2DMStartupChangedDuringSave(t *testing.T) {
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
 	hl2dmFixtureHelpers(t, fixture)
-	fixture.Files[hl2dmSettingsPath] = []byte("mp_teamplay 1\n")
+	fixture.Files[gamesettings.Hl2dmSettingsPath] = []byte("mp_teamplay 1\n")
 	fixture.State = "offline"
 	fixture.mu.Unlock()
-	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + hl2dmSettingsPath
+	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.Hl2dmSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	body := &etlegacyPausedBody{Reader: strings.NewReader(`{"revision":"` + str(view["revision"]) + `","settings":{"mp_teamplay":false}}`), admitted: make(chan struct{}), resume: make(chan struct{})}
 	req := WithUser(httptest.NewRequest("PUT", route, body), admin)
@@ -55,13 +56,13 @@ func TestHL2DMStartupChangedDuringSave(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	if string(fixture.Files[hl2dmSettingsPath]) != "mp_teamplay 1\n" {
+	if string(fixture.Files[gamesettings.Hl2dmSettingsPath]) != "mp_teamplay 1\n" {
 		t.Fatal("startup changed during save mutated native bytes")
 	}
 }
 func TestQuakeLiveStartupChangedDuringSave(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, quakeLiveSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.QuakeLiveSettingsRecipe)
 	ctx := context.Background()
 	if _, err := a.update(ctx, "eggs", num(server["egg_id"]), egg); err != nil {
 		t.Fatal(err)
@@ -71,10 +72,10 @@ func TestQuakeLiveStartupChangedDuringSave(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[quakeLiveBaseSettingsPath] = []byte("set g_allowvote 1\n")
+	fixture.Files[gamesettings.QuakeLiveBaseSettingsPath] = []byte("set g_allowvote 1\n")
 	fixture.State = "offline"
 	fixture.mu.Unlock()
-	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + quakeLiveBaseSettingsPath
+	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.QuakeLiveBaseSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	body := &etlegacyPausedBody{Reader: strings.NewReader(`{"revision":"` + str(view["revision"]) + `","settings":{"g_allowvote":false}}`), admitted: make(chan struct{}), resume: make(chan struct{})}
 	req := WithUser(httptest.NewRequest("PUT", route, body), admin)
@@ -103,13 +104,13 @@ func TestQuakeLiveStartupChangedDuringSave(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	if string(fixture.Files[quakeLiveBaseSettingsPath]) != "set g_allowvote 1\n" {
+	if string(fixture.Files[gamesettings.QuakeLiveBaseSettingsPath]) != "set g_allowvote 1\n" {
 		t.Fatal("startup changed during save mutated native bytes")
 	}
 }
 func TestOpenRAStartupChangedDuringSave(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, openraSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.OpenraSettingsRecipe)
 	ctx := context.Background()
 	if _, err := a.update(ctx, "eggs", num(server["egg_id"]), egg); err != nil {
 		t.Fatal(err)
@@ -119,10 +120,10 @@ func TestOpenRAStartupChangedDuringSave(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[openraSettingsPath] = []byte("Server:\n\tEnableVoteKick: true\n")
+	fixture.Files[gamesettings.OpenraSettingsPath] = []byte("Server:\n\tEnableVoteKick: true\n")
 	fixture.State = "offline"
 	fixture.mu.Unlock()
-	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + openraSettingsPath
+	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.OpenraSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	body := &etlegacyPausedBody{Reader: strings.NewReader(`{"revision":"` + str(view["revision"]) + `","settings":{"Server.EnableVoteKick":false}}`), admitted: make(chan struct{}), resume: make(chan struct{})}
 	req := WithUser(httptest.NewRequest("PUT", route, body), admin)
@@ -151,7 +152,7 @@ func TestOpenRAStartupChangedDuringSave(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	if string(fixture.Files[openraSettingsPath]) != "Server:\n\tEnableVoteKick: true\n" {
+	if string(fixture.Files[gamesettings.OpenraSettingsPath]) != "Server:\n\tEnableVoteKick: true\n" {
 		t.Fatal("startup changed during save mutated native bytes")
 	}
 }

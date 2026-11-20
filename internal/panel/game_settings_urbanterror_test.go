@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -45,12 +46,12 @@ func TestUrbanTerrorSettingsAPI(t *testing.T) {
 		}
 	}()
 
-	stock, err := os.ReadFile("testdata/game-settings/game-parity-20261029/wave340-urbanterror-typed-settings/stock-server.cfg")
+	stock, err := os.ReadFile("../gamesettings/testdata/game-settings/game-parity-20261029/wave340-urbanterror-typed-settings/stock-server.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ recipe, file, data, key string }{
-		{urbanTerrorSettingsRecipe, urbanTerrorSettingsPath, "\ufeff" + string(stock), "fraglimit"},
+		{gamesettings.UrbanTerrorSettingsRecipe, gamesettings.UrbanTerrorSettingsPath, "\ufeff" + string(stock), "fraglimit"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			a, mux, admin, server, f := quickSetupMinecraftFixture(t)
@@ -64,7 +65,7 @@ func TestUrbanTerrorSettingsAPI(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -100,7 +101,7 @@ func TestUrbanTerrorSettingsAPI(t *testing.T) {
 			}
 			f.Files[tc.file] = []byte(tc.data)
 			wrapper := "/tf/cfg/voltra-server.cfg"
-			if tc.recipe == gmodSettingsRecipe {
+			if tc.recipe == gamesettings.GmodSettingsRecipe {
 				wrapper = "/garrysmod/cfg/voltra-server.cfg"
 			}
 			f.Files[wrapper] = []byte("exec server.cfg\nexec voltra-managed.cfg\n")
@@ -324,33 +325,33 @@ func TestUrbanTerrorSettingsAPI(t *testing.T) {
 
 func TestUrbanTerrorSettingsGrammar(t *testing.T) {
 	raw := "\ufeff// operator\r\n\tSeTa\tfraglimit \"0\" // retained\r\nsets \" Admin\" \"owner\"\r\nset unknown \"opaque\"\r\nset rconpassword \"private-fixture-secret\"\r\nmap ut4_casa\r\n"
-	p, e := parseUrbanTerrorSettings([]byte(raw))
+	p, e := gamesettings.ParseUrbanTerrorSettings([]byte(raw))
 	if e != nil {
 		t.Fatal(e)
 	}
-	updated, e := p.patch(map[string]string{"fraglimit": "7"})
+	updated, e := p.Patch(map[string]string{"fraglimit": "7"})
 	if e != nil {
 		t.Fatal(e)
 	}
 	if string(updated) != strings.Replace(raw, `fraglimit "0"`, `fraglimit "7"`, 1) {
 		t.Fatal("opaque bytes changed")
 	}
-	for _, f := range p.fields {
-		if f.key == "rconpassword" && (!f.secret || f.kind != "readonly") {
+	for _, f := range p.Fields {
+		if f.Key == "rconpassword" && (!f.Secret || f.Kind != "readonly") {
 			t.Fatal("secret writable or unmasked")
 		}
 	}
 	for _, tail := range []string{`set fraglimit 4`, `set "fraglimit" 4`, `exec other.cfg`, `vstr cycle`, `set fraglimit 0;quit`, `set fraglimit`, `/* block */`} {
-		p, e := parseUrbanTerrorSettings([]byte(raw + tail + "\r\n"))
+		p, e := gamesettings.ParseUrbanTerrorSettings([]byte(raw + tail + "\r\n"))
 		if e != nil {
 			continue
 		}
-		if _, e = p.patch(map[string]string{"fraglimit": "8"}); e == nil {
+		if _, e = p.Patch(map[string]string{"fraglimit": "8"}); e == nil {
 			t.Fatalf("unsafe grammar admitted %q", tail)
 		}
 	}
 	for _, value := range []string{"-1", "1.5", "2147483648", "1;quit", ""} {
-		if _, e = p.patch(map[string]string{"fraglimit": value}); e == nil {
+		if _, e = p.Patch(map[string]string{"fraglimit": value}); e == nil {
 			t.Fatal("invalid scalar accepted")
 		}
 	}

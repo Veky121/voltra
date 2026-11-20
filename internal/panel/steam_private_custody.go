@@ -275,20 +275,20 @@ func (a *App) privateQueueJob(ctx context.Context, s, u M, kind, authID string, 
 		return nil, forbidden()
 	}
 	if str(server["status"]) != "" && str(server["status"]) != "reinstall_failed" {
-		return nil, APIError{409, "PrivateSteamServerState", "Finish the current server operation first."}
+		return nil, APIError{Status: 409, Code: "PrivateSteamServerState", Detail: "Finish the current server operation first."}
 	}
 	var blocked bool
 	e = tx.QueryRow(ctx, "SELECT n.maintenance_mode OR EXISTS(SELECT 1 FROM server_transfers WHERE server_id=$1 AND successful IS NULL) FROM nodes n WHERE n.id=$2", s["id"], server["node_id"]).Scan(&blocked)
 	if e != nil || blocked {
-		return nil, APIError{409, "PrivateSteamServerState", "The node or server is unavailable for private content."}
+		return nil, APIError{Status: 409, Code: "PrivateSteamServerState", Detail: "The node or server is unavailable for private content."}
 	}
 	profile, defaultBranch, e := privateContentProfile(ctx, tx, server)
 	if e != nil {
-		return nil, APIError{409, "PrivateSteamProfileUnavailable", "This server has no reviewed private content profile."}
+		return nil, APIError{Status: 409, Code: "PrivateSteamProfileUnavailable", Detail: "This server has no reviewed private content profile."}
 	}
 	app := profile.AppID
 	if !a.privateReady(ctx, num(server["node_id"]), app) {
-		return nil, APIError{409, "PrivateSteamNodeNotReady", "A production-trusted private Steam worker and reviewed game policy are required."}
+		return nil, APIError{Status: 409, Code: "PrivateSteamNodeNotReady", Detail: "A production-trusted private Steam worker and reviewed game policy are required."}
 	}
 	authorization, e := queryRowMap(tx.QueryRow(ctx, "SELECT row_to_json(p) FROM steam_private_authorizations p WHERE id=$1 AND server_id=$2 AND actor_id=$3 AND NOT revoked FOR UPDATE", in.Authorization, s["id"], u["id"]))
 	if e != nil {
@@ -336,14 +336,14 @@ func (a *App) privateQueueJob(ctx context.Context, s, u M, kind, authID string, 
 	e = tx.QueryRow(ctx, "SELECT receipt,node_id,server_owner_id,egg_id,installation_id FROM steam_private_publications WHERE server_id=$1", s["id"]).Scan(&previous, &previousNode, &previousOwner, &previousEgg, &previousInstallation)
 	if e == nil {
 		if previousNode != num(server["node_id"]) || previousOwner != num(server["owner_id"]) || previousEgg != num(server["egg_id"]) || previousInstallation != str(server["installation_id"]) {
-			return nil, APIError{409, "PrivateSteamContentMigrationRequired", "The server's placement or installation changed after private publication; review content migration before continuing."}
+			return nil, APIError{Status: 409, Code: "PrivateSteamContentMigrationRequired", Detail: "The server's placement or installation changed after private publication; review content migration before continuing."}
 		}
 		var receipt steamapi.PrivateReceipt
 		if json.Unmarshal(previous, &receipt) != nil {
 			return nil, errPrivateResupply
 		}
 		if receipt.Scope.Owner != r.Scope().Owner {
-			return nil, APIError{409, "PrivateSteamAccountMigrationRequired", "Existing private files belong to another account authorization; use the original profile or review migration."}
+			return nil, APIError{Status: 409, Code: "PrivateSteamAccountMigrationRequired", Detail: "Existing private files belong to another account authorization; use the original profile or review migration."}
 		}
 		r.Previous = &receipt
 		if in.Previous != nil {

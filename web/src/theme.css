@@ -1,5 +1,5 @@
 /* Shared Voltra theme. Both panels use the same surfaces and controls. */
-:root{color-scheme:dark;--canvas:#111214;--text:#eceef2;--surface-muted:#16171a;--line-strong:#3b3e45;--accent:#93b2ee;--primary:#416dc2;--accent-ink:#ffffff;--violet:#aeb4bf;--amber:#edc482;--ease:cubic-bezier(.2,.8,.2,1);color:#eceef2;background:var(--canvas);--muted:#a0a4ae;--line:#303239;--blue:#93b2ee;--card:#1b1c20;--red:#ff797e;--surface:#1b1c20;--surface-raised:#26282e;--accent-soft:#aeb4bf14}
+:root{color-scheme:dark;color:#eceef2;background:var(--canvas)}
 html{scrollbar-color:#424247 transparent;scrollbar-width:thin}
 body{background:var(--canvas);line-height:1.5}
 a{color:#93b2ee}
@@ -30,8 +30,6 @@ input:focus,select:focus,textarea:focus{border-color:#93b2ee;box-shadow:0 0 0 3p
 
 /* Navigation */
 .app-shell{grid-template-columns:264px minmax(0,1fr);background:var(--canvas)}
-.app-sidebar{margin:16px 0 16px 16px;padding:22px 12px 14px;gap:26px;background:#18191d;border:1px solid var(--line);border-radius:18px}
-.app-sidebar .brand{font-size:1.1rem;padding:0 10px 4px;gap:10px}
 .brand-mark,.app-shell--admin .brand-mark{width:32px;height:32px;border-radius:10px;font-size:1rem;color:#1b1c20;background:#e2e5eb;box-shadow:none}
 .sidebar-brand{align-items:stretch;gap:18px}
 .panel-switcher{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:3px;min-height:36px;flex-shrink:0;border:1px solid #303239;border-radius:9px;background:#141518}
@@ -45,14 +43,8 @@ input:focus,select:focus,textarea:focus{border-color:#93b2ee;box-shadow:0 0 0 3p
 .panel-switcher .nav-icon svg{width:14px;height:14px}
 .panel-switcher[data-single]{grid-template-columns:minmax(0,1fr)}
 .panel-switcher[data-single] .panel-switcher-indicator{width:calc(100% - 6px);transform:none}
-.sidebar-nav{gap:4px}
-.sidebar-nav a,.sidebar-nav button,.sidebar-nav button.secondary{position:relative;min-height:44px;padding:8px 11px;gap:11px;border:1px solid transparent;border-radius:10px;color:#a5a9b3;font-size:calc(13px * var(--ui-font-scale,1));font-weight:500}
-.sidebar-nav a:hover,.sidebar-nav button:hover{background:#ffffff06;color:#eceef2}
-.sidebar-nav a.active,.sidebar-nav button.active{background:#ffffff08;border:1px solid #ffffff13;color:#eceef2}
-.sidebar-nav>a>span:not(.nav-icon){min-width:0;overflow-wrap:anywhere}
 .nav-icon{--icon-color:var(--violet);display:grid;place-items:center;width:30px;height:30px;flex-shrink:0;border-radius:9px;background:#ffffff05;color:#aeb3bd}
 .nav-icon svg{width:18px;height:18px}
-.sidebar-nav .active .nav-icon{color:#e1e4eb;background:#ffffff08}
 .sidebar-section-heading{padding:0 12px;margin-bottom:9px}
 .sidebar-section-heading .eyebrow{font-size:calc(9px * var(--ui-font-scale,1));letter-spacing:.12em;color:#8d929d}
 .sidebar-description{font-size:calc(11px * var(--ui-font-scale,1));color:#85858d;line-height:1.5}
@@ -150,8 +142,6 @@ input:focus,select:focus,textarea:focus{border-color:#93b2ee;box-shadow:0 0 0 3p
 }
 @media(max-width:760px){
   .app-shell{grid-template-columns:minmax(0,1fr)}
-  .app-sidebar{margin:0;inset:12px auto 12px 12px;width:min(280px,calc(100vw - 48px));transform:translateX(calc(-100% - 12px));padding-top:24px}
-  .app-sidebar.is-open{transform:translateX(0)}
   .sidebar-toggle{top:20px;left:24px}
   .app-content>.page{padding:84px 18px 28px}
   .skip-link{left:110px}
@@ -209,7 +199,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .text-button{color:var(--accent)}
 .modal-backdrop{background:#070b10bf;backdrop-filter:blur(5px)}
 .page-header h1{margin-bottom:6px}
-.sidebar-nav a.active::after,.sidebar-nav button.active::after{content:'';position:absolute;right:11px;width:4px;height:4px;background:#c4c9d3;border-radius:50%}
 .metric-card p{font-variant-numeric:tabular-nums}
 .state-running .status-dot{background:var(--accent);animation:status-breathe 3s ease-in-out infinite}
 @keyframes status-breathe{0%,100%{box-shadow:0 0 0 3px #93b2ee10}50%{box-shadow:0 0 0 5px #93b2ee04}}

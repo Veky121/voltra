@@ -1,0 +1,9 @@
+.server-identity-heading{display:flex;align-items:center;gap:10px;min-width:0}
+.server-identity-heading>div{min-width:0}
+.server-identity-heading .server-identity-icon{display:block;flex:0 0 auto;width:36px;height:36px;object-fit:contain;border-radius:var(--ui-control-radius);background:var(--surface-muted);border:1px solid var(--ui-border);box-shadow:none}
+.server-hero .server-identity-heading .server-identity-icon{width:44px;height:44px}
+.server-topbar .server-identity-heading .server-identity-icon{width:30px;height:30px;border-radius:6px}
+.server-pack-name{margin:3px 0 0;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));line-height:1.5;overflow-wrap:anywhere}
+
+.overview-server-card .server-identity-icon[data-icon-source=game]{object-fit:cover}
+.server-identity-heading .server-identity-initial{display:grid;place-items:center;color:var(--muted);font-size:calc(15px * var(--ui-font-scale,1));font-weight:600;line-height:1;user-select:none}

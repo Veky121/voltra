@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestSonsSettingsAPIPrivacyAndGroups(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, sonsSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.SonsSettingsRecipe)
 	ctx := context.Background()
 	if _, err := a.update(ctx, "eggs", num(server["egg_id"]), egg); err != nil {
 		t.Fatal(err)
@@ -20,9 +21,9 @@ func TestSonsSettingsAPIPrivacyAndGroups(t *testing.T) {
 	original := []byte("\xef\xbb\xbf{\r\n\"ServerName\":\"operator\",\"Password\":\"private-password\",\"LanOnly\":false,\"SaveMode\":\"continue\",\"GamePort\":8766,\"Unknown\":123456789012345678901234567890,\"GameSettings\":{\"token\":\"nested-private\"}\r\n}\r\n")
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[sonsSettingsPath], fixture.State = original, "offline"
+	fixture.Files[gamesettings.SonsSettingsPath], fixture.State = original, "offline"
 	fixture.mu.Unlock()
-	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + sonsSettingsPath
+	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.SonsSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	encoded, _ := json.Marshal(view)
 	if bytes.Contains(encoded, []byte("private-password")) || bytes.Contains(encoded, []byte("nested-private")) {
@@ -46,7 +47,7 @@ func TestSonsSettingsAPIPrivacyAndGroups(t *testing.T) {
 		t.Fatal("allocation-owned port exposed")
 	}
 	fixture.mu.Lock()
-	unchanged := bytes.Equal(original, fixture.Files[sonsSettingsPath])
+	unchanged := bytes.Equal(original, fixture.Files[gamesettings.SonsSettingsPath])
 	fixture.mu.Unlock()
 	if !unchanged {
 		t.Fatal("read inserted defaults")
@@ -54,14 +55,14 @@ func TestSonsSettingsAPIPrivacyAndGroups(t *testing.T) {
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"/GamePort": "9999"}}, 422)
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"/MaxPlayers": "9"}}, 422)
 	fixture.mu.Lock()
-	unchanged = bytes.Equal(original, fixture.Files[sonsSettingsPath])
+	unchanged = bytes.Equal(original, fixture.Files[gamesettings.SonsSettingsPath])
 	fixture.mu.Unlock()
 	if !unchanged {
 		t.Fatal("invalid patch changed native bytes")
 	}
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"/ServerName": "changed", "/SaveInterval": "300"}}, 200)
 	fixture.mu.Lock()
-	after := append([]byte(nil), fixture.Files[sonsSettingsPath]...)
+	after := append([]byte(nil), fixture.Files[gamesettings.SonsSettingsPath]...)
 	fixture.mu.Unlock()
 	for _, retained := range []string{`"Password":"private-password"`, `"Unknown":123456789012345678901234567890`, `"GameSettings":{"token":"nested-private"}`} {
 		if !bytes.Contains(after, []byte(retained)) {

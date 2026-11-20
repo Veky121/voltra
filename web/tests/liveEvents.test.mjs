@@ -1,77 +1,278 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
-const bundle=await build({entryPoints:[new URL('../src/hooks/liveEvents.ts',import.meta.url).pathname.replace(/^\/(.:)/,'$1')],bundle:true,write:false,format:'esm',platform:'node'});
-const {observeLiveNavigation,observeLivePath,observeReadInvalidation,isLivePathFresh,livePathAllowed}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const bundle = await build({
+  entryPoints: [new URL('../src/hooks/liveEvents.ts', import.meta.url).pathname.replace(/^\/(.:)/, '$1')],
+  bundle: true,
+  write: false,
+  format: 'esm',
+  platform: 'node',
+});
+const {
+  observeLiveNavigation,
+  observeLivePath,
+  observeReadInvalidation,
+  isLivePathFresh,
+  livePathAllowed,
+  liveSocketReady,
+  liveHintsHealthy,
+} = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 
-test('live navigation coalesces events, resyncs on reconnect, and stops at auth boundary',t=>{
-  t.mock.timers.enable({apis:['setTimeout']});
-  const previousWindow=globalThis.window,previousSocket=globalThis.WebSocket;
-  const instances=[];
+test('live navigation coalesces events, resyncs on reconnect, and stops at auth boundary', t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const previousWindow = globalThis.window,
+    previousSocket = globalThis.WebSocket;
+  const instances = [];
   class Socket {
-    constructor(url){this.url=String(url);instances.push(this)}
-    close(){this.closed=true;this.onclose?.()}
-    message(value){this.onmessage?.({data:JSON.stringify(value)})}
+    constructor(url) {
+      this.url = String(url);
+      instances.push(this);
+    }
+    close() {
+      this.closed = true;
+      this.onclose?.();
+    }
+    message(value) {
+      this.onmessage?.({data: JSON.stringify(value)});
+    }
   }
-  globalThis.window=Object.assign(new EventTarget(),{location:{href:'https://panel.test/'}});
-  globalThis.WebSocket=Socket;
-  let refreshes=0;
-  const stop=observeLiveNavigation(()=>refreshes++);
-  t.after(()=>{stop();globalThis.window=previousWindow;globalThis.WebSocket=previousSocket});
-  const first=instances[0];assert.equal(first.url,'wss://panel.test/api/client/events');
-  first.message({type:'ready',version:1});
-  for(let i=0;i<50;i++)first.message({type:'navigation.invalidated',version:1});
-  t.mock.timers.tick(75);assert.equal(refreshes,1);
-  first.message({type:'navigation.invalidated',version:2});
-  first.onmessage({data:'malformed'});t.mock.timers.tick(75);assert.equal(refreshes,1);
-  first.close();t.mock.timers.tick(40000);assert.equal(instances.length,2);
-  instances[1].message({type:'ready',version:1});t.mock.timers.tick(75);assert.equal(refreshes,2);
+  globalThis.window = Object.assign(new EventTarget(), {location: {href: 'https://panel.test/'}});
+  globalThis.WebSocket = Socket;
+  let refreshes = 0;
+  const stop = observeLiveNavigation(() => refreshes++);
+  t.after(() => {
+    stop();
+    globalThis.window = previousWindow;
+    globalThis.WebSocket = previousSocket;
+  });
+  const first = instances[0];
+  assert.equal(first.url, 'wss://panel.test/api/client/events');
+  first.message({type: 'ready', version: 1});
+  for (let i = 0; i < 50; i++) first.message({type: 'navigation.invalidated', version: 1});
+  t.mock.timers.tick(75);
+  assert.equal(refreshes, 1);
+  first.message({type: 'navigation.invalidated', version: 2});
+  first.onmessage({data: 'malformed'});
+  t.mock.timers.tick(75);
+  assert.equal(refreshes, 1);
+  first.close();
+  t.mock.timers.tick(40000);
+  assert.equal(instances.length, 2);
+  instances[1].message({type: 'ready', version: 1});
+  t.mock.timers.tick(75);
+  assert.equal(refreshes, 2);
   window.dispatchEvent(new Event('panel-auth-changed'));
-  assert.equal(instances[1].closed,true);t.mock.timers.tick(60000);assert.equal(instances.length,2);
+  assert.equal(instances[1].closed, true);
+  t.mock.timers.tick(60000);
+  assert.equal(instances.length, 2);
 });
 
-test('quiet topics stay fresh on heartbeat; scoped hints coalesce and reconnect refreshes',t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- const old={window:globalThis.window,document:globalThis.document,WebSocket:globalThis.WebSocket,now:Date.now};let now=100000;
- Date.now=()=>now;const sockets=[];
- class Socket{constructor(){this.sent=[];sockets.push(this)}send(raw){this.sent.push(JSON.parse(raw))}close(){this.onclose?.()}message(packet){this.onmessage?.({data:JSON.stringify({version:1,...packet})})}}
- globalThis.window=Object.assign(new EventTarget(),{location:{href:'https://panel.test/'}});globalThis.document=Object.assign(new EventTarget(),{hidden:false});globalThis.WebSocket=Socket;
- const path='/api/client/servers/one/backups?page=2&per_page=20';let refreshes=0;
- const stop=observeLivePath(path,()=>{}),stopHints=observeReadInvalidation('/api/client/servers/one/network/allocations',()=>refreshes++);
- t.after(()=>{stop();stopHints();Object.assign(globalThis,{window:old.window,document:old.document,WebSocket:old.WebSocket});Date.now=old.now});
- const socket=sockets[0];socket.message({type:'ready',capabilities:['snapshots','event-driven']});t.mock.timers.tick(300);
- assert.equal(refreshes,1);assert.deepEqual(socket.sent.at(-1).domains,['network','access','servers','backups']);
- socket.message({type:'snapshot',path,revision:socket.sent.at(-1).revision,status:200,data:{data:[]}});
- now+=30000;socket.message({type:'heartbeat'});assert.equal(isLivePathFresh(path),true);
- now+=46000;assert.equal(isLivePathFresh(path),false);socket.message({type:'heartbeat'});assert.equal(isLivePathFresh(path),true);
- now+=15000;assert.equal(isLivePathFresh(path),false);socket.message({type:'unchanged',path,revision:socket.sent.at(-1).revision,status:200});assert.equal(isLivePathFresh(path),true);
- socket.message({type:'reads.invalidated',domains:['backups']});t.mock.timers.tick(300);assert.equal(refreshes,1);assert.equal(isLivePathFresh(path),false);
- socket.message({type:'unchanged',path,revision:socket.sent.at(-1).revision,status:200});assert.equal(isLivePathFresh(path),true);
- for(let i=0;i<100;i++)socket.message({type:'reads.invalidated',domains:['network']});t.mock.timers.tick(300);assert.equal(refreshes,2);
- socket.close();assert.equal(isLivePathFresh(path),false);t.mock.timers.tick(40000);assert.equal(sockets.length,2);
- sockets[1].message({type:'ready',capabilities:['snapshots','event-driven']});t.mock.timers.tick(300);assert.equal(refreshes,3);
- window.dispatchEvent(new Event('panel-auth-changed'));t.mock.timers.tick(40000);assert.equal(sockets.length,2);
+test('quiet topics stay fresh on heartbeat; scoped hints coalesce and reconnect refreshes', t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const old = {
+    window: globalThis.window,
+    document: globalThis.document,
+    WebSocket: globalThis.WebSocket,
+    now: Date.now,
+  };
+  let now = 100000;
+  Date.now = () => now;
+  const sockets = [];
+  class Socket {
+    constructor() {
+      this.sent = [];
+      sockets.push(this);
+    }
+    send(raw) {
+      this.sent.push(JSON.parse(raw));
+    }
+    close() {
+      this.onclose?.();
+    }
+    message(packet) {
+      this.onmessage?.({data: JSON.stringify({version: 1, ...packet})});
+    }
+  }
+  globalThis.window = Object.assign(new EventTarget(), {location: {href: 'https://panel.test/'}});
+  globalThis.document = Object.assign(new EventTarget(), {hidden: false});
+  globalThis.WebSocket = Socket;
+  const path = '/api/client/servers/one/backups?page=2&per_page=20';
+  let refreshes = 0;
+  const stop = observeLivePath(path, () => {}),
+    stopHints = observeReadInvalidation('/api/client/servers/one/network/allocations', () => refreshes++);
+  t.after(() => {
+    stop();
+    stopHints();
+    Object.assign(globalThis, {window: old.window, document: old.document, WebSocket: old.WebSocket});
+    Date.now = old.now;
+  });
+  const socket = sockets[0];
+  socket.message({type: 'ready', capabilities: ['snapshots', 'event-driven']});
+  t.mock.timers.tick(300);
+  assert.equal(refreshes, 1);
+  assert.deepEqual(socket.sent.at(-1).domains, ['network', 'access', 'servers', 'backups']);
+  socket.message({type: 'snapshot', path, revision: socket.sent.at(-1).revision, status: 200, data: {data: []}});
+  now += 30000;
+  socket.message({type: 'heartbeat'});
+  assert.equal(isLivePathFresh(path), true);
+  now += 46000;
+  assert.equal(isLivePathFresh(path), false);
+  socket.message({type: 'heartbeat'});
+  assert.equal(isLivePathFresh(path), true);
+  now += 15000;
+  assert.equal(isLivePathFresh(path), false);
+  socket.message({type: 'unchanged', path, revision: socket.sent.at(-1).revision, status: 200});
+  assert.equal(isLivePathFresh(path), true);
+  socket.message({type: 'reads.invalidated', domains: ['backups']});
+  t.mock.timers.tick(300);
+  assert.equal(refreshes, 1);
+  assert.equal(isLivePathFresh(path), false);
+  socket.message({type: 'unchanged', path, revision: socket.sent.at(-1).revision, status: 200});
+  assert.equal(isLivePathFresh(path), true);
+  for (let i = 0; i < 100; i++) socket.message({type: 'reads.invalidated', domains: ['network']});
+  t.mock.timers.tick(300);
+  assert.equal(refreshes, 2);
+  socket.close();
+  assert.equal(isLivePathFresh(path), false);
+  t.mock.timers.tick(40000);
+  assert.equal(sockets.length, 2);
+  sockets[1].message({type: 'ready', capabilities: ['snapshots', 'event-driven']});
+  t.mock.timers.tick(300);
+  assert.equal(refreshes, 3);
+  window.dispatchEvent(new Event('panel-auth-changed'));
+  t.mock.timers.tick(40000);
+  assert.equal(sockets.length, 2);
 });
 
-test('topic subscriptions share one socket, fence revisions, pause hidden and fall back on disconnect',t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- const oldWindow=globalThis.window,oldSocket=globalThis.WebSocket,oldDocument=globalThis.document;
- const sockets=[];
- class Socket{constructor(){this.sent=[];sockets.push(this)}send(raw){this.sent.push(JSON.parse(raw))}close(){this.onclose?.()}message(packet){this.onmessage?.({data:JSON.stringify({version:1,...packet})})}}
- globalThis.window=Object.assign(new EventTarget(),{location:{href:'https://panel.test/'}});
- globalThis.document=Object.assign(new EventTarget(),{hidden:false});globalThis.WebSocket=Socket;
- const path='/api/client/servers/one/resources';const seen=[];
- const stopA=observeLivePath(path,sample=>seen.push(sample));const stopB=observeLivePath(path,()=>{});
- t.after(()=>{stopA();stopB();globalThis.window=oldWindow;globalThis.WebSocket=oldSocket;globalThis.document=oldDocument});
- assert.equal(sockets.length,1);const socket=sockets[0];socket.message({type:'ready',capabilities:['snapshots']});t.mock.timers.tick(75);
- const first=socket.sent.at(-1);assert.deepEqual(first.paths,[path]);
- socket.message({type:'snapshot',path,revision:first.revision-1,status:200,data:{old:true}});assert.equal(seen.length,0);
- socket.message({type:'snapshot',path,revision:first.revision,status:200,data:{fresh:true}});assert.equal(seen.length,1);assert.equal(isLivePathFresh(path),true);
- const late=[];const stopLate=observeLivePath(path,sample=>late.push(sample));assert.equal(late.length,1);assert.deepEqual(late[0].data,{fresh:true});stopLate();
- document.hidden=true;document.dispatchEvent(new Event('visibilitychange'));t.mock.timers.tick(75);assert.deepEqual(socket.sent.at(-1).paths,[]);assert.equal(isLivePathFresh(path),false);
- document.hidden=false;document.dispatchEvent(new Event('visibilitychange'));t.mock.timers.tick(75);const revision=socket.sent.at(-1).revision;
- socket.message({type:'snapshot',path,revision,status:403,data:{errors:[{detail:'revoked'}]}});assert.equal(isLivePathFresh(path),false);assert.equal(seen.at(-1).status,403);
- socket.close();assert.equal(isLivePathFresh(path),false);const stale=[];const stopStale=observeLivePath(path,sample=>stale.push(sample));assert.equal(stale.length,0);stopStale();
- assert.equal(livePathAllowed('/api/client/servers/one/console-history'),true);
- assert.equal(livePathAllowed('/api/client/servers/one/files/contents'),false);assert.equal(livePathAllowed('/api/client/servers/one/steam/private'),false);
+test('topic subscriptions share one socket, fence revisions, pause hidden and fall back on disconnect', t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const oldWindow = globalThis.window,
+    oldSocket = globalThis.WebSocket,
+    oldDocument = globalThis.document;
+  const sockets = [];
+  class Socket {
+    constructor() {
+      this.sent = [];
+      sockets.push(this);
+    }
+    send(raw) {
+      this.sent.push(JSON.parse(raw));
+    }
+    close() {
+      this.onclose?.();
+    }
+    message(packet) {
+      this.onmessage?.({data: JSON.stringify({version: 1, ...packet})});
+    }
+  }
+  globalThis.window = Object.assign(new EventTarget(), {location: {href: 'https://panel.test/'}});
+  globalThis.document = Object.assign(new EventTarget(), {hidden: false});
+  globalThis.WebSocket = Socket;
+  const path = '/api/client/servers/one/resources';
+  const seen = [];
+  const stopA = observeLivePath(path, sample => seen.push(sample));
+  const stopB = observeLivePath(path, () => {});
+  t.after(() => {
+    stopA();
+    stopB();
+    globalThis.window = oldWindow;
+    globalThis.WebSocket = oldSocket;
+    globalThis.document = oldDocument;
+  });
+  assert.equal(sockets.length, 1);
+  const socket = sockets[0];
+  socket.message({type: 'ready', capabilities: ['snapshots']});
+  t.mock.timers.tick(75);
+  const first = socket.sent.at(-1);
+  assert.deepEqual(first.paths, [path]);
+  socket.message({type: 'snapshot', path, revision: first.revision - 1, status: 200, data: {old: true}});
+  assert.equal(seen.length, 0);
+  socket.message({type: 'snapshot', path, revision: first.revision, status: 200, data: {fresh: true}});
+  assert.equal(seen.length, 1);
+  assert.equal(isLivePathFresh(path), true);
+  const late = [];
+  const stopLate = observeLivePath(path, sample => late.push(sample));
+  assert.equal(late.length, 1);
+  assert.deepEqual(late[0].data, {fresh: true});
+  stopLate();
+  document.hidden = true;
+  document.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(75);
+  assert.deepEqual(socket.sent.at(-1).paths, []);
+  assert.equal(isLivePathFresh(path), false);
+  document.hidden = false;
+  document.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(75);
+  const revision = socket.sent.at(-1).revision;
+  socket.message({type: 'snapshot', path, revision, status: 403, data: {errors: [{detail: 'revoked'}]}});
+  assert.equal(isLivePathFresh(path), false);
+  assert.equal(seen.at(-1).status, 403);
+  socket.close();
+  assert.equal(isLivePathFresh(path), false);
+  const stale = [];
+  const stopStale = observeLivePath(path, sample => stale.push(sample));
+  assert.equal(stale.length, 0);
+  stopStale();
+  assert.equal(livePathAllowed('/api/client/servers/one/console-history'), true);
+  assert.equal(livePathAllowed('/api/client/servers/one/files/contents'), false);
+  assert.equal(livePathAllowed('/api/client/servers/one/steam/private'), false);
+});
+
+test('server-scoped hints refetch only that server and reads of no single server', t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const old = {window: globalThis.window, document: globalThis.document, WebSocket: globalThis.WebSocket};
+  const sockets = [];
+  class Socket {
+    constructor() {
+      this.sent = [];
+      sockets.push(this);
+    }
+    send(raw) {
+      this.sent.push(JSON.parse(raw));
+    }
+    close() {
+      this.onclose?.();
+    }
+    message(packet) {
+      this.onmessage?.({data: JSON.stringify({version: 1, ...packet})});
+    }
+  }
+  globalThis.window = Object.assign(new EventTarget(), {location: {href: 'https://panel.test/'}});
+  globalThis.document = Object.assign(new EventTarget(), {hidden: false});
+  globalThis.WebSocket = Socket;
+  const counts = {one: 0, two: 0, list: 0, admin: 0};
+  const stops = [
+    observeReadInvalidation('/api/client/servers/one/network/allocations', () => counts.one++),
+    observeReadInvalidation('/api/client/servers/two/network/allocations', () => counts.two++),
+    observeReadInvalidation('/api/client?summary=overview&per_page=100', () => counts.list++),
+    observeReadInvalidation('/api/application/servers?per_page=100', () => counts.admin++),
+  ];
+  t.after(() => {
+    stops.forEach(stop => stop());
+    Object.assign(globalThis, old);
+  });
+  assert.equal(liveSocketReady(), false);
+  const socket = sockets[0];
+  socket.message({type: 'ready', capabilities: ['snapshots', 'event-driven']});
+  t.mock.timers.tick(300);
+  assert.equal(liveSocketReady(), true);
+  assert.equal(liveHintsHealthy(), true);
+  for (const key in counts) counts[key] = 0;
+  socket.message({type: 'reads.invalidated', domains: ['servers'], servers: ['two', '00000000-two']});
+  t.mock.timers.tick(300);
+  assert.deepEqual(counts, {one: 0, two: 1, list: 1, admin: 1});
+  // Without servers a hint concerns every read of its domains.
+  socket.message({type: 'reads.invalidated', domains: ['network']});
+  t.mock.timers.tick(300);
+  assert.deepEqual(counts, {one: 1, two: 2, list: 1, admin: 1});
+  // Scoped hints coalesced with an unscoped one keep both scopes.
+  socket.message({type: 'reads.invalidated', domains: ['network'], servers: ['one']});
+  socket.message({type: 'reads.invalidated', domains: ['servers'], servers: ['two']});
+  t.mock.timers.tick(300);
+  assert.deepEqual(counts, {one: 2, two: 3, list: 2, admin: 2});
+  socket.close();
+  assert.equal(liveSocketReady(), false);
+  assert.equal(liveHintsHealthy(), false);
+  assert.equal(livePathAllowed('/api/client/servers/one/resources?summary=overview'), true);
+  assert.equal(livePathAllowed('/api/client/servers/one/resources?summary=other'), false);
 });

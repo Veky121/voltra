@@ -119,11 +119,11 @@ func (a *App) nodeReleaseFetch(ctx context.Context, address string, maximum int6
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, APIError{502, "NodeReleaseUnavailable", "Could not check the node release. Try again shortly."}
+		return nil, APIError{Status: 502, Code: "NodeReleaseUnavailable", Detail: "Could not check the node release. Try again shortly."}
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, APIError{502, "NodeReleaseUnavailable", fmt.Sprintf("Node release host returned HTTP %d. Try again shortly.", res.StatusCode)}
+		return nil, APIError{Status: 502, Code: "NodeReleaseUnavailable", Detail: fmt.Sprintf("Node release host returned HTTP %d. Try again shortly.", res.StatusCode)}
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, maximum+1))
 	if err != nil || int64(len(data)) > maximum {
@@ -232,7 +232,7 @@ func (a *App) resolveNodeInstaller(ctx context.Context) (nodeInstallerRelease, e
 		return ex == nil && ey == nil && x.Compare(y) > 0
 	})
 	if len(eligible) == 0 {
-		return nodeInstallerRelease{}, APIError{503, "NodeReleaseIncomplete", "No complete Linux node release is available on this channel yet. Both Wings and connector builds must finish before installation."}
+		return nodeInstallerRelease{}, APIError{Status: 503, Code: "NodeReleaseIncomplete", Detail: "No complete Linux node release is available on this channel yet. Both Wings and connector builds must finish before installation."}
 	}
 	release := eligible[0]
 	assets, _ := nodeReleaseAssets(release)

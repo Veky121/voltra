@@ -666,6 +666,7 @@ func (a *App) cliStoreSettings(ctx context.Context, settings M) error {
 			return e
 		}
 	}
+	defer a.settingsChanged()
 	return tx.Commit(ctx)
 }
 

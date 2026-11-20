@@ -15,14 +15,24 @@ import (
 type diagnosticRequestKey struct{}
 
 // Record the handler that rejected a request without logging its arguments.
+// Forwarding frames between another package's handler and fail are skipped, so
+// game settings failures name the game settings handler.
 func diagnosticFailureCaller() string {
-	pc, _, _, ok := runtime.Caller(2)
-	if ok {
-		if fn := runtime.FuncForPC(pc); fn != nil {
-			return fn.Name()
+	pcs := make([]uintptr, 8)
+	frames := runtime.CallersFrames(pcs[:runtime.Callers(3, pcs)])
+	for {
+		frame, more := frames.Next()
+		switch frame.Function {
+		case "voltra/internal/panel.gameSettingsHost.Fail", "voltra/internal/gamesettings.(*Service).fail":
+		case "":
+			return "unknown"
+		default:
+			return frame.Function
+		}
+		if !more {
+			return "unknown"
 		}
 	}
-	return "unknown"
 }
 
 // Always generate our own reference: incoming headers are not trusted log data.

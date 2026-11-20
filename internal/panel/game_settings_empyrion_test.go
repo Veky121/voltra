@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func batchSettingsRecipeFixture(t *testing.T, recipe string) M {
@@ -19,49 +20,49 @@ func batchSettingsRecipeFixture(t *testing.T, recipe string) M {
 }
 
 func TestEmpyrionScopedSecretManagedOverlay(t *testing.T) {
-	egg := batchSettingsRecipeFixture(t, empyrionSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.EmpyrionSettingsRecipe)
 	input := []byte("ServerConfig:\n  Tel_Pwd: fixture-private-admin\n  Srv_Port: 30000\n  Tel_Port: 39000\n  Tel_Enabled: true\n  Srv_Password: fixture-private-player\nGameConfig:\n  Seed: 123\n")
-	parsed, err := parseGameSettingsForEgg(egg, empyrionSettingsPath, input)
+	parsed, err := gamesettings.ParseForEgg(egg, gamesettings.EmpyrionSettingsPath, input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range parsed.fields {
-		if field.key == "/ServerConfig/Tel_Pwd" && !field.secret {
+	for _, field := range parsed.Fields {
+		if field.Key == "/ServerConfig/Tel_Pwd" && !field.Secret {
 			t.Fatal("Private console credential unclassified")
 		}
 	}
 	for _, key := range []string{"/ServerConfig/Tel_Pwd", "/ServerConfig/Srv_Port", "/ServerConfig/Tel_Port", "/ServerConfig/Tel_Enabled", "/serverconfig/tel_pwd"} {
-		if !empyrionSettingsManaged(egg, empyrionSettingsPath, key) {
+		if !gamesettings.EmpyrionSettingsManaged(egg, gamesettings.EmpyrionSettingsPath, key) {
 			t.Fatal("Managed transport key editable", key)
 		}
-		if _, err := parsed.patch(map[string]string{key: "1"}); err == nil {
+		if _, err := parsed.Patch(map[string]string{key: "1"}); err == nil {
 			t.Fatal("Direct patch bypassed runtime authority", key)
 		}
 	}
-	if empyrionSettingsManaged(egg, empyrionSettingsPath, "/ServerConfig/Srv_Password") {
+	if gamesettings.EmpyrionSettingsManaged(egg, gamesettings.EmpyrionSettingsPath, "/ServerConfig/Srv_Password") {
 		t.Fatal("Operator gameplay password became runtime-owned")
 	}
 	for _, scope := range []struct {
 		egg  M
 		file string
-	}{{M{"name": "Empyrion"}, empyrionSettingsPath}, {egg, "/other.yaml"}} {
-		plain, err := parseGameSettings(scope.file, input)
+	}{{M{"name": "Empyrion"}, gamesettings.EmpyrionSettingsPath}, {egg, "/other.yaml"}} {
+		plain, err := gamesettings.Parse(scope.file, input)
 		if err != nil {
 			t.Fatal(err)
 		}
-		out := empyrionSettingsFields(scope.egg, scope.file, plain)
-		for _, field := range out.fields {
-			if field.key == "/ServerConfig/Tel_Pwd" && field.secret {
+		out := gamesettings.EmpyrionSettingsFields(scope.egg, scope.file, plain)
+		for _, field := range out.Fields {
+			if field.Key == "/ServerConfig/Tel_Pwd" && field.Secret {
 				t.Fatal("Secret overlay escaped exact scope")
 			}
 		}
 	}
 	for _, malformed := range []string{"ServerConfig: [{Tel_Pwd: fixture-private-admin}]", "ServerConfig: fixture-private-admin", "[{ServerConfig: {Tel_Pwd: fixture-private-admin}}]"} {
-		p, err := parseGameSettingsForEgg(egg, empyrionSettingsPath, []byte(malformed))
+		p, err := gamesettings.ParseForEgg(egg, gamesettings.EmpyrionSettingsPath, []byte(malformed))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(p.fields) != 1 || !p.fields[0].secret || p.fields[0].kind != "readonly" {
+		if len(p.Fields) != 1 || !p.Fields[0].Secret || p.Fields[0].Kind != "readonly" {
 			t.Fatal("Malformed parent exposed private or managed children")
 		}
 	}
@@ -69,18 +70,18 @@ func TestEmpyrionScopedSecretManagedOverlay(t *testing.T) {
 
 func TestEmpyrionActualSettingsAPIPrivacy(t *testing.T) {
 	a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
-	egg := batchSettingsRecipeFixture(t, empyrionSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.EmpyrionSettingsRecipe)
 	if _, err := a.update(context.Background(), "eggs", num(server["egg_id"]), egg); err != nil {
 		t.Fatal(err)
 	}
 	original := "# operator comment\nServerConfig:\n  Srv_Name: Operator\n  Srv_Port: 30000\n  Tel_Port: 39000\n  Tel_Enabled: true\n  Tel_Pwd: fixture-private-admin\n  Srv_Password: fixture-private-player\nGameConfig:\n  Seed: 123\nUnknown:\n  keep: retained\n"
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[empyrionSettingsPath], fixture.State = []byte(original), "offline"
+	fixture.Files[gamesettings.EmpyrionSettingsPath], fixture.State = []byte(original), "offline"
 	fixture.mu.Unlock()
 	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
-	if view["file"] != empyrionSettingsPath {
+	if view["file"] != gamesettings.EmpyrionSettingsPath {
 		t.Fatal("Native document declaration missing")
 	}
 	encoded, _ := json.Marshal(view)
@@ -100,7 +101,7 @@ func TestEmpyrionActualSettingsAPIPrivacy(t *testing.T) {
 	}
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"/GameConfig/Seed": "456", "/ServerConfig/Srv_Name": "Updated"}}, 200)
 	fixture.mu.Lock()
-	updated := string(fixture.Files[empyrionSettingsPath])
+	updated := string(fixture.Files[gamesettings.EmpyrionSettingsPath])
 	fixture.mu.Unlock()
 	for _, keep := range []string{"# operator comment", "fixture-private-admin", "fixture-private-player", "keep: retained"} {
 		if !strings.Contains(updated, keep) {

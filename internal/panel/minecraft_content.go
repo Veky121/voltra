@@ -180,7 +180,7 @@ func (a *App) mcContentProvider(ctx context.Context, name string) (mcContentProv
 	for _, row := range rows {
 		credentials, e := a.integrationCredentials(row)
 		if e != nil {
-			return p, APIError{503, "ContentProviderConfiguration", "The global provider credential could not be loaded. Ask an administrator to save it again."}
+			return p, APIError{Status: 503, Code: "ContentProviderConfiguration", Detail: "The global provider credential could not be loaded. Ask an administrator to save it again."}
 		}
 		value := str(credentials[field])
 		if value == "" {
@@ -192,7 +192,7 @@ func (a *App) mcContentProvider(ctx context.Context, name string) (mcContentProv
 		p.credential = value
 	}
 	if name == "curseforge" && p.credential == "" {
-		return p, APIError{503, "ContentProviderConfiguration", "Ask an administrator to save an enabled global CurseForge API key in Integrations."}
+		return p, APIError{Status: 503, Code: "ContentProviderConfiguration", Detail: "Ask an administrator to save an enabled global CurseForge API key in Integrations."}
 	}
 	return p, nil
 }
@@ -241,18 +241,18 @@ func (p mcContentProvider) request(ctx context.Context, endpoint string, target 
 		client.CheckRedirect = func(*http.Request, []*http.Request) error { return errors.New("metadata redirects are disabled") }
 		res, e := client.Do(req)
 		if e != nil {
-			return nil, APIError{502, "ContentProviderUnavailable", "The content provider could not be reached. Try again shortly."}
+			return nil, APIError{Status: 502, Code: "ContentProviderUnavailable", Detail: "The content provider could not be reached. Try again shortly."}
 		}
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			return nil, APIError{502, "ContentProviderUnavailable", fmt.Sprintf("The content provider returned HTTP %d. Check its availability and the global credential.", res.StatusCode)}
+			return nil, APIError{Status: 502, Code: "ContentProviderUnavailable", Detail: fmt.Sprintf("The content provider returned HTTP %d. Check its availability and the global credential.", res.StatusCode)}
 		}
 		data, e := io.ReadAll(io.LimitReader(res.Body, (4<<20)+1))
 		if e != nil || len(data) > 4<<20 {
-			return nil, APIError{502, "ContentProviderMetadata", "The content provider returned invalid or oversized metadata."}
+			return nil, APIError{Status: 502, Code: "ContentProviderMetadata", Detail: "The content provider returned invalid or oversized metadata."}
 		}
 		if !json.Valid(data) {
-			return nil, APIError{502, "ContentProviderMetadata", "The content provider returned invalid metadata."}
+			return nil, APIError{Status: 502, Code: "ContentProviderMetadata", Detail: "The content provider returned invalid metadata."}
 		}
 		return data, nil
 	})
@@ -264,7 +264,7 @@ func (p mcContentProvider) request(ctx context.Context, endpoint string, target 
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	if decoder.Decode(target) != nil || decoder.Decode(new(any)) != io.EOF {
-		return APIError{502, "ContentProviderMetadata", "The content provider returned invalid or oversized metadata."}
+		return APIError{Status: 502, Code: "ContentProviderMetadata", Detail: "The content provider returned invalid or oversized metadata."}
 	}
 	return nil
 }
@@ -827,11 +827,11 @@ func (p mcContentProvider) download(ctx context.Context, v mcContentRelease) ([]
 	}
 	res, e := client.Do(req)
 	if e != nil {
-		return nil, APIError{502, "ContentDownloadFailed", "The provider download failed."}
+		return nil, APIError{Status: 502, Code: "ContentDownloadFailed", Detail: "The provider download failed."}
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, APIError{502, "ContentDownloadFailed", "The provider did not return a download."}
+		return nil, APIError{Status: 502, Code: "ContentDownloadFailed", Detail: "The provider did not return a download."}
 	}
 	if res.ContentLength > mcContentMaxFile || res.ContentLength > v.Size {
 		return nil, bad("The provider download exceeds its declared size.")
@@ -870,7 +870,7 @@ func (a *App) mcContentStopped(ctx context.Context, s M) error {
 	}
 	state := str(m["state"])
 	if state != "offline" && state != "stopped" {
-		return APIError{409, "MinecraftContentServerRunning", "Stop the server before changing mods or plugins. Changes take effect on the next start."}
+		return APIError{Status: 409, Code: "MinecraftContentServerRunning", Detail: "Stop the server before changing mods or plugins. Changes take effect on the next start."}
 	}
 	return nil
 }

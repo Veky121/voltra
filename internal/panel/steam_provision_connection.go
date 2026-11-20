@@ -27,7 +27,7 @@ func (a *App) acquireSteamProvisionConnection(ctx context.Context) (*steamProvis
 	select {
 	case steamProvisionSessions <- struct{}{}:
 	default:
-		return nil, APIError{503, "GameProvisionBusy", "Server creation is busy. Retry this request shortly."}
+		return nil, APIError{Status: 503, Code: "GameProvisionBusy", Detail: "Server creation is busy. Retry this request shortly."}
 	}
 	borrowed, err := a.DB.Acquire(ctx)
 	if err != nil {

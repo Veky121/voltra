@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 type wave161Transport struct {
@@ -34,7 +35,7 @@ func (x wave161Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestWave156ArcheanHandler(t *testing.T) {
 	a, mux, admin, s, f := quickSetupMinecraftFixture(t)
 	ctx := context.Background()
-	egg := batchSettingsRecipeFixture(t, archeanRepairRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.ArcheanRepairRecipe)
 	if _, e := a.update(ctx, "eggs", num(s["egg_id"]), egg); e != nil {
 		t.Fatal(e)
 	}
@@ -57,7 +58,7 @@ func TestWave156ArcheanHandler(t *testing.T) {
 	if _, e = a.insert(ctx, "egg_variables", M{"egg_id": s["egg_id"], "name": "Port", "env_variable": "SERVER_PORT", "default_value": "28020", "rules": "required|integer"}); e != nil {
 		t.Fatal(e)
 	}
-	entry, _ := gameSettingsProfile(egg)
+	entry, _ := gamesettings.ProfileFor(egg)
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 	re := regexp.MustCompile(`(?s)cat > (\S+) <<'([^']+)'\n(.*?)\n`)
 	_ = re
@@ -74,7 +75,7 @@ func TestWave156ArcheanHandler(t *testing.T) {
 		}
 		f.Files["/"+name] = []byte(data + "\n")
 	}
-	f.Files[archeanRepairPath] = []byte("[server]\nmax_simultaneous_players=4\npassword=fixture-private-password\n[networking]\nlisten_port=28020\n")
+	f.Files[gamesettings.ArcheanRepairPath] = []byte("[server]\nmax_simultaneous_players=4\npassword=fixture-private-password\n[networking]\nlisten_port=28020\n")
 	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	b, _ := json.Marshal(view)
@@ -109,7 +110,7 @@ func TestWave156ArcheanHandler(t *testing.T) {
 func TestWave161ArcheanPublication(t *testing.T) {
 	a, mux, admin, s, f := quickSetupMinecraftFixture(t)
 	ctx := context.Background()
-	egg := batchSettingsRecipeFixture(t, archeanRepairRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.ArcheanRepairRecipe)
 	if _, e := a.update(ctx, "eggs", num(s["egg_id"]), egg); e != nil {
 		t.Fatal(e)
 	}
@@ -132,7 +133,7 @@ func TestWave161ArcheanPublication(t *testing.T) {
 	if _, e = a.insert(ctx, "egg_variables", M{"egg_id": s["egg_id"], "name": "Port", "env_variable": "SERVER_PORT", "default_value": "28020", "rules": "required|integer"}); e != nil {
 		t.Fatal(e)
 	}
-	entry, _ := gameSettingsProfile(egg)
+	entry, _ := gamesettings.ProfileFor(egg)
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 	re := regexp.MustCompile(`(?s)cat > (\S+) <<'([^']+)'\n(.*?)\n`)
 	_ = re
@@ -149,7 +150,7 @@ func TestWave161ArcheanPublication(t *testing.T) {
 		}
 		f.Files["/"+name] = []byte(data + "\n")
 	}
-	f.Files[archeanRepairPath] = []byte("[server]\nmax_simultaneous_players=4\npassword=fixture-private-password\n[networking]\nlisten_port=28020\n")
+	f.Files[gamesettings.ArcheanRepairPath] = []byte("[server]\nmax_simultaneous_players=4\npassword=fixture-private-password\n[networking]\nlisten_port=28020\n")
 	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings"
 	get := func(user int64) M { return asMap(infraExpect(t, mux, user, "GET", route, nil, 200)["attributes"]) }
 	put := func(user int64, v M) int {
@@ -158,7 +159,7 @@ func TestWave161ArcheanPublication(t *testing.T) {
 	}
 	unchanged := func(writes int, b []byte) {
 		t.Helper()
-		if f.Writes != writes || !bytes.Equal(f.Files[archeanRepairPath], b) {
+		if f.Writes != writes || !bytes.Equal(f.Files[gamesettings.ArcheanRepairPath], b) {
 			t.Fatal("refused mutation wrote native bytes")
 		}
 	}
@@ -184,7 +185,7 @@ func TestWave161ArcheanPublication(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	before := append([]byte(nil), f.Files[archeanRepairPath]...)
+	before := append([]byte(nil), f.Files[gamesettings.ArcheanRepairPath]...)
 	writes := f.Writes
 	if put(num(reader["id"]), get(num(reader["id"]))) != 403 {
 		t.Fatal("read-only user accepted")
@@ -206,7 +207,7 @@ func TestWave161ArcheanPublication(t *testing.T) {
 		base = http.DefaultTransport
 	}
 	a.HTTP.Transport = wave161Transport{base, func(r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == archeanRepairPath {
+		if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == gamesettings.ArcheanRepairPath {
 			reads++
 		}
 	}}
@@ -227,13 +228,13 @@ func TestWave161ArcheanPublication(t *testing.T) {
 	for _, kind := range []string{"startup", "helper", "actor"} {
 		t.Run("final-read-"+kind, func(t *testing.T) {
 			view := get(admin)
-			before := append([]byte(nil), f.Files[archeanRepairPath]...)
+			before := append([]byte(nil), f.Files[gamesettings.ArcheanRepairPath]...)
 			writes := f.Writes
 			n := 0
 			fired := false
 			helper := append([]byte(nil), f.Files["/.voltra/archean_parity_wave3.py"]...)
 			a.HTTP.Transport = wave161Transport{base, func(r *http.Request) {
-				if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == archeanRepairPath {
+				if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == gamesettings.ArcheanRepairPath {
 					n++
 					if n == finalRead {
 						fired = true
@@ -267,7 +268,7 @@ func TestWave161ArcheanPublication(t *testing.T) {
 	}
 	t.Run("contended-lock", func(t *testing.T) {
 		view := get(admin)
-		before := append([]byte(nil), f.Files[archeanRepairPath]...)
+		before := append([]byte(nil), f.Files[gamesettings.ArcheanRepairPath]...)
 		writes := f.Writes
 		conn, e := a.DB.Acquire(ctx)
 		if e != nil {

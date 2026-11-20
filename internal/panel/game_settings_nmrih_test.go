@@ -9,13 +9,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 var testing421Baseline = os.Getenv("WAVE421_BASELINE") == "1"
 
 func TestWave421NMRiHAPI(t *testing.T) {
 	for _, tc := range []struct{ recipe, file, data, key string }{
-		{nmrihSettingsRecipe, nmrihSettingsPath, "// operator\r\nmp_timelimit \"73\" // retain\r\nrcon_password private-fixture-secret\r\nhostname stock\r\n", "mp_timelimit"},
+		{gamesettings.NmrihSettingsRecipe, gamesettings.NmrihSettingsPath, "// operator\r\nmp_timelimit \"73\" // retain\r\nrcon_password private-fixture-secret\r\nhostname stock\r\n", "mp_timelimit"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			a, mux, admin, server, f := quickSetupMinecraftFixture(t)
@@ -33,7 +34,7 @@ func TestWave421NMRiHAPI(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -75,7 +76,7 @@ func TestWave421NMRiHAPI(t *testing.T) {
 			delete(f.Files, "/server.properties")
 			f.Files[tc.file] = []byte(tc.data)
 			wrapper := "/nmrih/cfg/voltra-server.cfg"
-			if tc.recipe == gmodSettingsRecipe {
+			if tc.recipe == gamesettings.GmodSettingsRecipe {
 				wrapper = "/garrysmod/cfg/voltra-server.cfg"
 			}
 			f.Files[wrapper] = []byte("exec server.cfg\nexec voltra-managed.cfg\n")
@@ -257,14 +258,14 @@ func TestWave421NMRiHAPI(t *testing.T) {
 func TestWave421NMRiHRefusal(t *testing.T) {
 	for _, tail := range []string{"exec other.cfg", "mp_timelimit 9", "alias mp_timelimit quit", "unknown 1", "mp_timelimit 1;quit"} {
 		input := []byte("mp_timelimit 73\n" + tail + "\n")
-		p, e := parseNMRiHSettings(input)
+		p, e := gamesettings.ParseNMRiHSettings(input)
 		if e != nil {
 			continue
 		}
-		if _, e = p.patch(map[string]string{"mp_timelimit": "200"}); e == nil {
+		if _, e = p.Patch(map[string]string{"mp_timelimit": "200"}); e == nil {
 			t.Fatal("executable CFG accepted")
 		}
-		got, e := p.patch(nil)
+		got, e := p.Patch(nil)
 		if e != nil || !bytes.Equal(got, input) {
 			t.Fatal("refusal altered bytes")
 		}

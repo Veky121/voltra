@@ -107,7 +107,7 @@ func (a *App) adminRuntimeManagement(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if boolean(node["maintenance_mode"]) {
-			fail(w, APIError{409, "NodeMaintenance", "Leave node maintenance mode before changing its runtime tools."})
+			fail(w, APIError{Status: 409, Code: "NodeMaintenance", Detail: "Leave node maintenance mode before changing its runtime tools."})
 			return
 		}
 		body = action
@@ -125,7 +125,7 @@ func (a *App) adminRuntimeManagement(w http.ResponseWriter, r *http.Request) {
 		response, err = a.daemon(ctx, node, r.Method, "/api/runtime-images", body)
 		var remote *APIError
 		if errors.As(err, &remote) && remote.Status == 404 {
-			err = APIError{503, "RuntimeManagerUnavailable", "Update this node to the Wings build with runtime image management, then retry."}
+			err = APIError{Status: 503, Code: "RuntimeManagerUnavailable", Detail: "Update this node to the Wings build with runtime image management, then retry."}
 		}
 	} else {
 		response, err = a.steamClientAdminRequest(ctx, id, r.Method, action)
@@ -141,7 +141,7 @@ func (a *App) adminRuntimeManagement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet && !validRuntimeStatus(kind, data) {
-		fail(w, APIError{502, "InvalidRuntimeStatus", "The node returned an incompatible runtime status. Update the node and refresh before making changes."})
+		fail(w, APIError{Status: 502, Code: "InvalidRuntimeStatus", Detail: "The node returned an incompatible runtime status. Update the node and refresh before making changes."})
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -241,7 +241,7 @@ func (a *App) steamClientAdminRequest(ctx context.Context, nodeID int64, method 
 	client := &http.Client{Transport: transport, Timeout: 25 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, APIError{503, "RuntimeConnectorUnavailable", "SteamCMD management needs a connected Linux amd64 node with runtime maintenance support. Update or reconnect the node and retry."}
+		return nil, APIError{Status: 503, Code: "RuntimeConnectorUnavailable", Detail: "SteamCMD management needs a connected Linux amd64 node with runtime maintenance support. Update or reconnect the node and retry."}
 	}
 	return res, nil
 }
@@ -251,7 +251,7 @@ func readRuntimeResponse(res *http.Response) (M, error) {
 	raw, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
 	var result M
 	if err != nil || len(raw) > limit || json.Unmarshal(raw, &result) != nil || result == nil {
-		return nil, APIError{502, "InvalidRuntimeResponse", "The node returned an invalid runtime status. Refresh before retrying an action."}
+		return nil, APIError{Status: 502, Code: "InvalidRuntimeResponse", Detail: "The node returned an invalid runtime status. Refresh before retrying an action."}
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		status := 502
@@ -259,7 +259,7 @@ func readRuntimeResponse(res *http.Response) (M, error) {
 			status = res.StatusCode
 		}
 		// Do not reflect untrusted node output, paths or credentials into errors.
-		return nil, APIError{status, "RuntimeActionRejected", "The node could not accept this runtime request. Refresh its status; an operation may already be running or the node may need an update."}
+		return nil, APIError{Status: status, Code: "RuntimeActionRejected", Detail: "The node could not accept this runtime request. Refresh its status; an operation may already be running or the node may need an update."}
 	}
 	return result, nil
 }

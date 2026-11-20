@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -36,8 +37,8 @@ func TestSRB2SettingsAPI(t *testing.T) {
 	}()
 
 	for _, tc := range []struct{ recipe, file, data, key string }{
-		{srb2SettingsRecipe, srb2SettingsPath, "\ufeff// operator\r\nfriendlyfire \"Off\" // retained\r\nunknown \"opaque\"\r\npassword \"private-fixture-secret\"\r\nmaxplayers 4\r\n", "friendlyfire"},
-		{srb2SettingsRecipe, srb2SettingsPath, "\ufeff// stock config\r\nunknown \"opaque\"\r\npassword \"private-fixture-secret\"\r\nmaxplayers 4\r\n", "friendlyfire"},
+		{gamesettings.Srb2SettingsRecipe, gamesettings.Srb2SettingsPath, "\ufeff// operator\r\nfriendlyfire \"Off\" // retained\r\nunknown \"opaque\"\r\npassword \"private-fixture-secret\"\r\nmaxplayers 4\r\n", "friendlyfire"},
+		{gamesettings.Srb2SettingsRecipe, gamesettings.Srb2SettingsPath, "\ufeff// stock config\r\nunknown \"opaque\"\r\npassword \"private-fixture-secret\"\r\nmaxplayers 4\r\n", "friendlyfire"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			a, mux, admin, server, f := quickSetupMinecraftFixture(t)
@@ -50,7 +51,7 @@ func TestSRB2SettingsAPI(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -86,7 +87,7 @@ func TestSRB2SettingsAPI(t *testing.T) {
 			}
 			f.Files[tc.file] = []byte(tc.data)
 			wrapper := "/tf/cfg/voltra-server.cfg"
-			if tc.recipe == gmodSettingsRecipe {
+			if tc.recipe == gamesettings.GmodSettingsRecipe {
 				wrapper = "/garrysmod/cfg/voltra-server.cfg"
 			}
 			f.Files[wrapper] = []byte("exec server.cfg\nexec voltra-managed.cfg\n")
@@ -312,51 +313,51 @@ func TestSRB2SettingsAPI(t *testing.T) {
 
 func TestSRB2SettingsGrammar(t *testing.T) {
 	for _, raw := range []string{"", "// stock", "\ufeff// stock\r\nmaxplayers 4\r\n"} {
-		p, err := parseSRB2Settings([]byte(raw))
+		p, err := gamesettings.ParseSRB2Settings([]byte(raw))
 		if err != nil {
 			t.Fatal(err)
 		}
 		found := false
-		for _, field := range p.fields {
-			if field.key == "friendlyfire" && field.kind == "boolean" && field.value == "Off" {
+		for _, field := range p.Fields {
+			if field.Key == "friendlyfire" && field.Kind == "boolean" && field.Value == "Off" {
 				found = true
 			}
 		}
 		if !found {
 			t.Fatal("stock native default not exposed")
 		}
-		unchanged, err := p.patch(nil)
+		unchanged, err := p.Patch(nil)
 		if err != nil || string(unchanged) != raw {
 			t.Fatal("reading native default changed bytes")
 		}
-		updated, err := p.patch(map[string]string{"friendlyfire": "On"})
+		updated, err := p.Patch(map[string]string{"friendlyfire": "On"})
 		if err != nil || !strings.HasPrefix(string(updated), raw) || !strings.Contains(string(updated), "friendlyfire \"On\"") {
 			t.Fatal("explicit stock setting insertion failed")
 		}
 	}
 	for _, value := range []string{"0", "1", "On", "Off"} {
 		raw := []byte("\ufeff// retained\r\nfriendlyfire \"" + value + "\" // tail\r\nunknown opaque\r\npassword \"secret\"\r\n")
-		p, e := parseSRB2Settings(raw)
+		p, e := gamesettings.ParseSRB2Settings(raw)
 		if e != nil {
 			t.Fatal(e)
 		}
-		b, e := p.patch(map[string]string{"friendlyfire": "On"})
+		b, e := p.Patch(map[string]string{"friendlyfire": "On"})
 		if e != nil {
 			t.Fatal(e)
 		}
 		if string(b) != strings.Replace(string(raw), `friendlyfire "`+value+`"`, `friendlyfire "On"`, 1) {
 			t.Fatal("span preservation")
 		}
-		if _, e = p.patch(map[string]string{"password": "x"}); e == nil {
+		if _, e = p.Patch(map[string]string{"password": "x"}); e == nil {
 			t.Fatal("managed password accepted")
 		}
 	}
 	for _, raw := range []string{"friendlyfire On\nfriendlyfire Off\n", "friendlyfire On; quit\n", "friendlyfire On\nunknown \"unterminated\n", "friendlyfire=On\n", "unknown \"unterminated\n", "unknown one; quit\n"} {
-		p, e := parseSRB2Settings([]byte(raw))
+		p, e := gamesettings.ParseSRB2Settings([]byte(raw))
 		if e != nil {
 			continue
 		}
-		if _, e = p.patch(map[string]string{"friendlyfire": "Off"}); e == nil {
+		if _, e = p.Patch(map[string]string{"friendlyfire": "Off"}); e == nil {
 			t.Fatal("ambiguous syntax writable")
 		}
 	}

@@ -8,7 +8,7 @@ import path from 'node:path';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const readJSON=relative=>JSON.parse(readFileSync(path.join(root,relative),'utf8'));
 const catalog=readJSON('internal/panel/game_library/upstream/catalog.json');
-const manifest=readJSON('web/src/client/gameArtwork.json');
+const manifest=readJSON('web/src/features/game-library/gameArtwork.json');
 const ledger=readJSON('web/public/game-artwork/sources.json');
 const digest=data=>createHash('sha256').update(data).digest('hex');
 const publicRoot=path.join(root,'web/public');

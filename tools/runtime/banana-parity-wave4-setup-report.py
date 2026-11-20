@@ -15,7 +15,7 @@ fragment={recipe:{'setup_validation':[proposal['validation']]}}
 events=[json.loads(line) for line in (out/'banana-wave4-setup-go-tests.log').read_text(encoding='utf-8-sig').splitlines() if line.strip()]
 passes=sum(e.get('Action')=='pass' and 'Test' in e for e in events)
 assert not any(e.get('Action') in ('fail','skip') for e in events)
-paths=['internal/panel/game_setup_validation.go','internal/panel/game_setup_validation_test.go','web/src/client/templateSetupRules.ts','web/tests/templateSetupRules.test.mjs','tools/runtime/banana-parity-wave4-setup-stage.py','tools/runtime/banana-parity-wave4-setup-vectors.py','tools/runtime/banana-parity-wave4-setup-frontend-test.mjs','tools/runtime/banana-parity-wave4-setup-report.py']
+paths=['internal/panel/game_setup_validation.go','internal/panel/game_setup_validation_test.go','web/src/features/game-library/templateSetupRules.ts','web/tests/templateSetupRules.test.mjs','tools/runtime/banana-parity-wave4-setup-stage.py','tools/runtime/banana-parity-wave4-setup-vectors.py','tools/runtime/banana-parity-wave4-setup-frontend-test.mjs','tools/runtime/banana-parity-wave4-setup-report.py']
 paths += ['artifacts/game-parity-20261029/'+p.name for p in out.glob('banana-wave4-setup-*.pending')]
 paths += ['artifacts/game-parity-20261029/'+p for p in ['banana-wave4-setup-overlay.json','banana-wave4-setup-ipv4-vectors.json','banana-wave4-setup-metadata.json']]
 report={

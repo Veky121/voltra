@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"voltra/internal/gamesettings"
 )
 
 // Imported controls are translated into the existing managed Steam lifecycle.
@@ -135,7 +136,7 @@ func steamCatalogParse(game string, input M, players int64) (steamCatalogConfigu
 				}
 			}
 		}
-		if !quickSingleLine(raw) || len(raw) > 4096 {
+		if !gamesettings.QuickSingleLine(raw) || len(raw) > 4096 {
 			return out, bad(field.Label + " must be a single bounded value.")
 		}
 		if field.Required && raw == "" {
@@ -236,7 +237,7 @@ func steamCatalogPatchINI(content []byte, changes map[string]map[string]string) 
 	for section, values := range changes {
 		remaining[section] = map[string]string{}
 		for key, value := range values {
-			if !quickSingleLine(section+key+value) || strings.ContainsAny(key, "=[]") {
+			if !gamesettings.QuickSingleLine(section+key+value) || strings.ContainsAny(key, "=[]") {
 				return nil, bad("Invalid INI setting.")
 			}
 			remaining[section][key] = value
@@ -334,7 +335,7 @@ func steamCatalogSevenDaysConsole(port int64, password string, artifacts ...stea
 	if err := steamCatalogConsolePassword(password); err != nil {
 		return nil, nil, err
 	}
-	if port < 1024 || port > 65535 || !quickSingleLine(password) || len(password) > 1024 {
+	if port < 1024 || port > 65535 || !gamesettings.QuickSingleLine(password) || len(password) > 1024 {
 		return nil, nil, bad("Invalid private console configuration.")
 	}
 	launcher := strings.ReplaceAll(sevenDaysLauncher, "8081", strconv.FormatInt(port, 10))

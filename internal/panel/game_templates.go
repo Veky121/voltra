@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+	"voltra/internal/gamesettings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -77,7 +78,7 @@ func validateTemplateAgreements(entry gameTemplate) error {
 			(agreement.EffectiveDate == "" || validDate(agreement.EffectiveDate)) &&
 			(agreement.ReviewedDate == "" || validDate(agreement.ReviewedDate))
 		if !validKey || len(agreement.Environment) > 100 || seen[agreement.Environment] || strings.TrimSpace(agreement.Title) == "" || len(agreement.Title) > 512 || !utf8.ValidString(agreement.Title) || strings.TrimSpace(agreement.Text) == "" || len(agreement.Text) > 1024*1024 || !utf8.ValidString(agreement.Text) || strings.ContainsRune(agreement.Text, 0) || !validDates || agreement.AcceptValue != hex.EncodeToString(sum[:]) {
-			return APIError{409, "GameAgreementMetadataInvalid", "This template's reviewed publisher agreement needs a compatibility review."}
+			return APIError{Status: 409, Code: "GameAgreementMetadataInvalid", Detail: "This template's reviewed publisher agreement needs a compatibility review."}
 		}
 		seen[agreement.Environment] = true
 		matches := 0
@@ -86,12 +87,12 @@ func validateTemplateAgreements(entry gameTemplate) error {
 			if str(v["env_variable"]) == agreement.Environment {
 				matches++
 				if v["default_value"] != "0" || str(v["rules"]) != "required|string|in:0,"+agreement.AcceptValue {
-					return APIError{409, "GameAgreementMetadataInvalid", "This template's agreement control needs a compatibility review."}
+					return APIError{Status: 409, Code: "GameAgreementMetadataInvalid", Detail: "This template's agreement control needs a compatibility review."}
 				}
 			}
 		}
 		if matches != 1 {
-			return APIError{409, "GameAgreementMetadataInvalid", "This template's agreement control needs a compatibility review."}
+			return APIError{Status: 409, Code: "GameAgreementMetadataInvalid", Detail: "This template's agreement control needs a compatibility review."}
 		}
 	}
 	return nil
@@ -102,7 +103,7 @@ func requireTemplateAgreements(entry gameTemplate, supplied any) error {
 	case "minecraft/java/magma/egg-magma.json", "minecraft/java/mohist/egg-mohist.json", "minecraft/java/spongeforge/egg-sponge-forge.json":
 		provided := asMap(supplied)
 		if value, ok := provided["EULA_ACCEPTED"].(string); !ok || value != "true" {
-			return APIError{422, "MinecraftEULARequired", "Explicitly accept the Minecraft EULA before creating this imported server."}
+			return APIError{Status: 422, Code: "MinecraftEULARequired", Detail: "Explicitly accept the Minecraft EULA before creating this imported server."}
 		}
 	}
 	if err := validateTemplateAgreements(entry); err != nil {
@@ -111,54 +112,54 @@ func requireTemplateAgreements(entry gameTemplate, supplied any) error {
 	provided, _ := supplied.(map[string]any)
 	for _, agreement := range entry.Agreements {
 		if value, ok := provided[agreement.Environment].(string); !ok || value != agreement.AcceptValue {
-			return APIError{422, "PublisherAgreementRequired", "Explicitly accept the current publisher agreement: " + agreement.Title + "."}
+			return APIError{Status: 422, Code: "PublisherAgreementRequired", Detail: "Explicitly accept the current publisher agreement: " + agreement.Title + "."}
 		}
 	}
 	return nil
 }
 
 type gameTemplateOverride struct {
-	SettingsDocuments        settingsDocumentPaths     `json:"settings_documents,omitempty"`
-	SetupUnavailableReason   string                    `json:"setup_unavailable_reason,omitempty"`
-	Agreements               []templateAgreement       `json:"agreements,omitempty"`
-	SetupValidation          []templateSetupValidation `json:"setup_validation,omitempty"`
-	UpstreamSHA256           string                    `json:"upstream_sha256"`
-	Revision                 string                    `json:"revision"`
-	Defaults                 M                         `json:"defaults"`
-	Egg                      M                         `json:"egg"`
-	Verification             string                    `json:"verification,omitempty"`
-	Detail                   string                    `json:"detail,omitempty"`
-	SetupSteps               []string                  `json:"setup_steps,omitempty"`
-	Platforms                []string                  `json:"platforms,omitempty"`
-	RequiredPorts            int                       `json:"required_ports,omitempty"`
-	ConsecutivePorts         bool                      `json:"consecutive_ports,omitempty"`
-	ConsecutivePortsCount    int                       `json:"consecutive_ports_count,omitempty"`
-	ConsecutivePrimaryOffset int                       `json:"consecutive_primary_offset,omitempty"`
-	PrimaryPortEnv           string                    `json:"primary_port_env,omitempty"`
-	PortRules                []templatePortRule        `json:"port_rules,omitempty"`
+	SettingsDocuments        gamesettings.DocumentPaths `json:"settings_documents,omitempty"`
+	SetupUnavailableReason   string                     `json:"setup_unavailable_reason,omitempty"`
+	Agreements               []templateAgreement        `json:"agreements,omitempty"`
+	SetupValidation          []templateSetupValidation  `json:"setup_validation,omitempty"`
+	UpstreamSHA256           string                     `json:"upstream_sha256"`
+	Revision                 string                     `json:"revision"`
+	Defaults                 M                          `json:"defaults"`
+	Egg                      M                          `json:"egg"`
+	Verification             string                     `json:"verification,omitempty"`
+	Detail                   string                     `json:"detail,omitempty"`
+	SetupSteps               []string                   `json:"setup_steps,omitempty"`
+	Platforms                []string                   `json:"platforms,omitempty"`
+	RequiredPorts            int                        `json:"required_ports,omitempty"`
+	ConsecutivePorts         bool                       `json:"consecutive_ports,omitempty"`
+	ConsecutivePortsCount    int                        `json:"consecutive_ports_count,omitempty"`
+	ConsecutivePrimaryOffset int                        `json:"consecutive_primary_offset,omitempty"`
+	PrimaryPortEnv           string                     `json:"primary_port_env,omitempty"`
+	PortRules                []templatePortRule         `json:"port_rules,omitempty"`
 }
 
 type gameTemplate struct {
-	SettingsDocuments        settingsDocumentPaths     `json:"settings_documents,omitempty"`
-	SetupUnavailableReason   string                    `json:"setup_unavailable_reason,omitempty"`
-	Agreements               []templateAgreement       `json:"agreements,omitempty"`
-	SetupValidation          []templateSetupValidation `json:"setup_validation,omitempty"`
-	Path                     string                    `json:"path"`
-	SHA256                   string                    `json:"sha256"`
-	Egg                      M                         `json:"egg"`
-	ID                       string                    `json:"id"`
-	Profile                  string                    `json:"profile,omitempty"`
-	Defaults                 M                         `json:"defaults,omitempty"`
-	Verification             string                    `json:"verification,omitempty"`
-	Detail                   string                    `json:"detail,omitempty"`
-	SetupSteps               []string                  `json:"setup_steps,omitempty"`
-	Platforms                []string                  `json:"platforms,omitempty"`
-	RequiredPorts            int                       `json:"required_ports,omitempty"`
-	ConsecutivePorts         bool                      `json:"consecutive_ports,omitempty"`
-	ConsecutivePortsCount    int                       `json:"consecutive_ports_count,omitempty"`
-	ConsecutivePrimaryOffset int                       `json:"consecutive_primary_offset,omitempty"`
-	PrimaryPortEnv           string                    `json:"primary_port_env,omitempty"`
-	PortRules                []templatePortRule        `json:"port_rules,omitempty"`
+	SettingsDocuments        gamesettings.DocumentPaths `json:"settings_documents,omitempty"`
+	SetupUnavailableReason   string                     `json:"setup_unavailable_reason,omitempty"`
+	Agreements               []templateAgreement        `json:"agreements,omitempty"`
+	SetupValidation          []templateSetupValidation  `json:"setup_validation,omitempty"`
+	Path                     string                     `json:"path"`
+	SHA256                   string                     `json:"sha256"`
+	Egg                      M                          `json:"egg"`
+	ID                       string                     `json:"id"`
+	Profile                  string                     `json:"profile,omitempty"`
+	Defaults                 M                          `json:"defaults,omitempty"`
+	Verification             string                     `json:"verification,omitempty"`
+	Detail                   string                     `json:"detail,omitempty"`
+	SetupSteps               []string                   `json:"setup_steps,omitempty"`
+	Platforms                []string                   `json:"platforms,omitempty"`
+	RequiredPorts            int                        `json:"required_ports,omitempty"`
+	ConsecutivePorts         bool                       `json:"consecutive_ports,omitempty"`
+	ConsecutivePortsCount    int                        `json:"consecutive_ports_count,omitempty"`
+	ConsecutivePrimaryOffset int                        `json:"consecutive_primary_offset,omitempty"`
+	PrimaryPortEnv           string                     `json:"primary_port_env,omitempty"`
+	PortRules                []templatePortRule         `json:"port_rules,omitempty"`
 }
 type templateCatalog struct {
 	Repository string         `json:"repository"`
@@ -532,7 +533,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if reason := gameTemplateSetupUnavailable(entry); reason != "" {
-		fail(w, APIError{409, "GameSetupUnavailable", reason})
+		fail(w, APIError{Status: 409, Code: "GameSetupUnavailable", Detail: reason})
 		return
 	}
 	if err := validateTemplateAgreements(entry); err != nil {
@@ -576,7 +577,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if privateContent && privateTemplateApp(entry) == 0 {
-		fail(w, APIError{409, "PrivateSteamProfileNotReady", "Private Steam installation for this recipe is pending reviewed worker and publication policy support."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamProfileNotReady", Detail: "Private Steam installation for this recipe is pending reviewed worker and publication policy support."})
 		return
 	}
 	importEntry := entry
@@ -591,7 +592,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	name, ok := input["name"].(string)
-	if !ok || strings.TrimSpace(name) == "" || len([]rune(name)) > 100 || !quickSingleLine(name) {
+	if !ok || strings.TrimSpace(name) == "" || len([]rune(name)) > 100 || !gamesettings.QuickSingleLine(name) {
 		fail(w, bad("Enter a server name of at most 100 characters."))
 		return
 	}
@@ -710,7 +711,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 	existing, err := a.one(ctx, "SELECT * FROM servers WHERE external_id LIKE $1", prefix+"%")
 	if err == nil {
 		if str(existing["external_id"]) != externalID {
-			fail(w, APIError{409, "InstallationRequestConflict", "This request was already used for different settings."})
+			fail(w, APIError{Status: 409, Code: "InstallationRequestConflict", Detail: "This request was already used for different settings."})
 			return
 		}
 		writeJSON(w, 200, item("game_installation", M{"identifier": existing["uuid_short"], "name": existing["name"], "status": existing["status"], "ports": a.gameInstallPortResponse(ctx, existing, entry)}))
@@ -742,7 +743,7 @@ func (a *App) gameTemplateInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if privateContent && !a.privateReady(ctx, nodeID, privateTemplateApp(entry)) {
-		fail(w, APIError{409, "PrivateSteamNodeNotReady", "Private Steam installation is not enabled on this node."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamNodeNotReady", Detail: "Private Steam installation is not enabled on this node."})
 		return
 	}
 	if err = steamSessionLock(ctx, conn, fmt.Sprintf("voltra:steam-node-provision:%d", nodeID)); err != nil {

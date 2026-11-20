@@ -1,6 +1,13 @@
 import type {IndexHtmlTransformContext, Plugin} from 'vite';
 
-type Chunk = {type: 'chunk'; fileName: string; isEntry: boolean; facadeModuleId: string | null; imports: string[]; viteMetadata?: {importedCss: Set<string>}};
+type Chunk = {
+  type: 'chunk';
+  fileName: string;
+  isEntry: boolean;
+  facadeModuleId: string | null;
+  imports: string[];
+  viteMetadata?: {importedCss: Set<string>};
+};
 type Bundle = NonNullable<IndexHtmlTransformContext['bundle']>;
 
 const isChunk = (output: Bundle[string]): output is Bundle[string] & Chunk => output.type === 'chunk';
@@ -21,14 +28,17 @@ function chunks(bundle: Bundle, start: string[]): Chunk[] {
 /** The modules and styles the named lazy routes need that the entry does not already load. */
 export function firstPageFiles(bundle: Bundle, routes: string[], base = '/'): string[] {
   const all = Object.values(bundle).filter(isChunk);
-  const loaded = chunks(bundle, all.filter(chunk => chunk.isEntry).map(chunk => chunk.fileName));
-  const known = new Set(loaded.flatMap(chunk => [chunk.fileName, ...chunk.viteMetadata?.importedCss ?? []]));
+  const loaded = chunks(
+    bundle,
+    all.filter(chunk => chunk.isEntry).map(chunk => chunk.fileName)
+  );
+  const known = new Set(loaded.flatMap(chunk => [chunk.fileName, ...(chunk.viteMetadata?.importedCss ?? [])]));
   const files: string[] = [];
   for (const route of routes) {
     const facade = all.find(chunk => chunk.facadeModuleId?.replaceAll('\\', '/').endsWith(route));
     if (!facade) continue;
     for (const chunk of chunks(bundle, [facade.fileName])) {
-      for (const file of [chunk.fileName, ...chunk.viteMetadata?.importedCss ?? []]) {
+      for (const file of [chunk.fileName, ...(chunk.viteMetadata?.importedCss ?? [])]) {
         if (known.has(file)) continue;
         known.add(file);
         files.push(base + file);
@@ -58,7 +68,9 @@ export function bootHints({desktop, routes}: {desktop: boolean; routes: string[]
         const files = context.bundle ? firstPageFiles(context.bundle, routes, base) : [];
         return {
           html: desktop ? html.replace('<html', '<html data-voltra-desktop') : html,
-          tags: files.length ? [{tag: 'meta', attrs: {name: 'voltra-first-page', content: files.join(' ')}, injectTo: 'head'}] : [],
+          tags: files.length
+            ? [{tag: 'meta', attrs: {name: 'voltra-first-page', content: files.join(' ')}, injectTo: 'head'}]
+            : [],
         };
       },
     },

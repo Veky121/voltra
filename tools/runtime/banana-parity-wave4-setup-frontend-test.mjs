@@ -7,7 +7,7 @@ import ts from '../../web/node_modules/typescript/lib/typescript.js';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const proposal=resolve(root,'artifacts/game-parity-20261029/banana-wave4-setup-templateSetupValidation.ts.pending');
 let code=readFileSync(proposal,'utf8');
-for(const [specifier,path] of [['../resourceUnits.ts','web/src/resourceUnits.ts'],['./gameTemplateModel.ts','web/src/client/gameTemplateModel.ts'],['./templateSetupRules.ts','web/src/client/templateSetupRules.ts']])code=code.replaceAll(specifier,pathToFileURL(resolve(root,path)).href);
+for(const [specifier,path] of [['../resourceUnits.ts','web/src/resourceUnits.ts'],['./gameTemplateModel.ts','web/src/features/game-library/gameTemplateModel.ts'],['./templateSetupRules.ts','web/src/features/game-library/templateSetupRules.ts']])code=code.replaceAll(specifier,pathToFileURL(resolve(root,path)).href);
 const compiled=ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,verbatimModuleSyntax:true}}).outputText;
 const {templateSetupProblems}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 const rule={environment:'PUBLIC_IP',type:'public_ipv4',required:true,message:'Enter the global unicast IPv4 address advertised by this host to Astroneer clients.'};
@@ -24,8 +24,8 @@ test('full frontend TypeScript check with pending callsites, without changing li
   const config=ts.readConfigFile(configPath,ts.sys.readFile);
   const parsed=ts.parseJsonConfigFileContent(config.config,ts.sys,resolve(root,'web'));
   const overlay=new Map([
-    [resolve(root,'web/src/client/templateSetupValidation.ts').toLowerCase(),readFileSync(proposal,'utf8')],
-    [resolve(root,'web/src/client/TemplateGames.tsx').toLowerCase(),readFileSync(resolve(root,'artifacts/game-parity-20261029/banana-wave4-setup-TemplateGames.tsx.pending'),'utf8')],
+    [resolve(root,'web/src/features/game-library/templateSetupValidation.ts').toLowerCase(),readFileSync(proposal,'utf8')],
+    [resolve(root,'web/src/features/game-library/TemplateGames.tsx').toLowerCase(),readFileSync(resolve(root,'artifacts/game-parity-20261029/banana-wave4-setup-TemplateGames.tsx.pending'),'utf8')],
   ]);
   const host=ts.createCompilerHost(parsed.options);
   const originalRead=host.readFile.bind(host);host.readFile=path=>overlay.get(resolve(path).toLowerCase())??originalRead(path);

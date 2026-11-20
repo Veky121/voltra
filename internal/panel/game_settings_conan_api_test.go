@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestWave105ConanAPI(t *testing.T) {
 	for _, tc := range []struct{ recipe, file, data, key string }{
-		{conanAuthorityRecipe, conanAuthorityDirectory + "ServerSettings.ini", "; retain\r\n[ServerSettings]\r\nPVPEnabled=True\r\nServerPassword=private-fixture-secret\r\n; unknown retained\r\n", "ServerSettings/PVPEnabled"},
+		{gamesettings.ConanAuthorityRecipe, gamesettings.ConanAuthorityDirectory + "ServerSettings.ini", "; retain\r\n[ServerSettings]\r\nPVPEnabled=True\r\nServerPassword=private-fixture-secret\r\n; unknown retained\r\n", "ServerSettings/PVPEnabled"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			a, mux, admin, server, f := quickSetupMinecraftFixture(t)
@@ -26,7 +27,7 @@ func TestWave105ConanAPI(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -63,7 +64,7 @@ func TestWave105ConanAPI(t *testing.T) {
 			delete(f.Files, "/server.properties")
 			f.Files[tc.file] = []byte(tc.data)
 			wrapper := "/game/csgo/cfg/voltra-server.cfg"
-			if tc.recipe == gmodSettingsRecipe {
+			if tc.recipe == gamesettings.GmodSettingsRecipe {
 				wrapper = "/garrysmod/cfg/voltra-server.cfg"
 			}
 			f.Files[wrapper] = []byte("exec server.cfg\nexec voltra-managed.cfg\nexec voltra-native.cfg\n")
@@ -105,7 +106,7 @@ func TestWave105ConanAPI(t *testing.T) {
 				t.Fatalf("existing-only fields: %v", view)
 			}
 			for _, leaf := range []string{"Engine.ini", "Game.ini"} {
-				p := conanAuthorityDirectory + leaf
+				p := gamesettings.ConanAuthorityDirectory + leaf
 				original := "; keep\r\n[Custom]\r\nEnabled=True\r\n"
 				f.Files[p] = []byte(original)
 				v := asMap(infraExpect(t, mux, admin, "GET", endpoint+"?file="+p, nil, 200)["attributes"])

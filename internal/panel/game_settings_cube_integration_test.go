@@ -5,12 +5,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestCubeSettingsAPI(t *testing.T) {
 	for _, test := range []struct{ recipe, file, original, key, value, old, new string }{
-		{"cubeengine/assaultcube/egg-assault-cube.json", assaultCubeSettingsPath, "// operator\r\n-Iconfig/retained\r\n-l1\r\n-kA45\r\n-kB20\r\n", "afk-limit", "60", "-kA45", "-kA60"},
-		{"cubeengine/cube2/egg-cube2--sauerbraten.json", sauerCubeSettingsPath, "// operator\r\npublicserver 0\r\nrestrictpausegame 1\r\nrestrictgamespeed 1\r\n", "public-server-mode", "1", "publicserver 0", "publicserver 1"},
+		{"cubeengine/assaultcube/egg-assault-cube.json", gamesettings.AssaultCubeSettingsPath, "// operator\r\n-Iconfig/retained\r\n-l1\r\n-kA45\r\n-kB20\r\n", "afk-limit", "60", "-kA45", "-kA60"},
+		{"cubeengine/cube2/egg-cube2--sauerbraten.json", gamesettings.SauerCubeSettingsPath, "// operator\r\npublicserver 0\r\nrestrictpausegame 1\r\nrestrictgamespeed 1\r\n", "public-server-mode", "1", "publicserver 0", "publicserver 1"},
 	} {
 		t.Run(test.recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)

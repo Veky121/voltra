@@ -103,7 +103,7 @@ func (a *App) panelArtwork(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if UserID(r) <= 0 {
-		fail(w, APIError{401, "AuthenticationException", "Sign in to continue."})
+		fail(w, APIError{Status: 401, Code: "AuthenticationException", Detail: "Sign in to continue."})
 		return
 	}
 	a.artworkLibraryOnce.Do(func() { a.artworkLibrary = loadPanelArtwork(a.Config.ArtworkDirectory) })

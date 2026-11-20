@@ -1,43 +1,10 @@
-/* Soft capsule. Preserve the shared navigation, card structure and responsive rail. */
+/* Soft capsule: the user theme's shell background, buttons, links and focus ring. */
 :root[data-voltra-theme]{color:var(--text)}
 [data-voltra-theme] .app-shell{background:var(--theme-background)}
-[data-voltra-theme] .app-sidebar{background:var(--theme-background);border-color:#ffffff12;border-radius:18px;gap:22px;padding:19px 12px 12px}
-[data-voltra-theme] .app-sidebar .sidebar-scroll{gap:22px}
-[data-voltra-theme] .app-sidebar .sidebar-section-heading .eyebrow,[data-voltra-theme] .app-sidebar .shortcut-heading{color:#a6afbf;font-size:calc(10px * var(--ui-font-scale,1));font-weight:500;letter-spacing:.1em;padding:0 9px;justify-content:flex-start;min-height:18px}
-[data-voltra-theme] .app-sidebar .sidebar-section-heading{margin-bottom:9px}
-[data-voltra-theme] .app-sidebar .sidebar-section-heading .eyebrow::before,[data-voltra-theme] .app-sidebar .sidebar-section-heading .eyebrow::after,[data-voltra-theme] .app-sidebar .shortcut-heading::before,[data-voltra-theme] .app-sidebar .shortcut-heading::after{display:none}
-[data-voltra-theme] .app-sidebar .sidebar-nav a,[data-voltra-theme] .app-sidebar .sidebar-nav button{min-height:39px;border:1px solid transparent;border-radius:10px;padding:8px 9px;gap:9px;color:#d1d7e2;background:transparent;box-shadow:none}
-[data-voltra-theme] .app-sidebar .sidebar-nav a:hover,[data-voltra-theme] .app-sidebar .sidebar-nav button:hover{background:#ffffff09;color:#fff}
-[data-voltra-theme] .app-sidebar .sidebar-nav a.active,[data-voltra-theme] .app-sidebar .sidebar-nav button.active{background:var(--theme-button,var(--primary));color:var(--theme-button-ink,var(--accent-ink));border-color:transparent;box-shadow:inset 0 1px #ffffff16,0 3px 10px #00000019}
-[data-voltra-theme] .app-sidebar .sidebar-nav a.active::before,[data-voltra-theme] .app-sidebar .sidebar-nav a.active::after{display:none}
-[data-voltra-theme] .app-shell:not(.is-collapsed) .app-sidebar .sidebar-nav .nav-icon{width:25px;height:25px;border-radius:6px;padding:4px;background:#ffffff04;color:inherit}
-[data-voltra-theme] .app-shell:not(.is-collapsed) .app-sidebar .sidebar-nav .nav-icon svg{width:17px;height:17px}
-[data-voltra-theme] .app-sidebar .sidebar-nav a.active .nav-icon{color:inherit;background:#ffffff08}
-[data-voltra-theme] .app-sidebar .panel-switcher{background:#0c10172e;border-color:#ffffff0c;border-radius:10px}
-[data-voltra-theme] .app-sidebar .panel-switcher-indicator{background:#ffffff0a;border-color:#ffffff0e;box-shadow:none;border-radius:7px}
-[data-voltra-theme] .app-sidebar .panel-switcher a{color:#c4cbd7}
-[data-voltra-theme] .app-sidebar .panel-switcher a.is-selected{color:#fff}
-[data-voltra-theme] .app-sidebar .sidebar-collapse{background:#ffffff06;border-color:#ffffff0e;color:#d1d7e2}
-[data-voltra-theme] .app-sidebar .sidebar-bottom{border-color:#ffffff0c}
-[data-voltra-theme] .app-sidebar .account-avatar{background:var(--theme-primary);color:var(--theme-primary-ink);border-color:#ffffff0c;border-radius:10px}
-[data-voltra-theme] .app-sidebar .sidebar-account-menu{background:#1c202b;border-color:#ffffff15;border-radius:10px}
-[data-voltra-theme] .app-sidebar .shortcut-empty{color:#a6afbf}
-[data-voltra-theme] .app-sidebar .sidebar-count{background:#ffffff12;color:inherit}
-[data-voltra-theme] .app-sidebar .shortcut-artwork{width:25px;height:25px;border-radius:7px}
 [data-voltra-theme] .account-tabs a.active{color:var(--accent);border-color:var(--accent)}
 [data-voltra-theme] .button:not(.secondary):not(.danger){background:var(--theme-button,var(--primary));border-color:transparent;color:var(--theme-button-ink,var(--accent-ink))}
 [data-voltra-theme] .button:not(.secondary):not(.danger):hover{background:var(--theme-button,var(--primary));filter:brightness(1.08)}
 [data-voltra-theme] a:not([class]){color:var(--accent)}
 [data-voltra-theme] :is(button,a,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-@media(max-width:760px){[data-voltra-theme] .app-sidebar{border-radius:0 18px 18px 0}}
 
 @media(prefers-reduced-motion:reduce){.appearance-settings *{transition:none!important}}
-
-/* The two panel identities follow the account's two accent choices. */
-[data-voltra-theme] .app-sidebar .panel-switcher[data-panel=admin]{--panel-color:var(--panel-admin-color);--panel-ink:var(--panel-admin-ink)}
-[data-voltra-theme] .app-sidebar .panel-switcher[data-panel=servers]{--panel-color:var(--panel-servers-color);--panel-ink:var(--panel-servers-ink)}
-[data-voltra-theme] .app-sidebar .panel-switcher-indicator{background:var(--panel-color);border-color:var(--panel-color)}
-[data-voltra-theme] .app-sidebar .panel-switcher a.is-selected{color:var(--panel-ink)}
-[data-voltra-theme] .app-sidebar .panel-switcher a[data-panel-option=admin]:not(.is-selected) .nav-icon{color:color-mix(in srgb,var(--panel-admin-color),white 40%)}
-[data-voltra-theme] .app-sidebar .panel-switcher a[data-panel-option=servers]:not(.is-selected) .nav-icon{color:color-mix(in srgb,var(--panel-servers-color),white 40%)}
-[data-voltra-theme] .is-collapsed .app-sidebar .panel-switcher a.is-selected{background:var(--panel-color);border-color:var(--panel-color)}

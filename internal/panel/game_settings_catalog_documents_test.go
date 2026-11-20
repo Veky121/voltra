@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 // Exercise the real catalog, recipe identity, discovery and HTTP redaction
@@ -14,7 +15,7 @@ func TestCatalogTypedSettingsAPI(t *testing.T) {
 		name, recipe, file, content, key, kind string
 		secret                                 bool
 	}{
-		{"css", "counter_strike/counter_strike_source/egg-counter--strike--source.json", cssSettingsPath, "mp_autoteambalance 2\nmp_friendlyfire 0\n", "mp_autoteambalance", "number", false},
+		{"css", "counter_strike/counter_strike_source/egg-counter--strike--source.json", gamesettings.CssSettingsPath, "mp_autoteambalance 2\nmp_friendlyfire 0\n", "mp_autoteambalance", "number", false},
 		{"tshock", "terraria/tshock/egg-tshock.json", "/tshock/config.json", `{"Settings":{"MySqlConnectionString":"fixture-private-connection","EnableTokenEndpointAuthentication":false}}`, "/Settings/EnableTokenEndpointAuthentication", "boolean", false},
 		{"openttd", "openttd/egg-open-t-t-d-server.json", "/secrets.cfg", "[network]\nserver_invite_code = fixture-private-invite\nserver_password = fixture-private-password\n", "network/server_invite_code", "readonly", true},
 	} {

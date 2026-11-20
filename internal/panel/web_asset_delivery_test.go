@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestServeWebPrecompressedAssets(t *testing.T) {
@@ -123,5 +124,51 @@ func TestServeWebCachesShippedMediaButNotTheShell(t *testing.T) {
 		if got := w.Header().Get("Cache-Control"); (w.Code != 200 && w.Code != 301) || got != want {
 			t.Fatalf("%s: status %d, Cache-Control %q, want %q", path, w.Code, got, want)
 		}
+	}
+}
+
+func TestServeWebPrefersBrotliAssets(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "assets"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	name := filepath.Join(root, "assets", "Client-Ab12cd34.js")
+	// One build writes all three; give them one time, so none looks older than its file.
+	built := time.Now().Add(-time.Minute)
+	for suffix, content := range map[string]string{"": "identity", ".gz": "gzip-bytes", ".br": "brotli-bytes"} {
+		if err := os.WriteFile(name+suffix, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(name+suffix, built, built); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a := &App{Config: Config{WebDir: root}}
+	get := func(accept string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", "/assets/Client-Ab12cd34.js", nil)
+		r.Header.Set("Accept-Encoding", accept)
+		w := httptest.NewRecorder()
+		a.serveWeb(w, r)
+		return w
+	}
+	for accept, want := range map[string]string{
+		"gzip, deflate, br": "br", "br": "br", "*": "br", "gzip": "gzip", "br;q=0, gzip": "gzip", "br;q=0, *": "gzip", "": "", "identity": "",
+	} {
+		w := get(accept)
+		body := map[string]string{"br": "brotli-bytes", "gzip": "gzip-bytes", "": "identity"}[want]
+		if w.Code != 200 || w.Header().Get("Content-Encoding") != want || w.Body.String() != body || w.Header().Get("Vary") != "Accept-Encoding" || !strings.Contains(w.Header().Get("Content-Type"), "javascript") {
+			t.Errorf("%q: %d %q %q %v", accept, w.Code, w.Header().Get("Content-Encoding"), w.Body.String(), w.Header())
+		}
+	}
+	// A .br copy older than its file comes from an earlier build: use gzip.
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(name+".br", old, old); err != nil {
+		t.Fatal(err)
+	}
+	if w := get("br, gzip"); w.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("stale brotli served: %v", w.Header())
+	}
+	if !acceptsEncoding("BR;q=0.5", "br") || acceptsEncoding("gzip", "br") || acceptsEncoding("br;q=0,*", "br") {
+		t.Fatal("acceptsEncoding")
 	}
 }

@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 const digest=b=>crypto.createHash('sha256').update(b).digest('hex');
 const dir=path.resolve('.local/game-parity-20261029/goldsrc-schema-proposal');
 fs.mkdirSync(dir,{recursive:true});
-const shared='internal/panel/game_settings_source.go',before=fs.readFileSync(shared);
+const shared='internal/gamesettings/source.go',before=fs.readFileSync(shared);
 const proposal='.local/game-parity-20261029/runtime/css-native/schema-test/game_settings_source.go';
 const original=before.toString('utf8');
 const sharedIntegrated=original.includes('func parseSourceSettingsWithSchema(');
@@ -17,7 +17,7 @@ fs.writeFileSync(path.join(dir,'game_settings_source.go'),proposed);
 for(const name of ['game_settings_css.go','game_settings_css_test.go','game_settings_goldsrc.go','game_settings_goldsrc_test.go','game_settings_goldsrc_presentation.go','game_settings_goldsrc_presentation_test.go']){
  const pending='internal/panel/'+name+'.pending';fs.copyFileSync(fs.existsSync(pending)?pending:'internal/panel/'+name,path.join(dir,name));
 }
-fs.copyFileSync('internal/panel/game_settings_source_test.go',path.join(dir,'game_settings_source_test.go'));
+fs.copyFileSync('internal/gamesettings/source_test.go',path.join(dir,'game_settings_source_test.go'));
 fs.writeFileSync(path.join(dir,'support.go'),'package panel\nimport "fmt"\ntype gameSetting struct{key,value,kind,on,off string}\ntype gameSettingsParsed struct{fields []gameSetting;patch func(map[string]string)([]byte,error)}\nfunc bad(s string)error{return fmt.Errorf("%s",s)}\n');
 fs.appendFileSync(path.join(dir,'support.go'),'type M=map[string]any\ntype fixtureTemplate struct{Path string;Egg M}\nfunc gameTemplates()struct{Entries []fixtureTemplate}{return struct{Entries []fixtureTemplate}{[]fixtureTemplate{{"counter_strike/counter_strike_1.6/egg-counter-strike1-6--vanilla.json",M{"startup":"fixture"}}}}}\nfunc gameTemplateEggUUID(entry fixtureTemplate)string{return entry.Path}\nfunc nativeSettingsIsRecipe(egg M,recipe string)bool{return egg["uuid"]==recipe}\n');
 fs.writeFileSync(path.join(dir,'go.mod'),'module goldsrc-schema-proposal\n\ngo 1.26\n');

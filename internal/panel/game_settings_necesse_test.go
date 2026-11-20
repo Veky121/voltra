@@ -6,36 +6,37 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestNecesseNativeSchema(t *testing.T) {
 	data := []byte(necesseNativeSchemaFixture)
-	p, e := parseNecesseSettings(data)
+	p, e := gamesettings.ParseNecesseSettings(data)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if len(p.fields) != 12 {
-		t.Fatalf("fields %d", len(p.fields))
+	if len(p.Fields) != 12 {
+		t.Fatalf("fields %d", len(p.Fields))
 	}
-	for _, f := range p.fields {
-		if strings.Contains(f.key, "password") {
+	for _, f := range p.Fields {
+		if strings.Contains(f.Key, "password") {
 			t.Fatal("secret exposed")
 		}
-		m := M{"key": f.key}
-		necesseSettingPresentation(m)
-		if (m["readonly"] == true) == necesseEditable(f.key) {
+		m := M{"key": f.Key}
+		gamesettings.NecesseSettingPresentation(m)
+		if (m["readonly"] == true) == gamesettings.NecesseEditable(f.Key) {
 			t.Fatal("writable")
 		}
 	}
-	copy, e := p.patch(nil)
+	copy, e := p.Patch(nil)
 	if e != nil || !bytes.Equal(copy, data) {
 		t.Fatal("bytes changed")
 	}
-	if _, e = p.patch(map[string]string{"slots": "7"}); e == nil {
+	if _, e = p.Patch(map[string]string{"slots": "7"}); e == nil {
 		t.Fatal("write allowed")
 	}
 	for _, body := range []string{"set slots 7", "SERVER = {\nslots = 7,\nslots = 8,\n}", "SERVER = {\nlogging = yes,\n}", "SERVER = {\nslots = 4.1,\n}", "SERVER = {\nslots = 7,"} {
-		if _, e := parseNecesseSettings([]byte(body)); e == nil {
+		if _, e := gamesettings.ParseNecesseSettings([]byte(body)); e == nil {
 			t.Fatalf("accepted %q", body)
 		}
 	}
@@ -45,7 +46,7 @@ func TestNecesseSettingsAPI(t *testing.T) {
 	a, mux, admin, s, f := quickSetupMinecraftFixture(t)
 	ctx := context.Background()
 	hl2dmFixtureAllocation(t, a, s)
-	egg := batchSettingsRecipeFixture(t, necesseSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.NecesseSettingsRecipe)
 	egg["java_config"] = M{}
 	if _, e := a.update(ctx, "eggs", num(s["egg_id"]), egg); e != nil {
 		t.Fatal(e)
@@ -56,50 +57,50 @@ func TestNecesseSettingsAPI(t *testing.T) {
 	data := []byte(necesseNativeSchemaFixture)
 	f.mu.Lock()
 	delete(f.Files, "/server.properties")
-	f.Files[necesseSettingsPath] = data
+	f.Files[gamesettings.NecesseSettingsPath] = data
 	f.State = "offline"
-	for n, b := range wave46CanonicalHelpers(t, necesseSettingsRecipe) {
+	for n, b := range wave46CanonicalHelpers(t, gamesettings.NecesseSettingsRecipe) {
 		f.Files["/"+strings.TrimPrefix(n, "/")] = b
 	}
 	f.mu.Unlock()
-	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + necesseSettingsPath
+	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + gamesettings.NecesseSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	if len(asSlice(view["fields"])) != 12 {
 		t.Fatal("missing typed native fields")
 	}
 	for _, v := range asSlice(view["fields"]) {
 		field := asMap(v)
-		if boolean(field["readonly"]) == necesseEditable(str(field["key"])) {
+		if boolean(field["readonly"]) == gamesettings.NecesseEditable(str(field["key"])) {
 			t.Fatalf("wrong readonly: %v", field)
 		}
 	}
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"slots": 7}}, 422)
 	f.mu.Lock()
-	if !bytes.Equal(f.Files[necesseSettingsPath], data) {
+	if !bytes.Equal(f.Files[gamesettings.NecesseSettingsPath], data) {
 		t.Fatal("write changed bytes")
 	}
 	f.mu.Unlock()
 	changes := M{"logging": false, "strictServerAuthority": true, "maxClientLatencySeconds": "31", "unloadLevelsCooldown": "32", "droppedItemsLifeMinutes": "-2", "unloadSettlements": true, "maxSettlementsPerPlayer": "-2", "maxSettlersPerSettlement": "-3", "zipSaves": false}
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": changes}, 200)
 	f.mu.Lock()
-	candidate := append([]byte(nil), f.Files[necesseSettingsPath]...)
+	candidate := append([]byte(nil), f.Files[gamesettings.NecesseSettingsPath]...)
 	f.mu.Unlock()
-	parsed, err := parseNecesseSettings(candidate)
+	parsed, err := gamesettings.ParseNecesseSettings(candidate)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range parsed.fields {
-		if v, ok := changes[field.key]; ok {
+	for _, field := range parsed.Fields {
+		if v, ok := changes[field.Key]; ok {
 			want := str(v)
-			if field.kind == "boolean" {
+			if field.Kind == "boolean" {
 				if boolean(v) {
 					want = "true"
 				} else {
 					want = "false"
 				}
 			}
-			if field.value != want {
-				t.Fatalf("wrong persisted %s: %s", field.key, field.value)
+			if field.Value != want {
+				t.Fatalf("wrong persisted %s: %s", field.Key, field.Value)
 			}
 		}
 	}
@@ -136,20 +137,20 @@ const necesseNativeSchemaFixture = "SERVER = {\n\tport = 14159, // [0 - 65535] S
 
 func TestNecesseEditableSpans(t *testing.T) {
 	original := []byte(strings.ReplaceAll(necesseNativeSchemaFixture, "\n", "\r\n"))
-	p, e := parseNecesseSettings(original)
+	p, e := gamesettings.ParseNecesseSettings(original)
 	if e != nil {
 		t.Fatal(e)
 	}
 	updates := map[string]string{"logging": "false", "strictServerAuthority": "true", "maxClientLatencySeconds": "31", "unloadLevelsCooldown": "32", "droppedItemsLifeMinutes": "-2", "unloadSettlements": "true", "maxSettlementsPerPlayer": "-2", "maxSettlersPerSettlement": "-3", "zipSaves": "false"}
-	got, e := p.patch(updates)
+	got, e := p.Patch(updates)
 	if e != nil {
 		t.Fatal(e)
 	}
 	expected := string(original)
 	for k, v := range updates {
-		for _, f := range p.fields {
-			if f.key == k {
-				expected = strings.Replace(expected, k+" = "+f.value, k+" = "+v, 1)
+		for _, f := range p.Fields {
+			if f.Key == k {
+				expected = strings.Replace(expected, k+" = "+f.Value, k+" = "+v, 1)
 			}
 		}
 	}
@@ -162,11 +163,11 @@ func TestNecesseEditableSpans(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		native, e := parseNecesseSettings(input)
+		native, e := gamesettings.ParseNecesseSettings(input)
 		if e != nil {
 			t.Fatal(e)
 		}
-		candidate, e := native.patch(updates)
+		candidate, e := native.Patch(updates)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -175,24 +176,24 @@ func TestNecesseEditableSpans(t *testing.T) {
 		}
 	}
 	for _, u := range []map[string]string{{"password": "x"}, {"unknown": "1"}, {"port": "3"}, {"slots": "3"}, {"pauseWhenEmpty": "false"}, {"logging": "TRUE"}, {"logging": "1"}, {"maxSettlementsPerPlayer": "2147483648"}, {"unloadLevelsCooldown": "1"}, {"maxClientLatencySeconds": "1.0"}} {
-		if _, e := p.patch(u); e == nil {
+		if _, e := p.Patch(u); e == nil {
 			t.Fatalf("accepted %v", u)
 		}
 	}
 	for _, bad := range []string{strings.Replace(necesseNativeSchemaFixture, "logging = true,", "logging = true", 1), strings.Replace(necesseNativeSchemaFixture, "password = ,", "password = {,", 1), "\ufeff" + necesseNativeSchemaFixture, necesseNativeSchemaFixture + "\nOTHER = {}", strings.Replace(necesseNativeSchemaFixture, "logging = true,", "logging = true,\nlogging = false,", 1)} {
-		if _, e := parseNecesseSettings([]byte(bad)); e == nil {
+		if _, e := gamesettings.ParseNecesseSettings([]byte(bad)); e == nil {
 			t.Fatal("accepted ambiguous cfg")
 		}
 	}
-	absent, e := parseNecesseSettings([]byte("SERVER = {\nlogging = true\n}"))
+	absent, e := gamesettings.ParseNecesseSettings([]byte("SERVER = {\nlogging = true\n}"))
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = absent.patch(map[string]string{"zipSaves": "false"}); e == nil {
+	if _, e = absent.Patch(map[string]string{"zipSaves": "false"}); e == nil {
 		t.Fatal("insert allowed")
 	}
 	m := M{"key": "logging", "readonly": true}
-	necesseSettingPresentation(m)
+	gamesettings.NecesseSettingPresentation(m)
 	if !boolean(m["readonly"]) {
 		t.Fatal("permission readonly cleared")
 	}
@@ -201,27 +202,27 @@ func TestNecesseEditableSpans(t *testing.T) {
 func TestNecesseNativeCooldownClampNoOp(t *testing.T) {
 	for _, raw := range []string{"-2147483648", "0", "+0001"} {
 		data := []byte(strings.Replace(necesseNativeSchemaFixture, "unloadLevelsCooldown = 30", "unloadLevelsCooldown = "+raw, 1))
-		parsed, err := parseNecesseSettings(data)
+		parsed, err := gamesettings.ParseNecesseSettings(data)
 		if err != nil {
 			t.Fatal(raw, err)
 		}
 		found := false
-		for _, field := range parsed.fields {
-			if field.key == "unloadLevelsCooldown" {
+		for _, field := range parsed.Fields {
+			if field.Key == "unloadLevelsCooldown" {
 				found = true
-				if field.value != "2" {
-					t.Fatal("wrong effective clamp", field.value)
+				if field.Value != "2" {
+					t.Fatal("wrong effective clamp", field.Value)
 				}
 			}
 		}
 		if !found {
 			t.Fatal("missing field")
 		}
-		result, err := parsed.patch(map[string]string{"unloadLevelsCooldown": "2"})
+		result, err := parsed.Patch(map[string]string{"unloadLevelsCooldown": "2"})
 		if err != nil || !bytes.Equal(result, data) {
 			t.Fatal("semantic no-op changed native bytes", err)
 		}
-		if _, err := parsed.patch(map[string]string{"unloadLevelsCooldown": "1"}); err == nil {
+		if _, err := parsed.Patch(map[string]string{"unloadLevelsCooldown": "1"}); err == nil {
 			t.Fatal("new below-minimum value accepted")
 		}
 	}

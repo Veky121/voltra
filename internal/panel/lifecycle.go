@@ -28,6 +28,9 @@ import (
 // for every file operation or resource poll.
 var daemonTransports sync.Map
 
+// Idle keep-alive connections kept per Wings node.
+const daemonIdleConnsPerHost = 32
+
 type daemonTimeoutContextKey struct{}
 
 // withDaemonTimeout supplies an operation-specific network timeout. Archive
@@ -203,6 +206,11 @@ func (a *App) daemon(ctx context.Context, node M, method, path string, body any)
 			if !ok {
 				candidate := http.DefaultTransport.(*http.Transport).Clone()
 				candidate.DialContext = (&net.Dialer{Timeout: connect, KeepAlive: 30 * time.Second}).DialContext
+				// net/http keeps only 2 idle connections per host by default, so
+				// a page that reads several servers on one node reconnects to
+				// Wings (often with a TLS handshake) for most requests.
+				candidate.MaxIdleConnsPerHost = daemonIdleConnsPerHost
+				candidate.MaxIdleConns = 256
 				transport, _ = daemonTransports.LoadOrStore(connect, candidate)
 			}
 			configured.Transport = transport.(*http.Transport)
@@ -458,6 +466,10 @@ func (a *App) applicationServer(ctx context.Context, s M) (M, error) {
 	if err != nil {
 		return nil, err
 	}
+	return applicationServerAttributes(s, env), nil
+}
+
+func applicationServerAttributes(s, env M) M {
 	// Legacy Foundry rows may still contain a plaintext acquisition URL.
 	// Public application responses must not disclose that capability either.
 	for key, value := range env {
@@ -465,8 +477,7 @@ func (a *App) applicationServer(ctx context.Context, s M) (M, error) {
 			env[key] = integrationPlaceholder
 		}
 	}
-	out := M{"id": s["id"], "java_config": asMap(s["java_config"]), "external_id": s["external_id"], "uuid": s["uuid"], "identifier": s["uuid_short"], "name": s["name"], "description": s["description"], "status": s["status"], "suspended": str(s["status"]) == "suspended", "limits": serverLimits(s), "feature_limits": serverFeatures(s), "user": s["owner_id"], "node": s["node_id"], "allocation": s["allocation_id"], "nest": s["nest_id"], "egg": s["egg_id"], "container": M{"startup_command": s["startup"], "image": s["image"], "installed": map[bool]int{true: 1, false: 0}[serverInstalled(s)], "environment": env, "skip_scripts": s["skip_scripts"]}, "created_at": s["created_at"], "updated_at": s["updated_at"]}
-	return out, nil
+	return M{"id": s["id"], "java_config": asMap(s["java_config"]), "external_id": s["external_id"], "uuid": s["uuid"], "identifier": s["uuid_short"], "name": s["name"], "description": s["description"], "status": s["status"], "suspended": str(s["status"]) == "suspended", "limits": serverLimits(s), "feature_limits": serverFeatures(s), "user": s["owner_id"], "node": s["node_id"], "allocation": s["allocation_id"], "nest": s["nest_id"], "egg": s["egg_id"], "container": M{"startup_command": s["startup"], "image": s["image"], "installed": map[bool]int{true: 1, false: 0}[serverInstalled(s)], "environment": env, "skip_scripts": s["skip_scripts"]}, "created_at": s["created_at"], "updated_at": s["updated_at"]}
 }
 
 func (a *App) lifecycleClientList(w http.ResponseWriter, r *http.Request) {
@@ -538,70 +549,6 @@ func (a *App) lifecycleAdminServer(r *http.Request) (M, error) {
 	id := r.PathValue("server")
 	return a.one(r.Context(), "SELECT * FROM servers WHERE id::text=$1 OR uuid=$1 OR uuid_short=$1 OR identifier=$1", id)
 }
-func (a *App) lifecycleList(w http.ResponseWriter, r *http.Request) {
-	if _, err := a.requireAdmin(r); err != nil {
-		fail(w, err)
-		return
-	}
-	ss, err := a.query(r.Context(), "SELECT * FROM servers ORDER BY id")
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	out := []M{}
-	for _, s := range ss {
-		if f := r.URL.Query().Get("filter[name]"); f != "" && !strings.Contains(strings.ToLower(str(s["name"])), strings.ToLower(f)) {
-			continue
-		}
-		matched := true
-		for _, k := range []string{"id", "uuid", "external_id", "owner_id", "node_id"} {
-			if f := r.URL.Query().Get("filter[" + k + "]"); f != "" && str(s[k]) != f {
-				matched = false
-				break
-			}
-		}
-		if !matched {
-			continue
-		}
-		v, e := a.applicationServer(r.Context(), s)
-		if e != nil {
-			fail(w, e)
-			return
-		}
-		if e = a.applicationServerIncludes(r, s, v); e != nil {
-			fail(w, e)
-			return
-		}
-		out = append(out, v)
-	}
-	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	if per < 1 {
-		per = 50
-	}
-	if per > 100 {
-		per = 100
-	}
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	total := len(out)
-	start := (page - 1) * per
-	if start > total {
-		start = total
-	}
-	end := start + per
-	if end > total {
-		end = total
-	}
-	last := (total + per - 1) / per
-	if last == 0 {
-		last = 1
-	}
-	response := collection("server", out[start:end])
-	response["meta"] = M{"pagination": M{"total": total, "count": end - start, "per_page": per, "current_page": page, "total_pages": last, "links": M{}}}
-	writeJSON(w, 200, response)
-}
 func (a *App) lifecycleGet(w http.ResponseWriter, r *http.Request) {
 	s, e := a.lifecycleAdminServer(r)
 	if e != nil {
@@ -639,85 +586,6 @@ func (a *App) lifecycleExternal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, item("server", v))
-}
-
-func (a *App) applicationServerIncludes(r *http.Request, s, out M) error {
-	relationships := M{}
-	ctx := r.Context()
-	for _, include := range strings.Split(r.URL.Query().Get("include"), ",") {
-		scope := map[string]string{"allocations": "allocations", "user": "users", "subusers": "users", "nest": "nests", "egg": "eggs", "variables": "servers", "location": "locations", "node": "nodes", "databases": "server_databases", "transfer": "servers"}[include]
-		if scope == "" {
-			continue
-		}
-		if key, ok := r.Context().Value(apiKeyContextKey{}).(M); ok && !applicationScopeAllowed(asMap(key["permissions"]), http.MethodGet, "/api/application/"+scope) {
-			relationships[include] = M{"object": "null", "attributes": nil}
-			continue
-		}
-		var row M
-		var rows []M
-		var err error
-		object := include
-		switch include {
-		case "allocations":
-			object = "allocation"
-			rows, err = a.query(ctx, "SELECT * FROM allocations WHERE server_id=$1 ORDER BY id", s["id"])
-		case "user":
-			row, err = a.one(ctx, "SELECT id,uuid,external_id,username,nickname,name_first,name_last,root_admin,language,created_at,updated_at FROM users WHERE id=$1", s["owner_id"])
-		case "subusers":
-			object = "subuser"
-			rows, err = a.query(ctx, "SELECT * FROM subusers WHERE server_id=$1 ORDER BY id", s["id"])
-		case "nest":
-			row, err = a.one(ctx, "SELECT * FROM nests WHERE id=$1", s["nest_id"])
-		case "egg":
-			row, err = a.effectiveEgg(ctx, num(s["egg_id"]))
-		case "variables":
-			object = "server_variable"
-			rows, err = a.query(ctx, "SELECT * FROM server_variables WHERE server_id=$1 ORDER BY id", s["id"])
-		case "location":
-			row, err = a.one(ctx, "SELECT l.* FROM locations l JOIN nodes n ON n.location_id=l.id WHERE n.id=$1", s["node_id"])
-		case "node":
-			row, err = a.one(ctx, "SELECT id,uuid,name,description,location_id,fqdn,scheme,behind_proxy,public,memory,memory_overallocate,disk,disk_overallocate,upload_size,daemon_listen,daemon_sftp,daemon_base,maintenance_mode,created_at,updated_at FROM nodes WHERE id=$1", s["node_id"])
-		case "databases":
-			object = "server_database"
-			rows, err = a.query(ctx, "SELECT id,server_id,database_host_id,database,username,remote,max_connections,created_at,updated_at FROM databases WHERE server_id=$1 ORDER BY id", s["id"])
-		case "transfer":
-			rows, err = a.query(ctx, "SELECT * FROM server_transfers WHERE server_id=$1 AND successful IS NULL ORDER BY id DESC LIMIT 1", s["id"])
-			if len(rows) > 0 {
-				row = rows[0]
-			}
-			rows = nil
-		default:
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if include == "user" && row != nil {
-			row = userAttributes(row)
-		}
-		if include == "allocations" {
-			for i, v := range rows {
-				rows[i] = M{"id": v["id"], "ip": v["ip"], "alias": v["ip_alias"], "port": v["port"], "notes": v["notes"], "assigned": v["server_id"] != nil}
-			}
-		}
-		if include == "egg" && row != nil {
-			row, err = a.eggAttributes(r, row)
-			if err != nil {
-				return err
-			}
-		}
-		if row != nil {
-			relationships[include] = item(object, row)
-		} else if include == "transfer" {
-			relationships[include] = M{"object": "null", "attributes": nil}
-		} else {
-			relationships[include] = collection(object, rows)
-		}
-	}
-	if len(relationships) > 0 {
-		out["relationships"] = relationships
-	}
-	return nil
 }
 
 func flattenServerInput(data M) M {
@@ -2124,17 +1992,8 @@ func (a *App) remoteServers(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	if per < 1 {
-		per = 50
-	}
-	if per > 500 {
-		per = 500
-	}
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
+	paging := parseListPage(r.URL.Query(), 50, 500)
+	per, page := paging.PerPage, paging.Page
 	var total int64
 	e = a.DB.QueryRow(r.Context(), "SELECT COUNT(*) FROM servers WHERE node_id=$1", node["id"]).Scan(&total)
 	if e != nil {

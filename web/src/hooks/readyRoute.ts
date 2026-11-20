@@ -1,4 +1,4 @@
-import {createElement,lazy,useState,type ComponentType} from 'react';
+import {createElement, lazy, useState, type ComponentType} from 'react';
 import {preloadRoute} from './preloadRoute';
 
 /**
@@ -10,14 +10,19 @@ import {preloadRoute} from './preloadRoute';
  * that wait from every start. A route that is not ready behaves exactly like
  * React.lazy, including the retry after a failed preload.
  */
-export function readyRoute<P extends object>(load:()=>Promise<{default:ComponentType<P>}>){
-  let ready:ComponentType<P>|undefined;
-  const preload=preloadRoute(()=>load().then(module=>{ready=module.default;return module}));
-  const Lazy=lazy(preload) as unknown as ComponentType<P>;
-  function Route(props:P){
+export function readyRoute<P extends object>(load: () => Promise<{default: ComponentType<P>}>) {
+  let ready: ComponentType<P> | undefined;
+  const preload = preloadRoute(() =>
+    load().then(module => {
+      ready = module.default;
+      return module;
+    })
+  );
+  const Lazy = lazy(preload) as unknown as ComponentType<P>;
+  function Route(props: P) {
     // Chosen once per mount: changing the component type later would remount the page.
-    const [Page]=useState<ComponentType<P>>(()=>ready??Lazy);
-    return createElement(Page,props);
+    const [Page] = useState<ComponentType<P>>(() => ready ?? Lazy);
+    return createElement(Page, props);
   }
-  return Object.assign(Route,{preload});
+  return Object.assign(Route, {preload});
 }

@@ -1,10 +1,13 @@
 package panel
 
-import "strconv"
+import (
+	"strconv"
+	"voltra/internal/gamesettings"
+)
 
 // Cfx capacity is dependent on the selected game, rather than a per-field rule.
 func validateCfxRecipeEnvironment(recipe string, env M) error {
-	if recipe != fiveMRecipe || eggEnvironmentString(env["TXHOST_GAME_NAME"]) != "redm" {
+	if recipe != gamesettings.FiveMRecipe || eggEnvironmentString(env["TXHOST_GAME_NAME"]) != "redm" {
 		return nil
 	}
 	slots, err := strconv.Atoi(eggEnvironmentString(env["MAX_PLAYERS"]))
@@ -14,8 +17,8 @@ func validateCfxRecipeEnvironment(recipe string, env M) error {
 	return nil
 }
 func validateCfxEnvironment(egg M, env M) error {
-	if !nativeSettingsIsRecipe(egg, fiveMRecipe) {
+	if !gamesettings.IsRecipe(egg, gamesettings.FiveMRecipe) {
 		return nil
 	}
-	return validateCfxRecipeEnvironment(fiveMRecipe, env)
+	return validateCfxRecipeEnvironment(gamesettings.FiveMRecipe, env)
 }

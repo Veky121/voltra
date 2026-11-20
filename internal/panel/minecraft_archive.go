@@ -50,7 +50,7 @@ func (a *App) minecraftFetchArchive(ctx context.Context, file minecraftDownload)
 	size, err := io.Copy(io.MultiWriter(archive, checksum), io.LimitReader(response.Body, minecraftArchiveLimit+1))
 	if err != nil {
 		cleanup()
-		return nil, nil, APIError{502, "MinecraftArchiveReadFailed", "The modpack download was interrupted or temporary storage could not be written. Try again."}
+		return nil, nil, APIError{Status: 502, Code: "MinecraftArchiveReadFailed", Detail: "The modpack download was interrupted or temporary storage could not be written. Try again."}
 	}
 	if size > minecraftArchiveLimit {
 		cleanup()
@@ -58,7 +58,7 @@ func (a *App) minecraftFetchArchive(ctx context.Context, file minecraftDownload)
 	}
 	if !strings.EqualFold(hex.EncodeToString(checksum.Sum(nil)), file.Hash) {
 		cleanup()
-		return nil, nil, APIError{502, "MinecraftChecksumMismatch", "The provider download did not match its checksum. Try again later."}
+		return nil, nil, APIError{Status: 502, Code: "MinecraftChecksumMismatch", Detail: "The provider download did not match its checksum. Try again later."}
 	}
 	reader, err := minecraftReadZipFrom(archive, size)
 	if err != nil {

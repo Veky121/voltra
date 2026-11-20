@@ -78,7 +78,7 @@ The directory contains `manifest.json` and JPG, PNG or WebP files. Example:
 {"server":{"rust":"artwork/rust.jpg"},"library":{"steam-252490":"game-artwork/steam-252490.jpg"}}
 ```
 
-Use IDs from `web/src/client/serverArtworkCatalog.json` for `server` and asset keys from `web/src/client/gameArtwork.json` for `library`. Paths are relative to the private directory. Unlisted files and source metadata are never served. Files must be regular rasters of at most 8 MiB, 4096 pixels per side and 8 million pixels. The decoded pack is limited to 512 unique images and 128 MiB of encoded PNG data. Invalid or missing entries retain the original SVG tiles.
+Use IDs from `web/src/features/servers/serverArtworkCatalog.json` for `server` and asset keys from `web/src/features/game-library/gameArtwork.json` for `library`. Paths are relative to the private directory. Unlisted files and source metadata are never served. Files must be regular rasters of at most 8 MiB, 4096 pixels per side and 8 million pixels. The decoded pack is limited to 512 unique images and 128 MiB of encoded PNG data. Invalid or missing entries retain the original SVG tiles.
 
 The pack loads on the first authenticated artwork request and stays fixed for that panel process. Set the environment variable and restart the panel during your normal maintenance window to apply changes. No admin upload UI is provided yet. Operators are responsible for permission to host their chosen artwork.
 

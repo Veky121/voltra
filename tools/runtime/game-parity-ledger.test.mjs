@@ -13,13 +13,13 @@ test('current catalog includes FS25 and four managed bridges without promoting h
   assert.ok(ledger.games.some(g => g.path === 'farming-simulator/egg-farming-simulator-25.json'));
   assert.equal(new Set(ledger.games.map(g => g.path)).size, ledger.total);
   assert.equal(ledger.complete, 0);
-  for (const path of ['web/src/client/consoleFormatting.ts', 'web/src/client/consoleOutput.ts', 'web/src/client/gameTemplateModel.ts', 'internal/panel/game_quick_setup.go']) {
+  for (const path of ['web/src/features/console/consoleFormatting.ts', 'web/src/features/console/consoleOutput.ts', 'web/src/features/game-library/gameTemplateModel.ts', 'internal/panel/game_quick_setup.go']) {
     assert.ok(ledger.sources.some(source => source.path === path), `Verification fingerprint must include ${path}`);
   }
   assert.ok(ledger.games.some(g => g.historical_claim.verification === 'runtime_verified'));
   for (const game of ledger.games.filter(game => game.managed_game)) {
     assert.equal(game.gates.settings.status, 'partial', 'managed handler coverage is source-only evidence');
-    assert.ok(game.gates.settings.evidence.includes('internal/panel/game_settings_documents.go'));
+    assert.ok(game.gates.settings.evidence.includes('internal/gamesettings/documents.go'));
   }
   for (const game of ledger.games) {
     assert.deepEqual(Object.keys(game.gates), Object.keys(requirements));

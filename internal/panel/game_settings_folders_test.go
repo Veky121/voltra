@@ -3,6 +3,7 @@ package panel
 import (
 	"context"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestGameFolderShortcutsProbeExistingNativeDirectories(t *testing.T) {
@@ -21,8 +22,8 @@ func TestGameFolderShortcutsProbeExistingNativeDirectories(t *testing.T) {
 	wings.Files["/config/saves/world.msav"] = []byte("fixture save")
 	wings.Folders["/config/maps"] = []M{}
 	probe := func() ([]M, error) {
-		ctx := context.WithValue(context.Background(), quickListingContextKey{}, map[string][]M{})
-		return a.appendGameFolderShortcuts(ctx, server, egg, []M{{"label": "Existing config", "path": "/config"}})
+		ctx := context.WithValue(context.Background(), gamesettings.QuickListingContextKey{}, map[string][]M{})
+		return a.gameSettingsService().AppendGameFolderShortcuts(ctx, server, egg, []M{{"label": "Existing config", "path": "/config"}})
 	}
 	folders, err := probe()
 	if err != nil {

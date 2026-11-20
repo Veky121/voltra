@@ -38,7 +38,7 @@ for(const entry of fs.readdirSync(runtime,{withFileTypes:true}).filter(x=>x.isDi
  const old=JSON.parse(fs.readFileSync(p))[recipe];if(!old)continue;
  snapshots.push({snapshot:entry.name,manifest_fingerprint:manifest.fingerprint,catalog_sha256:sealed.sha256,profile_sha256:digest(JSON.stringify(old)),current_profile_match:JSON.stringify(old)===JSON.stringify(profile),helpers:[...old.egg.scripts.installation.script.matchAll(/cat > (.*?) <<'([^']+)'\n([\s\S]*?)\n\2/g)].map(m=>({name:path.basename(m[1]),sha256:digest(m[3]+'\n')}))});
 }
-const backendPath='internal/panel/game_settings_openra.go';
+const backendPath='internal/gamesettings/openra.go';
 const backend=fs.readFileSync(path.join(current.snapshot,backendPath),'utf8');
 const typedDune=backend.includes('openra_dune2000/egg-open-r-a--dune2000.json');
 const template=(await api('/api/client/game-library/templates/'+digest(recipe).slice(0,16))).attributes;

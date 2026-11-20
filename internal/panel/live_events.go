@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v5"
 )
 
 // First slice: account-local invalidations only. No server payloads, commands,
@@ -96,8 +94,10 @@ func (a *App) liveEventOrigin(r *http.Request) bool {
 	return a.Config.DevMode && loopbackRequest(r) && (origin == "http://localhost:5180" || origin == "http://127.0.0.1:5180")
 }
 
-// Recheck credentials before every event and heartbeat. A socket must not keep
-// the identity captured at upgrade after logout, expiry, disablement or revoke.
+// Each socket rechecks this on any access, settings or "all" change signal and
+// at least every liveAuthTTL before it sends anything, heartbeats included. A
+// socket must not keep the identity captured at upgrade after logout, expiry,
+// disablement or revoke.
 // Scoped machine API keys are intentionally unsupported in this first slice.
 func (a *App) liveEventIdentity(r *http.Request) (int64, error) {
 	developmentID := UserID(r)
@@ -115,9 +115,8 @@ func (a *App) liveEventIdentity(r *http.Request) (int64, error) {
 	if localOnly && !developmentHost(r) {
 		return 0, forbidden()
 	}
-	var maintenance bool
-	err = a.DB.QueryRow(ctx, "SELECT COALESCE(value::text,'false')::boolean FROM settings WHERE key='app.maintenance'").Scan(&maintenance)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	maintenance, err := a.maintenanceEnabled(ctx)
+	if err != nil {
 		return 0, err
 	}
 	if maintenance {
@@ -164,7 +163,7 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	events, shutdown, unsubscribe, ok := a.liveEvents.subscribe(id)
 	if !ok {
-		fail(w, APIError{429, "LiveConnectionLimit", "Too many live connections. Retry later."})
+		fail(w, APIError{Status: 429, Code: "LiveConnectionLimit", Detail: "Too many live connections. Retry later."})
 		return
 	}
 	defer unsubscribe()
@@ -228,6 +227,91 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 	if err = write("ready"); err != nil {
 		return
 	}
+	// Identity and server access are checked once and cached for this socket.
+	// A change to sessions, membership, permissions or settings re-checks them
+	// before anything else is sent; otherwise no check is older than liveAuthTTL.
+	access := newLiveSocketAccess(id, func() (int64, error) { return a.liveEventIdentity(r) }, a.liveServerAccess)
+	relevant := func(domain string) bool {
+		return readDomains[domain] || readDomains["all"] || (domain == "all" && len(readDomains) > 0)
+	}
+	hint := func(domains []string, servers []string) error {
+		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		packet := M{"type": "reads.invalidated", "version": 1, "domains": domains}
+		if servers != nil {
+			packet["servers"] = servers
+		}
+		return conn.WriteJSON(packet)
+	}
+	handleChanges := func() bool {
+		var global, scoped []string
+		var ids []int64
+		seen := map[int64]bool{}
+		for _, change := range takeChanges() {
+			switch change.domain {
+			case "access", "settings", "all":
+				access.changed()
+			}
+			if !relevant(change.domain) {
+				continue
+			}
+			if change.global {
+				global = append(global, change.domain)
+				continue
+			}
+			scoped = append(scoped, change.domain)
+			for _, server := range change.servers {
+				if !seen[server] {
+					seen[server] = true
+					ids = append(ids, server)
+				}
+			}
+		}
+		if !access.verify() {
+			return false
+		}
+		if len(global) > 0 && hint(global, nil) != nil {
+			return false
+		}
+		if len(scoped) > 0 {
+			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+			servers, shown, e := access.visible(ctx, ids)
+			cancel()
+			if e != nil {
+				// Unknown visibility: say what changed without naming servers.
+				servers, shown = nil, true
+			} else if servers == nil {
+				servers = []string{}
+			}
+			if shown && hint(scoped, servers) != nil {
+				return false
+			}
+		}
+		access.settle()
+		return true
+	}
+	// A change that was already published is handled before any other delivery,
+	// so a revocation is never overtaken by an event it should have stopped.
+	absorb := func() bool {
+		select {
+		case <-changes:
+			return handleChanges()
+		default:
+			return true
+		}
+	}
+	// Re-authorized when the data generation moves (any invalidation, including
+	// access changes), after an access change on this socket, or once
+	// liveAuthTTL has passed; otherwise the cached result stands.
+	authorize := func(b *liveBinding, generation uint64) error {
+		if b.authorizedEpoch == access.epoch && b.authorizedGeneration == generation && time.Since(b.authorizedAt) < liveAuthTTL {
+			return b.authorizedErr
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		_, err := a.authorizeLiveTopic(r.WithContext(ctx), b.topic, id)
+		cancel()
+		b.authorizedAt, b.authorizedEpoch, b.authorizedGeneration, b.authorizedErr = time.Now(), access.epoch, generation, err
+		return err
+	}
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -241,28 +325,11 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 		case <-resync:
 			return
 		case <-changes:
-			domains := takeChanges()
-			relevant := false
-			for _, domain := range domains {
-				if readDomains[domain] || readDomains["all"] || (domain == "all" && len(readDomains) > 0) {
-					relevant = true
-					break
-				}
-			}
-			if !relevant {
-				continue
-			}
-			current, e := a.liveEventIdentity(r)
-			if e != nil || current != id {
-				return
-			}
-			_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			if conn.WriteJSON(M{"type": "reads.invalidated", "version": 1, "domains": domains}) != nil {
+			if !handleChanges() {
 				return
 			}
 		case command := <-commands:
-			current, e := a.liveEventIdentity(r)
-			if e != nil || current != id {
+			if !absorb() || !access.verify() {
 				return
 			}
 			readDomains = map[string]bool{}
@@ -303,6 +370,8 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 				}
 				binding := &liveBinding{path: path, revision: command.Revision, topic: topic, updates: updates, resync: resync}
 				if a.watchLiveTopic(topic, id, binding) {
+					// The first delivery is re-authorized only if the data changes.
+					binding.authorizedAt, binding.authorizedEpoch, binding.authorizedGeneration = time.Now(), access.epoch, a.liveSnapshots.bindingGeneration(binding)
 					bindings[path] = binding
 				}
 			}
@@ -318,13 +387,14 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 			if time.Since(update.sample.sampledAt) > 10*time.Second {
 				continue
 			}
-			current, e := a.liveEventIdentity(r)
-			if e != nil || current != id {
+			// The overview's cards take a sample every few seconds, not every one.
+			if b.topic.event == "server.resources" && b.topic.interval > time.Second && update.sample.status == 200 && b.lastStatus == 200 && time.Since(b.lastSent) < b.topic.interval-500*time.Millisecond {
+				continue
+			}
+			if !absorb() || !access.verify() {
 				return
 			}
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			_, accessErr := a.authorizeLiveTopic(r.WithContext(ctx), b.topic, id)
-			cancel()
+			accessErr := authorize(b, update.generation)
 			sample := update.sample
 			// Membership can change after a shared account-list sample was read.
 			// Build this small list against current access immediately before send.
@@ -361,22 +431,20 @@ func (a *App) clientLiveEvents(w http.ResponseWriter, r *http.Request) {
 			if conn.WriteJSON(packet) != nil {
 				return
 			}
-			b.lastSent = time.Now()
+			b.lastSent, b.lastStatus = time.Now(), sample.status
 			if accessErr != nil {
 				b.cancel()
 				delete(bindings, b.path)
 			}
 		case <-events:
-			current, e := a.liveEventIdentity(r)
-			if e != nil || current != id {
+			if !absorb() || !access.verify() {
 				return
 			}
 			if write("navigation.invalidated") != nil {
 				return
 			}
 		case <-ticker.C:
-			current, e := a.liveEventIdentity(r)
-			if e != nil || current != id {
+			if !absorb() || !access.verify() {
 				return
 			}
 			if write("heartbeat") != nil {

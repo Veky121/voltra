@@ -46,7 +46,8 @@
 // has no way to notice that swap either, and shows such a tab the new
 // account's data in the old account's page until that check.
 const prefix = 'voltra.snapshot.v1.';
-const ownerKey = 'voltra.snapshot-owner';
+export const snapshotOwnerKey = 'voltra.snapshot-owner';
+const ownerKey = snapshotOwnerKey;
 export const snapshotRevisionKey = 'voltra.snapshot-session';
 const lockName = 'voltra.snapshot-store';
 const lockPatience = 2000;
@@ -121,9 +122,14 @@ function exclusively(change: () => void): Promise<void> {
   // turn comes at once. Should the browser withhold it all the same, the
   // caller is not kept waiting: the change then happens whenever it is granted.
   let giveUp: ReturnType<typeof setTimeout> | undefined;
-  const waited = new Promise<void>(resolve => { giveUp = setTimeout(resolve, lockPatience); });
+  const waited = new Promise<void>(resolve => {
+    giveUp = setTimeout(resolve, lockPatience);
+  });
   if (typeof giveUp === 'object') giveUp.unref?.();
-  const turn = locks.request(lockName, change).then(() => undefined, () => undefined);
+  const turn = locks.request(lockName, change).then(
+    () => undefined,
+    () => undefined
+  );
   return Promise.race([turn, waited]).finally(() => clearTimeout(giveUp));
 }
 
@@ -192,9 +198,13 @@ export function snapshotRevision(storage: SnapshotStore | undefined = local()): 
  * waiting. An account read that begins right after a sign-out must start from
  * the revision that sign-out leaves behind, not the one it is about to replace.
  */
-export function snapshotRevisionInTurn(storage: SnapshotStore | undefined = local()): Promise<string | null | undefined> {
+export function snapshotRevisionInTurn(
+  storage: SnapshotStore | undefined = local()
+): Promise<string | null | undefined> {
   let revision: string | null | undefined;
-  return exclusively(() => { revision = snapshotRevision(storage); }).then(() => revision);
+  return exclusively(() => {
+    revision = snapshotRevision(storage);
+  }).then(() => revision);
 }
 
 /**
@@ -210,7 +220,8 @@ export function setSnapshotAccount(next: string, storage: SnapshotStore | undefi
     if (storage) {
       // A sign-out, and any change of owner, starts a new revision. So does a
       // store that has none yet.
-      if (!next || storage.getItem(ownerKey) !== next || !storage.getItem(snapshotRevisionKey)) storage.setItem(snapshotRevisionKey, `${now.toString(36)}-${Math.random().toString(36).slice(2)}`);
+      if (!next || storage.getItem(ownerKey) !== next || !storage.getItem(snapshotRevisionKey))
+        storage.setItem(snapshotRevisionKey, `${now.toString(36)}-${Math.random().toString(36).slice(2)}`);
       if (next) storage.setItem(ownerKey, next);
       else storage.removeItem(ownerKey);
       removeCopies(storage, next, now);
@@ -223,7 +234,12 @@ export function setSnapshotAccount(next: string, storage: SnapshotStore | undefi
   believe(next, under);
 }
 
-function identify(next: string, started: string | null | undefined, storage: SnapshotStore | undefined, now: number): boolean {
+function identify(
+  next: string,
+  started: string | null | undefined,
+  storage: SnapshotStore | undefined,
+  now: number
+): boolean {
   if (started !== undefined && snapshotRevision(storage) === started) {
     setSnapshotAccount(next, storage, now);
     return true;
@@ -248,10 +264,17 @@ function identify(next: string, started: string | null | undefined, storage: Sna
  * account arrived while that read was on its way. `started` is the revision
  * taken when the read began. Resolves to whether this tab now saves for `next`.
  */
-export async function identifySnapshotAccount(next: string, started: string | null | undefined, storage: SnapshotStore | undefined = local(), now = Date.now()): Promise<boolean> {
+export async function identifySnapshotAccount(
+  next: string,
+  started: string | null | undefined,
+  storage: SnapshotStore | undefined = local(),
+  now = Date.now()
+): Promise<boolean> {
   if (!next) return false;
   let identified = false;
-  await exclusively(() => { identified = identify(next, started, storage, now); });
+  await exclusively(() => {
+    identified = identify(next, started, storage, now);
+  });
   return identified;
 }
 
@@ -303,7 +326,11 @@ export function snapshotOwner(): number | undefined {
  * happens outside the lock, so it removes nothing, and such copies are cleared
  * the next time the account is identified.
  */
-export function readAccountSnapshot<T>(name: string, storage: SnapshotStore | undefined = local(), now = Date.now()): T | undefined {
+export function readAccountSnapshot<T>(
+  name: string,
+  storage: SnapshotStore | undefined = local(),
+  now = Date.now()
+): T | undefined {
   if (!owned(storage)) return undefined;
   try {
     return fresh(storage.getItem(`${prefix}${name}.${account}`), now)?.value as T | undefined;
@@ -321,7 +348,11 @@ export function readAccountSnapshot<T>(name: string, storage: SnapshotStore | un
  * copy the store already holds is newer and stays. Resolves to whether the
  * store was this tab's account's to add to; if not, nothing was taken.
  */
-export async function adoptAccountSnapshots(entries: Record<string, string>, storage: SnapshotStore | undefined = local(), now = Date.now()): Promise<boolean> {
+export async function adoptAccountSnapshots(
+  entries: Record<string, string>,
+  storage: SnapshotStore | undefined = local(),
+  now = Date.now()
+): Promise<boolean> {
   let adopted = false;
   await exclusively(() => {
     if (!owned(storage)) return;
@@ -339,11 +370,21 @@ export async function adoptAccountSnapshots(entries: Record<string, string>, sto
 }
 
 /** A saved list of records, or nothing unless every record has the named text fields. */
-export function readSavedList<T extends object>(name: string, fields: string[], storage: SnapshotStore | undefined = local(), now = Date.now()): T[] | undefined {
+export function readSavedList<T extends object>(
+  name: string,
+  fields: string[],
+  storage: SnapshotStore | undefined = local(),
+  now = Date.now()
+): T[] | undefined {
   const saved = readAccountSnapshot<unknown>(name, storage, now);
   if (!Array.isArray(saved)) return undefined;
-  const valid = saved.every(record => record && typeof record === 'object' && fields.every(field => typeof (record as Record<string, unknown>)[field] === 'string'));
-  return valid ? saved as T[] : undefined;
+  const valid = saved.every(
+    record =>
+      record &&
+      typeof record === 'object' &&
+      fields.every(field => typeof (record as Record<string, unknown>)[field] === 'string')
+  );
+  return valid ? (saved as T[]) : undefined;
 }
 
 /**
@@ -352,7 +393,13 @@ export function readSavedList<T extends object>(name: string, fields: string[], 
  * for `value` began, and it is never guessed: a request that began while
  * nobody was identified saves nothing, whoever is signed in when it ends.
  */
-export function writeAccountSnapshot(name: string, value: unknown, owner: number | undefined, storage: SnapshotStore | undefined = local(), now = Date.now()) {
+export function writeAccountSnapshot(
+  name: string,
+  value: unknown,
+  owner: number | undefined,
+  storage: SnapshotStore | undefined = local(),
+  now = Date.now()
+) {
   if (owner === undefined) return;
   void exclusively(() => {
     // Checked here, under the lock: the owner cannot change between this and the save.

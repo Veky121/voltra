@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestWave165Handlers(t *testing.T) {
@@ -25,7 +26,7 @@ func TestWave165Handlers(t *testing.T) {
 				t.Fatal(e)
 			}
 			wave95InstallReviewed(t, a, s, f, egg)
-			entry, _ := gameSettingsProfile(egg)
+			entry, _ := gamesettings.ProfileFor(egg)
 			script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 			for _, chunk := range strings.Split(script, "cat > ")[1:] {
 				head, body, ok := strings.Cut(chunk, "\n")

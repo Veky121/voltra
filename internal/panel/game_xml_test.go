@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 	"voltra/internal/steamapi"
 )
 
@@ -109,16 +110,16 @@ func TestSteamSetupCountsAlreadyAllocatedMemoryAndDisk(t *testing.T) {
 
 func TestQuickXMLPropertiesPreserveFormattingAndUnknownSettings(t *testing.T) {
 	original := []byte("<?xml version='1.0'?>\r\n<ServerSettings>\r\n <!-- operator note -->\r\n <property value = 'Old &amp; Name' extra=\"kept\" name='ServerName' />\r\n <property name=\"CustomFuture\" value=\"42\"/>\r\n</ServerSettings>\r\n")
-	noChange, err := quickPatchXMLProperties(original, "ServerSettings", map[string]string{})
+	noChange, err := gamesettings.QuickPatchXMLProperties(original, "ServerSettings", map[string]string{})
 	if err != nil || !bytes.Equal(original, noChange) {
 		t.Fatal("unchanged XML was reformatted")
 	}
 	name := `Quotes " ' < & > and value="not-an-attribute"`
-	updated, err := quickPatchXMLProperties(original, "ServerSettings", map[string]string{"ServerName": name, "ServerPassword": `"/><property name="Injected" value="yes`})
+	updated, err := gamesettings.QuickPatchXMLProperties(original, "ServerSettings", map[string]string{"ServerName": name, "ServerPassword": `"/><property name="Injected" value="yes`})
 	if err != nil {
 		t.Fatal(err)
 	}
-	records, _, err := quickXMLProperties(updated, "ServerSettings")
+	records, _, err := gamesettings.QuickXMLProperties(updated, "ServerSettings")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,19 +130,19 @@ func TestQuickXMLPropertiesPreserveFormattingAndUnknownSettings(t *testing.T) {
 		t.Fatal("comments or attributes lost")
 	}
 	withBOM := append([]byte{0xef, 0xbb, 0xbf}, original...)
-	bomUpdated, err := quickPatchXMLProperties(withBOM, "ServerSettings", map[string]string{"ServerName": "Windows edited file"})
+	bomUpdated, err := gamesettings.QuickPatchXMLProperties(withBOM, "ServerSettings", map[string]string{"ServerName": "Windows edited file"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.HasPrefix(bomUpdated, []byte{0xef, 0xbb, 0xbf}) {
 		t.Fatal("UTF-8 BOM lost")
 	}
-	bomValues, _, err := quickXMLProperties(bomUpdated, "ServerSettings")
+	bomValues, _, err := gamesettings.QuickXMLProperties(bomUpdated, "ServerSettings")
 	if err != nil || bomValues["ServerName"].Value != "Windows edited file" {
 		t.Fatal("BOM shifted edit offsets")
 	}
 	for _, content := range []string{`<Wrong></Wrong>`, `<ServerSettings/>`, `<ServerSettings><property name="A" value="1"/><property name="A" value="2"/></ServerSettings>`, `<ServerSettings><property name="A" value="1" value="2"/></ServerSettings>`, `<!DOCTYPE ServerSettings [<!ENTITY unsafe "expanded">]><ServerSettings></ServerSettings>`, `<ServerSettings><property name="A"/></ServerSettings>`} {
-		if _, _, err = quickXMLProperties([]byte(content), "ServerSettings"); err == nil {
+		if _, _, err = gamesettings.QuickXMLProperties([]byte(content), "ServerSettings"); err == nil {
 			t.Errorf("accepted invalid XML: %s", content)
 		}
 	}
@@ -194,11 +195,11 @@ func TestSevenDaysInitializationAndNativeSettings(t *testing.T) {
 			t.Fatal("required companion offsets were not preserved", assigned)
 		}
 	}
-	wings.Files[sevenDaysSettingsPath] = []byte(`<ServerSettings><!-- keep --><property name="ServerName" value="Default"/><property name="CustomFuture" value="kept"/><property name="GameDifficulty" value="2"/></ServerSettings>`)
+	wings.Files[gamesettings.SevenDaysSettingsPath] = []byte(`<ServerSettings><!-- keep --><property name="ServerName" value="Default"/><property name="CustomFuture" value="kept"/><property name="GameDifficulty" value="2"/></ServerSettings>`)
 	if err = a.steamGameAfterInstall(ctx, server); err != nil {
 		t.Fatal(err)
 	}
-	values, _, err := quickXMLProperties(wings.Files[sevenDaysSettingsPath], "ServerSettings")
+	values, _, err := gamesettings.QuickXMLProperties(wings.Files[gamesettings.SevenDaysSettingsPath], "ServerSettings")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,11 +212,11 @@ func TestSevenDaysInitializationAndNativeSettings(t *testing.T) {
 		t.Fatal("launcher does not wait for game save")
 	}
 	custom := []byte(`<ServerSettings><property name="ServerName" value="Operator edit"/></ServerSettings>`)
-	wings.Files[sevenDaysSettingsPath] = custom
+	wings.Files[gamesettings.SevenDaysSettingsPath] = custom
 	if err = a.steamGameAfterInstall(ctx, server); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(wings.Files[sevenDaysSettingsPath], custom) {
+	if !bytes.Equal(wings.Files[gamesettings.SevenDaysSettingsPath], custom) {
 		t.Fatal("initialization overwrote operator edits")
 	}
 	for _, settings := range []M{{"GameDifficulty": "9"}, {"ServerMaxPlayerCount": 1.5}, {"TelnetEnabled": false}, {"ServerName": "bad\nname"}} {

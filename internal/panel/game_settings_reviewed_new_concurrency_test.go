@@ -8,18 +8,19 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 // Hold the real PostgreSQL mutation lock and observe the pending request's
 // blocker before changing its launcher. Admission-time validation alone cannot
 // protect a write which has already been admitted and is waiting for this lock.
 func TestReviewedNewStartupChangedWhileSaveLocked(t *testing.T) {
-	for _, recipe := range []string{"arma/arma3/egg-arma3.json", reforgerSettingsRecipe, foundryVTTRecipe, fiveMRecipe, sonsSettingsRecipe, resoniteSettingsRecipe, "ddnet/egg-d-d-net.json"} {
+	for _, recipe := range []string{"arma/arma3/egg-arma3.json", gamesettings.ReforgerSettingsRecipe, gamesettings.FoundryVTTRecipe, gamesettings.FiveMRecipe, gamesettings.SonsSettingsRecipe, gamesettings.ResoniteSettingsRecipe, "ddnet/egg-d-d-net.json"} {
 		for _, mutation := range []string{"startup", "helper", "allocation"} {
-			if mutation == "allocation" && recipe != reforgerSettingsRecipe {
+			if mutation == "allocation" && recipe != gamesettings.ReforgerSettingsRecipe {
 				continue
 			}
-			if mutation == "helper" && recipe != "arma/arma3/egg-arma3.json" && recipe != reforgerSettingsRecipe && recipe != fiveMRecipe {
+			if mutation == "helper" && recipe != "arma/arma3/egg-arma3.json" && recipe != gamesettings.ReforgerSettingsRecipe && recipe != gamesettings.FiveMRecipe {
 				continue
 			}
 			t.Run(recipe+"/"+mutation, func(t *testing.T) {
@@ -34,27 +35,27 @@ func TestReviewedNewStartupChangedWhileSaveLocked(t *testing.T) {
 					t.Fatal(err)
 				}
 				file, key, original := "/data/Config/options.json", "upnp", "{\"upnp\":false,\"passwordSalt\":\"private\"}\r\n"
-				if recipe == "arma/arma3/egg-arma3.json" || recipe == reforgerSettingsRecipe {
+				if recipe == "arma/arma3/egg-arma3.json" || recipe == gamesettings.ReforgerSettingsRecipe {
 					wave95InstallReviewed(t, a, server, fixture, egg)
 				}
-				if recipe == fiveMRecipe {
+				if recipe == gamesettings.FiveMRecipe {
 					wave95InstallReviewed(t, a, server, fixture, egg)
 					file, key, original = "/server.cfg", "sv_lan", "sv_lan 0\r\nsv_hostname \"operator\"\r\nsv_licenseKey private\r\n"
 				}
-				if recipe == sonsSettingsRecipe {
-					file, key, original = sonsSettingsPath, "/LanOnly", "{\"LanOnly\":false,\"Password\":\"private\"}\r\n"
+				if recipe == gamesettings.SonsSettingsRecipe {
+					file, key, original = gamesettings.SonsSettingsPath, "/LanOnly", "{\"LanOnly\":false,\"Password\":\"private\"}\r\n"
 				}
-				if recipe == resoniteSettingsRecipe {
-					file, _ = reviewedNewSettings(egg)
+				if recipe == gamesettings.ResoniteSettingsRecipe {
+					file, _ = gamesettings.ReviewedNewSettings(egg)
 					key, original = "/startWorlds/0/saveOnExit", "{\"loginPassword\":\"private\",\"startWorlds\":[{\"saveOnExit\":false}]}\r\n"
 				}
 				if recipe == "ddnet/egg-d-d-net.json" {
-					file, key, original = ddnetSettingsPath, "sv_register", ddnetOriginalSeed
+					file, key, original = gamesettings.DdnetSettingsPath, "sv_register", ddnetOriginalSeed
 				}
 				if recipe == "arma/arma3/egg-arma3.json" {
 					file, key, original = "/server.cfg", "hostname", `hostname = "old";`
 				}
-				if recipe == reforgerSettingsRecipe {
+				if recipe == gamesettings.ReforgerSettingsRecipe {
 					file, key, original = "/config.json", "/game/visible", `{"game":{"visible":false,"maxPlayers":32}}`
 				}
 				fixture.mu.Lock()

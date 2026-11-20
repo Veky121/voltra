@@ -10,7 +10,7 @@ const normalize = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, ' ')
 const catalog = JSON.parse(await fs.readFile('internal/panel/game_library/upstream/catalog.json', 'utf8'));
 const records = [];
 const failures = [];
-const previous = new Map(JSON.parse(await fs.readFile('web/src/client/serverArtworkCatalog.json', 'utf8').catch(() => '[]')).map(record => [record.id, record]));
+const previous = new Map(JSON.parse(await fs.readFile('web/src/features/servers/serverArtworkCatalog.json', 'utf8').catch(() => '[]')).map(record => [record.id, record]));
 async function request(url) {
   const response = await fetch(url, {signal: AbortSignal.timeout(18000), headers: {'User-Agent': 'Voltra-Artwork-Sync/1.0'}});
   if (!response.ok) throw Error(`HTTP ${response.status}`);
@@ -145,7 +145,7 @@ for (const [id, name, website, aliases] of [
 
 const extraAliases = {'counter-strike-16': ['cs16', 'cstrike'], 'counter-strike-source': ['css'], 'half-life-2-deathmatch': ['hl2dm', 'hl2mp'], 'team-fortress-2': ['tf2'], 'gmod': ['garrysmod'], 'gta': ['fivem', 'ragemp', 'altv'], 'minecraft': ['minecraft bedrock']};
 for (const record of records) record.aliases = [...new Set([...record.aliases, ...(extraAliases[record.id] || [])])];
-await fs.writeFile('web/src/client/serverArtworkCatalog.json', JSON.stringify(records, null, 2) + '\n');
+await fs.writeFile('web/src/features/servers/serverArtworkCatalog.json', JSON.stringify(records, null, 2) + '\n');
 await fs.writeFile(path.join(output, 'SOURCES.md'), '# Server artwork sources\n\nExisting publisher artwork and stock photography downloaded for Voltra server identification. Images are not AI generated. Publisher artwork and trademarks remain owned by their respective rights holders; no endorsement is implied. Unsplash photos are used under the Unsplash License. Original source URLs follow.\n\n' + records.map(record => `- **${record.name}** (${path.basename(record.src)}): [source](${record.source}) · [original image](${record.imageUrl})`).join('\n') + '\n');
 await fs.mkdir('artifacts/ui-overview', {recursive: true});
 await fs.writeFile('artifacts/ui-overview/artwork-sync.json', JSON.stringify({downloaded: records.length, fallbacks: failures, generatedImages: false}, null, 2));

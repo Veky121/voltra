@@ -3,15 +3,16 @@ package panel
 import (
 	"reflect"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestCampaignParserEntryPoints(t *testing.T) {
 	for _, tc := range []struct{ recipe, file, data, key string }{
-		{"Aska/egg-aska.json", askaSettingsPath, "server name=Existing\n", "server name"},
-		{"puck/egg-puck.json", puckSettingsPath, `{"useWhitelist":false}`, "/useWhitelist"},
-		{tf2SettingsRecipe, tf2SettingsPath, "mp_timelimit 20\n", "mp_timelimit"},
-		{rustStagingSettingsRecipe, "/server/rust/cfg/server.cfg", "server.tags \"monthly,vanilla\"\n", "server.tags"},
-		{unturnedSettingsRecipe, "/Servers/default/Server/Commands.dat", "Cheats\n", "Cheats"},
+		{"Aska/egg-aska.json", gamesettings.AskaSettingsPath, "server name=Existing\n", "server name"},
+		{"puck/egg-puck.json", gamesettings.PuckSettingsPath, `{"useWhitelist":false}`, "/useWhitelist"},
+		{gamesettings.Tf2SettingsRecipe, gamesettings.Tf2SettingsPath, "mp_timelimit 20\n", "mp_timelimit"},
+		{gamesettings.RustStagingSettingsRecipe, "/server/rust/cfg/server.cfg", "server.tags \"monthly,vanilla\"\n", "server.tags"},
+		{gamesettings.UnturnedSettingsRecipe, "/Servers/default/Server/Commands.dat", "Cheats\n", "Cheats"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			var egg M
@@ -24,26 +25,26 @@ func TestCampaignParserEntryPoints(t *testing.T) {
 			if egg == nil {
 				t.Fatal("missing canonical recipe")
 			}
-			direct, err := parseGameSettingsForEgg(egg, tc.file, []byte(tc.data))
+			direct, err := gamesettings.ParseForEgg(egg, tc.file, []byte(tc.data))
 			if err != nil {
 				t.Fatal(err)
 			}
-			discovered, err := parseDiscoveredGameSettings(egg, tc.file, []byte(tc.data))
-			if err != nil || !reflect.DeepEqual(direct.fields, discovered.fields) {
+			discovered, err := gamesettings.ParseDiscovered(egg, tc.file, []byte(tc.data))
+			if err != nil || !reflect.DeepEqual(direct.Fields, discovered.Fields) {
 				t.Fatal("parser entry points disagree", err)
 			}
 			found := false
-			for _, field := range direct.fields {
-				found = found || field.key == tc.key
+			for _, field := range direct.Fields {
+				found = found || field.Key == tc.key
 			}
 			if !found {
 				t.Fatal("wrong game's schema selected")
 			}
-			if _, err := parseGameSettingsForEgg(egg, "/different.cfg", []byte(tc.data)); err == nil {
+			if _, err := gamesettings.ParseForEgg(egg, "/different.cfg", []byte(tc.data)); err == nil {
 				t.Fatal("unbound file admitted")
 			}
 			delete(egg, "_campaign_parser_path")
-			if _, err := parseGameSettingsForEgg(egg, tc.file, []byte(tc.data)); err == nil {
+			if _, err := gamesettings.ParseForEgg(egg, tc.file, []byte(tc.data)); err == nil {
 				t.Fatal("authority binding bypassed")
 			}
 		})

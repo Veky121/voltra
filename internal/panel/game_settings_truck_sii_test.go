@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 const truckFixture = "\ufeffSiiNunit\r\n{\r\nserver_config : _nameless.123 {\r\n lobby_name: \"A // lobby\" // keep\r\n traffic: true\r\n max_players: 8\r\n timezones: 2\r\n password: \"secret\"\r\n server_logon_token: ABC123\r\n moderator_list: 2\r\n moderator_list[0]: 123\r\n moderator_list[1]: 456\r\n unknown: 42\r\n}\r\nother_unit : _nameless.other {\r\n traffic: false\r\n entries[]: 1\r\n entries[]: 2\r\n}\r\n}\r\n"
 
 func TestTruckSIILossless(t *testing.T) {
-	d, e := ParseTruckSII([]byte(truckFixture))
+	d, e := gamesettings.ParseTruckSII([]byte(truckFixture))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -30,7 +31,7 @@ func TestTruckSIILossless(t *testing.T) {
 	if string(got) != want {
 		t.Fatal("unrelated bytes changed")
 	}
-	if _, e = ParseTruckSII(got); e != nil {
+	if _, e = gamesettings.ParseTruckSII(got); e != nil {
 		t.Fatal(e)
 	}
 }
@@ -38,14 +39,14 @@ func TestTruckSIIRefusal(t *testing.T) {
 	for _, s := range []string{strings.Replace(truckFixture, " traffic: true", " traffic: true\r\n traffic: false", 1), strings.Replace(truckFixture, " traffic: true", " Traffic: true", 1), strings.Replace(truckFixture, " traffic: true", " traffic: 1", 1), strings.Replace(truckFixture, " unknown: 42", " @include \"x\"", 1), strings.Replace(truckFixture, " unknown: 42", " #include \"x\"", 1), strings.Replace(truckFixture, " unknown: 42", " unknown: exec(x)", 1), strings.Replace(truckFixture, " unknown: 42", " unknown: {", 1), truckFixture + "exec x\n", strings.Replace(truckFixture, " lobby_name: \"A // lobby\"", " lobby_name: \"bad\\q\"", 1)} {
 		before := []byte(s)
 		copyBefore := append([]byte(nil), before...)
-		if _, e := ParseTruckSII(before); e == nil {
+		if _, e := gamesettings.ParseTruckSII(before); e == nil {
 			t.Fatalf("accepted unsafe input %q", s)
 		}
 		if !bytes.Equal(before, copyBefore) {
 			t.Fatal("mutated refusal")
 		}
 	}
-	d, e := ParseTruckSII([]byte(truckFixture))
+	d, e := gamesettings.ParseTruckSII([]byte(truckFixture))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -63,7 +64,7 @@ func TestTruckSIIRefusal(t *testing.T) {
 func TestTruckSIINativeLayout(t *testing.T) {
 	source := strings.ReplaceAll(truckFixture, " {\r\n", "\r\n{\r\n")
 	source = strings.Replace(source, "ABC123", "6544F7E034119F113526E96474F", 1)
-	d, e := ParseTruckSII([]byte(source))
+	d, e := gamesettings.ParseTruckSII([]byte(source))
 	if e != nil {
 		t.Fatal(e)
 	}

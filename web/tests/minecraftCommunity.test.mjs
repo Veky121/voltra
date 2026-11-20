@@ -1,12 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {isMinecraftTemplate, minecraftProjectKey} from '../src/client/minecraftCommunityModel.ts';
+import {isMinecraftTemplate, minecraftProjectKey} from '../src/features/game-library/minecraftCommunityModel.ts';
 
 test('all pinned Minecraft recipes move into Minecraft without hiding other games', () => {
-  const {entries} = JSON.parse(fs.readFileSync(new URL('../../internal/panel/game_library/upstream/catalog.json', import.meta.url)));
+  const {entries} = JSON.parse(
+    fs.readFileSync(new URL('../../internal/panel/game_library/upstream/catalog.json', import.meta.url))
+  );
   for (const entry of entries) {
-    assert.equal(isMinecraftTemplate({category: entry.path.split('/')[0], source: `https://github.com/pterodactyl/game-eggs/blob/revision/${entry.path}`}), entry.path.startsWith('minecraft/'), entry.path);
+    assert.equal(
+      isMinecraftTemplate({
+        category: entry.path.split('/')[0],
+        source: `https://github.com/pterodactyl/game-eggs/blob/revision/${entry.path}`,
+      }),
+      entry.path.startsWith('minecraft/'),
+      entry.path
+    );
   }
 });
 

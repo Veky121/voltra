@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 // Isolated PostgreSQL plus fake Wings; this verifies raw-byte transactional
@@ -35,7 +36,7 @@ func TestSteamCatalogConsolePackageRawInstallAndRollback(t *testing.T) {
 				}
 			}
 			f.mu.Lock()
-			f.Files[sevenDaysSettingsPath] = []byte("<ServerSettings></ServerSettings>\n")
+			f.Files[gamesettings.SevenDaysSettingsPath] = []byte("<ServerSettings></ServerSettings>\n")
 			f.mu.Unlock()
 			configuration, state, err := a.steamCatalogLoad(ctx, server)
 			if err != nil {

@@ -1,0 +1,26 @@
+<Settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<Port>28000</Port>
+	<MaxPlayers>12</MaxPlayers>
+	<MaxLatency>500</MaxLatency>
+	<Name>Voltra "RAGECOOP" $ + 517077</Name>
+	<Website>https://ragecoop.com/</Website>
+	<Description>RAGECOOP server</Description>
+	<GameMode>FreeRoam</GameMode>
+	<Language>English</Language>
+	<WelcomeMessage>517077 native state</WelcomeMessage>
+	<AnnounceSelf>false</AnnounceSelf>
+	<MasterServer>https://masterserver.ragecoop.com/</MasterServer>
+	<LogLevel>0</LogLevel>
+	<NpcStreamingDistance>500</NpcStreamingDistance>
+	<PlayerStreamingDistance>-1</PlayerStreamingDistance>
+	<WeatherTimeSync>true</WeatherTimeSync>
+	<AllowedUsernameChars>ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890-_</AllowedUsernameChars>
+	<UseP2P>false</UseP2P>
+	<UseZeroTier>false</UseZeroTier>
+	<UseVoice>true</UseVoice>
+	<ZeroTierNetworkID>0000000000000000</ZeroTierNetworkID>
+	<AutoUpdate>false</AutoUpdate>
+	<KickGodMode>false</KickGodMode>
+	<KickSpamming>true</KickSpamming>
+	<SpamLimit>100</SpamLimit>
+</Settings>

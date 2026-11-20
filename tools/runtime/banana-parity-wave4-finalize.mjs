@@ -70,8 +70,8 @@ if(fs.existsSync(backendLog)) {
   const failed=events.filter(event=>event.Action==='fail');
   const skipped=events.filter(event=>event.Action==='skip'&&event.Test);
   if(failed.length||skipped.length||!events.some(event=>event.Action==='pass'&&!event.Test&&event.Package==='voltra/internal/panel'))throw Error('Backend check incomplete or failed');
-  const sources=['internal/panel/game_settings_banana.go','internal/panel/game_settings_banana_test.go',
-    'internal/panel/game_settings_craftopia.go','internal/panel/game_settings_craftopia_test.go'];
+  const sources=['internal/gamesettings/banana.go','internal/panel/game_settings_banana_test.go',
+    'internal/gamesettings/craftopia.go','internal/panel/game_settings_craftopia_test.go'];
   const backend={scope:'Implemented new request-context and typed metadata helpers; shared integration/native acceptance still root-owned',complete:false,
     source:sources.map(file=>({path:file,sha256:sha(file)})),
     checks:{command:"go test ./internal/panel -run '^(TestBananaSettings|TestCraftopia|TestNativeSettings|TestSettingsReviewManagedPaths)' -count=1 -json",log:backendLog,

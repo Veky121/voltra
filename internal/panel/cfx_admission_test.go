@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync/atomic"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 type cfxCountingTransport struct {
@@ -19,16 +20,16 @@ func (c *cfxCountingTransport) RoundTrip(r *http.Request) (*http.Response, error
 }
 func TestCfxAdmissionBounds(t *testing.T) {
 	for _, v := range []string{"0", "33", "48", "1.5", "", "oops"} {
-		if validateCfxRecipeEnvironment(fiveMRecipe, M{"TXHOST_GAME_NAME": "redm", "MAX_PLAYERS": v}) == nil {
+		if validateCfxRecipeEnvironment(gamesettings.FiveMRecipe, M{"TXHOST_GAME_NAME": "redm", "MAX_PLAYERS": v}) == nil {
 			t.Fatalf("accepted RedM %q", v)
 		}
 	}
 	for _, v := range []string{"1", "32"} {
-		if e := validateCfxRecipeEnvironment(fiveMRecipe, M{"TXHOST_GAME_NAME": "redm", "MAX_PLAYERS": v}); e != nil {
+		if e := validateCfxRecipeEnvironment(gamesettings.FiveMRecipe, M{"TXHOST_GAME_NAME": "redm", "MAX_PLAYERS": v}); e != nil {
 			t.Fatal(e)
 		}
 	}
-	if e := validateCfxRecipeEnvironment(fiveMRecipe, M{"TXHOST_GAME_NAME": "fivem", "MAX_PLAYERS": "48"}); e != nil {
+	if e := validateCfxRecipeEnvironment(gamesettings.FiveMRecipe, M{"TXHOST_GAME_NAME": "fivem", "MAX_PLAYERS": "48"}); e != nil {
 		t.Fatal(e)
 	}
 	if e := validateCfxRecipeEnvironment("unrelated", M{"TXHOST_GAME_NAME": "redm", "MAX_PLAYERS": "48"}); e != nil {
@@ -49,7 +50,7 @@ func TestCfxAdmissionAPI(t *testing.T) {
 	a.HTTP.Transport = counter
 	var entry gameTemplate
 	for _, v := range gameTemplates().Entries {
-		if v.Path == fiveMRecipe {
+		if v.Path == gamesettings.FiveMRecipe {
 			entry = v
 		}
 	}

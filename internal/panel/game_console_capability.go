@@ -1,10 +1,12 @@
 package panel
 
+import "voltra/internal/gamesettings"
+
 // Unknown and custom launchers retain command input. Only the reviewed catalog
 // launchers with no reviewed interactive interface are advertised as logs only.
 // Nonstock plugins are not covered; custom startup strings retain command input.
 func serverConsoleInputSupported(server, egg M) bool {
-	entry, ok := gameSettingsProfile(egg)
+	entry, ok := gamesettings.ProfileFor(egg)
 	if !ok || str(server["startup"]) != str(entry.Egg["startup"]) || str(egg["startup"]) != str(entry.Egg["startup"]) {
 		return true
 	}

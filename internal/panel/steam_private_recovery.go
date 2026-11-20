@@ -52,7 +52,7 @@ func privateRecoveryRequest(ctx context.Context, q steamHistoryQuerier, server M
 	if err != nil {
 		return empty, err
 	}
-	changed := APIError{409, "PrivateSteamRecoveryScopeChanged", "The original private Steam attempt no longer matches this server or was superseded; review content migration before recovery."}
+	changed := APIError{Status: 409, Code: "PrivateSteamRecoveryScopeChanged", Detail: "The original private Steam attempt no longer matches this server or was superseded; review content migration before recovery."}
 	if num(row["node_id"]) != num(server["node_id"]) || num(row["server_owner_id"]) != num(server["owner_id"]) || num(row["egg_id"]) != num(server["egg_id"]) || str(row["installation_id"]) != str(server["installation_id"]) || boolean(row["superseded"]) {
 		return empty, changed
 	}

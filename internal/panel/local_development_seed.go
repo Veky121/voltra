@@ -174,6 +174,7 @@ func (a *App) seedLocalDevelopmentBase(ctx context.Context, options LocalDevelop
 	if _, err = tx.Exec(ctx, "INSERT INTO activity_logs(event,description) VALUES('dev:workspace.created','Created the isolated local development workspace')"); err != nil {
 		return err
 	}
+	defer a.settingsChanged()
 	return tx.Commit(ctx)
 }
 

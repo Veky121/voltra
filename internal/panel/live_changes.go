@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,45 +13,90 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Hints contain domains only, never row IDs, credentials, queries or payloads.
+// Hints contain domains and, where the change belongs to one server, that
+// server's ID. Never row values, credentials, queries or payloads. Each socket
+// turns server IDs into the identifiers its user may see, or drops the hint.
 // HTTP readers retain their own authorization and response contracts.
 type liveReadChanges struct {
 	mu      sync.Mutex
-	clients map[chan struct{}]map[string]bool
+	clients map[chan struct{}]map[string]*liveChangeScope
 	cancel  context.CancelFunc
 	done    chan struct{}
 }
 
-func (h *liveReadChanges) subscribe() (<-chan struct{}, func() []string, func()) {
+// A domain changed for every server (global) or for the listed servers only.
+type liveChangeScope struct {
+	global  bool
+	servers map[int64]bool
+}
+
+type liveReadChange struct {
+	domain  string
+	global  bool
+	servers []int64
+}
+
+// Pending changes per socket are bounded: past this many servers a domain
+// counts as changed everywhere.
+const liveChangeServerLimit = 64
+
+func (h *liveReadChanges) subscribe() (<-chan struct{}, func() []liveReadChange, func()) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.clients == nil {
-		h.clients = map[chan struct{}]map[string]bool{}
+		h.clients = map[chan struct{}]map[string]*liveChangeScope{}
 	}
 	ch := make(chan struct{}, 1)
-	h.clients[ch] = map[string]bool{}
-	take := func() []string {
+	h.clients[ch] = map[string]*liveChangeScope{}
+	take := func() []liveReadChange {
 		h.mu.Lock()
 		defer h.mu.Unlock()
-		var domains []string
-		for domain := range h.clients[ch] {
-			domains = append(domains, domain)
+		var changes []liveReadChange
+		for domain, scope := range h.clients[ch] {
+			change := liveReadChange{domain: domain, global: scope.global}
+			if !scope.global {
+				for id := range scope.servers {
+					change.servers = append(change.servers, id)
+				}
+			}
+			changes = append(changes, change)
 		}
 		if _, exists := h.clients[ch]; exists {
-			h.clients[ch] = map[string]bool{}
+			h.clients[ch] = map[string]*liveChangeScope{}
 		}
-		return domains
+		return changes
 	}
 	stop := func() { h.mu.Lock(); delete(h.clients, ch); h.mu.Unlock() }
 	return ch, take, stop
 }
 
-func (h *liveReadChanges) publish(domains ...string) {
+func (h *liveReadChanges) publish(domains ...string) { h.publishScoped(nil, domains...) }
+
+// No servers means the change concerns every server.
+func (h *liveReadChanges) publishScoped(servers []int64, domains ...string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch, pending := range h.clients {
 		for _, domain := range domains {
-			pending[domain] = true
+			scope := pending[domain]
+			if scope == nil {
+				scope = &liveChangeScope{servers: map[int64]bool{}}
+				pending[domain] = scope
+			}
+			if len(servers) == 0 {
+				scope.global = true
+			}
+			for _, id := range servers {
+				if id > 0 && !scope.global {
+					scope.servers[id] = true
+				}
+			}
+			if len(scope.servers) > liveChangeServerLimit {
+				scope.global = true
+			}
+			if scope.global {
+				scope.servers = map[int64]bool{}
+			}
 		}
 		select {
 		case ch <- struct{}{}:
@@ -148,12 +195,44 @@ func (h *liveSnapshotHub) invalidateDomains(domains ...string) {
 	}
 }
 
-func (a *App) publishReadChanges(domains ...string) {
+func (a *App) publishReadChanges(domains ...string) { a.publishServerReadChanges(nil, domains...) }
+
+// Scoped to the given servers; none means every server.
+func (a *App) publishServerReadChanges(servers []int64, domains ...string) {
 	if len(domains) == 0 {
 		return
 	}
-	a.readChanges.publish(domains...)
+	a.readChanges.publishScoped(servers, domains...)
 	a.liveSnapshots.invalidateDomains(domains...)
+}
+
+// The server a mutation path names, or 0 when it names none or is unknown.
+func (a *App) liveMutationServer(ctx context.Context, path string) int64 {
+	if a.DB == nil {
+		return 0
+	}
+	for _, prefix := range []string{"/api/application/servers/", "/api/admin/servers/"} {
+		if rest, ok := strings.CutPrefix(path, prefix); ok {
+			id, _ := strconv.ParseInt(strings.SplitN(rest, "/", 2)[0], 10, 64)
+			return id
+		}
+	}
+	rest, ok := strings.CutPrefix(path, "/api/client/servers/")
+	if !ok {
+		return 0
+	}
+	identifier := strings.SplitN(rest, "/", 2)[0]
+	if identifier == "" {
+		return 0
+	}
+	numeric, _ := strconv.ParseInt(identifier, 10, 64)
+	lookupCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	var id int64
+	if a.DB.QueryRow(lookupCtx, "SELECT id FROM servers WHERE uuid=$1 OR uuid_short=$1 OR identifier=$1 OR id=$2 LIMIT 1", identifier, numeric).Scan(&id) != nil {
+		return 0
+	}
+	return id
 }
 
 // Filesystem mutations have no database row trigger. Fan out their completion
@@ -161,19 +240,30 @@ func (a *App) publishReadChanges(domains ...string) {
 // notification failure without changing the result of the user's operation.
 func (a *App) publishMutationReadChanges(ctx context.Context, path string) {
 	domains := liveMutationDomains(path)
-	a.publishReadChanges(domains...)
-	for _, domain := range domains {
-		if domain != "files" || a.DB == nil {
-			continue
-		}
-		notifyCtx, cancel := context.WithTimeout(ctx, time.Second)
-		_, err := a.DB.Exec(notifyCtx, "SELECT pg_notify('voltra_read_changes', json_build_object('schema',current_schema(),'domain','files')::text)")
-		cancel()
-		if err != nil {
-			slog.Warn("file change notification unavailable; directory reconciliation remains active")
-		}
-		break
+	if len(domains) == 0 {
+		return
 	}
+	var servers []int64
+	if server := a.liveMutationServer(ctx, path); server > 0 && !slices.Contains(domains, "all") {
+		servers = []int64{server}
+	}
+	a.publishServerReadChanges(servers, domains...)
+	if !slices.Contains(domains, "files") || a.DB == nil {
+		return
+	}
+	notifyCtx, cancel := context.WithTimeout(ctx, time.Second)
+	_, err := a.DB.Exec(notifyCtx, "SELECT pg_notify('voltra_read_changes', json_build_object('schema',current_schema(),'domain','files','server',NULLIF($1::bigint,0)::text)::text)", firstServer(servers))
+	cancel()
+	if err != nil {
+		slog.Warn("file change notification unavailable; directory reconciliation remains active")
+	}
+}
+
+func firstServer(servers []int64) int64 {
+	if len(servers) == 0 {
+		return 0
+	}
+	return servers[0]
 }
 
 func (h *liveSnapshotHub) refreshBinding(b *liveBinding) {
@@ -219,6 +309,7 @@ func (a *App) startLiveChanges() {
 				if err == nil {
 					// Notifications are not durable. A new listener invalidates every
 					// active reader to recover anything lost during disconnection.
+					a.settings.setListening(true)
 					a.publishReadChanges("all")
 					for ctx.Err() == nil {
 						n, e := conn.WaitForNotification(ctx)
@@ -227,20 +318,34 @@ func (a *App) startLiveChanges() {
 							break
 						}
 						var hint struct {
-							Schema string `json:"schema"`
-							Table  string `json:"table"`
-							Domain string `json:"domain"`
+							Schema    string `json:"schema"`
+							Table     string `json:"table"`
+							Domain    string `json:"domain"`
+							Server    string `json:"server"`
+							OldServer string `json:"old_server"`
 						}
-						if json.Unmarshal([]byte(n.Payload), &hint) == nil && hint.Schema == schemaName {
+						parsed := json.Unmarshal([]byte(n.Payload), &hint) == nil
+						if !parsed || hint.Schema == schemaName && hint.Table == "settings" {
+							a.settings.invalidate()
+						}
+						if parsed && hint.Schema == schemaName {
+							var servers []int64
+							for _, raw := range []string{hint.Server, hint.OldServer} {
+								if id, e := strconv.ParseInt(raw, 10, 64); e == nil && id > 0 {
+									servers = append(servers, id)
+								}
+							}
 							if hint.Domain == "files" {
-								a.publishReadChanges("files")
+								a.publishServerReadChanges(servers, "files")
 							}
 							if domains := liveTableDomains(hint.Table); len(domains) > 0 {
-								a.publishReadChanges(domains...)
+								a.publishServerReadChanges(servers, domains...)
 							}
 						}
 					}
 				}
+				// Without a listener, changes would go unnoticed: stop caching.
+				a.settings.setListening(false)
 				closeCtx, finishClose := context.WithTimeout(context.Background(), time.Second)
 				_ = conn.Close(closeCtx)
 				finishClose()

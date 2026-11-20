@@ -1,50 +1,106 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readableSettingName,settingsGroups} from '../src/client/gameSettingsLayout.ts';
-const field=(key,label=key)=>({key,label,type:'text',value:''});
-test('native API groups keep Sons base and gameplay controls together',()=>{
- const fields=[
-  {...field('/ServerName'),group:'General'},
-  {...field('/Password'),group:'General',secret:true},
-  {...field('/SaveSlot'),group:'World'},
-  {...field('/GameSettings/Gameplay.TreeRegrowth'),group:'Gameplay',type:'boolean'},
-  {...field('/CustomGameModeSettings/GameSetting.Vail.EnemySpawn'),group:'Custom game (new saves)',type:'boolean'},
-  {...field('/Future/Option'),group:'   '},
- ];
- const groups=settingsGroups(fields,'sons','/dedicatedserver.cfg');
- assert.deepEqual(groups.map(group=>group.label),['General','World','Gameplay','Custom game (new saves)','Future']);
- assert.deepEqual(groups[0].fields,fields.slice(0,2));
- assert.deepEqual(groups.flatMap(group=>group.fields),fields);
+import {readableSettingName, settingsGroups} from '../src/features/server-settings/gameSettingsLayout.ts';
+const field = (key, label = key) => ({key, label, type: 'text', value: ''});
+test('native API groups keep Sons base and gameplay controls together', () => {
+  const fields = [
+    {...field('/ServerName'), group: 'General'},
+    {...field('/Password'), group: 'General', secret: true},
+    {...field('/SaveSlot'), group: 'World'},
+    {...field('/GameSettings/Gameplay.TreeRegrowth'), group: 'Gameplay', type: 'boolean'},
+    {
+      ...field('/CustomGameModeSettings/GameSetting.Vail.EnemySpawn'),
+      group: 'Custom game (new saves)',
+      type: 'boolean',
+    },
+    {...field('/Future/Option'), group: '   '},
+  ];
+  const groups = settingsGroups(fields, 'sons', '/dedicatedserver.cfg');
+  assert.deepEqual(
+    groups.map(group => group.label),
+    ['General', 'World', 'Gameplay', 'Custom game (new saves)', 'Future']
+  );
+  assert.deepEqual(groups[0].fields, fields.slice(0, 2));
+  assert.deepEqual(
+    groups.flatMap(group => group.fields),
+    fields
+  );
 });
-test('Minecraft and Palworld purpose groups retain precedence over API hints',()=>{
- assert.equal(settingsGroups([{...field('view-distance'),group:'General'}],'minecraft','/server.properties')[0].id,'performance');
- assert.equal(settingsGroups([{...field('PalSpawnNumRate'),group:'General'}],'palworld','/PalWorldSettings.ini')[0].id,'pals');
+test('Minecraft and Palworld purpose groups retain precedence over API hints', () => {
+  assert.equal(
+    settingsGroups([{...field('view-distance'), group: 'General'}], 'minecraft', '/server.properties')[0].id,
+    'performance'
+  );
+  assert.equal(
+    settingsGroups([{...field('PalSpawnNumRate'), group: 'General'}], 'palworld', '/PalWorldSettings.ini')[0].id,
+    'pals'
+  );
 });
-test('Minecraft settings group by purpose and retain every property exactly once',()=>{
- const fields=['motd','gamemode','level-seed','view-distance','server-port','resource-pack','rcon.password','unknown-future-option'].map(key=>field(key));
- const groups=settingsGroups(fields,'minecraft','/server.properties');
- assert.equal(groups[0].id,'general');
- assert.equal(groups.find(group=>group.id==='world').fields[0].key,'level-seed');
- assert.equal(groups.find(group=>group.id==='network').fields[0].key,'server-port');
- assert.deepEqual(groups.flatMap(group=>group.fields.map(field=>field.key)).sort(),fields.map(field=>field.key).sort());
+test('Minecraft settings group by purpose and retain every property exactly once', () => {
+  const fields = [
+    'motd',
+    'gamemode',
+    'level-seed',
+    'view-distance',
+    'server-port',
+    'resource-pack',
+    'rcon.password',
+    'unknown-future-option',
+  ].map(key => field(key));
+  const groups = settingsGroups(fields, 'minecraft', '/server.properties');
+  assert.equal(groups[0].id, 'general');
+  assert.equal(groups.find(group => group.id === 'world').fields[0].key, 'level-seed');
+  assert.equal(groups.find(group => group.id === 'network').fields[0].key, 'server-port');
+  assert.deepEqual(
+    groups.flatMap(group => group.fields.map(field => field.key)).sort(),
+    fields.map(field => field.key).sort()
+  );
 });
-test('platform YAML and other game settings follow their native sections',()=>{
- const groups=settingsGroups([field('/chunks/autosave'),field('/misc/enable-nether')],'minecraft','/config/paper-global.yml');
- assert.deepEqual(groups.map(group=>group.label),['Chunks','Misc']);
- assert.equal(settingsGroups([field('ServerName')],'palworld','/server.ini')[0].label,'Server');
+test('platform YAML and other game settings follow their native sections', () => {
+  const groups = settingsGroups(
+    [field('/chunks/autosave'), field('/misc/enable-nether')],
+    'minecraft',
+    '/config/paper-global.yml'
+  );
+  assert.deepEqual(
+    groups.map(group => group.label),
+    ['Chunks', 'Misc']
+  );
+  assert.equal(settingsGroups([field('ServerName')], 'palworld', '/server.ini')[0].label, 'Server');
 });
-test('names are readable while original property keys stay intact',()=>{
- assert.equal(readableSettingName(field('management-server-tls-enabled')),'Management server TLS enabled');
- assert.equal(readableSettingName(field('view-distance')),'View distance');
- assert.equal(readableSettingName(field('ServerName','Server name')),'Server name');
- assert.equal(readableSettingName(field('/misc/enable-nether')),'Misc / Enable nether');
+test('names are readable while original property keys stay intact', () => {
+  assert.equal(readableSettingName(field('management-server-tls-enabled')), 'Management server TLS enabled');
+  assert.equal(readableSettingName(field('view-distance')), 'View distance');
+  assert.equal(readableSettingName(field('ServerName', 'Server name')), 'Server name');
+  assert.equal(readableSettingName(field('/misc/enable-nether')), 'Misc / Enable nether');
 });
 
-test('Palworld groups packed and flattened options without dropping unknown members',()=>{
- const fields=['ServerName','ExpRate','DayTimeSpeedRate','PalSpawnNumRate','BaseCampMaxNum','CollectionDropRate','RESTAPIEnabled','FutureSetting'].map(key=>field(key));
- const groups=settingsGroups(fields,'palworld','/PalWorldSettings.ini');
- assert.deepEqual(groups.map(group=>group.id),['server','world','players','pals','building','items','network','advanced']);
- assert.equal(groups.flatMap(group=>group.fields).length,fields.length);
- assert.equal(readableSettingName(field('bEnablePlayerToPlayerDamage')),'Enable Player To Player Damage');
- assert.equal(readableSettingName(field('/Script/Pal.PalGameWorldSettings/OptionSettings/ExpRate')),'Experience multiplier');
+test('Palworld groups packed and flattened options without dropping unknown members', () => {
+  const fields = [
+    'ServerName',
+    'ExpRate',
+    'DayTimeSpeedRate',
+    'PalSpawnNumRate',
+    'BaseCampMaxNum',
+    'CollectionDropRate',
+    'RESTAPIEnabled',
+    'FutureSetting',
+  ].map(key => field(key));
+  const groups = settingsGroups(fields, 'palworld', '/PalWorldSettings.ini');
+  assert.deepEqual(
+    groups.map(group => group.id),
+    ['server', 'world', 'players', 'pals', 'building', 'items', 'network', 'advanced']
+  );
+  assert.equal(groups.flatMap(group => group.fields).length, fields.length);
+  assert.equal(readableSettingName(field('bEnablePlayerToPlayerDamage')), 'Enable player to player damage');
+  assert.equal(readableSettingName(field('RCONEnabled')), 'RCON enabled');
+  assert.equal(readableSettingName(field('bIsPvP')), 'Is PvP');
+  assert.equal(
+    readableSettingName(field('/GameSettings/Gameplay.TreeRegrowth')),
+    'Game settings / Gameplay tree regrowth'
+  );
+  assert.equal(
+    readableSettingName(field('/Script/Pal.PalGameWorldSettings/OptionSettings/ExpRate')),
+    'Experience multiplier'
+  );
 });

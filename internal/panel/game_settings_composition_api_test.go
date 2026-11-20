@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestNativeSettingsCompositionAPI(t *testing.T) {
-	for _, recipe := range []string{sonsSettingsRecipe, resoniteSettingsRecipe} {
+	for _, recipe := range []string{gamesettings.SonsSettingsRecipe, gamesettings.ResoniteSettingsRecipe} {
 		t.Run(recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			egg := batchSettingsRecipeFixture(t, recipe)
@@ -19,12 +20,12 @@ func TestNativeSettingsCompositionAPI(t *testing.T) {
 			if _, err := a.update(ctx, "servers", num(server["id"]), M{"startup": egg["startup"]}); err != nil {
 				t.Fatal(err)
 			}
-			file, _ := reviewedNewSettings(egg)
+			file, _ := gamesettings.ReviewedNewSettings(egg)
 			source := `{"ServerName":"operator","Password":"root-private","unknown":123456789012345678901234567890,"GameSettings":{"Gameplay.TreeRegrowth":true,"token":"nested-private"}}`
 			change := M{"/ServerName": "a longer server name", "/GameSettings/Gameplay.TreeRegrowth": false}
 			key, group := "/GameSettings/Gameplay.TreeRegrowth", "Gameplay"
 			invalidKey := "/GameSettings/unsupported"
-			if recipe == resoniteSettingsRecipe {
+			if recipe == gamesettings.ResoniteSettingsRecipe {
 				source = `{"comment":"operator","loginPassword":"root-private","unknown":123456789012345678901234567890,"startWorlds":[null,{"sessionName":"same","accessLevel":"Private","saveOnExit":false,"token":"nested-private"}]}`
 				change = M{"/comment": "a longer comment", "/startWorlds/1/sessionName": "a longer session name", "/startWorlds/1/saveOnExit": true}
 				key, group = "/startWorlds/1/saveOnExit", "Startup world 2"
@@ -59,16 +60,16 @@ func TestNativeSettingsCompositionAPI(t *testing.T) {
 			fixture.mu.Lock()
 			after := append([]byte(nil), fixture.Files[file]...)
 			fixture.mu.Unlock()
-			parsed, err := parseGameSettingsForEgg(egg, file, after)
+			parsed, err := gamesettings.ParseForEgg(egg, file, after)
 			if err != nil {
 				t.Fatal(err)
 			}
 			values := map[string]string{}
-			for _, field := range parsed.fields {
-				values[field.key] = field.value
+			for _, field := range parsed.Fields {
+				values[field.Key] = field.Value
 			}
 			expected := "false"
-			if recipe == resoniteSettingsRecipe {
+			if recipe == gamesettings.ResoniteSettingsRecipe {
 				expected = "true"
 			}
 			if values[key] != expected {

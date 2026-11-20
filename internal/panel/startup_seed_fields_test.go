@@ -159,7 +159,7 @@ func TestStartupSeedEffectCanonicalBinding(t *testing.T) {
 				t.Fatalf("%s %s: undeclared or duplicate initial default", entry.Path, key)
 			}
 			classified[key] = true
-			effect := startupSeedEffect(server, egg, entry, key)
+			effect := startupSeedEffect(server, egg, gameSettingsProfileOf(entry), key)
 			if effect == nil {
 				t.Fatalf("%s %s: no canonical annotation", entry.Path, key)
 			}
@@ -172,20 +172,20 @@ func TestStartupSeedEffectCanonicalBinding(t *testing.T) {
 			if classified[key] {
 				continue
 			}
-			if startupSeedEffect(server, egg, entry, key) != nil {
+			if startupSeedEffect(server, egg, gameSettingsProfileOf(entry), key) != nil {
 				t.Fatalf("unexpected classification %s", key)
 			}
 		}
 		for _, field := range []string{"startup", "script_install", "script_entry", "copy_script_from"} {
 			old := egg[field]
 			egg[field] = "custom"
-			if startupSeedEffect(server, egg, entry, keys[0]) != nil {
+			if startupSeedEffect(server, egg, gameSettingsProfileOf(entry), keys[0]) != nil {
 				t.Fatalf("custom %s classified", field)
 			}
 			egg[field] = old
 		}
 		server["startup"] = "custom"
-		if startupSeedEffect(server, egg, entry, keys[0]) != nil {
+		if startupSeedEffect(server, egg, gameSettingsProfileOf(entry), keys[0]) != nil {
 			t.Fatal("custom server classified")
 		}
 	}

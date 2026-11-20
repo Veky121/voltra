@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestWave165BrickadiaStock(t *testing.T) {
@@ -23,7 +24,7 @@ func TestWave165BrickadiaStock(t *testing.T) {
 	if _, e = a.update(ctx, "servers", num(s["id"]), M{"startup": egg["startup"], "allocation_id": alloc["id"]}); e != nil {
 		t.Fatal(e)
 	}
-	entry, _ := gameSettingsProfile(egg)
+	entry, _ := gamesettings.ProfileFor(egg)
 	for _, value := range asSlice(entry.Egg["variables"]) {
 		v := asMap(value)
 		row := M{}
@@ -67,11 +68,11 @@ func TestWave165BrickadiaStock(t *testing.T) {
 	if count != 7 {
 		t.Fatal(count)
 	}
-	raw := "; retained\r\n[" + strings.TrimSuffix(brickadiaSection, "/") + "]\r\nServerName=Before\r\nServerPassword=fixture-private\r\nbPubliclyListed=False\r\nPort=29100\r\nUnknownScalar=9007199254740993\r\n+Array=A\r\n+Array=B\r\n"
-	f.Files[brickadiaPath] = []byte(raw)
+	raw := "; retained\r\n[" + strings.TrimSuffix(gamesettings.BrickadiaSection, "/") + "]\r\nServerName=Before\r\nServerPassword=fixture-private\r\nbPubliclyListed=False\r\nPort=29100\r\nUnknownScalar=9007199254740993\r\n+Array=A\r\n+Array=B\r\n"
+	f.Files[gamesettings.BrickadiaPath] = []byte(raw)
 	f.Files["/unrelated.ini"] = []byte("Name=Other\n")
 	f.State = "offline"
-	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + url.QueryEscape(brickadiaPath)
+	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + url.QueryEscape(gamesettings.BrickadiaPath)
 	fresh, _ := a.one(ctx, "SELECT * FROM servers WHERE id=$1", s["id"])
 	cfg, ce := a.serverConfig(ctx, fresh)
 	if ce != nil {
@@ -79,10 +80,10 @@ func TestWave165BrickadiaStock(t *testing.T) {
 	}
 	env := asMap(cfg["environment"])
 	t.Log("ports", env["SERVER_PORT"], env["VOLTRA_ALLOCATED_PORTS"])
-	if e := a.prepareBrickadiaAuthority(ctx, fresh, egg); e != nil {
+	if e := a.gameSettingsService().PrepareBrickadiaAuthority(ctx, fresh, egg); e != nil {
 		t.Fatal("direct authority", e)
 	}
-	docs, _, de := a.gameSettingsDocuments(ctx, fresh, egg, false, false)
+	docs, _, de := a.gameSettingsService().Documents(ctx, fresh, egg, false, false)
 	t.Log("docs", docs, de)
 	view := asMap(infraExpect(t, m, u, "GET", route, nil, 200)["attributes"])
 	b, _ := json.Marshal(view)
@@ -92,7 +93,7 @@ func TestWave165BrickadiaStock(t *testing.T) {
 	seen := false
 	for _, v := range asSlice(view["fields"]) {
 		field := asMap(v)
-		if str(field["key"]) == brickadiaSection+"Port" {
+		if str(field["key"]) == gamesettings.BrickadiaSection+"Port" {
 			seen = true
 			if !boolean(field["readonly"]) {
 				t.Fatal("port editable")
@@ -104,7 +105,7 @@ func TestWave165BrickadiaStock(t *testing.T) {
 	}
 	// Binding is nonempty and selects the exact native path. Environment and allocation
 	// changes keep native bytes unchanged but invalidate the revision.
-	if str(egg["_campaign_parser_path"]) != brickadiaPath || str(egg["_campaign_parser_binding"]) == "" {
+	if str(egg["_campaign_parser_path"]) != gamesettings.BrickadiaPath || str(egg["_campaign_parser_binding"]) == "" {
 		t.Fatal("missing active binding")
 	}
 	binding := str(egg["_campaign_parser_binding"])
@@ -137,18 +138,18 @@ func TestWave165BrickadiaStock(t *testing.T) {
 	other := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=/unrelated.ini"
 	infraExpect(t, m, u, "GET", other, nil, 404)
 	infraExpect(t, m, u, "PUT", other, M{"revision": view["revision"], "settings": M{"Name": "Change"}}, 404)
-	infraExpect(t, m, u, "PUT", route, M{"revision": view["revision"], "settings": M{brickadiaSection + "Port": "29101"}}, 422)
+	infraExpect(t, m, u, "PUT", route, M{"revision": view["revision"], "settings": M{gamesettings.BrickadiaSection + "Port": "29101"}}, 422)
 	if f.Writes != before {
 		t.Fatal("denial wrote")
 	}
-	infraExpect(t, m, u, "PUT", route, M{"revision": view["revision"], "settings": M{brickadiaSection + "ServerName": "After"}}, 200)
-	if string(f.Files[brickadiaPath]) != strings.Replace(raw, "ServerName=Before", "ServerName=After", 1) {
+	infraExpect(t, m, u, "PUT", route, M{"revision": view["revision"], "settings": M{gamesettings.BrickadiaSection + "ServerName": "After"}}, 200)
+	if string(f.Files[gamesettings.BrickadiaPath]) != strings.Replace(raw, "ServerName=Before", "ServerName=After", 1) {
 		t.Fatal("unexpected native byte change")
 	}
-	infraExpect(t, m, u, "PUT", route, M{"revision": view["revision"], "settings": M{brickadiaSection + "ServerName": "Stale"}}, 409)
+	infraExpect(t, m, u, "PUT", route, M{"revision": view["revision"], "settings": M{gamesettings.BrickadiaSection + "ServerName": "Stale"}}, 409)
 	f.State = "running"
 	current := asMap(infraExpect(t, m, u, "GET", route, nil, 200)["attributes"])
-	infraExpect(t, m, u, "PUT", route, M{"revision": current["revision"], "settings": M{brickadiaSection + "ServerName": "Running"}}, 409)
+	infraExpect(t, m, u, "PUT", route, M{"revision": current["revision"], "settings": M{gamesettings.BrickadiaSection + "ServerName": "Running"}}, 409)
 	f.State = "offline"
 	t.Log("stock GET/PUT, exact path, unrelated refusal, port readonly/denial, secret masking and byte preservation passed")
 }

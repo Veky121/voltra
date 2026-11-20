@@ -3,7 +3,8 @@
 The panel exposes one authenticated `/api/client/events` WebSocket per browser
 or desktop window. React consumers share the connection. HTTP remains the
 source for initial snapshots, actions, file transfers, secrets and recovery.
-The existing Wings console WebSocket is unchanged.
+Each server page opens one Wings WebSocket (`features/servers/serverSocket.ts`), shared by
+the console and transfer tracking.
 
 ## Read policies
 
@@ -14,7 +15,7 @@ that it may publish a WebSocket payload.
 
 | Read family | Delivery and recovery |
 | --- | --- |
-| CPU, RAM, disk, network and uptime (`resources`) | Shared server collector at 1 second while watched; existing visible HTTP fallback when unavailable |
+| CPU, RAM, disk, network and uptime (`resources`) | Shared server collector at 1 second while a server page watches; overview cards subscribe to `resources?summary=overview` and get the same sample every 5 seconds. Existing visible HTTP fallback when unavailable |
 | Saved console (`console-history`) | Cursor batches checked at 1 second; direct Wings console events remain in place |
 | Fleet lifecycle states | Immediate invalidation on observed Wings state changes and server/database changes; 15-second safety collection |
 | Server detail and overview metadata | Change hint followed by authorized HTTP; 60-second reconciliation |
@@ -57,8 +58,12 @@ with `version: 1`. The client sends its complete desired subscription set:
 
 Snapshots carry their exact path, subscription revision, HTTP-compatible status
 and JSON envelope. Server details send `invalidated`, followed by authorized
-HTTP, rather than caching their full response. `reads.invalidated` carries only
-domain names. A 20-second authenticated heartbeat confirms connection health.
+HTTP, rather than caching their full response. `reads.invalidated` carries
+domain names and, when the change belongs to particular servers, `servers`: the
+UUID, short UUID, identifier and number of each changed server this account may
+open. A client then refetches reads of those servers and reads that belong to no
+single server, such as lists. A hint about servers the account cannot open is not
+sent. Without `servers`, a hint concerns every read of its domains. A 20-second authenticated heartbeat confirms connection health.
 Unchanged bodies are not repeated: small acknowledgements confirm a changed
 collection has settled and reconcile quiet subscriptions approximately once a
 minute. This is deliberately not a one-second broadcast of unchanged lists.
@@ -76,7 +81,9 @@ DELETE and TRUNCATE operations. Rollbacks do not publish. This covers scheduler
 runs, background workers, daemon callbacks, administrative writes and other panel
 processes, not just the user who clicked a button. Timestamp-only heartbeat
 updates are suppressed; console log rows are excluded from this mechanism.
-No row values or credentials enter the notification payload.
+The only row value in the payload is the internal ID of the server a row belongs
+to (`server`, plus `old_server` when a row moves); no credentials. The ID stays
+inside the panel, which turns it into identifiers per socket as above.
 
 Each App uses one dedicated LISTEN connection outside the request pool. Reconnect
 invalidates active readers to recover missed notifications. Successful HTTP
@@ -85,9 +92,10 @@ because filesystem writes have no database row trigger. Failed file operations
 also refresh metadata when partial changes are possible. Upload chunks do not
 invalidate directory lists; completion does.
 
-Hints are scoped by resource domain, not individual server ID. They can refresh
-another watched server in the same domain; this favors correctness but leaves
-room for finer targeting. Client refreshes coalesce over 250 ms, and each worker
+Hints are scoped by resource domain and, where known, by server. Rows of server
+tables, observed Wings state changes and mutations under a server's path name
+that server; other changes (nodes, eggs, settings, tasks) stay unscoped. Past 64
+pending servers a domain counts as changed everywhere. Client refreshes coalesce over 250 ms, and each worker
 has a bounded wake signal. In-flight and queued snapshots are fenced by the
 worker's change generation. Slow-client queue overflow forces reconnect and a
 fresh read instead of silently leaving a client behind.
@@ -101,8 +109,16 @@ the database schema migration installs the notification triggers.
 
 ## Security and bounds
 
-Credentials are checked before each delivery and heartbeat. Topic access is
-checked both on subscription and immediately before delivery. Current membership
+Each socket caches its identity and per-topic authorization. It checks them again
+before anything is sent when an `access`, `settings` or `all` change has arrived
+(sessions, desktop devices, users, subusers, API keys, settings such as
+maintenance, and sign-out, which publishes `all`), and otherwise whenever the last
+check is older than 5 seconds (`liveAuthTTL`). A change already published is
+handled before any other delivery. The 20-second heartbeat also checks, so a quiet
+socket closes within 20 seconds of a session that simply expires, and an active
+one within 5 seconds. Topic access is checked on subscription and again before
+delivery whenever the topic's data generation moves, after an access change, or
+after 5 seconds. Current membership
 is re-read before an account server-state list is sent. Revoked subscribers
 receive no subsequent protected payload; their topic is removed or connection
 closed. Reconnect always rebuilds subscriptions and fetches current data.
@@ -164,7 +180,10 @@ user or request results from replacing newer state. Transient failures retain
 loaded content and show an error; 401/403/404 clear protected data.
 
 Hidden windows unsubscribe from topics and hint interests. Visibility restoration
-resubscribes and refreshes mounted views. Authentication changes close the socket
+resubscribes. One shared, debounced focus/visibility pass
+(`hooks/focusRevalidation.ts`) then refreshes mounted reads, skipping a read that
+answered in the last 10 seconds, a topic whose socket will send a new snapshot,
+and, after a focus change without hiding, reads kept current by live hints. Authentication changes close the socket
 and clear subscriptions and cached authority. Reconnect fetches current state;
 there is no reliance on replaying every missed event. Subscription/collector limits
 leave excess reads on HTTP recovery. Older panels retain the conservative
@@ -176,6 +195,23 @@ existing rows, expansion, selections and drafts. Skeletons have an accessible
 loading label and respect reduced-motion preferences. Database metadata is live;
 passwords are requested only when revealed and hidden again when list data changes.
 The uploads layout and existing transfer controls are unchanged.
+
+## Browser read cache
+
+`hooks/queryCache.ts` keeps the last answer of every eligible read in memory,
+paints it at once and always fetches it again (stale-while-revalidate). `queryTTL`
+now only decides how long an allowlisted answer counts as fresh. Eligible reads
+are those `readPolicy.ts` refreshes in the background, minus credentials, tokens,
+signed URLs, file bytes, live telemetry, account security pages and the session.
+The reinstall dialog reads with `useFreshAPI`, which never paints an earlier
+answer. The cache is purged when the session identity changes, on any 401 and on
+sign-in or sign-out; another tab's session change drops unwatched answers and
+refetches watched ones. Nothing is persisted.
+
+A successful write refreshes reads of its route family only (`mutationTargets`):
+for example a file write refreshes that server's file listings and activity; a
+backup refreshes backups, files and the server; power, settings and unknown server
+writes refresh every read of that server; unknown routes refresh everything.
 
 ## Failure cases and verification
 
@@ -194,8 +230,9 @@ Additional boundaries to preserve:
   reconciliation also covers a lost notification or disabled notification source.
 - Bulk actions coalesce wake-ups. New pagination/filter paths have separate
   authorized state; changing pages never reuses another page's snapshot.
-- Revoked access is rechecked before payload delivery. Hints contain no resource
-  identity or data, and HTTP rechecks permissions independently.
+- Revoked access is rechecked before payload delivery. Hints name only servers
+  the account may open (or could open before the change that removed it) and
+  carry no data; HTTP rechecks permissions independently.
 - A failed mutation is never retried automatically. File metadata may refresh
   after a partial failure; the original operation error stays visible.
 - Unknown future endpoint families use conservative HTTP read recovery; adding

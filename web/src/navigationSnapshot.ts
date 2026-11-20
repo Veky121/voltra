@@ -1,9 +1,14 @@
 import {readSavedList, writeAccountSnapshot} from './accountSnapshots';
 
 export type SavedNavigationServer = {
-  uuid: string; identifier: string; name: string; egg_name?: string;
+  uuid: string;
+  identifier: string;
+  name: string;
+  egg_name?: string;
   artwork?: {game?: 'minecraft'; server_icon?: string; pack_icon?: string; pack_name?: string};
-  status: string | null; favorite: boolean; last_visited_at: string | null;
+  status: string | null;
+  favorite: boolean;
+  last_visited_at: string | null;
 };
 
 const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
@@ -28,12 +33,23 @@ export function saveNavigation(servers: unknown[], owner: number | undefined, no
 
 /** Exactly what the sidebar draws for a server. Nothing else in the panel's answer is saved. */
 export function savedNavigationEntry(server: any): SavedNavigationServer {
-  const artwork = server?.artwork && typeof server.artwork === 'object'
-    ? {game: server.artwork.game === 'minecraft' ? 'minecraft' as const : undefined, server_icon: text(server.artwork.server_icon), pack_icon: text(server.artwork.pack_icon), pack_name: text(server.artwork.pack_name)}
-    : undefined;
+  const artwork =
+    server?.artwork && typeof server.artwork === 'object'
+      ? {
+          game: server.artwork.game === 'minecraft' ? ('minecraft' as const) : undefined,
+          server_icon: text(server.artwork.server_icon),
+          pack_icon: text(server.artwork.pack_icon),
+          pack_name: text(server.artwork.pack_name),
+        }
+      : undefined;
   return {
-    uuid: String(server?.uuid ?? ''), identifier: String(server?.identifier ?? ''), name: String(server?.name ?? ''),
-    egg_name: text(server?.egg_name), artwork, status: text(server?.status) ?? null,
-    favorite: server?.favorite === true, last_visited_at: text(server?.last_visited_at) ?? null,
+    uuid: String(server?.uuid ?? ''),
+    identifier: String(server?.identifier ?? ''),
+    name: String(server?.name ?? ''),
+    egg_name: text(server?.egg_name),
+    artwork,
+    status: text(server?.status) ?? null,
+    favorite: server?.favorite === true,
+    last_visited_at: text(server?.last_visited_at) ?? null,
   };
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 // Wings reapplies property mappings at startup. Save the corresponding editable
@@ -27,11 +28,11 @@ func (a *App) minecraftQuickUpdate(ctx context.Context, server M, file, revision
 	if err != nil {
 		return err
 	}
-	if revision != quickRevision("minecraft", file, content, exists) {
-		return APIError{409, "QuickSetupRevisionConflict", "These settings changed since you opened Quick setup. Reload before saving."}
+	if revision != gamesettings.QuickRevision("minecraft", file, content, exists) {
+		return APIError{Status: 409, Code: "QuickSetupRevisionConflict", Detail: "These settings changed since you opened Quick setup. Reload before saving."}
 	}
 	if !exists {
-		return APIError{409, "QuickSetupConfigMissing", "The game has not created its configuration yet. Start it once, stop it, then reload Quick setup."}
+		return APIError{Status: 409, Code: "QuickSetupConfigMissing", Detail: "The game has not created its configuration yet. Start it once, stop it, then reload Quick setup."}
 	}
 	egg, err := a.serverEffectiveEgg(ctx, server)
 	if err != nil {
@@ -48,7 +49,7 @@ func (a *App) minecraftQuickUpdate(ctx context.Context, server M, file, revision
 			filePatch[key] = minecraftPropertyEnumNumber(key, value)
 		}
 	}
-	updated, err := quickPatchProperties(content, filePatch)
+	updated, err := gamesettings.QuickPatchProperties(content, filePatch)
 	if err != nil {
 		return err
 	}

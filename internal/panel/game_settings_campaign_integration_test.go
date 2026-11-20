@@ -9,15 +9,16 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestCampaignParsersAPI(t *testing.T) {
 	for _, tc := range []struct{ recipe, file, data, key, value string }{
-		{"voyagers_of_nera/egg-voyagers-of-nera.json", voyagersSettingsPath, "[" + voyagersSettingsSection + "]\nHostServerDisplayName=Before\nHostServerPassword=private-fixture-secret\nMaxPlayers=10\nAutosaveTimerSeconds=300\n", voyagersSettingsSection + "/HostServerDisplayName", "After"},
-		{"the_forest/egg-the-forest.json", forestSettingsPath, "serverName Before\nserverPlayers 5\nserverPassword private-fixture-secret\n", "serverName", "After"},
+		{"voyagers_of_nera/egg-voyagers-of-nera.json", gamesettings.VoyagersSettingsPath, "[" + gamesettings.VoyagersSettingsSection + "]\nHostServerDisplayName=Before\nHostServerPassword=private-fixture-secret\nMaxPlayers=10\nAutosaveTimerSeconds=300\n", gamesettings.VoyagersSettingsSection + "/HostServerDisplayName", "After"},
+		{"the_forest/egg-the-forest.json", gamesettings.ForestSettingsPath, "serverName Before\nserverPlayers 5\nserverPassword private-fixture-secret\n", "serverName", "After"},
 		{"subnautica_nitrox_mod/egg-subnautica.json", "/NitroxData/saves/nitrox_world/server.cfg", "MaxConnections=10\n", "MaxConnections", "8"},
-		{"squad/egg-squad.json", squadSettingsPath, "ServerName=\"Before\"\nMaxPlayers=20\n", "ServerName", "After"},
-		{starboundAuthorityRecipe, "/storage/starbound_server.config", `{"serverName":"Before","maxPlayers":8}`, "/serverName", "After"},
+		{"squad/egg-squad.json", gamesettings.SquadSettingsPath, "ServerName=\"Before\"\nMaxPlayers=20\n", "ServerName", "After"},
+		{gamesettings.StarboundAuthorityRecipe, "/storage/starbound_server.config", `{"serverName":"Before","maxPlayers":8}`, "/serverName", "After"},
 		{"truck-simulator/american-truck-simulator/egg-american-truck-simulator-dedicated-server.json", "/.local/share/American Truck Simulator/server_config.sii", truckFixture, "lobby_name", "After"},
 		{"truck-simulator/euro-truck-simulator2/egg-euro-truck-simulator2-dedicated-server.json", "/.local/share/Euro Truck Simulator 2/server_config.sii", truckFixture, "lobby_name", "After"},
 	} {
@@ -32,7 +33,7 @@ func TestCampaignParsersAPI(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -117,7 +118,7 @@ func TestCampaignParsersAPI(t *testing.T) {
 			if f.Writes != beforeDrift {
 				t.Fatal("environment drift wrote")
 			}
-			if tc.recipe == starboundAuthorityRecipe {
+			if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 				old = asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
 				f.Files["/sbinit.config"] = []byte(`{"storageDirectory":"storage","unknown":true}`)
 				infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": old["revision"], "settings": change}, 409)

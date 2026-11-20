@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestASKASettingsAPI(t *testing.T) {
@@ -43,7 +44,7 @@ func TestASKASettingsAPI(t *testing.T) {
 		}
 		original := ";keep\r\nserver name = Before\r\npassword = secret-sentinel\r\nauthentication token = token-sentinel\r\nkeep server world alive = true\r\nsave id = operator\r\n"
 		f.mu.Lock()
-		f.Files[askaSettingsPath], f.State = []byte(original), "offline"
+		f.Files[gamesettings.AskaSettingsPath], f.State = []byte(original), "offline"
 		f.mu.Unlock()
 		endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=%2Fserver%20properties.txt"
 		view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
@@ -53,7 +54,7 @@ func TestASKASettingsAPI(t *testing.T) {
 		}
 		infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{"server name": "After #;= literal", "keep server world alive": false}}, 200)
 		f.mu.Lock()
-		updated := string(f.Files[askaSettingsPath])
+		updated := string(f.Files[gamesettings.AskaSettingsPath])
 		f.mu.Unlock()
 		want := strings.Replace(strings.Replace(original, "Before", "After #;= literal", 1), "= true", "= false", 1)
 		if updated != want {
@@ -66,14 +67,14 @@ func TestASKASettingsAPI(t *testing.T) {
 
 func TestASKALiteralSettingsRoundTrip(t *testing.T) {
 	data := []byte("\ufeff;keep\r\nserver name = Old\r\npassword = \"literal#;=value\"\r\nkeep server world alive = true\r\nsave id = unknown\r\n")
-	p, err := parseASKASettings(data)
+	p, err := gamesettings.ParseASKASettings(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.fields) != 3 || p.fields[1].value != "\"literal#;=value\"" {
-		t.Fatalf("literal parsing: %#v", p.fields)
+	if len(p.Fields) != 3 || p.Fields[1].Value != "\"literal#;=value\"" {
+		t.Fatalf("literal parsing: %#v", p.Fields)
 	}
-	updated, err := p.patch(map[string]string{"server name": "New #;= name", "keep server world alive": "false"})
+	updated, err := p.Patch(map[string]string{"server name": "New #;= name", "keep server world alive": "false"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,11 +83,11 @@ func TestASKALiteralSettingsRoundTrip(t *testing.T) {
 	if !bytes.Equal(updated, want) {
 		t.Fatalf("unrelated bytes changed: %q", updated)
 	}
-	if _, err = parseASKASettings(updated); err != nil {
+	if _, err = gamesettings.ParseASKASettings(updated); err != nil {
 		t.Fatal(err)
 	}
 	for _, change := range []map[string]string{{"server name": "bad\nkey=value"}, {"save id": "overwrite"}, {"keep server world alive": "1"}} {
-		if _, err := p.patch(change); err == nil {
+		if _, err := p.Patch(change); err == nil {
 			t.Fatal("unsafe patch accepted")
 		}
 	}
@@ -94,7 +95,7 @@ func TestASKALiteralSettingsRoundTrip(t *testing.T) {
 
 func TestASKAAmbiguityAndDispatch(t *testing.T) {
 	for _, data := range []string{"password=a\npassword=b", "Password=a", "keep server world alive=1", "password=bad\x00value"} {
-		if _, err := parseASKASettings([]byte(data)); err == nil {
+		if _, err := gamesettings.ParseASKASettings([]byte(data)); err == nil {
 			t.Fatalf("accepted %q", data)
 		}
 	}
@@ -102,12 +103,12 @@ func TestASKAAmbiguityAndDispatch(t *testing.T) {
 		if entry.Path != "Aska/egg-aska.json" {
 			continue
 		}
-		egg := M{"uuid": gameTemplateEggUUID(entry), "_campaign_parser_path": askaSettingsPath}
-		p, err := parseGameSettingsForEgg(egg, askaSettingsPath, []byte("server name = Spaced Name\npassword = literal#value\n"))
-		if err != nil || len(p.fields) != 2 || p.fields[0].key != "server name" {
-			t.Fatalf("dispatch failed: %v %#v", err, p.fields)
+		egg := M{"uuid": gameTemplateEggUUID(entry), "_campaign_parser_path": gamesettings.AskaSettingsPath}
+		p, err := gamesettings.ParseForEgg(egg, gamesettings.AskaSettingsPath, []byte("server name = Spaced Name\npassword = literal#value\n"))
+		if err != nil || len(p.Fields) != 2 || p.Fields[0].Key != "server name" {
+			t.Fatalf("dispatch failed: %v %#v", err, p.Fields)
 		}
-		if !strings.Contains(p.fields[1].value, "#") {
+		if !strings.Contains(p.Fields[1].Value, "#") {
 			t.Fatal("INI comment rules applied")
 		}
 		return
@@ -118,21 +119,21 @@ func TestASKAAmbiguityAndDispatch(t *testing.T) {
 // The editor must not publish values refused by the startup preflight.
 func TestASKAPreflightParity(t *testing.T) {
 	original := []byte("server name = retain\r\nauthentication token = fixture-token\r\nkeep server world alive = false\r\n")
-	p, err := parseASKASettings(original)
+	p, err := gamesettings.ParseASKASettings(original)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, value := range []string{"", " ", "\t", "\u00a0", string([]byte{0xff})} {
-		if _, err := p.patch(map[string]string{"authentication token": value}); err == nil {
+		if _, err := p.Patch(map[string]string{"authentication token": value}); err == nil {
 			t.Fatal("accepted invalid token")
 		}
 	}
 	for _, value := range [][]byte{[]byte("server name = \xff\n"), []byte("authentication token = \u00a0\n")} {
-		if _, err := parseASKASettings(value); err == nil {
+		if _, err := gamesettings.ParseASKASettings(value); err == nil {
 			t.Fatal("accepted invalid native document")
 		}
 	}
-	preserved, err := p.patch(map[string]string{})
+	preserved, err := p.Patch(map[string]string{})
 	if err != nil || !bytes.Equal(preserved, original) {
 		t.Fatal("refusal changed native document")
 	}

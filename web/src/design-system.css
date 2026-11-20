@@ -1,6 +1,6 @@
 /* Adapted design principles from T3 Code: semantic tokens, quiet surfaces,
    compact controls, and SettingsSection -> group -> row composition. */
-:root{--ui-font-scale:1.25;font-size:calc(16px * var(--ui-font-scale));--font-ui:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;--ui-control-radius:8px;--ui-card-radius:12px;--ui-control-height:40px;--ui-card-padding:22px;--ui-border:#ffffff0f;--ui-divider:#ffffff0a;--ui-surface:#17191de8;--ui-input:#111317;--ui-hover:#ffffff06;--line:var(--ui-border);--line-strong:#ffffff20;--surface:var(--ui-surface);--surface-muted:#121418;--surface-raised:#22252c;--card:var(--surface);--text:#eceef2;--muted:#969da9;font-family:var(--font-ui)}
+:root{font-size:calc(16px * var(--ui-font-scale));font-family:var(--font-ui)}
 .card,.metric-card{border:1px solid var(--ui-border);border-radius:var(--ui-card-radius);background:var(--ui-surface);box-shadow:0 1px 2px #00000008}
 .card{padding:var(--ui-card-padding)}
 .card>h2,.card>header h2{font-size:calc(14px * var(--ui-font-scale,1));font-weight:550;letter-spacing:-.01em}
@@ -46,5 +46,5 @@ input[readonly]{color:#a8b0bd}
 .settings-actions--split{justify-content:space-between}
 .settings-note{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;color:var(--muted);margin:0}
 @container(max-width:480px){.settings-row-layout{grid-template-columns:minmax(0,1fr);gap:12px}.settings-row-control{justify-content:flex-start}.settings-row-control>.appearance-setting-controls{width:100%}}
-@media(pointer:coarse){:root{--ui-control-height:40px}.button{min-height:40px}.ui-switch{touch-action:manipulation}}
-@media(max-width:760px){:root{--ui-card-padding:16px}.settings-section-heading{padding:0 12px}.settings-row-layout{padding:14px}.settings-actions{padding:12px 14px}.modal{padding:18px}}
+@media(pointer:coarse){.button{min-height:40px}.ui-switch{touch-action:manipulation}}
+@media(max-width:760px){.settings-section-heading{padding:0 12px}.settings-row-layout{padding:14px}.settings-actions{padding:12px 14px}.modal{padding:18px}}

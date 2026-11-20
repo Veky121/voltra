@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestGameSettingsNativeRoundTrips(t *testing.T) {
@@ -19,27 +20,27 @@ func TestGameSettingsNativeRoundTrips(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.file, func(t *testing.T) {
-			parsed, err := parseGameSettings(tc.file, []byte(tc.input))
+			parsed, err := gamesettings.Parse(tc.file, []byte(tc.input))
 			if err != nil {
 				t.Fatal(err)
 			}
-			updated, err := parsed.patch(map[string]string{tc.key: tc.value})
+			updated, err := parsed.Patch(map[string]string{tc.key: tc.value})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !strings.Contains(string(updated), tc.keep) {
 				t.Fatalf("lost untouched configuration: %s", updated)
 			}
-			next, err := parseGameSettings(tc.file, updated)
+			next, err := gamesettings.Parse(tc.file, updated)
 			if err != nil {
 				t.Fatal(err)
 			}
 			found := false
-			for _, f := range next.fields {
-				if f.key == tc.key {
+			for _, f := range next.Fields {
+				if f.Key == tc.key {
 					found = true
-					if f.value != tc.value {
-						t.Fatalf("value did not round trip: %q", f.value)
+					if f.Value != tc.value {
+						t.Fatalf("value did not round trip: %q", f.Value)
 					}
 				}
 			}
@@ -52,16 +53,16 @@ func TestGameSettingsNativeRoundTrips(t *testing.T) {
 
 func TestGameSettingsJSONExactNumbers(t *testing.T) {
 	input := `{"enabled":true,"operator":18446744073709551617,"decimal":0.123456789012345678901,"list":[18446744073709551618],"a/b":{"~name":"before"}}`
-	parsed, err := parseGameSettings("/server.json", []byte(input))
+	parsed, err := gamesettings.Parse("/server.json", []byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range parsed.fields {
-		if field.key == "/list" && field.value != "[18446744073709551618]" {
-			t.Fatalf("list display rounded an operator value: %s", field.value)
+	for _, field := range parsed.Fields {
+		if field.Key == "/list" && field.Value != "[18446744073709551618]" {
+			t.Fatalf("list display rounded an operator value: %s", field.Value)
 		}
 	}
-	updated, err := parsed.patch(map[string]string{"/enabled": "false", "/a~1b/~0name": "after"})
+	updated, err := parsed.Patch(map[string]string{"/enabled": "false", "/a~1b/~0name": "after"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,60 +71,60 @@ func TestGameSettingsJSONExactNumbers(t *testing.T) {
 			t.Fatalf("lost exact JSON value %s: %s", exact, updated)
 		}
 	}
-	updated, err = parsed.patch(map[string]string{"/list": "[18446744073709551619,0.123456789012345678901]"})
+	updated, err = parsed.Patch(map[string]string{"/list": "[18446744073709551619,0.123456789012345678901]"})
 	if err != nil || !strings.Contains(string(updated), "18446744073709551619") || !strings.Contains(string(updated), "0.123456789012345678901") {
 		t.Fatalf("list precision lost: %s, %v", updated, err)
 	}
 }
 
 func TestGameSettingsUppercaseTOMLSafety(t *testing.T) {
-	if _, err := parseGameSettings("/server.TOML", []byte("name=1\nname=2\n")); err == nil {
+	if _, err := gamesettings.Parse("/server.TOML", []byte("name=1\nname=2\n")); err == nil {
 		t.Fatal("uppercase TOML bypassed duplicate rejection")
 	}
-	parsed, err := parseGameSettings("/server.TOML", []byte("settings={a=1}\n"))
+	parsed, err := gamesettings.Parse("/server.TOML", []byte("settings={a=1}\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(parsed.fields) != 1 || parsed.fields[0].kind != "readonly" {
+	if len(parsed.Fields) != 1 || parsed.Fields[0].Kind != "readonly" {
 		t.Fatal("complex uppercase TOML value became editable")
 	}
 }
 
 func TestGameSettingsListsAndBooleanEncoding(t *testing.T) {
-	parsed, err := parseGameSettings("/paper.yml", []byte("# keep\nallowed: []\nflags:\n  enabled: true\n"))
+	parsed, err := gamesettings.Parse("/paper.yml", []byte("# keep\nallowed: []\nflags:\n  enabled: true\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := parsed.patch(map[string]string{"/allowed": "[\"minecraft:stone\",\"minecraft:dirt\"]"})
+	updated, err := parsed.Patch(map[string]string{"/allowed": "[\"minecraft:stone\",\"minecraft:dirt\"]"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	next, err := parseGameSettings("/paper.yml", updated)
+	next, err := gamesettings.Parse("/paper.yml", updated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(next.fields) != 2 {
+	if len(next.Fields) != 2 {
 		t.Fatal("list was split into unrelated fields")
 	}
 	for _, tc := range []struct{ key, value, kind string }{{"enabled", "1", "boolean"}, {"RCONEnabled", "0", "boolean"}, {"max-players", "1", "number"}, {"island", "1", "number"}, {"entity-broadcast-range-percentage", "1", "number"}, {"pvp", "false", "boolean"}, {"password", "true", "text"}} {
-		f := gameSettingType(tc.key, tc.value)
-		if f.kind != tc.kind {
-			t.Errorf("%s: got %s want %s", tc.key, f.kind, tc.kind)
+		f := gamesettings.SettingType(tc.key, tc.value)
+		if f.Kind != tc.kind {
+			t.Errorf("%s: got %s want %s", tc.key, f.Kind, tc.kind)
 		}
 	}
-	fields := []gameSetting{gameSettingType("Enabled", "1")}
-	patch, err := gameSettingsChanges(fields, M{"Enabled": false}, M{}, "/server.ini")
+	fields := []gamesettings.Setting{gamesettings.SettingType("Enabled", "1")}
+	patch, err := gamesettings.Changes(fields, M{"Enabled": false}, M{}, "/server.ini")
 	if err != nil || patch["Enabled"] != "0" {
 		t.Fatal("boolean lost its native numeric representation")
 	}
-	if _, err = gameSettingsChanges(fields, M{"Enabled": "false"}, M{}, "/server.ini"); err == nil {
+	if _, err = gamesettings.Changes(fields, M{"Enabled": "false"}, M{}, "/server.ini"); err == nil {
 		t.Fatal("invalid boolean accepted")
 	}
 }
 
 func TestGameSettingsRejectAmbiguousDocuments(t *testing.T) {
 	for _, tc := range []struct{ file, input string }{{"/paper.yml", "x: 1\nx: 2\n"}, {"/paper.yml", "x: &x {a: 1}\ny: *x\n"}, {"/server.json", "{invalid}"}} {
-		if _, err := parseGameSettings(tc.file, []byte(tc.input)); err == nil {
+		if _, err := gamesettings.Parse(tc.file, []byte(tc.input)); err == nil {
 			t.Errorf("ambiguous document accepted: %s", tc.input)
 		}
 	}

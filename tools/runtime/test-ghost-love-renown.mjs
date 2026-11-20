@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {templatePortRanges,templateAdditionalPorts,templatePortEnvironment,templatePortsValid} from '../../web/src/client/gameTemplateModel.ts';
+import {templatePortRanges,templateAdditionalPorts,templatePortEnvironment,templatePortsValid} from '../../web/src/features/game-library/gameTemplateModel.ts';
 const profiles=JSON.parse(fs.readFileSync('.local/ghost-love-renown/profiles.json')),catalog=JSON.parse(fs.readFileSync('internal/panel/game_library/upstream/catalog.json'));
 let originals=0;
 for(const[path,profile]of Object.entries(profiles)){

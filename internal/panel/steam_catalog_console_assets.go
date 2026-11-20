@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"voltra/internal/gamesettings"
 )
 
 //go:embed managed_console_assets
@@ -85,11 +86,11 @@ func (a *App) steamCatalogReadNativeFile(ctx context.Context, server M, file str
 	if err != nil || !exists {
 		return nil, false, err
 	}
-	entry, exists, err := quickFindEntry(entries, "console-client")
+	entry, exists, err := gamesettings.QuickFindEntry(entries, "console-client")
 	if err != nil || !exists {
 		return nil, false, err
 	}
-	if !quickFileEntry(entry) {
+	if !gamesettings.QuickFileEntry(entry) {
 		return nil, false, bad("Managed console executable must be a regular file.")
 	}
 	response, err := a.daemonServer(ctx, server, "GET", "/files/contents?"+url.Values{"file": {steamCatalogConsolePath}}.Encode(), nil)

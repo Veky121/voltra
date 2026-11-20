@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestGameTemplateProvisioningAndRetries(t *testing.T) {
@@ -234,7 +235,7 @@ func TestValheimProvisioningRequiresConsecutivePortsAndPreservesSettings(t *test
 	if err = a.steamGameAfterInstall(context.Background(), server); err != nil {
 		t.Fatal(err)
 	}
-	values, err := valheimValues(wings.Files[valheimSettingsPath])
+	values, err := gamesettings.ValheimValues(wings.Files[gamesettings.ValheimSettingsPath])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,11 +243,11 @@ func TestValheimProvisioningRequiresConsecutivePortsAndPreservesSettings(t *test
 		t.Fatal("initial settings missing")
 	}
 	original := []byte("name=Operator world\npassword=retained-pass\nworld=Another\npublic=false\n")
-	wings.Files[valheimSettingsPath] = original
+	wings.Files[gamesettings.ValheimSettingsPath] = original
 	if err = a.steamGameAfterInstall(context.Background(), server); err != nil {
 		t.Fatal(err)
 	}
-	if string(wings.Files[valheimSettingsPath]) != string(original) {
+	if string(wings.Files[gamesettings.ValheimSettingsPath]) != string(original) {
 		t.Fatal("existing game settings overwritten")
 	}
 	spec, _ := steamGameSpecFor("valheim")
@@ -264,11 +265,11 @@ func TestValheimQuickSettingsTreatShellTextAsData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	content, err := valheimPatch([]byte("custom=retained\n"), patch)
+	content, err := gamesettings.ValheimPatch([]byte("custom=retained\n"), patch)
 	if err != nil {
 		t.Fatal(err)
 	}
-	read, err := valheimValues(content)
+	read, err := gamesettings.ValheimValues(content)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +282,7 @@ func TestValheimQuickSettingsTreatShellTextAsData(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{"name=One\nname=Two\n", "not-a-setting\n", "name=bad\r\n"} {
-		if _, err = valheimValues([]byte(bad)); err == nil {
+		if _, err = gamesettings.ValheimValues([]byte(bad)); err == nil {
 			t.Fatal("accepted malformed config")
 		}
 	}

@@ -8,12 +8,24 @@ import {bootHints} from '../build/bootHints.ts';
 
 async function fixture(options) {
   const root = await mkdtemp(join(tmpdir(), 'voltra-hints-'));
-  await writeFile(join(root, 'index.html'), '<!doctype html><html lang="en"><head><title>Voltra</title></head><body><script type="module" src="/entry.js"></script></body></html>');
-  await writeFile(join(root, 'entry.js'), 'import "./entry.css";document.body.onclick=()=>import("./route.js").then(m=>m.open());');
+  await writeFile(
+    join(root, 'index.html'),
+    '<!doctype html><html lang="en"><head><title>Voltra</title></head><body><script type="module" src="/entry.js"></script></body></html>'
+  );
+  await writeFile(
+    join(root, 'entry.js'),
+    'import "./entry.css";document.body.onclick=()=>import("./route.js").then(m=>m.open());'
+  );
   await writeFile(join(root, 'entry.css'), 'body{margin:0}');
-  await writeFile(join(root, 'route.js'), 'import "./route.css";import {label} from "./shared.js";export const open=()=>import("./page.js").then(m=>m.show(label));');
+  await writeFile(
+    join(root, 'route.js'),
+    'import "./route.css";import {label} from "./shared.js";export const open=()=>import("./page.js").then(m=>m.show(label));'
+  );
   await writeFile(join(root, 'route.css'), 'main{color:green}');
-  await writeFile(join(root, 'page.js'), 'import "./page.css";import {label} from "./shared.js";export const show=text=>{document.body.textContent=text+label};');
+  await writeFile(
+    join(root, 'page.js'),
+    'import "./page.css";import {label} from "./shared.js";export const show=text=>{document.body.textContent=text+label};'
+  );
   await writeFile(join(root, 'page.css'), 'section{color:blue}');
   await writeFile(join(root, 'shared.js'), 'export const label="Loaded";');
   await build({root, configFile: false, logLevel: 'silent', plugins: [bootHints(options)]});
@@ -26,13 +38,28 @@ test('the first page is listed in the document, once per file and without the en
     const listed = html.match(/<meta name="voltra-first-page" content="([^"]+)">/)?.[1].split(' ') ?? [];
     const entry = html.match(/<script type="module" crossorigin src="([^"]+)">/)[1];
     const entryStyle = html.match(/<link rel="stylesheet" crossorigin href="([^"]+)">/)[1];
-    assert.ok(listed.some(href => /\/assets\/route-[^.]+\.js$/.test(href)), html);
-    assert.ok(listed.some(href => /\/assets\/page-[^.]+\.js$/.test(href)), html);
-    assert.deepEqual(listed.filter(href => href.endsWith('.css')).map(href => href.replace(/-[^.]+\.css$/, '.css')).sort(), ['/assets/page.css', '/assets/route.css']);
+    assert.ok(
+      listed.some(href => /\/assets\/route-[^.]+\.js$/.test(href)),
+      html
+    );
+    assert.ok(
+      listed.some(href => /\/assets\/page-[^.]+\.js$/.test(href)),
+      html
+    );
+    assert.deepEqual(
+      listed
+        .filter(href => href.endsWith('.css'))
+        .map(href => href.replace(/-[^.]+\.css$/, '.css'))
+        .sort(),
+      ['/assets/page.css', '/assets/route.css']
+    );
     assert.equal(new Set(listed).size, listed.length, 'a shared module is listed once');
     assert.ok(!listed.includes(entry) && !listed.includes(entryStyle), 'the entry is already loading');
     for (const href of listed) await access(join(root, 'dist', href));
-    assert.ok(!/rel="(modulepreload|preload)"[^>]+(route|page)-/.test(html), 'startup.js decides whether to fetch them');
+    assert.ok(
+      !/rel="(modulepreload|preload)"[^>]+(route|page)-/.test(html),
+      'startup.js decides whether to fetch them'
+    );
     assert.ok(!html.includes('data-voltra-desktop'));
   } finally {
     await rm(root, {recursive: true, force: true});

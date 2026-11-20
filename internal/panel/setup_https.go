@@ -142,6 +142,7 @@ func (a *App) setupHTTPS(w http.ResponseWriter, r *http.Request) {
 		raw, e := json.Marshal(s)
 		if e == nil {
 			_, e = a.DB.Exec(r.Context(), "UPDATE settings SET value=$1 WHERE key='panel:setup'", raw)
+			a.settingsChanged()
 		}
 		if e != nil {
 			fail(w, e)

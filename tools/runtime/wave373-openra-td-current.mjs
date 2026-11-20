@@ -38,7 +38,7 @@ for(const name of ['build-input-wave348-1793441318355','build-input-wave358-1793
  const p=read(path.join(base,'internal/panel/game_library/overrides.json'))[recipe];
  snapshots.push({name,sealed_fingerprint:manifest.fingerprint,profile_sha256:h.digest(JSON.stringify(p)),installer_sha256:h.digest(p.egg.scripts.installation.script),same_current_installer:p.egg.scripts.installation.script===profile.egg.scripts.installation.script});
 }
-const settingsPath=path.join(runtime.snapshot,'internal/panel/game_settings_openra.go'),settings=fs.readFileSync(settingsPath,'utf8');
+const settingsPath=path.join(runtime.snapshot,'internal/gamesettings/openra.go'),settings=fs.readFileSync(settingsPath,'utf8');
 const settingsEvidence={path:settingsPath,sha256:h.digest(settings),ra_only:settings.includes('const openraSettingsRecipe = "openra/openra_red_alert/egg-open-r-a.json"'),required_startup:'exec python3 .voltra/openra-ra-runtime.py',td_typed_adapter:false};
 if(!settingsEvidence.ra_only)throw Error('Settings eligibility changed; native review required');
 const report={schema_version:1,at:new Date().toISOString(),recipe,mod:'cnc',version:'release-20250330',status:'partial_current_installer_native_checks_pending',full_parity:false,runtime,profile_sha256:h.digest(JSON.stringify(profile)),installer_sha256:h.digest(profile.egg.scripts.installation.script),helpers,snapshots,settings:settingsEvidence,

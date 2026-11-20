@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestSteamCatalogPalworldOriginalControls(t *testing.T) {
@@ -23,7 +24,7 @@ func TestSteamCatalogPalworldOriginalControls(t *testing.T) {
 		if patch["CrossplayPlatforms"] != "(Xbox)" || patch["PublicIP"] != `"127.0.0.1"` || patch["RCONEnabled"] != "True" {
 			t.Fatal("Publisher configuration mapping differs")
 		}
-		raw, err := quickPatchPalworld([]byte("[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(CustomFuture=(A,B),ExpRate=2.0)\n"), patch)
+		raw, err := gamesettings.QuickPatchPalworld([]byte("[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(CustomFuture=(A,B),ExpRate=2.0)\n"), patch)
 		if err != nil || !strings.Contains(string(raw), "CustomFuture=(A,B)") {
 			t.Fatal("Unknown native control lost")
 		}

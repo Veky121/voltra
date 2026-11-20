@@ -447,30 +447,7 @@ func (a *App) eggAttributes(r *http.Request, e M) (M, error) {
 	return out, nil
 }
 func eggPage(r *http.Request, object string, rows []M) M {
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	if per < 1 || per > 1000 {
-		per = 50
-	}
-	total := len(rows)
-	start := (page - 1) * per
-	if start > total {
-		start = total
-	}
-	end := start + per
-	if end > total {
-		end = total
-	}
-	out := collection(object, rows[start:end])
-	pages := (total + per - 1) / per
-	if pages == 0 {
-		pages = 1
-	}
-	out["meta"] = M{"pagination": M{"total": total, "count": end - start, "per_page": per, "current_page": page, "total_pages": pages, "links": M{}}}
-	return out
+	return parseListPage(r.URL.Query(), 50, 1000).Collection(object, rows)
 }
 func (a *App) getEgg(w http.ResponseWriter, r *http.Request) {
 	if !a.eggAdmin(w, r) {

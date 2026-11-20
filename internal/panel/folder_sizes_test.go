@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -171,4 +172,51 @@ func TestFolderSizeEndpointUsesFileReadPermissionAndInvalidatesAfterWrite(t *tes
 		t.Fatal(err)
 	}
 	operationsExpect(t, f.request("GET", f.serverPath("/files/folder-size?directory=%2Fconfig"), nil, f.sub), 403)
+}
+
+func TestFolderSizeBatchAnswersEachFolderInOneRequest(t *testing.T) {
+	f := operationsFixtureNew(t)
+	list := func(query string, user M, status int) []M {
+		t.Helper()
+		body := operationsExpect(t, f.request("GET", f.serverPath("/files/folder-size?batch=1&"+query), nil, user), status)
+		rows := []M{}
+		data, _ := body["data"].([]any)
+		for _, row := range data {
+			rows = append(rows, asMap(asMap(row)["attributes"]))
+		}
+		return rows
+	}
+	rows := list("directory=%2Fmods&directory=plugins&directory=%2Fmods%2F", f.sub, 200)
+	if len(rows) != 2 || rows[0]["directory"] != "/mods" || rows[1]["directory"] != "/plugins" || num(rows[0]["size"]) != 4 || num(rows[1]["size"]) != 4 || rows[0]["error"] != nil {
+		t.Fatalf("Batch did not return one size per distinct folder: %#v", rows)
+	}
+	f.mu.Lock()
+	before := len(f.calls)
+	f.mu.Unlock()
+	list("directory=%2Fmods&directory=%2Fplugins", f.owner, 200)
+	f.mu.Lock()
+	after := len(f.calls)
+	f.mu.Unlock()
+	if before != after {
+		t.Fatal("Batch did not reuse the shared per-folder cache")
+	}
+	// A failing folder reports its own error without hiding its siblings.
+	f.a.folderSizes.invalidate(str(f.server["uuid"]))
+	f.mu.Lock()
+	f.failPath = "/files/list-directory"
+	f.mu.Unlock()
+	rows = list("directory=%2Fbroken", f.owner, 200)
+	if len(rows) != 1 || rows[0]["error"] == nil || rows[0]["size"] != nil {
+		t.Fatalf("Failed folder was not reported: %#v", rows)
+	}
+	f.mu.Lock()
+	f.failPath = ""
+	f.mu.Unlock()
+	many := strings.Repeat("directory=%2Fd&", folderSizeBatchLimit+1)
+	operationsExpect(t, f.request("GET", f.serverPath("/files/folder-size?batch=1&"+many), nil, f.owner), 422)
+	operationsExpect(t, f.request("GET", f.serverPath("/files/folder-size?batch=1"), nil, f.owner), 422)
+	if err := f.a.exec(context.Background(), "UPDATE subusers SET permissions='[]'::jsonb WHERE server_id=$1 AND user_id=$2", num(f.server["id"]), num(f.sub["id"])); err != nil {
+		t.Fatal(err)
+	}
+	operationsExpect(t, f.request("GET", f.serverPath("/files/folder-size?batch=1&directory=%2Fmods"), nil, f.sub), 403)
 }

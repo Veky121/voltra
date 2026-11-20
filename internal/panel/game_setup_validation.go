@@ -36,7 +36,7 @@ func setupPublicIPv4(value string) bool {
 
 func validateTemplateSetupMetadata(validations []templateSetupValidation, egg M) error {
 	invalid := func() error {
-		return APIError{409, "GameSetupValidationMetadataInvalid", "This template's setup validation needs a compatibility review."}
+		return APIError{Status: 409, Code: "GameSetupValidationMetadataInvalid", Detail: "This template's setup validation needs a compatibility review."}
 	}
 	if len(validations) > 64 {
 		return invalid()
@@ -75,7 +75,7 @@ func validateTemplateSetupEnvironment(validations []templateSetupValidation, egg
 	// Bind the cross-control rule to the reviewed native launcher. Compare the
 	// effective environment representation, without changing stored values.
 	if str(egg["startup"]) == "exec bash .voltra/unturned-entry.sh" && eggEnvironmentString(environment["PUBLIC_SERVER"]) == "1" && eggEnvironmentString(environment["OFFLINE_ONLY"]) == "1" {
-		return APIError{422, "GameSetupValidationFailed", "PUBLIC_SERVER and OFFLINE_ONLY are mutually exclusive. Choose LAN/offline or Internet mode."}
+		return APIError{Status: 422, Code: "GameSetupValidationFailed", Detail: "PUBLIC_SERVER and OFFLINE_ONLY are mutually exclusive. Choose LAN/offline or Internet mode."}
 	}
 	for _, rule := range validations {
 		raw, exists := environment[rule.Environment]
@@ -84,7 +84,7 @@ func validateTemplateSetupEnvironment(validations []templateSetupValidation, egg
 			continue
 		}
 		if !ok || !setupPublicIPv4(value) {
-			return APIError{422, "GameSetupValidationFailed", rule.Environment + ": " + rule.Message}
+			return APIError{Status: 422, Code: "GameSetupValidationFailed", Detail: rule.Environment + ": " + rule.Message}
 		}
 	}
 	return nil

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func ss14TestEgg(t *testing.T) M {
 	t.Helper()
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path == ss14SettingsRecipe {
+		if entry.Path == gamesettings.Ss14SettingsRecipe {
 			return M{"uuid": gameTemplateEggUUID(entry)}
 		}
 	}
@@ -29,9 +30,9 @@ func TestSS14ScalarSafetyRejectsBeforeUnderlyingPatch(t *testing.T) {
 	} {
 		t.Run(tc.key+"/"+tc.value, func(t *testing.T) {
 			called := false
-			parsed := gameSettingsParsed{patch: func(map[string]string) ([]byte, error) { called = true; return nil, nil }}
-			parsed = ss14GameSettingsSafety(egg, ss14SettingsPath, parsed)
-			if _, err := parsed.patch(map[string]string{tc.key: tc.value}); err == nil || called {
+			parsed := gamesettings.Parsed{Patch: func(map[string]string) ([]byte, error) { called = true; return nil, nil }}
+			parsed = gamesettings.Ss14GameSettingsSafety(egg, gamesettings.Ss14SettingsPath, parsed)
+			if _, err := parsed.Patch(map[string]string{tc.key: tc.value}); err == nil || called {
 				t.Fatal("invalid scalar reached underlying editor")
 			}
 		})
@@ -40,13 +41,13 @@ func TestSS14ScalarSafetyRejectsBeforeUnderlyingPatch(t *testing.T) {
 
 func TestSS14ScalarSafetyPreservesUnknownNativeBytes(t *testing.T) {
 	original := []byte("# operator\r\n[game]\r\nhostname = \"before\" # retained\r\nsoft_max_players=8\r\n[net]\r\ntickrate=30\r\nmax_connections=8\r\n[private]\r\nopaque = 'operator bytes' # unknown\r\n")
-	parsed, err := parseGameSettings(ss14SettingsPath, original)
+	parsed, err := gamesettings.Parse(gamesettings.Ss14SettingsPath, original)
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed = ss14GameSettingsSafety(ss14TestEgg(t), ss14SettingsPath, parsed)
+	parsed = gamesettings.Ss14GameSettingsSafety(ss14TestEgg(t), gamesettings.Ss14SettingsPath, parsed)
 	name := strings.Repeat("界", 48)
-	updated, err := parsed.patch(map[string]string{"game/hostname": name, "game/soft_max_players": "256", "net/max_connections": "1", "net/tickrate": "80"})
+	updated, err := parsed.Patch(map[string]string{"game/hostname": name, "game/soft_max_players": "256", "net/max_connections": "1", "net/tickrate": "80"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,16 +65,16 @@ func TestSS14ScalarSafetyExactRecipeAndPath(t *testing.T) {
 		egg  M
 		file string
 	}{
-		{M{}, ss14SettingsPath}, {ss14TestEgg(t), "/other/server_config.toml"}, {ss14TestEgg(t), "/ss14/server_config.TOML"},
+		{M{}, gamesettings.Ss14SettingsPath}, {ss14TestEgg(t), "/other/server_config.toml"}, {ss14TestEgg(t), "/ss14/server_config.TOML"},
 	} {
 		called := false
-		parsed := gameSettingsParsed{patch: func(map[string]string) ([]byte, error) { called = true; return nil, nil }}
-		parsed = ss14GameSettingsSafety(tc.egg, tc.file, parsed)
-		if _, err := parsed.patch(map[string]string{"net/tickrate": "0"}); err != nil || !called {
+		parsed := gamesettings.Parsed{Patch: func(map[string]string) ([]byte, error) { called = true; return nil, nil }}
+		parsed = gamesettings.Ss14GameSettingsSafety(tc.egg, tc.file, parsed)
+		if _, err := parsed.Patch(map[string]string{"net/tickrate": "0"}); err != nil || !called {
 			t.Fatal("SS14 restriction leaked outside exact recipe/path")
 		}
 	}
-	if parsed := ss14GameSettingsSafety(ss14TestEgg(t), ss14SettingsPath, gameSettingsParsed{}); parsed.patch != nil {
+	if parsed := gamesettings.Ss14GameSettingsSafety(ss14TestEgg(t), gamesettings.Ss14SettingsPath, gamesettings.Parsed{}); parsed.Patch != nil {
 		t.Fatal("nil patch changed")
 	}
 }

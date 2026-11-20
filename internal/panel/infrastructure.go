@@ -127,23 +127,7 @@ func (a *App) infraCRUD(resource string) http.HandlerFunc {
 				writeJSON(w, 200, item(object, result))
 				return
 			}
-			records, e := a.query(r.Context(), "SELECT * FROM "+table+" ORDER BY id")
-			if e != nil {
-				fail(w, e)
-				return
-			}
-			filtered := make([]M, 0, len(records))
-			for _, row := range records {
-				if infraFilter(r, row) {
-					result, e := a.infraPresent(r, resource, row)
-					if e != nil {
-						fail(w, e)
-						return
-					}
-					filtered = append(filtered, result)
-				}
-			}
-			infraPage(w, r, object, filtered)
+			a.infraList(w, r, resource)
 		case "POST", "PATCH":
 			data, e := decode(r)
 			if e != nil {
@@ -276,33 +260,7 @@ func infraFilter(r *http.Request, row M) bool {
 }
 
 func infraPage(w http.ResponseWriter, r *http.Request, object string, records []M) {
-	per := 50
-	page := 1
-	if n, e := strconv.Atoi(r.URL.Query().Get("per_page")); e == nil && n > 0 {
-		per = n
-	}
-	if per > 1000 {
-		per = 1000
-	}
-	if n, e := strconv.Atoi(r.URL.Query().Get("page")); e == nil && n > 0 {
-		page = n
-	}
-	total := len(records)
-	start := (page - 1) * per
-	if start > total {
-		start = total
-	}
-	end := start + per
-	if end > total {
-		end = total
-	}
-	pages := (total + per - 1) / per
-	if pages == 0 {
-		pages = 1
-	}
-	response := collection(object, records[start:end])
-	response["meta"] = M{"pagination": M{"total": total, "count": end - start, "per_page": per, "current_page": page, "total_pages": pages, "links": M{}}}
-	writeJSON(w, 200, response)
+	writeJSON(w, 200, parseListPage(r.URL.Query(), 50, 1000).Collection(object, records))
 }
 
 func (a *App) infraPresent(r *http.Request, resource string, row M) (M, error) {
@@ -1780,7 +1738,9 @@ func (a *App) infraApplySettings(w http.ResponseWriter, r *http.Request, deploym
 			return
 		}
 	}
-	if e = tx.Commit(r.Context()); e != nil {
+	e = tx.Commit(r.Context())
+	a.settingsChanged()
+	if e != nil {
 		fail(w, e)
 		return
 	}

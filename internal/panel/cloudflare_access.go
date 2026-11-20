@@ -205,15 +205,15 @@ func (v *cloudflareVerifier) verify(ctx context.Context, raw string) (cloudflare
 func (a *App) authenticateCloudflare(r *http.Request) (*http.Request, error) {
 	verifier, err := a.accessVerifier()
 	if err != nil {
-		return r, APIError{503, "AccessConfigurationException", "Cloudflare Access login is not configured correctly."}
+		return r, APIError{Status: 503, Code: "AccessConfigurationException", Detail: "Cloudflare Access login is not configured correctly."}
 	}
 	headers := r.Header.Values("Cf-Access-Jwt-Assertion")
 	if len(headers) != 1 {
-		return r, APIError{401, "AuthenticationException", "Sign in through Cloudflare Access."}
+		return r, APIError{Status: 401, Code: "AuthenticationException", Detail: "Sign in through Cloudflare Access."}
 	}
 	identity, err := verifier.verify(r.Context(), headers[0])
 	if err != nil {
-		return r, APIError{401, "AuthenticationException", "Cloudflare Access could not verify this login. Sign in again."}
+		return r, APIError{Status: 401, Code: "AuthenticationException", Detail: "Cloudflare Access could not verify this login. Sign in again."}
 	}
 	id, err := a.cloudflareUser(r.Context(), identity)
 	if err != nil {
@@ -266,7 +266,7 @@ func (a *App) cloudflareUser(ctx context.Context, identity cloudflareIdentity) (
 		return 0, err
 	}
 	if count > 1 {
-		return 0, APIError{403, "AccessIdentityException", "Multiple panel accounts match this identity. Contact the panel administrator."}
+		return 0, APIError{Status: 403, Code: "AccessIdentityException", Detail: "Multiple panel accounts match this identity. Contact the panel administrator."}
 	}
 	if count == 1 {
 		if disabled || subject != "" {
@@ -280,7 +280,7 @@ func (a *App) cloudflareUser(ctx context.Context, identity cloudflareIdentity) (
 				}
 			}
 			if !allowed {
-				return 0, APIError{403, "AccessIdentityException", "This administrator account requires explicit Cloudflare linking by the panel operator."}
+				return 0, APIError{Status: 403, Code: "AccessIdentityException", Detail: "This administrator account requires explicit Cloudflare linking by the panel operator."}
 			}
 		}
 		if _, err = tx.Exec(ctx, "UPDATE users SET access_subject=$1,updated_at=now() WHERE id=$2", identity.Subject, id); err != nil {

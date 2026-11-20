@@ -9,10 +9,8 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -29,9 +27,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"voltra/internal/apiutil"
 )
 
-type M = map[string]any
+type M = apiutil.M
 type Config struct {
 	CloudflareAccessTeamDomain, CloudflareAccessAudience                                   string
 	CloudflareAccessLinkAdminEmails                                                        []string
@@ -40,9 +40,13 @@ type Config struct {
 	DevMode                                                                                bool
 	DevUserID                                                                              int64
 	ConsoleHistoryLines                                                                    int
+	// Database pool limits; zero keeps the DATABASE_URL value or the default.
+	DatabaseMaxConns, DatabaseMinIdleConns           int
+	DatabaseMaxConnLifetime, DatabaseMaxConnIdleTime time.Duration
 }
 type App struct {
 	folderSizes        folderSizeCache
+	settings           settingsCache
 	readChanges        liveReadChanges
 	liveSnapshots      liveSnapshotHub
 	resourceReads      sharedResourceReads
@@ -59,33 +63,23 @@ type App struct {
 	artworkLibraryOnce sync.Once
 	artworkLibrary     *panelArtworkLibrary
 }
-type APIError struct {
-	Status       int
-	Code, Detail string
-}
 
-func (e APIError) Error() string { return e.Detail }
-func bad(detail string) error    { return APIError{422, "ValidationException", detail} }
-func forbidden() error {
-	return APIError{403, "ForbiddenException", "You do not have permission to perform this action."}
-}
-func notFound() error {
-	return APIError{404, "NotFoundException", "The requested resource was not found."}
-}
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if status != 204 {
-		_ = json.NewEncoder(w).Encode(value)
-	}
-}
+// The JSON API primitives live in package apiutil so panel and the packages
+// it serves (such as gamesettings) share one error type and one set of value
+// coercions. These are panel's names for them.
+type APIError = apiutil.APIError
+
+func bad(detail string) error                                { return apiutil.Bad(detail) }
+func forbidden() error                                       { return apiutil.Forbidden() }
+func notFound() error                                        { return apiutil.NotFound() }
+func writeJSON(w http.ResponseWriter, status int, value any) { apiutil.WriteJSON(w, status, value) }
 func fail(w http.ResponseWriter, err error) {
 	status, code, detail := 500, "InternalServerError", "Voltra could not finish this request. Check whether the action took effect before retrying. If this continues, share the request reference with an administrator."
 	var api APIError
 	var apiPointer *APIError
 	if errors.As(err, &api) {
 		status, code, detail = api.Status, api.Code, api.Detail
-	} else if errors.As(err, &apiPointer) {
+	} else if errors.As(err, &apiPointer) && apiPointer != nil {
 		status, code, detail = apiPointer.Status, apiPointer.Code, apiPointer.Detail
 	} else if errors.Is(err, pgx.ErrNoRows) {
 		status, code, detail = 404, "NotFoundException", "The requested resource was not found."
@@ -121,7 +115,7 @@ func fail(w http.ResponseWriter, err error) {
 	}
 	writeJSON(w, status, M{"errors": []M{{"code": code, "status": strconv.Itoa(status), "detail": detail, "request_id": reference}}})
 }
-func item(object string, attributes M) M { return M{"object": object, "attributes": attributes} }
+func item(object string, attributes M) M { return apiutil.Item(object, attributes) }
 func collection(object string, rows []M) M {
 	data := make([]M, 0, len(rows))
 	for _, r := range rows {
@@ -136,81 +130,14 @@ func decode(r *http.Request) (M, error) {
 	}
 	return normalizeInput(m, "").(M), nil
 }
-func decodeRaw(r *http.Request) (M, error) {
-	var m M
-	dec := json.NewDecoder(io.LimitReader(r.Body, 4<<20+1))
-	dec.UseNumber()
-	if err := dec.Decode(&m); err != nil {
-		return nil, bad("A valid JSON object is required.")
-	}
-	if m == nil {
-		return nil, bad("A JSON object is required.")
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		return nil, bad("Only one JSON object is allowed.")
-	}
-	return m, nil
-}
-func num(v any) int64 {
-	switch n := v.(type) {
-	case int:
-		return int64(n)
-	case int32:
-		return int64(n)
-	case int64:
-		return n
-	case float64:
-		return int64(n)
-	case json.Number:
-		i, _ := n.Int64()
-		return i
-	case string:
-		i, _ := strconv.ParseInt(n, 10, 64)
-		return i
-	}
-	return 0
-}
-func str(v any) string {
-	if v == nil {
-		return ""
-	}
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return fmt.Sprint(v)
-}
-func boolean(v any) bool {
-	switch b := v.(type) {
-	case bool:
-		return b
-	case string:
-		return b == "true" || b == "1"
-	default:
-		return num(v) != 0
-	}
-}
-func asMap(v any) M {
-	if m, ok := v.(map[string]any); ok {
-		return m
-	}
-	return M{}
-}
-func asSlice(v any) []any {
-	if a, ok := v.([]any); ok {
-		return a
-	}
-	if a, ok := v.([]string); ok {
-		r := make([]any, len(a))
-		for i, s := range a {
-			r[i] = s
-		}
-		return r
-	}
-	return []any{}
-}
-func now() string     { return time.Now().UTC().Format(time.RFC3339Nano) }
-func newUUID() string { return uuid.NewString() }
+func decodeRaw(r *http.Request) (M, error) { return apiutil.DecodeRaw(r) }
+func num(v any) int64                      { return apiutil.Num(v) }
+func str(v any) string                     { return apiutil.Str(v) }
+func boolean(v any) bool                   { return apiutil.Boolean(v) }
+func asMap(v any) M                        { return apiutil.AsMap(v) }
+func asSlice(v any) []any                  { return apiutil.AsSlice(v) }
+func now() string                          { return time.Now().UTC().Format(time.RFC3339Nano) }
+func newUUID() string                      { return uuid.NewString() }
 func randomToken(bytes int) string {
 	data := make([]byte, bytes)
 	if _, err := rand.Read(data); err != nil {
@@ -425,6 +352,9 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	// The operational CLI can apply an additive schema migration while the
 	// server remains online. Describe per execution avoids stale SELECT * plans.
 	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
+	if err = applyPoolLimits(poolConfig, cfg.DatabaseURL, cfg); err != nil {
+		return nil, err
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, err
@@ -546,19 +476,22 @@ func (a *App) Handler() http.Handler {
 			return
 		}
 		if r.URL.Path != "/healthz" && !strings.HasPrefix(r.URL.Path, "/api/remote/") {
-			var maintenance bool
-			err := a.DB.QueryRow(r.Context(), "SELECT COALESCE(value::text,'false')::boolean FROM settings WHERE key='app.maintenance'").Scan(&maintenance)
-			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			maintenance, err := a.maintenanceEnabled(r.Context())
+			if err != nil {
 				fail(w, err)
 				return
 			}
 			if maintenance {
 				w.Header().Set("Retry-After", "60")
-				fail(w, APIError{503, "MaintenanceException", "The panel is temporarily under maintenance."})
+				fail(w, APIError{Status: 503, Code: "MaintenanceException", Detail: "The panel is temporarily under maintenance."})
 				return
 			}
 		}
-		if !strings.HasPrefix(r.URL.Path, "/api/remote/") && r.URL.Path != "/healthz" {
+		// Only /api routes read the caller's identity. Static files, the page
+		// shell, locales and node installers are public, so they skip the
+		// session, key and Access lookups (and their database reads).
+		apiRequest := r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/")
+		if apiRequest && !strings.HasPrefix(r.URL.Path, "/api/remote/") {
 			var err error
 			if r.URL.Path == "/api/desktop/exchange" && r.Method == http.MethodPost {
 				// The single-use pairing code authenticates this request.
@@ -576,7 +509,7 @@ func (a *App) Handler() http.Handler {
 				}
 			} else if a.cloudflareBrowserRequest(r) {
 				if !setup.Completed {
-					fail(w, APIError{503, "AccessSetupException", "Complete the panel's local administrator setup before enabling Cloudflare Access login."})
+					fail(w, APIError{Status: 503, Code: "AccessSetupException", Detail: "Complete the panel's local administrator setup before enabling Cloudflare Access login."})
 					return
 				}
 				r, err = a.authenticateCloudflare(r)
@@ -604,7 +537,7 @@ func (a *App) Handler() http.Handler {
 				}
 				r = WithUser(r, id)
 			} else if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/setup/") && !strings.HasPrefix(r.URL.Path, "/api/auth/") {
-				fail(w, APIError{401, "AuthenticationException", "Sign in to continue."})
+				fail(w, APIError{Status: 401, Code: "AuthenticationException", Detail: "Sign in to continue."})
 				return
 			}
 			if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
@@ -630,16 +563,23 @@ func (a *App) Handler() http.Handler {
 				return
 			}
 			r.SetPathValue("external", external)
-			a.lifecycleExternal(w, r)
+			serveCompressedAPI(w, r, http.HandlerFunc(a.lifecycleExternal))
 			return
 		}
-		if r.Method!="GET" && r.Method!="HEAD" && r.Method!="OPTIONS" && (UserID(r)>0||strings.HasPrefix(r.URL.Path,"/api/remote/")) && strings.HasPrefix(r.URL.Path,"/api/") {
-			tracked:=&liveMutationResponse{ResponseWriter:w};mux.ServeHTTP(tracked,r)
-			if (tracked.status>=200&&tracked.status<300)||(strings.Contains(r.URL.Path,"/files/")&&tracked.status>=400&&tracked.status!=401&&tracked.status!=403&&tracked.status!=429) {
+		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" && (UserID(r) > 0 || strings.HasPrefix(r.URL.Path, "/api/remote/")) && strings.HasPrefix(r.URL.Path, "/api/") {
+			tracked := &liveMutationResponse{ResponseWriter: w}
+			serveCompressedAPI(tracked, r, mux)
+			if (tracked.status >= 200 && tracked.status < 300) || (strings.Contains(r.URL.Path, "/files/") && tracked.status >= 400 && tracked.status != 401 && tracked.status != 403 && tracked.status != 429) {
 				a.publishMutationReadChanges(r.Context(), r.URL.Path)
-				if !strings.HasSuffix(r.URL.Path,"/navigation")&&(strings.HasPrefix(r.URL.Path,"/api/client/servers/")||strings.HasPrefix(r.URL.Path,"/api/admin/servers")||strings.HasPrefix(r.URL.Path,"/api/application/servers")) {a.liveEvents.navigationChanged(UserID(r))}
+				if !strings.HasSuffix(r.URL.Path, "/navigation") && (strings.HasPrefix(r.URL.Path, "/api/client/servers/") || strings.HasPrefix(r.URL.Path, "/api/admin/servers") || strings.HasPrefix(r.URL.Path, "/api/application/servers")) {
+					a.liveEvents.navigationChanged(UserID(r))
+				}
 			}
-		} else {mux.ServeHTTP(w, r)}
+		} else if apiRequest {
+			serveCompressedAPI(w, r, mux)
+		} else {
+			mux.ServeHTTP(w, r)
+		}
 	})
 }
 func (a *App) serveWeb(w http.ResponseWriter, r *http.Request) {

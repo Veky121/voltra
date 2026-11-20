@@ -2,112 +2,391 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
+import {folderSizeRequests} from '../src/features/files/fileListing.ts';
 
-const key='__fileExplorerPerformanceFixture';
-const bundled=await build({
-  entryPoints:[fileURLToPath(new URL('../src/client/FileExplorer.tsx',import.meta.url))],
-  bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',loader:{'.css':'empty'},
-  plugins:[{name:'explorer-fixture',setup(builder){
-    builder.onResolve({filter:/notifications$|^\.\.\/ui\/IconButton$|^\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/lib$|^\.\.\/Icons$|^\.\/common$/},args=>({path:args.path,namespace:'fixture'}));
-    builder.onLoad({filter:/.*/,namespace:'fixture'},({path})=>({loader:'js',contents:
-      path.endsWith('notifications')?`export const Feedback=({message})=>message;`:
-      path==='react'?`export const memo=component=>component; export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useCallback=(fn,deps)=>globalThis.${key}.useMemo(()=>fn,deps); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`:
-      path==='react/jsx-runtime'?`export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`:
-      path==='../lib'?`export const useAPI=path=>globalThis.${key}.query(path);export const api=async path=>globalThis.${key}.query(path).data||{data:[]};`:
-      path==='../components/ui/checkbox'?`export const Checkbox='input';`:
-      path==='../ui/IconButton'?`export const IconButton='button';`:
-      path==='../Icons'?`export const Icon=()=>null;`:
-      `export const bytes=n=>String(n);export const can=(p,v)=>p.includes('*')||p.includes(v);export const items=r=>(r?.data||[]).map(x=>x.attributes);`
-    }));
-  }}],
+const key = '__fileExplorerPerformanceFixture';
+const bundled = await build({
+  entryPoints: [fileURLToPath(new URL('../src/features/files/FileExplorer.tsx', import.meta.url))],
+  bundle: true,
+  write: false,
+  platform: 'node',
+  format: 'esm',
+  jsx: 'automatic',
+  loader: {'.css': 'empty'},
+  plugins: [
+    {
+      name: 'explorer-fixture',
+      setup(builder) {
+        builder.onResolve(
+          {
+            filter:
+              /notifications$|^\.\.\/\.\.\/ui\/IconButton$|^\.\.\/\.\.\/components\/ui\/checkbox$|^react$|^react\/jsx-runtime$|^\.\.\/\.\.\/lib$|^\.\.\/\.\.\/Icons$|^\.\.\/shared\/common$/,
+          },
+          args => ({path: args.path, namespace: 'fixture'})
+        );
+        builder.onLoad({filter: /.*/, namespace: 'fixture'}, ({path}) => ({
+          loader: 'js',
+          contents: path.endsWith('notifications')
+            ? `export const Feedback=({message})=>message;`
+            : path === 'react'
+              ? `export const Fragment='fragment'; export const memo=component=>component; export const useLayoutEffect=(...a)=>globalThis.${key}.useEffect(...a); export const useState=(...a)=>globalThis.${key}.useState(...a); export const useRef=(...a)=>globalThis.${key}.useRef(...a); export const useMemo=(...a)=>globalThis.${key}.useMemo(...a); export const useCallback=(fn,deps)=>globalThis.${key}.useMemo(()=>fn,deps); export const useEffect=(...a)=>globalThis.${key}.useEffect(...a);`
+              : path === 'react/jsx-runtime'
+                ? `export const Fragment='fragment'; export const jsx=(type,props,key)=>({type,props:props||{},key});export const jsxs=jsx;`
+                : path === '../../lib'
+                  ? `export const useAPI=path=>globalThis.${key}.query(path);export const api=async path=>globalThis.${key}.query(path).data||{data:[]};`
+                  : path === '../../components/ui/checkbox'
+                    ? `export const Checkbox='input';`
+                    : path === '../../ui/IconButton'
+                      ? `export const IconButton='button';`
+                      : path === '../../Icons'
+                        ? `export const Icon=()=>null;`
+                        : `export const bytes=n=>String(n);export const can=(p,v)=>p.includes('*')||p.includes(v);export const items=r=>(r?.data||[]).map(x=>x.attributes);`,
+        }));
+      },
+    },
+  ],
 });
-const {default:FileExplorer}=await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
-const entry=(name,is_file=true)=>({name,is_file,size:1,modified_at:''});
-const response=files=>({data:files.map(attributes=>({attributes}))});
-function fixture(){
-  const instances=new Map(),queries=new Map(),effects=[];let active;
-  const f={props:{base:'/server/a',activeFile:'',dirty:false,permissions:['*'],onOpen:()=>{},onBrowse:()=>{},onDirectory:()=>{}},tree:null,memos:0,
-    query(path){if(!path)return {data:null,loading:false,error:'',reload:()=>{}};if(!queries.has(path))queries.set(path,{data:null,loading:true,error:'',calls:0,reload(){this.calls++}});const q=queries.get(path);q.reloadBound??=q.reload.bind(q);return {...q,reload:q.reloadBound};},
-    listing(path,files){const url=`${f.props.base}/files/list?directory=${encodeURIComponent(path)}`;f.query(url);const q=queries.get(url);if(files)q.data=response(files);return q;},
-    folderSize(path,size){const url=`${f.props.base}/files/folder-size?directory=${encodeURIComponent(path)}`;f.query(url);const q=queries.get(url);q.data={attributes:{size}};q.loading=false;return q;},
-    useState(initial){const i=active.index++;const h=active.hooks[i]??=( {value:typeof initial==='function'?initial():initial} );return [h.value,v=>{h.value=typeof v==='function'?v(h.value):v}];},
-    useRef(initial){return f.useState(()=>({current:initial}))[0];},
-    useMemo(fn,deps){const i=active.index++,old=active.hooks[i];if(!old||deps.some((x,j)=>!Object.is(x,old.deps[j]))){f.memos++;active.hooks[i]={deps,value:fn()}}return active.hooks[i].value;},
-    useEffect(fn,deps){const i=active.index++,old=active.hooks[i];if(!old||deps.some((x,j)=>!Object.is(x,old.deps[j]))){active.hooks[i]={deps};effects.push(fn)}},
-    render(){globalThis[key]=f;function visit(node,path='root'){if(Array.isArray(node))return node.map((n,i)=>visit(n,`${path}/${n?.key??i}`));if(!node||typeof node!=='object')return node;if(typeof node.type==='function'){const id=`${path}/${node.type.name}:${node.key??''}`;const parent=active;active=instances.get(id)??{hooks:[]};instances.set(id,active);active.index=0;const child=node.type(node.props);active=parent;return visit(child,id)}return {...node,props:{...node.props,children:visit(node.props.children,path+'/children')}}}f.tree=visit({type:FileExplorer,props:f.props});while(effects.length)effects.shift()();return f;},
-    nodes(){const out=[];function walk(n){if(Array.isArray(n))return n.forEach(walk);if(n&&typeof n==='object'){out.push(n);walk(n.props?.children)}}walk(f.tree);return out;},
-    button(label){return f.nodes().find(n=>n.type==='button'&&n.props['aria-label']===label);},
-    text(){return JSON.stringify(f.tree);},
-  };return f;
+const {default: FileExplorer} = await import(
+  `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`
+);
+const entry = (name, is_file = true) => ({name, is_file, size: 1, modified_at: ''});
+const response = files => ({data: files.map(attributes => ({attributes}))});
+function fixture() {
+  const instances = new Map(),
+    queries = new Map(),
+    effects = [];
+  let active;
+  const f = {
+    props: {
+      base: '/server/a',
+      activeFile: '',
+      dirty: false,
+      permissions: ['*'],
+      onOpen: () => {},
+      onBrowse: () => {},
+      onDirectory: () => {},
+    },
+    tree: null,
+    memos: 0,
+    query(path) {
+      if (!path) return {data: null, loading: false, error: '', reload: () => {}};
+      if (!queries.has(path))
+        queries.set(path, {
+          data: null,
+          loading: true,
+          error: '',
+          calls: 0,
+          reload() {
+            this.calls++;
+          },
+        });
+      const q = queries.get(path);
+      q.reloadBound ??= q.reload.bind(q);
+      return {...q, reload: q.reloadBound};
+    },
+    listing(path, files) {
+      const url = `${f.props.base}/files/list?directory=${encodeURIComponent(path)}`;
+      f.query(url);
+      const q = queries.get(url);
+      if (files) q.data = response(files);
+      return q;
+    },
+    folderSizes(sizes, failed = []) {
+      const [request] = folderSizeRequests(f.props.base, [...Object.keys(sizes), ...failed]);
+      f.query(request.url);
+      const q = queries.get(request.url);
+      q.data = {
+        data: [
+          ...Object.entries(sizes).map(([directory, size]) => ({attributes: {directory, size}})),
+          ...failed.map(directory => ({attributes: {directory, error: 'unavailable'}})),
+        ],
+      };
+      q.loading = false;
+      return q;
+    },
+    url(path) {
+      return [...queries.keys()].find(key => key.includes(path));
+    },
+    useState(initial) {
+      const i = active.index++;
+      const h = (active.hooks[i] ??= {value: typeof initial === 'function' ? initial() : initial});
+      return [
+        h.value,
+        v => {
+          h.value = typeof v === 'function' ? v(h.value) : v;
+        },
+      ];
+    },
+    useRef(initial) {
+      return f.useState(() => ({current: initial}))[0];
+    },
+    useMemo(fn, deps) {
+      const i = active.index++,
+        old = active.hooks[i];
+      if (!old || deps.some((x, j) => !Object.is(x, old.deps[j]))) {
+        f.memos++;
+        active.hooks[i] = {deps, value: fn()};
+      }
+      return active.hooks[i].value;
+    },
+    useEffect(fn, deps) {
+      const i = active.index++,
+        old = active.hooks[i];
+      if (!old || deps.some((x, j) => !Object.is(x, old.deps[j]))) {
+        active.hooks[i] = {deps};
+        effects.push(fn);
+      }
+    },
+    render() {
+      globalThis[key] = f;
+      function visit(node, path = 'root') {
+        if (Array.isArray(node)) return node.map((n, i) => visit(n, `${path}/${n?.key ?? i}`));
+        if (!node || typeof node !== 'object') return node;
+        if (typeof node.type === 'function') {
+          const id = `${path}/${node.type.name}:${node.key ?? ''}`;
+          const parent = active;
+          active = instances.get(id) ?? {hooks: []};
+          instances.set(id, active);
+          active.index = 0;
+          const child = node.type(node.props);
+          active = parent;
+          return visit(child, id);
+        }
+        return {...node, props: {...node.props, children: visit(node.props.children, path + '/children')}};
+      }
+      f.tree = visit({type: FileExplorer, props: f.props});
+      while (effects.length) effects.shift()();
+      return f;
+    },
+    nodes() {
+      const out = [];
+      function walk(n) {
+        if (Array.isArray(n)) return n.forEach(walk);
+        if (n && typeof n === 'object') {
+          out.push(n);
+          walk(n.props?.children);
+        }
+      }
+      walk(f.tree);
+      return out;
+    },
+    button(label) {
+      return f.nodes().find(n => n.type === 'button' && n.props['aria-label'] === label);
+    },
+    text() {
+      return JSON.stringify(f.tree);
+    },
+    urls() {
+      return queries.keys();
+    },
+  };
+  return f;
 }
 
-test('refresh preserves rows and expansion, refreshes mounted folders, and keeps rows on failure',()=>{
-  const f=fixture();const root=f.listing('/',[entry('mods',false),entry('server.properties')]);root.loading=false;f.render();
-  f.button('Expand /mods').props.onClick();const mods=f.listing('/mods',[entry('plugin.jar')]);mods.loading=false;f.render();
-  f.button('Refresh file explorer').props.onClick();f.render();
-  assert.equal(root.calls,1);assert.equal(mods.calls,1);assert.ok(f.button('Open /mods/plugin.jar'));
-  root.loading=true;mods.loading=true;f.render();assert.ok(f.button('Open /server.properties'));assert.ok(f.button('Open /mods/plugin.jar'));assert.match(f.text(),/Refreshing/);
-  root.loading=false;root.error='offline';f.render();assert.ok(f.button('Open /server.properties'));assert.match(f.text(),/Could not refresh/);
-  f.props.refreshKey=1;f.render();assert.equal(root.calls,2);assert.equal(mods.calls,2);
-});
-
-test('initial folder load exposes one loading status and replaces it with the real rows',()=>{
- const f=fixture();f.render();
- const status=f.nodes().filter(n=>n.props?.role==='status');
- assert.equal(status.length,1);assert.equal(status[0].props['aria-label'],'Loading folder');assert.equal(status[0].props['aria-busy'],'true');
- const root=f.listing('/',[entry('server.properties')]);root.loading=false;f.render();
- assert.equal(f.nodes().filter(n=>n.props?.role==='status').length,0);assert.ok(f.button('Open /server.properties'));
-});
-
-test('sorting and filtering reuse memoized results and hide folders without matching files',async()=>{
-  const f=fixture(),q=f.listing('/',[entry('z.txt'),entry('a10.txt'),entry('a2.txt'),entry('mods',false)]);q.loading=false;f.render();
-  const labels=f.nodes().filter(n=>n.type==='button').map(n=>n.props['aria-label']).filter(x=>x?.startsWith('Open /'));assert.deepEqual(labels,['Open /a2.txt','Open /a10.txt','Open /z.txt']);
-  const before=f.memos;f.props.dirty=true;q.loading=true;f.render();assert.equal(f.memos,before);
-  f.nodes().find(n=>n.type==='input'&&n.props.type==='search').props.onChange({target:{value:'A2'}});f.render();
-  await new Promise(resolve=>setTimeout(resolve,350));f.render();
-  assert.ok(f.button('Open /a2.txt'));assert.equal(f.button('Open /z.txt'),undefined);assert.equal(f.button('Browse /mods'),undefined);
-});
-
-
-test('server changes do not expose previous rows and initial failure keeps retry available',()=>{
-  const f=fixture(),old=f.listing('/',[entry('private.txt')]);old.loading=false;f.render();assert.ok(f.button('Open /private.txt'));
-  f.props.base='/server/b';f.render();assert.equal(f.button('Open /private.txt'),undefined);
-  const q=f.listing('/');q.loading=false;q.error='denied';f.render();assert.match(f.text(),/Could not load this folder/);const retry=f.nodes().find(n=>n.type==='button'&&n.props.children==='Retry');retry.props.onClick();assert.equal(q.calls,1);
-});
-
-test('folder sizes load automatically from the shared server endpoint and search reveals descendants',async()=>{
-  const f=fixture();
-  f.listing('/',[entry('mods',false),entry('empty',false)]).loading=false;
-  f.listing('/mods',[{...entry('target.jar'),size:1024}]).loading=false;
-  f.listing('/empty',[]).loading=false;
+test('refresh preserves rows and expansion, refreshes mounted folders, and keeps rows on failure', () => {
+  const f = fixture();
+  const root = f.listing('/', [entry('mods', false), entry('server.properties')]);
+  root.loading = false;
   f.render();
-  assert.equal(f.button('Calculate size of /mods'),undefined);
-  f.folderSize('/mods',1024);f.render();
-  assert.equal(f.nodes().find(n=>n.props['aria-label']==='Folder size for /mods').props.children,'1024');
-  f.nodes().find(n=>n.type==='input'&&n.props.type==='search').props.onChange({target:{value:'TARGET'}});f.render();
-  await new Promise(resolve=>setTimeout(resolve,350));f.render();
-  assert.ok(f.button('Browse /mods'));assert.ok(f.button('Open /mods/target.jar'));assert.equal(f.button('Browse /empty'),undefined);
+  f.button('Expand /mods').props.onClick();
+  const mods = f.listing('/mods', [entry('plugin.jar')]);
+  mods.loading = false;
+  f.render();
+  f.button('Refresh file explorer').props.onClick();
+  f.render();
+  assert.equal(root.calls, 1);
+  assert.equal(mods.calls, 1);
+  assert.ok(f.button('Open /mods/plugin.jar'));
+  root.loading = true;
+  mods.loading = true;
+  f.render();
+  assert.ok(f.button('Open /server.properties'));
+  assert.ok(f.button('Open /mods/plugin.jar'));
+  assert.match(f.text(), /Refreshing/);
+  root.loading = false;
+  root.error = 'offline';
+  f.render();
+  assert.ok(f.button('Open /server.properties'));
+  assert.match(f.text(), /Could not refresh/);
+  f.props.refreshKey = 1;
+  f.render();
+  assert.equal(root.calls, 2);
+  assert.equal(mods.calls, 2);
 });
 
-test('date header cycles newest, oldest and default in the rendered explorer',()=>{
-  const f=fixture();f.listing('/',[{...entry('old'),modified_at:'2026-11-01T00:00:00Z'},{...entry('new'),modified_at:'2026-11-06T00:00:00Z'}]).loading=false;f.render();
-  const header=()=>f.nodes().find(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Date modified:'));
-  const files=()=>f.nodes().filter(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Open /')).map(n=>n.props['aria-label']);
-  header().props.onClick();f.render();assert.deepEqual(files(),['Open /new','Open /old']);assert.match(header().props['aria-label'],/descending/);
-  header().props.onClick();f.render();assert.deepEqual(files(),['Open /old','Open /new']);
-  header().props.onClick();f.render();assert.match(header().props['aria-label'],/default order/);
+test('initial folder load exposes one loading status and replaces it with the real rows', () => {
+  const f = fixture();
+  f.render();
+  const status = f.nodes().filter(n => n.props?.role === 'status');
+  assert.equal(status.length, 1);
+  assert.equal(status[0].props['aria-label'], 'Loading folder');
+  assert.equal(status[0].props['aria-busy'], 'true');
+  const root = f.listing('/', [entry('server.properties')]);
+  root.loading = false;
+  f.render();
+  assert.equal(f.nodes().filter(n => n.props?.role === 'status').length, 0);
+  assert.ok(f.button('Open /server.properties'));
+});
+
+test('sorting and filtering reuse memoized results and hide folders without matching files', async () => {
+  const f = fixture(),
+    q = f.listing('/', [entry('z.txt'), entry('a10.txt'), entry('a2.txt'), entry('mods', false)]);
+  q.loading = false;
+  f.render();
+  const labels = f
+    .nodes()
+    .filter(n => n.type === 'button')
+    .map(n => n.props['aria-label'])
+    .filter(x => x?.startsWith('Open /'));
+  assert.deepEqual(labels, ['Open /a2.txt', 'Open /a10.txt', 'Open /z.txt']);
+  const before = f.memos;
+  f.props.dirty = true;
+  q.loading = true;
+  f.render();
+  assert.equal(f.memos, before);
+  f.nodes()
+    .find(n => n.type === 'input' && n.props.type === 'search')
+    .props.onChange({target: {value: 'A2'}});
+  f.render();
+  await new Promise(resolve => setTimeout(resolve, 350));
+  f.render();
+  assert.ok(f.button('Open /a2.txt'));
+  assert.equal(f.button('Open /z.txt'), undefined);
+  assert.equal(f.button('Browse /mods'), undefined);
+});
+
+test('server changes do not expose previous rows and initial failure keeps retry available', () => {
+  const f = fixture(),
+    old = f.listing('/', [entry('private.txt')]);
+  old.loading = false;
+  f.render();
+  assert.ok(f.button('Open /private.txt'));
+  f.props.base = '/server/b';
+  f.render();
+  assert.equal(f.button('Open /private.txt'), undefined);
+  const q = f.listing('/');
+  q.loading = false;
+  q.error = 'denied';
+  f.render();
+  assert.match(f.text(), /Could not load this folder/);
+  const retry = f.nodes().find(n => n.type === 'button' && n.props.children === 'Retry');
+  retry.props.onClick();
+  assert.equal(q.calls, 1);
+});
+
+test('folder sizes load automatically from the shared server endpoint and search reveals descendants', async () => {
+  const f = fixture();
+  f.listing('/', [entry('mods', false), entry('empty', false)]).loading = false;
+  f.listing('/mods', [{...entry('target.jar'), size: 1024}]).loading = false;
+  f.listing('/empty', []).loading = false;
+  f.render();
+  assert.equal(f.button('Calculate size of /mods'), undefined);
+  assert.equal([...f.urls()].filter(url => url.includes('folder-size')).length, 1, 'one batched size read per listing');
+  f.folderSizes({'/mods': 1024}, ['/empty']);
+  f.render();
+  f.render();
+  assert.equal(f.nodes().find(n => n.props['aria-label'] === 'Folder size for /empty').props.children, '—');
+  assert.equal(f.nodes().find(n => n.props['aria-label'] === 'Folder size for /mods').props.children, '1024');
+  f.nodes()
+    .find(n => n.type === 'input' && n.props.type === 'search')
+    .props.onChange({target: {value: 'TARGET'}});
+  f.render();
+  await new Promise(resolve => setTimeout(resolve, 350));
+  f.render();
+  assert.ok(f.button('Browse /mods'));
+  assert.ok(f.button('Open /mods/target.jar'));
+  assert.equal(f.button('Browse /empty'), undefined);
+});
+
+test('date header cycles newest, oldest and default in the rendered explorer', () => {
+  const f = fixture();
+  f.listing('/', [
+    {...entry('old'), modified_at: '2026-11-01T00:00:00Z'},
+    {...entry('new'), modified_at: '2026-11-06T00:00:00Z'},
+  ]).loading = false;
+  f.render();
+  const header = () => f.nodes().find(n => n.type === 'button' && n.props['aria-label']?.startsWith('Date modified:'));
+  const files = () =>
+    f
+      .nodes()
+      .filter(n => n.type === 'button' && n.props['aria-label']?.startsWith('Open /'))
+      .map(n => n.props['aria-label']);
+  header().props.onClick();
+  f.render();
+  assert.deepEqual(files(), ['Open /new', 'Open /old']);
+  assert.match(header().props['aria-label'], /descending/);
+  header().props.onClick();
+  f.render();
+  assert.deepEqual(files(), ['Open /old', 'Open /new']);
+  header().props.onClick();
+  f.render();
+  assert.match(header().props['aria-label'], /default order/);
 });
 
 // Memoization is measured with the compiled app; this fixture checks row behavior.
-test('compact explorer skips metadata and keeps open, selection and permission behavior',()=>{
-  const f=fixture(),q=f.listing('/',[{...entry('server.properties'),modified_at:'2026-11-01T06:00:00Z'}]);q.loading=false;
-  const opened=[],selected=[],menus=[];f.props.onOpen=path=>opened.push(path);
-  f.props.controls={selected:['/server.properties'],onSelect:path=>selected.push(path),onMenu:(path,anchor)=>menus.push([path,anchor])};
-  f.render();assert.equal(f.nodes().filter(n=>n.type==='time').length,1);
-  const button=f.button('Open /server.properties');
-  button.props.onClick({button:0});assert.deepEqual(opened,['/server.properties']);
-  button.props.onClick({button:0,ctrlKey:true});assert.deepEqual(selected,['/server.properties']);
-  const anchor={};f.button('Options for /server.properties').props.onClick({currentTarget:anchor});assert.deepEqual(menus,[['/server.properties',anchor]]);
-  f.props.activeFile='/server.properties';f.props.dirty=true;f.render();assert.equal(f.nodes().filter(n=>n.type==='time').length,0);assert.match(f.text(),/Unsaved changes/);
-  f.props.permissions=[];f.render();assert.equal(f.button('Open /server.properties').props.disabled,true);
+test('compact explorer skips metadata and keeps open, selection and permission behavior', () => {
+  const f = fixture(),
+    q = f.listing('/', [{...entry('server.properties'), modified_at: '2026-11-01T06:00:00Z'}]);
+  q.loading = false;
+  const opened = [],
+    selected = [],
+    menus = [];
+  f.props.onOpen = path => opened.push(path);
+  f.props.controls = {
+    selected: ['/server.properties'],
+    onSelect: path => selected.push(path),
+    onMenu: (path, anchor) => menus.push([path, anchor]),
+  };
+  f.render();
+  assert.equal(f.nodes().filter(n => n.type === 'time').length, 1);
+  const button = f.button('Open /server.properties');
+  button.props.onClick({button: 0});
+  assert.deepEqual(opened, ['/server.properties']);
+  button.props.onClick({button: 0, ctrlKey: true});
+  assert.deepEqual(selected, ['/server.properties']);
+  const anchor = {};
+  f.button('Options for /server.properties').props.onClick({currentTarget: anchor});
+  assert.deepEqual(menus, [['/server.properties', anchor]]);
+  f.props.activeFile = '/server.properties';
+  f.props.dirty = true;
+  f.render();
+  assert.equal(f.nodes().filter(n => n.type === 'time').length, 0);
+  assert.match(f.text(), /Unsaved changes/);
+  f.props.permissions = [];
+  f.render();
+  assert.equal(f.button('Open /server.properties').props.disabled, true);
+});
+
+test('folders above 200 entries render a window of rows with spacers; smaller folders render every row', () => {
+  const f = fixture();
+  const names = Array.from({length: 500}, (_, i) => `file${String(i).padStart(3, '0')}.txt`);
+  f.listing(
+    '/',
+    names.map(name => entry(name))
+  ).loading = false;
+  f.render();
+  const open = () => f.nodes().filter(n => n.type === 'button' && n.props['aria-label']?.startsWith('Open /'));
+  const spacers = () => f.nodes().filter(n => n.type === 'li' && n.props.className === 'explorer-spacer');
+  assert.ok(open().length > 20 && open().length < 100, `rendered ${open().length} rows`);
+  assert.equal(open()[0].props['aria-label'], 'Open /file000.txt');
+  assert.equal(spacers().length, 1);
+  assert.equal(spacers()[0].props.style.height, (500 - open().length) * 34);
+  // Selection and menus still work on rendered rows.
+  const selected = [];
+  f.props.controls = {selected: [], onSelect: path => selected.push(path), onMenu: () => {}};
+  f.render();
+  f.button('Open /file001.txt').props.onClick({button: 0, ctrlKey: true});
+  assert.deepEqual(selected, ['/file001.txt']);
+
+  const small = fixture();
+  small.listing(
+    '/',
+    names.slice(0, 150).map(name => entry(name))
+  ).loading = false;
+  small.render();
+  assert.equal(
+    small.nodes().filter(n => n.type === 'button' && n.props['aria-label']?.startsWith('Open /')).length,
+    150
+  );
+  assert.equal(small.nodes().filter(n => n.type === 'li' && n.props.className === 'explorer-spacer').length, 0);
 });

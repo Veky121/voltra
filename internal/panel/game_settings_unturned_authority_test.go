@@ -4,17 +4,18 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestUnturnedAuthority(t *testing.T) {
 	var entry gameTemplate
 	for _, e := range gameTemplates().Entries {
-		if e.Path == unturnedSettingsRecipe {
+		if e.Path == gamesettings.UnturnedSettingsRecipe {
 			entry = e
 		}
 	}
 	startup := str(entry.Egg["startup"])
-	if entry.Profile != "unturned-native-v1" || startup != unturnedSettingsStartup {
+	if entry.Profile != "unturned-native-v1" || startup != gamesettings.UnturnedSettingsStartup {
 		t.Fatal("canonical profile drift")
 	}
 	script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
@@ -28,34 +29,36 @@ func TestUnturnedAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := func() settingsAuthorityInput {
-		return settingsAuthorityInput{Startup: startup, Env: map[string]string{"SRV_ID": "Operator_1"}, Files: map[string][]byte{".voltra/unturned-entry.sh": []byte(wrapper), ".voltra/unturned_runtime.py": runtime, "Servers/Operator_1/Server/Commands.dat": []byte("Chatrate 0.25\nCheats\npassword secret")}}
+	input := func() gamesettings.SettingsAuthorityInput {
+		return gamesettings.SettingsAuthorityInput{Startup: startup, Env: map[string]string{"SRV_ID": "Operator_1"}, Files: map[string][]byte{".voltra/unturned-entry.sh": []byte(wrapper), ".voltra/unturned_runtime.py": runtime, "Servers/Operator_1/Server/Commands.dat": []byte("Chatrate 0.25\nCheats\npassword secret")}}
 	}
-	a, err := unturnedSettingsAuthority(unturnedSettingsRecipe, startup, input())
+	a, err := gamesettings.UnturnedSettingsAuthority(gamesettings.UnturnedSettingsRecipe, startup, input())
 	if err != nil || a.Path != "/Servers/Operator_1/Server/Commands.dat" {
 		t.Fatal(a, err)
 	}
-	for _, mutate := range []func(*settingsAuthorityInput){
-		func(i *settingsAuthorityInput) { i.Startup += " -port 1234" },
-		func(i *settingsAuthorityInput) { i.Env["SRV_ID"] = "../Default" },
-		func(i *settingsAuthorityInput) { i.Env["SRV_ID"] = "" },
-		func(i *settingsAuthorityInput) { i.Env["SRV_ID"] = "Other" },
-		func(i *settingsAuthorityInput) { delete(i.Files, ".voltra/unturned-entry.sh") },
-		func(i *settingsAuthorityInput) { i.Files[".voltra/unturned_runtime.py"] = []byte("custom") },
+	for _, mutate := range []func(*gamesettings.SettingsAuthorityInput){
+		func(i *gamesettings.SettingsAuthorityInput) { i.Startup += " -port 1234" },
+		func(i *gamesettings.SettingsAuthorityInput) { i.Env["SRV_ID"] = "../Default" },
+		func(i *gamesettings.SettingsAuthorityInput) { i.Env["SRV_ID"] = "" },
+		func(i *gamesettings.SettingsAuthorityInput) { i.Env["SRV_ID"] = "Other" },
+		func(i *gamesettings.SettingsAuthorityInput) { delete(i.Files, ".voltra/unturned-entry.sh") },
+		func(i *gamesettings.SettingsAuthorityInput) {
+			i.Files[".voltra/unturned_runtime.py"] = []byte("custom")
+		},
 	} {
 		i := input()
 		mutate(&i)
-		if _, err := unturnedSettingsAuthority(unturnedSettingsRecipe, startup, i); err == nil {
+		if _, err := gamesettings.UnturnedSettingsAuthority(gamesettings.UnturnedSettingsRecipe, startup, i); err == nil {
 			t.Fatal("unsafe authority accepted")
 		}
 	}
-	if _, err := unturnedSettingsAuthority("other/egg.json", startup, input()); err == nil {
+	if _, err := gamesettings.UnturnedSettingsAuthority("other/egg.json", startup, input()); err == nil {
 		t.Fatal("recipe accepted")
 	}
 	i := input()
 	delete(i.Env, "SRV_ID")
 	i.Files["Servers/PterodactylUnturned/Server/Commands.dat"] = []byte("Cheats\n")
-	b, err := unturnedSettingsAuthority(unturnedSettingsRecipe, startup, i)
+	b, err := gamesettings.UnturnedSettingsAuthority(gamesettings.UnturnedSettingsRecipe, startup, i)
 	if err != nil || a.Revision == b.Revision {
 		t.Fatal("identity revision not fenced", err)
 	}

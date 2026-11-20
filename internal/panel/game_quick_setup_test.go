@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestQuickSetupPropertiesPreserveUnknownAndEscapes(t *testing.T) {
@@ -19,14 +20,14 @@ func TestQuickSetupPropertiesPreserveUnknownAndEscapes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := quickPatchProperties(input, patch)
+	out, err := gamesettings.QuickPatchProperties(input, patch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(out), "custom\\ key : line1\\\r\n  line2\r\n") || !strings.Contains(string(out), "unknown=end") {
 		t.Fatal("unknown properties were altered")
 	}
-	records, err := quickPropertyRecords(out)
+	records, err := gamesettings.QuickPropertyRecords(out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,10 +42,10 @@ func TestQuickSetupPropertiesPreserveUnknownAndEscapes(t *testing.T) {
 	if values["motd"] != " Grüß 😀 " || values["custom key"] != "line1line2" || values["max-players"] != "20" || values["pvp"] != "true" || motds != 1 {
 		t.Fatalf("invalid property round trip: %v", values)
 	}
-	if _, err = quickPropertyRecords([]byte(`motd=bad\uXXXZ`)); err == nil {
+	if _, err = gamesettings.QuickPropertyRecords([]byte(`motd=bad\uXXXZ`)); err == nil {
 		t.Fatal("malformed Unicode escape accepted")
 	}
-	commented, err := quickPatchProperties([]byte("# comment ending with slash \\\nmotd=before\n"), map[string]string{"motd": "after"})
+	commented, err := gamesettings.QuickPatchProperties([]byte("# comment ending with slash \\\nmotd=before\n"), map[string]string{"motd": "after"})
 	if err != nil || string(commented) != "# comment ending with slash \\\nmotd=after\n" {
 		t.Fatal("comment continuation consumed following property")
 	}
@@ -56,7 +57,7 @@ func TestQuickSetupPalworldPreservesNestedAndQuotedUnknownSettings(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := quickPatchPalworld(input, patch)
+	out, err := gamesettings.QuickPatchPalworld(input, patch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestQuickSetupPalworldPreservesNestedAndQuotedUnknownSettings(t *testing.T)
 			t.Fatalf("unknown settings changed: %s", fragment)
 		}
 	}
-	_, values, err := quickPalworldOptions(out)
+	_, values, err := gamesettings.QuickPalworldOptions(out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func TestQuickSetupPalworldPreservesNestedAndQuotedUnknownSettings(t *testing.T)
 		t.Fatal("Palworld values did not round trip")
 	}
 	for _, bad := range []string{"OptionSettings=(ServerName=\"x\")", "[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(Broken=\"unterminated)\n", "[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(A=1)\nOptionSettings=(A=2)\n"} {
-		if _, _, err := quickPalworldOptions([]byte(bad)); err == nil {
+		if _, _, err := gamesettings.QuickPalworldOptions([]byte(bad)); err == nil {
 			t.Fatal("malformed/ambiguous configuration accepted")
 		}
 	}
@@ -91,7 +92,7 @@ func TestQuickSetupAllowlistAndValidation(t *testing.T) {
 			t.Errorf("accepted %s settings %v", tc.game, tc.settings)
 		}
 	}
-	if quickRevision("minecraft", "/server.properties", nil, false) == quickRevision("minecraft", "/server.properties", nil, true) {
+	if gamesettings.QuickRevision("minecraft", "/server.properties", nil, false) == gamesettings.QuickRevision("minecraft", "/server.properties", nil, true) {
 		t.Fatal("missing and empty configs have equal revisions")
 	}
 }

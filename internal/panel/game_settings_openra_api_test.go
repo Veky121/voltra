@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestOpenRAActualSettingsAPI(t *testing.T) {
-	for _, recipe := range []string{openraSettingsRecipe, "openra/openra_dune2000/egg-open-r-a--dune2000.json", "openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json"} {
+	for _, recipe := range []string{gamesettings.OpenraSettingsRecipe, "openra/openra_dune2000/egg-open-r-a--dune2000.json", "openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json"} {
 		t.Run(recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			egg := batchSettingsRecipeFixture(t, recipe)
@@ -21,11 +22,11 @@ func TestOpenRAActualSettingsAPI(t *testing.T) {
 			original := "\ufeff# operator\r\nServer:\r\n\tEnableVoteKick: false # retained\r\n\tFloodLimitInterval: 2500\r\n\tPassword: fixture-private-pass\r\n\tListenPort: 29100\r\n\tUnknown:\r\n\t\tToken: fixture-private-nested\r\n"
 			fixture.mu.Lock()
 			delete(fixture.Files, "/server.properties")
-			fixture.Files[openraSettingsPath], fixture.State = []byte(original), "offline"
+			fixture.Files[gamesettings.OpenraSettingsPath], fixture.State = []byte(original), "offline"
 			fixture.mu.Unlock()
 			route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 			view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
-			if view["file"] != openraSettingsPath || laneGameSettingsField(view, "Server.EnableVoteKick")["type"] != "boolean" || laneGameSettingsField(view, "Server.FloodLimitInterval")["type"] != "number" {
+			if view["file"] != gamesettings.OpenraSettingsPath || laneGameSettingsField(view, "Server.EnableVoteKick")["type"] != "boolean" || laneGameSettingsField(view, "Server.FloodLimitInterval")["type"] != "number" {
 				t.Fatal("Exact MiniYaml document/dispatch missing", view)
 			}
 			encoded, _ := json.Marshal(view)
@@ -38,7 +39,7 @@ func TestOpenRAActualSettingsAPI(t *testing.T) {
 			}
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"Server.EnableVoteKick": true, "Server.FloodLimitInterval": "3000"}}, 200)
 			fixture.mu.Lock()
-			after := string(fixture.Files[openraSettingsPath])
+			after := string(fixture.Files[gamesettings.OpenraSettingsPath])
 			fixture.mu.Unlock()
 			want := strings.Replace(strings.Replace(original, "false # retained", "True # retained", 1), "2500", "3000", 1)
 			if after != want {
@@ -46,7 +47,7 @@ func TestOpenRAActualSettingsAPI(t *testing.T) {
 			}
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"Server.EnableVoteKick": false}}, 409)
 			fixture.mu.Lock()
-			fixture.Files[openraSettingsPath] = []byte("Server:\n\tEnableVoteKick: True\n\tEnableVoteKick: False\n")
+			fixture.Files[gamesettings.OpenraSettingsPath] = []byte("Server:\n\tEnableVoteKick: True\n\tEnableVoteKick: False\n")
 			fixture.mu.Unlock()
 			infraExpect(t, mux, admin, "GET", route, nil, 422)
 		})
@@ -54,30 +55,30 @@ func TestOpenRAActualSettingsAPI(t *testing.T) {
 }
 
 func TestOpenRAAndETLegacyExactFormatScope(t *testing.T) {
-	for _, test := range []struct{ recipe, file, format string }{{openraSettingsRecipe, openraSettingsPath, "openra"}, {"openra/openra_dune2000/egg-open-r-a--dune2000.json", openraSettingsPath, "openra"}, {"openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json", openraSettingsPath, "openra"}, {etlegacySettingsRecipe, etlegacySettingsPath, "source"}} {
+	for _, test := range []struct{ recipe, file, format string }{{gamesettings.OpenraSettingsRecipe, gamesettings.OpenraSettingsPath, "openra"}, {"openra/openra_dune2000/egg-open-r-a--dune2000.json", gamesettings.OpenraSettingsPath, "openra"}, {"openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json", gamesettings.OpenraSettingsPath, "openra"}, {gamesettings.EtlegacySettingsRecipe, gamesettings.EtlegacySettingsPath, "source"}} {
 		egg := batchSettingsRecipeFixture(t, test.recipe)
-		if gameSettingsDiscoveryFormat(egg, test.file) != test.format {
+		if gamesettings.DiscoveryFormat(egg, test.file) != test.format {
 			t.Fatal("Exact format missing", test.recipe)
 		}
 		other := batchSettingsRecipeFixture(t, "counter_strike/counter_strike_source/egg-counter--strike--source.json")
-		if gameSettingsDiscoveryFormat(other, test.file) == test.format {
+		if gamesettings.DiscoveryFormat(other, test.file) == test.format {
 			t.Fatal("Format escaped recipe identity", test.recipe)
 		}
-		if openraSettingsStartup(egg) != "" {
+		if gamesettings.OpenraSettingsStartup(egg) != "" {
 			egg["startup"] = "exec OpenRA.Server"
-			if gameSettingsDiscoveryFormat(egg, test.file) != "" || len(gameSettingsDeclaredDocuments(egg)) != 0 {
+			if gamesettings.DiscoveryFormat(egg, test.file) != "" || len(gamesettings.DeclaredDocuments(egg)) != 0 {
 				t.Fatal("Old launcher exposed MiniYaml")
 			}
-			if _, err := parseGameSettingsForEgg(egg, test.file, []byte("Server:\n\tEnableVoteKick: True\n")); err == nil {
+			if _, err := gamesettings.ParseForEgg(egg, test.file, []byte("Server:\n\tEnableVoteKick: True\n")); err == nil {
 				t.Fatal("Old launcher reached generic YAML")
 			}
 		}
-		if test.recipe == etlegacySettingsRecipe {
+		if test.recipe == gamesettings.EtlegacySettingsRecipe {
 			egg["startup"] = "exec .voltra/quake_family_runtime.py etlegacy"
-			if gameSettingsDiscoveryFormat(egg, test.file) != "" || len(gameSettingsDeclaredDocuments(egg)) != 0 {
+			if gamesettings.DiscoveryFormat(egg, test.file) != "" || len(gamesettings.DeclaredDocuments(egg)) != 0 {
 				t.Fatal("Old ET launcher exposed authority document")
 			}
-			if _, err := parseGameSettingsForEgg(egg, test.file, []byte("set g_friendlyfire 1\n")); err == nil {
+			if _, err := gamesettings.ParseForEgg(egg, test.file, []byte("set g_friendlyfire 1\n")); err == nil {
 				t.Fatal("Old ET launcher reached generic INI")
 			}
 		}
@@ -85,7 +86,7 @@ func TestOpenRAAndETLegacyExactFormatScope(t *testing.T) {
 }
 
 func TestOpenRAAndETLegacyOldLauncherActualAPI(t *testing.T) {
-	for _, test := range []struct{ recipe, file string }{{openraSettingsRecipe, openraSettingsPath}, {"openra/openra_dune2000/egg-open-r-a--dune2000.json", openraSettingsPath}, {"openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json", openraSettingsPath}, {etlegacySettingsRecipe, etlegacySettingsPath}} {
+	for _, test := range []struct{ recipe, file string }{{gamesettings.OpenraSettingsRecipe, gamesettings.OpenraSettingsPath}, {"openra/openra_dune2000/egg-open-r-a--dune2000.json", gamesettings.OpenraSettingsPath}, {"openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json", gamesettings.OpenraSettingsPath}, {gamesettings.EtlegacySettingsRecipe, gamesettings.EtlegacySettingsPath}} {
 		t.Run(test.recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			egg := batchSettingsRecipeFixture(t, test.recipe)

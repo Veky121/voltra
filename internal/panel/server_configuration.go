@@ -82,7 +82,7 @@ func configurationManagedOverrides(server, egg, overrides M, managed bool) error
 	}
 	for _, key := range []string{"script_install", "script_container", "script_entry"} {
 		if _, exists := overrides[key]; exists {
-			return APIError{409, "ManagedInstallerConfiguration", "This server uses a managed installer. Remove installation overrides and use its game installation or Java settings controls."}
+			return APIError{Status: 409, Code: "ManagedInstallerConfiguration", Detail: "This server uses a managed installer. Remove installation overrides and use its game installation or Java settings controls."}
 		}
 	}
 	// Process file rules can otherwise overwrite a managed launcher or its JVM
@@ -258,14 +258,14 @@ func configurationReplacement(value any) bool {
 
 func (a *App) configurationStopped(ctx context.Context, server M) error {
 	if str(server["status"]) != "" && str(server["status"]) != "reinstall_failed" || boolean(server["node_maintenance"]) || boolean(server["transferring"]) {
-		return APIError{409, "ServerStateConflict", "The server is unavailable during installation, maintenance, suspension or transfer."}
+		return APIError{Status: 409, Code: "ServerStateConflict", Detail: "The server is unavailable during installation, maintenance, suspension or transfer."}
 	}
 	var active bool
 	if err := a.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM steam_jobs WHERE server_id=$1 AND status IN ('queued','running')) OR EXISTS(SELECT 1 FROM steam_game_provisions WHERE server_id=$1 AND stage NOT IN ('queued','failed','complete'))`, server["id"]).Scan(&active); err != nil {
 		return err
 	}
 	if active {
-		return APIError{409, "ServerConfigurationLeaseConflict", "Wait for game installation or Steam maintenance to finish before changing configuration."}
+		return APIError{Status: 409, Code: "ServerConfigurationLeaseConflict", Detail: "Wait for game installation or Steam maintenance to finish before changing configuration."}
 	}
 	res, err := a.daemonServer(ctx, server, "GET", "", nil)
 	if err != nil {
@@ -274,10 +274,10 @@ func (a *App) configurationStopped(ctx context.Context, server M) error {
 	defer res.Body.Close()
 	var info M
 	if json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&info) != nil {
-		return APIError{502, "ServerConfigurationStateUnavailable", "The node returned invalid server state. No configuration was changed."}
+		return APIError{Status: 502, Code: "ServerConfigurationStateUnavailable", Detail: "The node returned invalid server state. No configuration was changed."}
 	}
 	if state := str(info["state"]); state != "offline" && state != "stopped" {
-		return APIError{409, "ServerConfigurationRunning", "Stop the server before changing its configuration."}
+		return APIError{Status: 409, Code: "ServerConfigurationRunning", Detail: "Stop the server before changing its configuration."}
 	}
 	return nil
 }
@@ -418,7 +418,7 @@ func (a *App) saveServerConfiguration(ctx context.Context, user, server M, revis
 		return nil, err
 	}
 	if revision != configurationRevision(current, egg) {
-		return nil, APIError{409, "ServerConfigurationRevisionConflict", "This server or its template changed. Reload configuration before saving."}
+		return nil, APIError{Status: 409, Code: "ServerConfigurationRevisionConflict", Detail: "This server or its template changed. Reload configuration before saving."}
 	}
 	managed, err := a.configurationManaged(ctx, current, egg)
 	if err != nil {
@@ -445,12 +445,12 @@ func (a *App) saveServerConfiguration(ctx context.Context, user, server M, revis
 		}
 		_ = a.audit(cleanup, num(user["id"]), num(current["id"]), event, properties)
 		if restoreErr != nil {
-			return nil, APIError{502, "ServerConfigurationRollbackFailed", "The node rejected configuration and the previous settings could not be restored. Reload configuration and repair node synchronization before starting."}
+			return nil, APIError{Status: 502, Code: "ServerConfigurationRollbackFailed", Detail: "The node rejected configuration and the previous settings could not be restored. Reload configuration and repair node synchronization before starting."}
 		}
 		if !boolean(properties["daemon_restored"]) {
-			return nil, APIError{502, "ServerConfigurationResyncFailed", "Previous database settings were restored, but the node could not confirm restoration. Repair node synchronization before starting."}
+			return nil, APIError{Status: 502, Code: "ServerConfigurationResyncFailed", Detail: "Previous database settings were restored, but the node could not confirm restoration. Repair node synchronization before starting."}
 		}
-		return nil, APIError{502, "ServerConfigurationSyncFailed", "The node could not synchronize configuration. Previous settings were restored; check the node connection before retrying."}
+		return nil, APIError{Status: 502, Code: "ServerConfigurationSyncFailed", Detail: "The node could not synchronize configuration. Previous settings were restored; check the node connection before retrying."}
 	}
 	keys := []string{}
 	seen := map[string]bool{}

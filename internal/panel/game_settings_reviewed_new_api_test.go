@@ -3,10 +3,11 @@ package panel
 import (
 	"context"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestReviewedNewActualStartupAPI(t *testing.T) {
-	for _, recipe := range []string{foundryVTTRecipe, fiveMRecipe, sonsSettingsRecipe, resoniteSettingsRecipe} {
+	for _, recipe := range []string{gamesettings.FoundryVTTRecipe, gamesettings.FiveMRecipe, gamesettings.SonsSettingsRecipe, gamesettings.ResoniteSettingsRecipe} {
 		t.Run(recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			egg := batchSettingsRecipeFixture(t, recipe)
@@ -17,22 +18,22 @@ func TestReviewedNewActualStartupAPI(t *testing.T) {
 				t.Fatal(e)
 			}
 			file, key, body := "/data/Config/options.json", "upnp", `{ "upnp": false, "passwordSalt": "private" }`
-			if recipe == fiveMRecipe {
+			if recipe == gamesettings.FiveMRecipe {
 				wave95InstallReviewed(t, a, server, fixture, egg)
 				file, key, body = "/server.cfg", "sv_lan", "sv_lan 0\nsv_hostname \"test\"\n"
 			}
-			if recipe == sonsSettingsRecipe {
-				file, key, body = sonsSettingsPath, "/LanOnly", `{"LanOnly":false,"Password":"private","Unknown":123456789012345678901234567890}`
+			if recipe == gamesettings.SonsSettingsRecipe {
+				file, key, body = gamesettings.SonsSettingsPath, "/LanOnly", `{"LanOnly":false,"Password":"private","Unknown":123456789012345678901234567890}`
 			}
-			if recipe == resoniteSettingsRecipe {
-				file, _ = reviewedNewSettings(egg)
+			if recipe == gamesettings.ResoniteSettingsRecipe {
+				file, _ = gamesettings.ReviewedNewSettings(egg)
 				key, body = "/startWorlds/0/saveOnExit", `{"loginPassword":"private","startWorlds":[{"saveOnExit":false}]}`
 			}
-			if recipe == quakeLiveSettingsRecipe {
-				file, key, body = quakeLiveBaseSettingsPath, "g_allowvote", "set g_allowvote 0\n"
+			if recipe == gamesettings.QuakeLiveSettingsRecipe {
+				file, key, body = gamesettings.QuakeLiveBaseSettingsPath, "g_allowvote", "set g_allowvote 0\n"
 			}
-			if recipe == openraSettingsRecipe {
-				file, key, body = openraSettingsPath, "Server.EnableVoteKick", "Server:\n\tEnableVoteKick: false\n"
+			if recipe == gamesettings.OpenraSettingsRecipe {
+				file, key, body = gamesettings.OpenraSettingsPath, "Server.EnableVoteKick", "Server:\n\tEnableVoteKick: false\n"
 			}
 			fixture.mu.Lock()
 			delete(fixture.Files, "/server.properties")
@@ -52,13 +53,13 @@ func TestReviewedNewActualStartupAPI(t *testing.T) {
 			infraExpect(t, mux, num(reader["id"]), "PUT", route, M{"revision": view["revision"], "settings": M{key: true}}, 403)
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{key: true}}, 200)
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{key: false}}, 409)
-			if recipe == quakeLiveSettingsRecipe {
+			if recipe == gamesettings.QuakeLiveSettingsRecipe {
 				fixture.mu.Lock()
-				fixture.Files[quakeLiveHomeSettingsPath] = []byte(body)
+				fixture.Files[gamesettings.QuakeLiveHomeSettingsPath] = []byte(body)
 				fixture.mu.Unlock()
 				infraExpect(t, mux, admin, "GET", route, nil, 404)
 				infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{key: false}}, 404)
-				route = "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + quakeLiveHomeSettingsPath
+				route = "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.QuakeLiveHomeSettingsPath
 			}
 			view = asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 			fixture.mu.Lock()

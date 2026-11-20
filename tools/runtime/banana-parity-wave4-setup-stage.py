@@ -23,17 +23,17 @@ source=once(source,anchor,'\tif err := validateTemplateSetupEnvironment(entry.Se
 anchor='\ta.writeGamePortPreview(w, r, in, entry, env)'
 source=once(source,anchor,'\tif err = validateTemplateSetupEnvironment(entry.SetupValidation, entry.Egg, env); err != nil { fail(w,err); return }\n'+anchor)
 paths['internal/panel/game_install_ports.go']=source
-source=(root/'web/src/client/templateSetupValidation.ts').read_text()
+source=(root/'web/src/features/game-library/templateSetupValidation.ts').read_text()
 source="import {templateSetupRuleProblems,type TemplateSetupValidation} from './templateSetupRules.ts';\n"+source
 source=once(source,'  variables:(TemplateVariableDefinition','  setupValidation?:TemplateSetupValidation[]|null;\n  variables:(TemplateVariableDefinition')
 anchor='  if(input.fs25&&!problems.some'
 source=once(source,anchor,"  for(const problem of templateSetupRuleProblems(input.setupValidation,input.variables,input.environment))if(!problems.some(p=>p.field===problem.field))problems.push(problem);\n"+anchor)
-paths['web/src/client/templateSetupValidation.ts']=source
-source=(root/'web/src/client/TemplateGames.tsx').read_text()
+paths['web/src/features/game-library/templateSetupValidation.ts']=source
+source=(root/'web/src/features/game-library/TemplateGames.tsx').read_text()
 source="import {type TemplateSetupValidation} from './templateSetupRules';\n"+source
 source=once(source,'type TemplateOptions = Template & {','type TemplateOptions = Template & {setup_validation?:TemplateSetupValidation[]|null; ')
 source=once(source,'agreements:options.agreements});','agreements:options.agreements,setupValidation:options.setup_validation});')
-paths['web/src/client/TemplateGames.tsx']=source
+paths['web/src/features/game-library/TemplateGames.tsx']=source
 overlay={}
 for path,body in paths.items():
     target=out/('banana-wave4-setup-'+Path(path).name+'.pending')

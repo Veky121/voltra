@@ -5,21 +5,22 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestOpenTTDPublicTimeoutTypesAndScope(t *testing.T) {
 	egg := openttdFieldsFixture(t)
 	for _, value := range []string{"0", "2000", "32000", "-1", "32001", "1.5", "02000", "invalid"} {
-		parsed, err := parseGameSettingsForEgg(egg, "/openttd.cfg", []byte("[network]\nmax_password_time = "+value+"\n"))
+		parsed, err := gamesettings.ParseForEgg(egg, "/openttd.cfg", []byte("[network]\nmax_password_time = "+value+"\n"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		field := parsed.fields[0]
-		valid := openttdTimeoutValue(value)
-		if openttdPublicNumericField(egg, "/openttd.cfg", field) != valid {
+		field := parsed.Fields[0]
+		valid := gamesettings.OpenttdTimeoutValue(value)
+		if gamesettings.OpenttdPublicNumericField(egg, "/openttd.cfg", field) != valid {
 			t.Fatal("timeout classification", value)
 		}
-		if !valid && field.kind != "readonly" {
+		if !valid && field.Kind != "readonly" {
 			t.Fatal("malformed native timeout is writable", value)
 		}
 	}
@@ -28,7 +29,7 @@ func TestOpenTTDPublicTimeoutTypesAndScope(t *testing.T) {
 		file string
 		key  string
 	}{{M{"name": "OpenTTD"}, "/openttd.cfg", "network/max_password_time"}, {egg, "/secrets.cfg", "network/max_password_time"}, {egg, "/openttd.cfg", "network/server_password"}} {
-		if openttdPublicNumericField(scope.egg, scope.file, gameSetting{key: scope.key, kind: "number", value: "2000"}) {
+		if gamesettings.OpenttdPublicNumericField(scope.egg, scope.file, gamesettings.Setting{Key: scope.key, Kind: "number", Value: "2000"}) {
 			t.Fatal("public exception widened")
 		}
 	}

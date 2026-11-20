@@ -1,5 +1,0 @@
-{
-  "egg": {
-    "startup": "exec python3 .voltra/fantasy_worlds_runtime.py solace"
-  }
-}

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"voltra/internal/gamesettings"
 
 	_ "golang.org/x/image/webp"
 )
@@ -169,8 +170,8 @@ func (a *App) minecraftServerIcon(ctx context.Context, server M) []byte {
 	if err != nil {
 		return nil
 	}
-	entry, found, err := quickFindEntry(entries, "server-icon.png")
-	if err != nil || !found || !quickFileEntry(entry) || num(entry["size"]) > 256<<10 {
+	entry, found, err := gamesettings.QuickFindEntry(entries, "server-icon.png")
+	if err != nil || !found || !gamesettings.QuickFileEntry(entry) || num(entry["size"]) > 256<<10 {
 		return nil
 	}
 	response, err := a.daemonServer(ctx, server, http.MethodGet, "/files/contents?"+url.Values{"file": {"/server-icon.png"}}.Encode(), nil)

@@ -1,0 +1,10 @@
+{
+  "startup": "exec env PYTHONHOME=/home/container/.voltra/python LD_LIBRARY_PATH=/home/container/.voltra/python/lib .voltra/python/bin/python3 .voltra/arma3-controls.py run arma3",
+  "pins": {
+    ".voltra/arma-native.py": "2f4110ae0f8cec20900f18c98f02f3ce3ee2ac939f3e0a2a5972c7154ef3e41f",
+    ".voltra/native-config.py": "8c125bb526b38896eeba57143ec2fc70bfb94f1c9783e4c6d652d8f57e3b52a2",
+    ".voltra/steam_template.py": "dc8ff0a9e462751878aad55da80bea8fd2a2d4ef16dbf8d37b798ea8d4c476dd",
+    ".voltra/bundle-debian-python.py": "16b2ebdcfa2656b591624c9d627defa4c3940be4c8a69d8842778ff25ea0cdc0",
+    ".voltra/arma3-controls.py": "26d00fa1ef01d0ed29bb0359ef3b19b76492e46888911526adfe247b09f4bac1"
+  }
+}

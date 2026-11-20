@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestCS2DSettingsAPI(t *testing.T) {
@@ -18,7 +19,7 @@ func TestCS2DSettingsAPI(t *testing.T) {
 		}
 		original := "// operator\r\r\nsv_password private-sentinel\r\r\nsv_hostport 29102\r\r\nsv_friendlyfire 0\r\r\nmp_roundtime 5 // retained\r\r\nunknown future\r\r\n"
 		fixture.mu.Lock()
-		fixture.Files[cs2dSettingsPath], fixture.State = []byte(original), "offline"
+		fixture.Files[gamesettings.Cs2dSettingsPath], fixture.State = []byte(original), "offline"
 		fixture.mu.Unlock()
 		endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=%2Fcs2d%2Fsys%2Fserver.cfg"
 		view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
@@ -28,7 +29,7 @@ func TestCS2DSettingsAPI(t *testing.T) {
 		}
 		infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{"sv_friendlyfire": true, "mp_roundtime": "10"}}, 200)
 		fixture.mu.Lock()
-		updated := string(fixture.Files[cs2dSettingsPath])
+		updated := string(fixture.Files[gamesettings.Cs2dSettingsPath])
 		fixture.mu.Unlock()
 		expected := strings.Replace(strings.Replace(original, "sv_friendlyfire 0", "sv_friendlyfire 1", 1), "mp_roundtime 5", "mp_roundtime 10", 1)
 		if updated != expected {
@@ -46,19 +47,19 @@ func TestCS2DSettingsRecipeDispatch(t *testing.T) {
 		}
 		egg := M{"uuid": gameTemplateEggUUID(entry)}
 		found := false
-		for _, file := range gameSettingsDeclaredDocuments(egg) {
-			if file == cs2dSettingsPath {
+		for _, file := range gamesettings.DeclaredDocuments(egg) {
+			if file == gamesettings.Cs2dSettingsPath {
 				found = true
 			}
 		}
 		if !found {
 			t.Fatal("safe native document not discovered")
 		}
-		parsed, err := parseDiscoveredGameSettings(egg, cs2dSettingsPath, []byte("sv_password private\nsv_hostport 29102\nsv_friendlyfire 0\nmp_roundtime 5\n"))
-		if err != nil || len(parsed.fields) != 2 {
-			t.Fatalf("specialized parser not dispatched: %v fields=%d", err, len(parsed.fields))
+		parsed, err := gamesettings.ParseDiscovered(egg, gamesettings.Cs2dSettingsPath, []byte("sv_password private\nsv_hostport 29102\nsv_friendlyfire 0\nmp_roundtime 5\n"))
+		if err != nil || len(parsed.Fields) != 2 {
+			t.Fatalf("specialized parser not dispatched: %v fields=%d", err, len(parsed.Fields))
 		}
-		if _, err = parsed.patch(map[string]string{"sv_hostport": "1234"}); err == nil {
+		if _, err = parsed.Patch(map[string]string{"sv_hostport": "1234"}); err == nil {
 			t.Fatal("runtime listener editable")
 		}
 		return

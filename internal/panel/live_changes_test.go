@@ -163,7 +163,7 @@ func TestLiveCommittedDatabaseChangesAcrossListenersPostgres(t *testing.T) {
 	defer a.stopLiveChanges()
 	b.startLiveChanges()
 	defer b.stopLiveChanges()
-	wait := func(ch <-chan struct{}, take func() []string, want string) {
+	wait := func(ch <-chan struct{}, take func() []liveReadChange, want string) {
 		t.Helper()
 		timer := time.NewTimer(4 * time.Second)
 		defer timer.Stop()
@@ -171,7 +171,7 @@ func TestLiveCommittedDatabaseChangesAcrossListenersPostgres(t *testing.T) {
 			select {
 			case <-ch:
 				for _, d := range take() {
-					if d == want {
+					if d.domain == want {
 						return
 					}
 				}

@@ -233,7 +233,7 @@ func (a *App) requestNodeEnrollment(w http.ResponseWriter, r *http.Request) {
 	var recoveryID *int64
 	e = tx.QueryRow(r.Context(), `SELECT id,expires_at,max_nodes,approved_count,recovery_node_id FROM node_enrollments WHERE token_hash=$1 AND NOT closed AND expires_at>now() FOR UPDATE`, pairingHash(token)).Scan(&session, &expires, &maximum, &approved, &recoveryID)
 	if errors.Is(e, pgx.ErrNoRows) {
-		fail(w, APIError{401, "InvalidPairingToken", "This pairing session is invalid, closed, or expired."})
+		fail(w, APIError{Status: 401, Code: "InvalidPairingToken", Detail: "This pairing session is invalid, closed, or expired."})
 		return
 	}
 	if e != nil {
@@ -251,7 +251,7 @@ func (a *App) requestNodeEnrollment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pending >= 128 {
-		fail(w, APIError{429, "EnrollmentQueueFull", "Approve or reject waiting nodes before adding more."})
+		fail(w, APIError{Status: 429, Code: "EnrollmentQueueFull", Detail: "Approve or reject waiting nodes before adding more."})
 		return
 	}
 	requestToken, id, code := randomToken(32), newUUID(), strings.ToUpper(randomToken(4))

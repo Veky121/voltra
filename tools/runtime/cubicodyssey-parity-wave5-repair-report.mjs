@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
 const recipe='cubic_odyssey/egg-cubic-odyssey.json',profileFile='artifacts/game-parity-20261029/cubicodyssey-wave5-profile.json';
 const profile=JSON.parse(fs.readFileSync(profileFile))[recipe],baseline=JSON.parse(fs.readFileSync('internal/panel/game_library/overrides.json'))[recipe];
-const sources=['internal/panel/game_library/scripts/cubic-odyssey-native.py','internal/panel/game_settings_cubic.go.pending','internal/panel/game_settings_cubic_test.go.pending','tools/runtime/cubicodyssey-parity-wave5-test.py','tools/runtime/cubicodyssey-parity-wave5-publisher.sample'];
+const sources=['internal/panel/game_library/scripts/cubic-odyssey-native.py','internal/gamesettings/cubic.go.pending','internal/panel/game_settings_cubic_test.go.pending','tools/runtime/cubicodyssey-parity-wave5-test.py','tools/runtime/cubicodyssey-parity-wave5-publisher.sample'];
 const state=JSON.parse(fs.readFileSync('.local/game-parity-20261029/runtime/cubicodyssey-wave5/state.json'));
 const canonicals=['game_settings_cubic.go','game_settings_cubic_test.go'].map(file=>{const canonical=path.join('internal/panel',file),old=path.join(state.runtime.snapshot,'internal/panel',file);return{path:canonical,sha256:sha(fs.readFileSync(canonical)),unchanged_since_original_fixture:fs.readFileSync(canonical).equals(fs.readFileSync(old))};});
 function embedded(script,name){const header=[...script.matchAll(/^cat > \.voltra\/([^ ]+) <<'([^']+)'\n/gm)].find(m=>m[1]===name);if(!header)throw Error('Missing embedded helper '+name);const start=header.index+header[0].length,end=script.indexOf('\n'+header[2]+'\n',start);if(end<0)throw Error('Malformed helper delimiter');return script.slice(start,end);}

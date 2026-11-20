@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestGoldSrcPresentationActualGetter(t *testing.T) {
@@ -15,11 +16,11 @@ func TestGoldSrcPresentationActualGetter(t *testing.T) {
 	original := "// operator\r\nmp_roundtime 5\r\nmp_forcecamera 2\r\nmp_friendlyfire 0\r\n"
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[goldSrcCS16SettingsPath], fixture.State = []byte(original), "offline"
+	fixture.Files[gamesettings.GoldSrcCS16SettingsPath], fixture.State = []byte(original), "offline"
 	fixture.mu.Unlock()
 	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
-	if view["file"] != goldSrcCS16SettingsPath {
+	if view["file"] != gamesettings.GoldSrcCS16SettingsPath {
 		t.Fatal("Primary gameplay declaration missing")
 	}
 	round := laneGameSettingsField(view, "mp_roundtime")
@@ -39,7 +40,7 @@ func TestGoldSrcPresentationActualGetter(t *testing.T) {
 	infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{"mp_forcecamera": "3"}}, 422)
 	infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{"mp_forcecamera": "1"}}, 200)
 	fixture.mu.Lock()
-	got := string(fixture.Files[goldSrcCS16SettingsPath])
+	got := string(fixture.Files[gamesettings.GoldSrcCS16SettingsPath])
 	fixture.mu.Unlock()
 	if got != strings.Replace(original, "mp_forcecamera 2", "mp_forcecamera 1", 1) {
 		t.Fatal("Presentation changed validator or operator bytes")

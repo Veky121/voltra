@@ -1,41 +1,37 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Select as SelectPrimitive } from "@base-ui/react/select"
-import { cn } from "@/lib/utils"
-import {useOverlayPortalContainer} from '../../ui/OverlayPortal'
+import * as React from 'react';
+import {Select as SelectPrimitive} from '@base-ui/react/select';
+import {cn} from '@/lib/utils';
+import {useOverlayPortalContainer} from '../../ui/OverlayPortal';
 
-import {ChevronDownIcon, ChevronUpIcon, CheckIcon} from "lucide-react"
+import {ChevronDownIcon, ChevronUpIcon, CheckIcon} from 'lucide-react';
 
-const Select = SelectPrimitive.Root
+const Select = SelectPrimitive.Root;
 
-function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
+function SelectGroup({className, ...props}: SelectPrimitive.Group.Props) {
   return (
-    <SelectPrimitive.Group
-      data-slot="select-group"
-      className={cn("scn:scroll-my-1 scn:p-1", className)}
-      {...props}
-    />
-  )
+    <SelectPrimitive.Group data-slot="select-group" className={cn('scn:scroll-my-1 scn:p-1', className)} {...props} />
+  );
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+function SelectValue({className, ...props}: SelectPrimitive.Value.Props) {
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
-      className={cn("scn:flex scn:flex-1 scn:text-left", className)}
+      className={cn('scn:flex scn:flex-1 scn:text-left', className)}
       {...props}
     />
-  )
+  );
 }
 
 function SelectTrigger({
   className,
-  size = "default",
+  size = 'default',
   children,
   ...props
 }: SelectPrimitive.Trigger.Props & {
-  size?: "sm" | "default"
+  size?: 'sm' | 'default';
 }) {
   return (
     <SelectPrimitive.Trigger
@@ -49,37 +45,33 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon
-        render={
-          <ChevronDownIcon className="scn:pointer-events-none scn:size-3.5 scn:text-muted-foreground"/>
-        }
+        render={<ChevronDownIcon className="scn:pointer-events-none scn:size-3.5 scn:text-muted-foreground" />}
       />
     </SelectPrimitive.Trigger>
-  )
+  );
 }
 
 function SelectContent({
   className,
   children,
   portalContainer,
-  side = "bottom",
+  side = 'bottom',
   sideOffset = 4,
-  align = "center",
+  align = 'center',
   alignOffset = 0,
   alignItemWithTrigger = true,
   ...props
-}: SelectPrimitive.Popup.Props &
-  {portalContainer?: SelectPrimitive.Portal.Props["container"]} &
-  Pick<
+}: SelectPrimitive.Popup.Props & {portalContainer?: SelectPrimitive.Portal.Props['container']} & Pick<
     SelectPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
+    'align' | 'alignOffset' | 'side' | 'sideOffset' | 'alignItemWithTrigger'
   >) {
-  const container=useOverlayPortalContainer()
+  const container = useOverlayPortalContainer();
   return (
-    <SelectPrimitive.Portal container={portalContainer??container}>
+    <SelectPrimitive.Portal container={portalContainer ?? container}>
       <SelectPrimitive.Positioner
         // Dialog portals stay in the top layer, but their menus use viewport
         // coordinates and must escape the dialog's scrolling overflow.
-        positionMethod={portalContainer || container ? "fixed" : undefined}
+        positionMethod={portalContainer || container ? 'fixed' : undefined}
         collisionBoundary={[]}
         side={side}
         sideOffset={sideOffset}
@@ -92,7 +84,7 @@ function SelectContent({
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           className={cn(
-            "scn:relative scn:isolate scn:z-50 scn:max-h-(--available-height) scn:w-(--anchor-width) scn:min-w-32 scn:origin-(--transform-origin) scn:overflow-x-hidden scn:overflow-y-auto scn:rounded-lg scn:bg-popover scn:text-popover-foreground scn:shadow-md scn:ring-1 scn:ring-foreground/10 scn:duration-100 scn:data-[align-trigger=true]:animate-none scn:data-[side=bottom]:slide-in-from-top-2 scn:data-[side=inline-end]:slide-in-from-left-2 scn:data-[side=inline-start]:slide-in-from-right-2 scn:data-[side=left]:slide-in-from-right-2 scn:data-[side=right]:slide-in-from-left-2 scn:data-[side=top]:slide-in-from-bottom-2 scn:data-open:animate-in scn:data-open:fade-in-0 scn:data-open:zoom-in-95 scn:data-closed:animate-out scn:data-closed:fade-out-0 scn:data-closed:zoom-out-95",
+            'scn:relative scn:isolate scn:z-50 scn:max-h-(--available-height) scn:w-(--anchor-width) scn:min-w-32 scn:origin-(--transform-origin) scn:overflow-x-hidden scn:overflow-y-auto scn:rounded-lg scn:bg-popover scn:text-popover-foreground scn:shadow-md scn:ring-1 scn:ring-foreground/10 scn:duration-100 scn:data-[align-trigger=true]:animate-none scn:data-[side=bottom]:slide-in-from-top-2 scn:data-[side=inline-end]:slide-in-from-left-2 scn:data-[side=inline-start]:slide-in-from-right-2 scn:data-[side=left]:slide-in-from-right-2 scn:data-[side=right]:slide-in-from-left-2 scn:data-[side=top]:slide-in-from-bottom-2 scn:data-open:animate-in scn:data-open:fade-in-0 scn:data-open:zoom-in-95 scn:data-closed:animate-out scn:data-closed:fade-out-0 scn:data-closed:zoom-out-95',
             className
           )}
           {...props}
@@ -103,27 +95,20 @@ function SelectContent({
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
     </SelectPrimitive.Portal>
-  )
+  );
 }
 
-function SelectLabel({
-  className,
-  ...props
-}: SelectPrimitive.GroupLabel.Props) {
+function SelectLabel({className, ...props}: SelectPrimitive.GroupLabel.Props) {
   return (
     <SelectPrimitive.GroupLabel
       data-slot="select-label"
-      className={cn("scn:px-2 scn:py-1.5 scn:text-xs scn:text-muted-foreground", className)}
+      className={cn('scn:px-2 scn:py-1.5 scn:text-xs scn:text-muted-foreground', className)}
       {...props}
     />
-  )
+  );
 }
 
-function SelectItem({
-  className,
-  children,
-  ...props
-}: SelectPrimitive.Item.Props) {
+function SelectItem({className, children, ...props}: SelectPrimitive.Item.Props) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -141,32 +126,23 @@ function SelectItem({
           <span className="scn:pointer-events-none scn:absolute scn:right-2 scn:flex scn:items-center scn:justify-center" />
         }
       >
-        <CheckIcon className="scn:pointer-events-none"/>
+        <CheckIcon className="scn:pointer-events-none" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
-  )
+  );
 }
 
-function SelectSeparator({
-  className,
-  ...props
-}: SelectPrimitive.Separator.Props) {
+function SelectSeparator({className, ...props}: SelectPrimitive.Separator.Props) {
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
-      className={cn(
-        "scn:pointer-events-none scn:-mx-1 scn:my-1 scn:h-px scn:bg-border/50",
-        className
-      )}
+      className={cn('scn:pointer-events-none scn:-mx-1 scn:my-1 scn:h-px scn:bg-border/50', className)}
       {...props}
     />
-  )
+  );
 }
 
-function SelectScrollUpButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpArrow>) {
+function SelectScrollUpButton({className, ...props}: React.ComponentProps<typeof SelectPrimitive.ScrollUpArrow>) {
   return (
     <SelectPrimitive.ScrollUpArrow
       data-slot="select-scroll-up-button"
@@ -176,15 +152,12 @@ function SelectScrollUpButton({
       )}
       {...props}
     >
-      <ChevronUpIcon/>
+      <ChevronUpIcon />
     </SelectPrimitive.ScrollUpArrow>
-  )
+  );
 }
 
-function SelectScrollDownButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
+function SelectScrollDownButton({className, ...props}: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
   return (
     <SelectPrimitive.ScrollDownArrow
       data-slot="select-scroll-down-button"
@@ -194,9 +167,9 @@ function SelectScrollDownButton({
       )}
       {...props}
     >
-      <ChevronDownIcon/>
+      <ChevronDownIcon />
     </SelectPrimitive.ScrollDownArrow>
-  )
+  );
 }
 
 export {
@@ -210,4 +183,4 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-}
+};

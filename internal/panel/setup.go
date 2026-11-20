@@ -31,22 +31,6 @@ type setupState struct {
 	PendingTLS bool   `json:"pending_tls"`
 }
 
-func (a *App) setupState(ctx context.Context) (setupState, error) {
-	s := setupState{PublicURL: a.Config.PublicURL, AccessMode: "local", TLSMode: "proxy"}
-	if a.DB == nil {
-		return s, nil
-	}
-	var raw []byte
-	e := a.DB.QueryRow(ctx, "SELECT value FROM settings WHERE key='panel:setup'").Scan(&raw)
-	if errors.Is(e, pgx.ErrNoRows) {
-		return s, nil
-	}
-	if e != nil {
-		return s, e
-	}
-	e = json.Unmarshal(raw, &s)
-	return s, e
-}
 func (a *App) panelPublicURL(ctx context.Context) string {
 	s, e := a.setupState(ctx)
 	if e == nil && s.PublicURL != "" && (s.Completed || s.PendingTLS) {
@@ -258,7 +242,7 @@ func (a *App) setupComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if current.Completed {
-		fail(w, APIError{409, "SetupComplete", "This Panel is already configured."})
+		fail(w, APIError{Status: 409, Code: "SetupComplete", Detail: "This Panel is already configured."})
 		return
 	}
 	if !a.bootstrapAllowed(r, current) || !a.browserOrigin(r, current) {
@@ -321,7 +305,7 @@ func (a *App) setupComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing {
-		fail(w, APIError{409, "SetupComplete", "This Panel is already configured."})
+		fail(w, APIError{Status: 409, Code: "SetupComplete", Detail: "This Panel is already configured."})
 		return
 	}
 	// A public installation with any password account cannot be claimed again,
@@ -332,7 +316,7 @@ func (a *App) setupComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing {
-		fail(w, APIError{409, "AccountConfigured", "An administrator account already exists."})
+		fail(w, APIError{Status: 409, Code: "AccountConfigured", Detail: "An administrator account already exists."})
 		return
 	}
 	var userID int64
@@ -352,6 +336,7 @@ func (a *App) setupComplete(w http.ResponseWriter, r *http.Request) {
 	if e == nil {
 		e = tx.Commit(ctx)
 	}
+	a.settingsChanged()
 	if e != nil {
 		fail(w, e)
 		return
@@ -431,7 +416,7 @@ func (a *App) browserLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if attempts > 10 {
 		w.Header().Set("Retry-After", "900")
-		fail(w, APIError{429, "LoginRateLimited", "Too many sign-in attempts. Try again in 15 minutes."})
+		fail(w, APIError{Status: 429, Code: "LoginRateLimited", Detail: "Too many sign-in attempts. Try again in 15 minutes."})
 		return
 	}
 	username, password := str(d["username"]), str(d["password"])
@@ -442,7 +427,7 @@ func (a *App) browserLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	valid := len(password) <= 72 && bcrypt.CompareHashAndPassword(hash, []byte(password)) == nil
 	if e != nil || !valid || boolean(u["disabled"]) {
-		fail(w, APIError{401, "InvalidLogin", "The username or password is incorrect."})
+		fail(w, APIError{Status: 401, Code: "InvalidLogin", Detail: "The username or password is incorrect."})
 		return
 	}
 	token := randomToken(32)

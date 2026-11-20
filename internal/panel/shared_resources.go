@@ -40,12 +40,12 @@ func (h *sharedResourceReads) read(ctx context.Context, key resourceReadKey, fet
 	f := h.flights[key]
 	if f != nil && f.waiters == 0 {
 		h.mu.Unlock()
-		return nil, APIError{503, "ResourceReadCancelled", "Resource monitoring is reconnecting. Retry shortly."}
+		return nil, APIError{Status: 503, Code: "ResourceReadCancelled", Detail: "Resource monitoring is reconnecting. Retry shortly."}
 	}
 	if f == nil {
 		if len(h.flights) >= 64 {
 			h.mu.Unlock()
-			return nil, APIError{503, "ResourceReadLimit", "Resource monitoring is busy. Retry shortly."}
+			return nil, APIError{Status: 503, Code: "ResourceReadLimit", Detail: "Resource monitoring is busy. Retry shortly."}
 		}
 		shared, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		f = &resourceReadFlight{done: make(chan struct{}), cancel: cancel}

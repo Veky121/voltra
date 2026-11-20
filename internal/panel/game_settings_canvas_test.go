@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestCanvasDifficultyGuidanceAPI(t *testing.T) {
@@ -15,7 +16,7 @@ func TestCanvasDifficultyGuidanceAPI(t *testing.T) {
 	}
 	var canvas gameTemplate
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path == canvasSettingsRecipe {
+		if entry.Path == gamesettings.CanvasSettingsRecipe {
 			canvas = entry
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func laneGameSettingsField(view M, key string) M {
@@ -84,13 +85,13 @@ func TestBananaSettingsIntegratedAPI(t *testing.T) {
 
 func TestBananaSettingsFolderBoundary(t *testing.T) {
 	for _, name := range []string{"PterodactylServer", "Operator_42", "Mods", "-", strings.Repeat("x", 80)} {
-		file, err := bananaSettingsPath(name)
+		file, err := gamesettings.BananaSettingsPath(name)
 		if err != nil || file != "/Servers/"+name+"/Config.json" {
 			t.Fatalf("valid folder %q: %q %v", name, file, err)
 		}
 	}
 	for _, name := range []string{"", "..", "../escape", "/absolute", "sub/folder", `sub\folder`, "with space", "dots.name", "{{SERVER}}", "a\x00b", "a\nb", "é", strings.Repeat("x", 81)} {
-		if _, err := bananaSettingsPath(name); err == nil {
+		if _, err := gamesettings.BananaSettingsPath(name); err == nil {
 			t.Fatalf("accepted unsafe folder %q", name)
 		}
 	}
@@ -99,7 +100,7 @@ func TestBananaSettingsFolderBoundary(t *testing.T) {
 func bananaSettingsFixtureEgg(t *testing.T) M {
 	t.Helper()
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path == bananaSettingsRecipe {
+		if entry.Path == gamesettings.BananaSettingsRecipe {
 			return M{"uuid": gameTemplateEggUUID(entry), "startup": entry.Egg["startup"]}
 		}
 	}
@@ -109,7 +110,7 @@ func bananaSettingsFixtureEgg(t *testing.T) M {
 
 func TestBananaSettingsWrongRecipeDoesNotQuery(t *testing.T) {
 	egg := M{"name": "Banana Shooter", "_banana_settings_path": "/Servers/Old/Config.json"}
-	if err := (&App{}).prepareBananaSettingsEgg(context.Background(), M{}, egg); err != nil {
+	if err := (&App{}).gameSettingsService().PrepareBananaSettingsEgg(context.Background(), M{}, egg); err != nil {
 		t.Fatal(err)
 	}
 	if _, exists := egg["_banana_settings_path"]; exists {
@@ -121,17 +122,17 @@ func TestBananaSettingsSelectedDocumentBoundary(t *testing.T) {
 	egg := bananaSettingsFixtureEgg(t)
 	for _, selected := range []string{"/Servers/Operator_42/Config.json", "/Servers/Mods/Config.json"} {
 		egg["_banana_settings_path"] = selected
-		if bananaSelectedSettingsDocument(egg) != selected {
+		if gamesettings.BananaSelectedSettingsDocument(egg) != selected {
 			t.Fatal("validated runtime-selected document was lost")
 		}
 	}
 	for _, selected := range []string{"", "/Config.json", "/Servers/Other/Unknown.json", "/Servers/../Config.json", "/Servers/One/Two/Config.json", "/Servers/{{SERVER}}/Config.json"} {
 		egg["_banana_settings_path"] = selected
-		if bananaSelectedSettingsDocument(egg) != "" {
+		if gamesettings.BananaSelectedSettingsDocument(egg) != "" {
 			t.Fatalf("unsafe selected document authorized: %q", selected)
 		}
 	}
-	if bananaSelectedSettingsDocument(M{"name": "Banana Shooter", "_banana_settings_path": "/Servers/Operator_42/Config.json"}) != "" {
+	if gamesettings.BananaSelectedSettingsDocument(M{"name": "Banana Shooter", "_banana_settings_path": "/Servers/Operator_42/Config.json"}) != "" {
 		t.Fatal("display name gained selected-document authority")
 	}
 }
@@ -139,10 +140,10 @@ func TestBananaSettingsSelectedDocumentBoundary(t *testing.T) {
 func TestBananaSettingsInvalidServerContextFailsClosed(t *testing.T) {
 	egg := bananaSettingsFixtureEgg(t)
 	egg["_banana_settings_path"] = "/Servers/Stale/Config.json"
-	if err := (&App{}).prepareBananaSettingsEgg(context.Background(), M{}, egg); err == nil {
+	if err := (&App{}).gameSettingsService().PrepareBananaSettingsEgg(context.Background(), M{}, egg); err == nil {
 		t.Fatal("missing server context silently selected a default or queried a nil database")
 	}
-	if bananaSelectedSettingsDocument(egg) != "" {
+	if gamesettings.BananaSelectedSettingsDocument(egg) != "" {
 		t.Fatal("invalid server context retained selected-document authority")
 	}
 }
@@ -154,7 +155,7 @@ func TestBananaSettingsEffectiveFolderPostgres(t *testing.T) {
 	if _, err := a.update(ctx, "eggs", num(server["egg_id"]), M{"uuid": egg["uuid"], "startup": egg["startup"]}); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.prepareBananaSettingsEgg(ctx, server, egg); err != nil {
+	if err := a.gameSettingsService().PrepareBananaSettingsEgg(ctx, server, egg); err != nil {
 		t.Fatal(err)
 	}
 	if egg["_banana_settings_path"] != "/Servers/PterodactylServer/Config.json" {
@@ -164,13 +165,13 @@ func TestBananaSettingsEffectiveFolderPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = a.prepareBananaSettingsEgg(ctx, server, egg); err != nil || egg["_banana_settings_path"] != "/Servers/EggDefault/Config.json" {
+	if err = a.gameSettingsService().PrepareBananaSettingsEgg(ctx, server, egg); err != nil || egg["_banana_settings_path"] != "/Servers/EggDefault/Config.json" {
 		t.Fatalf("egg default: %v %v", err, egg["_banana_settings_path"])
 	}
 	if _, err = a.insert(ctx, "server_variables", M{"server_id": server["id"], "variable_id": variable["id"], "variable_value": "Actual_Operator"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = a.prepareBananaSettingsEgg(ctx, server, egg); err != nil || egg["_banana_settings_path"] != "/Servers/Actual_Operator/Config.json" {
+	if err = a.gameSettingsService().PrepareBananaSettingsEgg(ctx, server, egg); err != nil || egg["_banana_settings_path"] != "/Servers/Actual_Operator/Config.json" {
 		t.Fatalf("server override: %v %v", err, egg["_banana_settings_path"])
 	}
 	for _, invalid := range []string{"", "../escape", "nested/path", strings.Repeat("a", 81)} {
@@ -178,7 +179,7 @@ func TestBananaSettingsEffectiveFolderPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 		egg["_banana_settings_path"] = "/Servers/Stale/Config.json"
-		if err = a.prepareBananaSettingsEgg(ctx, server, egg); err == nil {
+		if err = a.gameSettingsService().PrepareBananaSettingsEgg(ctx, server, egg); err == nil {
 			t.Fatalf("accepted invalid effective folder %q", invalid)
 		}
 		if _, exists := egg["_banana_settings_path"]; exists {
@@ -191,7 +192,7 @@ func TestBananaSettingsEffectiveFolderPostgres(t *testing.T) {
 	if _, err = a.insert(ctx, "egg_variables", M{"egg_id": server["egg_id"], "name": "Repeated server folder", "env_variable": "SERVER", "default_value": "Actual_Operator", "rules": "required|string"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = a.prepareBananaSettingsEgg(ctx, server, egg); err == nil {
+	if err = a.gameSettingsService().PrepareBananaSettingsEgg(ctx, server, egg); err == nil {
 		t.Fatal("duplicate SERVER rows were silently selected, even with equal values")
 	}
 	if _, exists := egg["_banana_settings_path"]; exists {
@@ -204,7 +205,7 @@ func TestBananaSettingsEffectiveFolderPostgres(t *testing.T) {
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
 	egg["_banana_settings_path"] = "/Servers/Stale/Config.json"
-	if err = a.prepareBananaSettingsEgg(canceled, server, egg); err == nil {
+	if err = a.gameSettingsService().PrepareBananaSettingsEgg(canceled, server, egg); err == nil {
 		t.Fatal("failed database read silently selected a default path")
 	}
 	if _, exists := egg["_banana_settings_path"]; exists {

@@ -1,6 +1,10 @@
 package panel
 
-import "context"
+import (
+	"context"
+
+	"voltra/internal/gamesettings"
+)
 
 // These are only initial environment inputs proved by the named source adapters.
 // No native file or secret value is inspected to describe their effect.
@@ -35,7 +39,7 @@ var startupSeedKeys = map[string][]string{
 	"openrct2/egg-openrct2.json":                                   {"AUTOSAVE_INTERVAL", "AUTOSAVE_AMOUNT", "MAX_PLAYERS", "SERVER_PLAYER_NAME", "SERVER_PASSWORD", "SERVER_NAME", "SERVER_DESCRIPTION", "SERVER_GREETING", "PROVIDER_NAME", "PROVIDER_EMAIL", "PROVIDER_WEBSITE", "SERVER_ADVERTISE", "PAUSE_NO_CLIENTS", "LOG_CHAT", "LOG_SERVER_ACTIONS", "RCT2_DATA_PATH"},
 }
 
-func startupSeedEffect(server, egg M, entry gameTemplate, key string) M {
+func startupSeedEffect(server, egg M, entry gamesettings.Profile, key string) M {
 	install := asMap(asMap(entry.Egg["scripts"])["installation"])
 	if str(entry.Egg["startup"]) == "" || str(egg["startup"]) != str(entry.Egg["startup"]) || str(server["startup"]) != str(entry.Egg["startup"]) ||
 		str(install["script"]) == "" || str(egg["script_install"]) != str(install["script"]) ||
@@ -55,7 +59,7 @@ func (a *App) annotateStartupSeedFields(ctx context.Context, server M, variables
 	if err != nil {
 		return err
 	}
-	entry, ok := gameSettingsProfile(egg)
+	entry, ok := gamesettings.ProfileFor(egg)
 	for _, variable := range variables {
 		delete(variable, "effect")
 		if ok {

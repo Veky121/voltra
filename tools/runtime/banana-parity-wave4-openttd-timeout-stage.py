@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 root=Path(__file__).resolve().parents[2]
 out=root/'artifacts/game-parity-20261029'
-source=(root/'internal/panel/game_settings_openttd_fields.go').read_text()
+source=(root/'internal/gamesettings/openttd_fields.go').read_text()
 assert source.count('import "strings"')==1
 source=source.replace('import "strings"','import ("strings"; "strconv")')
 anchor='\t\tfolded := strings.ToLower(gameSettingsINIFold(field.key))'
@@ -38,7 +38,7 @@ func openttdPublicNumericField(egg M,file string,field gameSetting) bool {
 }
 '''
 (out/'banana-wave4-openttd-timeout-fields.go.pending').write_text(source)
-documents=(root/'internal/panel/game_settings_documents.go').read_text()
+documents=(root/'internal/gamesettings/documents.go').read_text()
 lines=[line for line in documents.splitlines() if 'secret := f.secret || gameSettingSecret.MatchString(f.key)' in line]
 assert len(lines)==1
 anchor=lines[0]
@@ -47,8 +47,8 @@ assert '&& !(' in anchor and anchor.endswith(')')
 documents=documents.replace(anchor,anchor[:-1]+' || openttdPublicNumericField(egg, file, f))')
 (out/'banana-wave4-openttd-timeout-documents.go.pending').write_text(documents)
 overlay={'Replace':{
-str((root/'internal/panel/game_settings_openttd_fields.go').resolve()):str((out/'banana-wave4-openttd-timeout-fields.go.pending').resolve()),
-str((root/'internal/panel/game_settings_documents.go').resolve()):str((out/'banana-wave4-openttd-timeout-documents.go.pending').resolve()),
+str((root/'internal/gamesettings/openttd_fields.go').resolve()):str((out/'banana-wave4-openttd-timeout-fields.go.pending').resolve()),
+str((root/'internal/gamesettings/documents.go').resolve()):str((out/'banana-wave4-openttd-timeout-documents.go.pending').resolve()),
 str((root/'internal/panel/game_settings_openttd_timeout_test.go').resolve()):str((out/'banana-wave4-openttd-timeout_test.go.pending').resolve())}}
 (out/'banana-wave4-openttd-timeout-overlay.json').write_text(json.dumps(overlay,indent=2)+'\n')
 print('Pending exact timeout field/helper/getter proposal; canonical Go unchanged.')

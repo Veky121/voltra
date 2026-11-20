@@ -10,12 +10,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestWave154AssettoHandlers(t *testing.T) {
 	for _, tc := range []struct{ recipe, file, data, key, value string }{
-		{assettoVanillaRecipe, "/cfg/server_cfg.ini", "\ufeff[SERVER]\r\nCARS=car_a;car_b\r\n; keep comment\r\nPASSWORD=private-fixture-secret\r\n", "SERVER/CARS", "car_c"},
-		{assettoAIRecipe, "/cfg/server_cfg.ini", "\ufeff[SERVER]\r\nCARS=car_a;car_b\r\n; keep comment\r\nPASSWORD=private-fixture-secret\r\n", "SERVER/CARS", "car_c"},
+		{gamesettings.AssettoVanillaRecipe, "/cfg/server_cfg.ini", "\ufeff[SERVER]\r\nCARS=car_a;car_b\r\n; keep comment\r\nPASSWORD=private-fixture-secret\r\n", "SERVER/CARS", "car_c"},
+		{gamesettings.AssettoAIRecipe, "/cfg/server_cfg.ini", "\ufeff[SERVER]\r\nCARS=car_a;car_b\r\n; keep comment\r\nPASSWORD=private-fixture-secret\r\n", "SERVER/CARS", "car_c"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			a, mux, admin, server, f := quickSetupMinecraftFixture(t)
@@ -28,7 +29,7 @@ func TestWave154AssettoHandlers(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -132,7 +133,7 @@ func TestWave154AssettoHandlers(t *testing.T) {
 			if f.Writes != beforeDrift {
 				t.Fatal("environment drift wrote")
 			}
-			if tc.recipe == starboundAuthorityRecipe {
+			if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 				old = asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
 				f.Files["/sbinit.config"] = []byte(`{"storageDirectory":"storage","unknown":true}`)
 				infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": old["revision"], "settings": change}, 409)
@@ -290,19 +291,19 @@ func (w wave154Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return b.RoundTrip(r)
 }
 func TestWave154AssettoParserRefusals(t *testing.T) {
-	for _, recipe := range []string{assettoVanillaRecipe, assettoAIRecipe} {
+	for _, recipe := range []string{gamesettings.AssettoVanillaRecipe, gamesettings.AssettoAIRecipe} {
 		egg := batchSettingsRecipeFixture(t, recipe)
 		for _, raw := range []string{"[SERVER]\nCARS=car_a\ncars=car_b\n", "[SERVER]\nCARS=car_a\n[server]\nCARS=car_b\n"} {
-			if _, e := parseAssettoSettings(egg, []byte(raw)); e == nil {
+			if _, e := gamesettings.ParseAssettoSettings(egg, []byte(raw)); e == nil {
 				t.Fatal("alias accepted")
 			}
 		}
-		p, e := parseAssettoSettings(egg, []byte("[SERVER]\nCARS=car_a;car_b\nUDP_PORT=9000\n"))
+		p, e := gamesettings.ParseAssettoSettings(egg, []byte("[SERVER]\nCARS=car_a;car_b\nUDP_PORT=9000\n"))
 		if e != nil {
 			t.Fatal(e)
 		}
 		for _, key := range []string{"SERVER/UDP_PORT", "SERVER/exec", "SERVER/CARS/../x"} {
-			if _, e = p.patch(map[string]string{key: "9001"}); e == nil {
+			if _, e = p.Patch(map[string]string{key: "9001"}); e == nil {
 				t.Fatal("unreviewed control accepted")
 			}
 		}
@@ -310,16 +311,16 @@ func TestWave154AssettoParserRefusals(t *testing.T) {
 }
 
 func TestAssettoControlCharactersRefuse(t *testing.T) {
-	for _, recipe := range []string{assettoVanillaRecipe, assettoAIRecipe} {
+	for _, recipe := range []string{gamesettings.AssettoVanillaRecipe, gamesettings.AssettoAIRecipe} {
 		egg := batchSettingsRecipeFixture(t, recipe)
-		parsed, err := parseAssettoSettings(egg, []byte("[SERVER]\nNAME=Operator\nPASSWORD=private-fixture\nADMIN_PASSWORD=admin-fixture\n"))
+		parsed, err := gamesettings.ParseAssettoSettings(egg, []byte("[SERVER]\nNAME=Operator\nPASSWORD=private-fixture\nADMIN_PASSWORD=admin-fixture\n"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		for key, value := range map[string]string{
 			"SERVER/NAME": "bad\tname", "SERVER/PASSWORD": "bad\x7fpassword", "SERVER/ADMIN_PASSWORD": "bad\x01admin-password",
 		} {
-			if _, err := parsed.patch(map[string]string{key: value}); err == nil {
+			if _, err := parsed.Patch(map[string]string{key: value}); err == nil {
 				t.Fatalf("%s accepted control characters in %s", recipe, key)
 			}
 		}

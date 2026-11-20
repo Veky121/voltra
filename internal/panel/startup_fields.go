@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"voltra/internal/gamesettings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -138,7 +139,7 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 		fail(w, err)
 		return
 	}
-	if nativeSettingsIsRecipe(egg, fiveMRecipe) {
+	if gamesettings.IsRecipe(egg, gamesettings.FiveMRecipe) {
 		env, envErr := a.serverEnvironment(ctx, server)
 		if envErr != nil {
 			fail(w, envErr)
@@ -225,7 +226,7 @@ func (a *App) saveStartupField(w http.ResponseWriter, r *http.Request, server, c
 			e = a.syncServer(cleanup, server)
 		}
 		if boolean(changed["secret"]) {
-			fail(w, APIError{http.StatusBadGateway, "StartupSecretSyncFailed", "Could not synchronize the secret with the node. Reload this setting before retrying."})
+			fail(w, APIError{Status: http.StatusBadGateway, Code: "StartupSecretSyncFailed", Detail: "Could not synchronize the secret with the node. Reload this setting before retrying."})
 		} else {
 			fail(w, errors.Join(err, e))
 		}

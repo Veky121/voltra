@@ -26,7 +26,7 @@ try {
   const m=script.match(re), hash=m?h.digest(m[2]+'\n'):null;
   helpers.push({name,accepted_sha256:proof.tested_sha256,emitted_sha256:hash,exact_match:hash===proof.tested_sha256});
  }
- const backend=['internal/panel/game_settings_gmod.go','internal/panel/game_settings_source.go','internal/panel/game_settings_campaign_authority.go','internal/panel/game_settings_documents.go'].map(p=>({path:p,current_sha256:h.digest(fs.readFileSync(path.join(h.root,p))),sealed_sha256:h.digest(fs.readFileSync(path.join(runtime.snapshot,p)))}));
+ const backend=['internal/gamesettings/gmod.go','internal/gamesettings/source.go','internal/gamesettings/campaign_authority.go','internal/gamesettings/documents.go'].map(p=>({path:p,current_sha256:h.digest(fs.readFileSync(path.join(h.root,p))),sealed_sha256:h.digest(fs.readFileSync(path.join(runtime.snapshot,p)))}));
  const compare={canonical_catalog:receipt('../pterodactyl-vite/upstream/game-eggs/'+recipe),admission,profile_current_matches_sealed:JSON.stringify(profile)===JSON.stringify(current),startup:profile.egg.startup,config_files:profile.egg.config.files,installer_sha256:h.digest(script),historical_profile_found:!!historical,historical_installer_sha256:historical?.egg?.scripts?.installation?.script?h.digest(historical.egg.scripts.installation.script):null,helpers,backend};
  save('comparison.json',compare);
  const template=(await h.api('/api/client/game-library/templates/'+h.digest(recipe).slice(0,16))).attributes;

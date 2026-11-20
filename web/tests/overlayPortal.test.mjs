@@ -8,15 +8,22 @@ import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
 const source = readFileSync(new URL('../src/ui/OverlayPortal.tsx', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX}}).outputText;
+const compiled = ts.transpileModule(source, {
+  compilerOptions: {module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX},
+}).outputText;
 const module = {exports: {}};
 new Function('require', 'module', 'exports', compiled)(require, module, module.exports);
 const {OverlayPortalContext, useOverlayPortalContainer} = module.exports;
 
 function resolve(container) {
   let result;
-  function Consumer() { result = useOverlayPortalContainer(); return null; }
-  renderToStaticMarkup(React.createElement(OverlayPortalContext.Provider, {value: container}, React.createElement(Consumer)));
+  function Consumer() {
+    result = useOverlayPortalContainer();
+    return null;
+  }
+  renderToStaticMarkup(
+    React.createElement(OverlayPortalContext.Provider, {value: container}, React.createElement(Consumer))
+  );
   return result;
 }
 

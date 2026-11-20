@@ -34,7 +34,7 @@ func (a *App) sftpPasswordAttempt(ctx context.Context, bucket string) error {
 		return err
 	}
 	if attempts > 20 {
-		return APIError{429, "SFTPPasswordRateLimited", "Too many password attempts. Try again in 15 minutes."}
+		return APIError{Status: 429, Code: "SFTPPasswordRateLimited", Detail: "Too many password attempts. Try again in 15 minutes."}
 	}
 	return nil
 }
@@ -95,7 +95,7 @@ func (a *App) saveSFTPPassword(w http.ResponseWriter, r *http.Request, id, actor
 		return
 	}
 	if !admin && current != "" && !validSFTPPassword(current, str(d["current_password"])) {
-		fail(w, APIError{403, "InvalidSFTPPassword", "The current SFTP password is incorrect."})
+		fail(w, APIError{Status: 403, Code: "InvalidSFTPPassword", Detail: "The current SFTP password is incorrect."})
 		return
 	}
 	if _, err = tx.Exec(r.Context(), "UPDATE users SET sftp_password_hash=$1,updated_at=now() WHERE id=$2", hash, id); err != nil {

@@ -69,7 +69,7 @@ connection URL and run `go test -timeout=20m ./...`. The TCP port can vary. Each
 fixture creates and removes its own schema. GitHub CI supplies a separate
 PostgreSQL service and passes this URL through `tools/ci/test-linux.sh`.
 
-Required config examples are tracked in `internal/panel/testdata/game-settings`.
+Required config examples are tracked in `internal/gamesettings/testdata/game-settings`.
 Historical receipt checks are separate: `go test -tags campaign_audit ./internal/panel -run FixtureCleanup` requires the original campaign database and
 logs. `go test -tags native_fixtures ./internal/panel -run TestValheimPlusAPI`
 requires the retained game/plugin archive. These opt-in checks are not native

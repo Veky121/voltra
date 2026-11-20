@@ -13,7 +13,7 @@ export async function verifyRetry22(ctx,contract,pairSHA){
  const oldRaw=await readFile(resolve(oldSnapshot,'snapshot-manifest.json')),newRaw=await readFile(resolve(newSnapshot,'snapshot-manifest.json'));
  if(sha(oldRaw)!=='0c213b4bb59ea0b1ce6073a18b8896650a66812a6ba0725526cd39536b1b771e'||sha(newRaw)!=='1440ae7f76f256084fd50ebda562327557dd928da3eeeb27911687607d0ffd61')throw Error('Exact frozen manifest pins differ');
  const old=JSON.parse(oldRaw),next=JSON.parse(newRaw),a=new Map(old.inputs.map(x=>[x.path,x.sha256])),b=new Map(next.inputs.map(x=>[x.path,x.sha256]));
- const changed=[...new Set([...a.keys(),...b.keys()])].filter(p=>a.get(p)!==b.get(p)).sort(),expected=['internal/panel/game_settings_campaign_authority.go','internal/panel/game_settings_discovery.go','internal/panel/game_settings_l4d_readonly.go','internal/panel/game_settings_l4d_readonly_dispatch_test.go'].sort();
+ const changed=[...new Set([...a.keys(),...b.keys()])].filter(p=>a.get(p)!==b.get(p)).sort(),expected=['internal/gamesettings/campaign_authority.go','internal/gamesettings/discovery.go','internal/panel/game_settings_l4d_readonly.go','internal/panel/game_settings_l4d_readonly_dispatch_test.go'].sort();
  if(JSON.stringify(changed)!==JSON.stringify(expected))throw Error('Frozen source delta exceeds exact four reviewed L4D Go files');
  for(const path of changed)if(sha(await readFile(resolve(newSnapshot,path)))!==b.get(path))throw Error('Frozen22 changed source bytes differ');
  const recipe='factorio/clusterio/egg-clusterio.json',file='internal/panel/game_library/overrides.json',oldCatalog=await readFile(resolve(oldSnapshot,file)),newCatalog=await readFile(resolve(newSnapshot,file));

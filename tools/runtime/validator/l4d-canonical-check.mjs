@@ -76,7 +76,7 @@ print(json.dumps(dict(helpers=actual,files=files,appid=field('appid'),buildid=fi
  return {...result,scope:'Fresh canonical Steam publication/map/config identity only; current native protocol/settings/reinstall acceptance pending',gameDownloadCacheClaim:false};
 }
 
-const bridgeChanges=['internal/panel/game_settings_campaign_authority.go','internal/panel/game_settings_discovery.go','internal/panel/game_settings_l4d_readonly_dispatch_test.go','internal/panel/game_settings_l4d_readonly.go'].sort();
+const bridgeChanges=['internal/gamesettings/campaign_authority.go','internal/gamesettings/discovery.go','internal/panel/game_settings_l4d_readonly_dispatch_test.go','internal/panel/game_settings_l4d_readonly.go'].sort();
 function l4dInstallReceiptValid(f,original){return f.install?.rawExit==='0'&&f.install.callback?.success===true&&f.install.logsFollowed===true&&f.install.memoryValid===true&&f.install.removed===true&&f.install.scriptHash===hash(original)&&(!f.install.canonicalScriptSha256||f.install.canonicalScriptSha256===hash(original));}
 export function l4dInstallerScriptAllowed(ctx,original,actual){
  if(actual===original)return true;

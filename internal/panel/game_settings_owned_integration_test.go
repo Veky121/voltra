@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestSettingsIntegrationDDNetAPI(t *testing.T) {
@@ -29,11 +30,11 @@ func TestSettingsIntegrationDDNetAPI(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[ddnetSettingsPath], fixture.State = []byte(ddnetOriginalSeed), "offline"
+	fixture.Files[gamesettings.DdnetSettingsPath], fixture.State = []byte(ddnetOriginalSeed), "offline"
 	fixture.mu.Unlock()
 	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
-	if view["file"] != ddnetSettingsPath || len(asSlice(view["fields"])) != 6 {
+	if view["file"] != gamesettings.DdnetSettingsPath || len(asSlice(view["fields"])) != 6 {
 		t.Fatal("root command document not discovered or specialized parser missing")
 	}
 	reader, err := a.insert(context.Background(), "users", M{"uuid": newUUID(), "username": "settings-reader", "email": "settings-reader@example.invalid"})
@@ -57,9 +58,9 @@ func TestSettingsIntegrationDDNetAPI(t *testing.T) {
 	fixture.mu.Lock()
 	fixture.State = "offline"
 	fixture.mu.Unlock()
-	infraExpect(t, mux, admin, "PUT", endpoint, M{"file": ddnetSettingsPath, "revision": view["revision"], "settings": M{"sv_name": "Updated", "sv_register": true}}, 200)
+	infraExpect(t, mux, admin, "PUT", endpoint, M{"file": gamesettings.DdnetSettingsPath, "revision": view["revision"], "settings": M{"sv_name": "Updated", "sv_register": true}}, 200)
 	fixture.mu.Lock()
-	updated := string(fixture.Files[ddnetSettingsPath])
+	updated := string(fixture.Files[gamesettings.DdnetSettingsPath])
 	fixture.mu.Unlock()
 	expected := strings.Replace(strings.Replace(ddnetOriginalSeed, `"Original"`, `"Updated"`, 1), "sv_register 0", `sv_register "1"`, 1)
 	if updated != expected {
@@ -79,10 +80,10 @@ func TestSettingsIntegrationDDNetStartupDrift(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[ddnetSettingsPath] = []byte(ddnetOriginalSeed)
+	fixture.Files[gamesettings.DdnetSettingsPath] = []byte(ddnetOriginalSeed)
 	fixture.State = "offline"
 	fixture.mu.Unlock()
-	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + ddnetSettingsPath
+	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.DdnetSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	body := &etlegacyPausedBody{Reader: strings.NewReader(`{"revision":"` + str(view["revision"]) + `","settings":{"sv_name":"Rejected"}}`), admitted: make(chan struct{}), resume: make(chan struct{})}
 	req := WithUser(httptest.NewRequest("PUT", route, body), admin)
@@ -111,7 +112,7 @@ func TestSettingsIntegrationDDNetStartupDrift(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	if string(fixture.Files[ddnetSettingsPath]) != ddnetOriginalSeed {
+	if string(fixture.Files[gamesettings.DdnetSettingsPath]) != ddnetOriginalSeed {
 		t.Fatal("startup changed during save mutated native bytes")
 	}
 }
@@ -151,10 +152,10 @@ func TestSettingsIntegrationDDNetConfigDrift(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[ddnetSettingsPath] = []byte(ddnetOriginalSeed)
+	fixture.Files[gamesettings.DdnetSettingsPath] = []byte(ddnetOriginalSeed)
 	fixture.State = "offline"
 	fixture.mu.Unlock()
-	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + ddnetSettingsPath
+	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.DdnetSettingsPath
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	body := &etlegacyPausedBody{Reader: strings.NewReader(`{"revision":"` + str(view["revision"]) + `","settings":{"sv_name":"Rejected"}}`), admitted: make(chan struct{}), resume: make(chan struct{})}
 	req := WithUser(httptest.NewRequest("PUT", route, body), admin)
@@ -169,7 +170,7 @@ func TestSettingsIntegrationDDNetConfigDrift(t *testing.T) {
 		t.Fatal("save did not reach body decoding")
 	}
 	fixture.mu.Lock()
-	delete(fixture.Files, ddnetSettingsPath)
+	delete(fixture.Files, gamesettings.DdnetSettingsPath)
 	fixture.mu.Unlock()
 	var err error
 	close(body.resume)
@@ -186,7 +187,7 @@ func TestSettingsIntegrationDDNetConfigDrift(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	defer fixture.mu.Unlock()
-	if len(fixture.Files[ddnetSettingsPath]) != 0 {
+	if len(fixture.Files[gamesettings.DdnetSettingsPath]) != 0 {
 		t.Fatal("startup changed during save mutated native bytes")
 	}
 }

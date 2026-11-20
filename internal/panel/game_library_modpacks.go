@@ -234,7 +234,7 @@ func (a *App) gameLibraryModpackVersions(w http.ResponseWriter, r *http.Request)
 func minecraftCFDownload(file M) (minecraftDownload, error) {
 	out := minecraftDownload{URL: str(file["downloadUrl"]), Algorithm: "sha1"}
 	if out.URL == "" {
-		return out, APIError{422, "CurseForgeDownloadingDisabled", "The author has disabled API downloads for this file. Choose another pack version or ask the author to allow server-pack downloads."}
+		return out, APIError{Status: 422, Code: "CurseForgeDownloadingDisabled", Detail: "The author has disabled API downloads for this file. Choose another pack version or ask the author to allow server-pack downloads."}
 	}
 	if !boolean(file["isAvailable"]) {
 		return out, bad("This CurseForge file is no longer available.")
@@ -406,7 +406,7 @@ func (a *App) minecraftModpackPlan(ctx context.Context, selection M) (minecraftP
 			}
 		}
 		if !allowed {
-			return minecraftPlan{}, APIError{422, "ClientOnlyModpack", "This pack does not declare dedicated-server support. Choose a server-compatible pack."}
+			return minecraftPlan{}, APIError{Status: 422, Code: "ClientOnlyModpack", Detail: "This pack does not declare dedicated-server support. Choose a server-compatible pack."}
 		}
 		var archive minecraftDownload
 		for _, v := range asSlice(version["files"]) {
@@ -433,7 +433,7 @@ func (a *App) minecraftModpackPlan(ctx context.Context, selection M) (minecraftP
 		archives = append(archives, minecraftPackArchive{File: archive, Prefixes: []string{"overrides/", "server-overrides/"}})
 	} else {
 		if num(version["serverPackFileId"]) <= 0 {
-			return minecraftPlan{}, APIError{422, "ClientOnlyModpack", "This CurseForge version has no author-published server pack. Choose a version with a server download."}
+			return minecraftPlan{}, APIError{Status: 422, Code: "ClientOnlyModpack", Detail: "This CurseForge version has no author-published server pack. Choose a version with a server download."}
 		}
 		clientArchive, e := minecraftCFDownload(version)
 		if e != nil {

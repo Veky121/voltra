@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestCoreKeeperSettingsAPI(t *testing.T) {
 	a, mux, admin, s, f := quickSetupMinecraftFixture(t)
 	ctx := context.Background()
 	hl2dmFixtureAllocation(t, a, s)
-	egg := batchSettingsRecipeFixture(t, coreKeeperSettingsRecipe)
+	egg := batchSettingsRecipeFixture(t, gamesettings.CoreKeeperSettingsRecipe)
 	egg["java_config"] = M{}
 	if _, e := a.update(ctx, "eggs", num(s["egg_id"]), egg); e != nil {
 		t.Fatal(e)
@@ -23,16 +24,16 @@ func TestCoreKeeperSettingsAPI(t *testing.T) {
 	original := []byte("{\r\n  \"gameId\":\"private-id\",\"password\":\"private-password\",\"worldSeed\":\"875047367409\",\"hashedWorldSeed\":3327892597,\"worldMode\":0,\"maxNumberPlayers\":8,\"unknown\":[1,2]\r\n}\r\n")
 	f.mu.Lock()
 	delete(f.Files, "/server.properties")
-	f.Files[coreKeeperSettingsPath] = original
+	f.Files[gamesettings.CoreKeeperSettingsPath] = original
 	f.State = "offline"
-	for n, b := range wave46CanonicalHelpers(t, coreKeeperSettingsRecipe) {
+	for n, b := range wave46CanonicalHelpers(t, gamesettings.CoreKeeperSettingsRecipe) {
 		f.Files["/"+strings.TrimPrefix(n, "/")] = b
 	}
 	f.mu.Unlock()
-	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + coreKeeperSettingsPath
+	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + gamesettings.CoreKeeperSettingsPath
 	get := func() M { return asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"]) }
 	defaultView := asMap(infraExpect(t, mux, admin, "GET", "/api/client/servers/"+str(s["uuid_short"])+"/game-settings", nil, 200)["attributes"])
-	if str(defaultView["file"]) != coreKeeperSettingsPath || len(asSlice(defaultView["fields"])) != 1 {
+	if str(defaultView["file"]) != gamesettings.CoreKeeperSettingsPath || len(asSlice(defaultView["fields"])) != 1 {
 		t.Fatal("shared Game settings did not select the native document")
 	}
 	view := get()
@@ -54,7 +55,7 @@ func TestCoreKeeperSettingsAPI(t *testing.T) {
 		t.Helper()
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		if !bytes.Equal(f.Files[coreKeeperSettingsPath], expected) {
+		if !bytes.Equal(f.Files[gamesettings.CoreKeeperSettingsPath], expected) {
 			t.Fatal("unexpected file mutation")
 		}
 	}
@@ -91,7 +92,7 @@ func TestCoreKeeperSettingsAPI(t *testing.T) {
 func TestCoreKeeperRefusesInvalidUTF8(t *testing.T) {
 	data := append([]byte(`{"maxNumberPlayers":8,"unknown":"`), 0xff)
 	data = append(data, []byte(`"}`)...)
-	if _, e := parseCoreKeeperSettings(data); e == nil {
+	if _, e := gamesettings.ParseCoreKeeperSettings(data); e == nil {
 		t.Fatal("settings accepted bytes rejected by native runtime decoder")
 	}
 }

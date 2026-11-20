@@ -72,7 +72,7 @@ func (a *App) minecraftVersions(ctx context.Context) (minecraftManifest, error) 
 	var manifest minecraftManifest
 	err := a.minecraftJSON(ctx, minecraftManifestURL, &manifest)
 	if err == nil && (manifest.Latest.Release == "" || len(manifest.Versions) == 0) {
-		err = APIError{502, "MinecraftMetadataUnavailable", "No Minecraft releases are available. Try again shortly."}
+		err = APIError{Status: 502, Code: "MinecraftMetadataUnavailable", Detail: "No Minecraft releases are available. Try again shortly."}
 	}
 	return manifest, err
 }

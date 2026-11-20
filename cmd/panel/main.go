@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,12 +20,44 @@ func env(k, def string) string {
 	}
 	return def
 }
+func positiveEnv(k string, err error) (int, error) {
+	raw := os.Getenv(k)
+	if raw == "" || err != nil {
+		return 0, err
+	}
+	n, e := strconv.Atoi(raw)
+	if e != nil || n < 1 || n > 10000 {
+		return 0, fmt.Errorf("%s must be a whole number from 1 to 10000", k)
+	}
+	return n, nil
+}
+func durationEnv(k string, err error) (time.Duration, error) {
+	raw := os.Getenv(k)
+	if raw == "" || err != nil {
+		return 0, err
+	}
+	d, e := time.ParseDuration(raw)
+	if e != nil || d <= 0 {
+		return 0, fmt.Errorf("%s must be a positive duration such as 30m", k)
+	}
+	return d, nil
+}
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	id, _ := strconv.ParseInt(env("DEV_USER_ID", "1"), 10, 64)
 	cfg := panel.Config{ArtworkDirectory: os.Getenv("ARTWORK_DIRECTORY"), Listen: env("LISTEN", "127.0.0.1:8088"), DatabaseURL: os.Getenv("DATABASE_URL"), PublicURL: env("PUBLIC_URL", "http://127.0.0.1:8088"), DaemonURL: os.Getenv("DAEMON_URL"), WebDir: env("WEB_DIR", "web/dist"), LocalesDir: os.Getenv("LOCALES_DIR"), EncryptionKey: os.Getenv("ENCRYPTION_KEY"), Timezone: env("APP_TIMEZONE", "UTC"), DevMode: os.Getenv("DEV_MODE") == "true", DevUserID: id}
 	cfg.ConsoleHistoryLines, _ = strconv.Atoi(env("CONSOLE_HISTORY_LINES", "5000"))
+	// Optional pool limits; DATABASE_URL pool_* parameters also work.
+	var poolErr error
+	cfg.DatabaseMaxConns, poolErr = positiveEnv("DATABASE_MAX_CONNS", poolErr)
+	cfg.DatabaseMinIdleConns, poolErr = positiveEnv("DATABASE_MIN_IDLE_CONNS", poolErr)
+	cfg.DatabaseMaxConnLifetime, poolErr = durationEnv("DATABASE_MAX_CONN_LIFETIME", poolErr)
+	cfg.DatabaseMaxConnIdleTime, poolErr = durationEnv("DATABASE_MAX_CONN_IDLE_TIME", poolErr)
+	if poolErr != nil {
+		slog.Error("invalid database pool setting", "error", poolErr)
+		os.Exit(1)
+	}
 	cfg.CloudflareAccessTeamDomain = os.Getenv("CLOUDFLARE_ACCESS_TEAM_DOMAIN")
 	cfg.CloudflareAccessAudience = os.Getenv("CLOUDFLARE_ACCESS_AUDIENCE")
 	if value := strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCESS_LINK_ADMIN_EMAILS")); value != "" {

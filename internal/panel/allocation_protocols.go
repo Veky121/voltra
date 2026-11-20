@@ -3,23 +3,24 @@ package panel
 import (
 	"encoding/json"
 	"sync"
+	"voltra/internal/gamesettings"
 )
 
 var allocationProtocolCatalog struct {
 	sync.Once
-	entries []gameTemplate
+	entries []gamesettings.Profile
 }
 
 // Use recipe identity and exact, unique startup matching for display metadata.
 // This lookup does not depend on installer overrides or change forwarding policy.
-func allocationProtocolRecipe(egg M) (gameTemplate, bool) {
+func allocationProtocolRecipe(egg M) (gamesettings.Profile, bool) {
 	allocationProtocolCatalog.Do(func() {
 		var catalog templateCatalog
 		if json.Unmarshal(gameTemplateCatalogJSON, &catalog) == nil {
-			allocationProtocolCatalog.entries = catalog.Entries
+			allocationProtocolCatalog.entries = gameSettingsProfilesOf(catalog.Entries)
 		}
 	})
-	return gameSettingsProfileFrom(egg, allocationProtocolCatalog.entries)
+	return gamesettings.ProfileFrom(egg, allocationProtocolCatalog.entries)
 }
 
 // Allocation protocol labels describe the recipe or saved forwarding, not live listeners.

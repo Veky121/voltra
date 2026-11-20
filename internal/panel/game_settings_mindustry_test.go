@@ -5,11 +5,12 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func mindustryTestUTF(t *testing.T, s string) []byte {
 	t.Helper()
-	b, e := mindustryEncodeUTF(s)
+	b, e := gamesettings.MindustryEncodeUTF(s)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -45,21 +46,21 @@ func mindustryTestFixture(t *testing.T) []byte {
 
 func TestMindustryNativeSpanPreservation(t *testing.T) {
 	data := mindustryTestFixture(t)
-	parsed, err := parseMindustrySettings(data)
+	parsed, err := gamesettings.ParseMindustrySettings(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(parsed.fields) != 4 {
-		t.Fatalf("opaque data exposed: %d", len(parsed.fields))
+	if len(parsed.Fields) != 4 {
+		t.Fatalf("opaque data exposed: %d", len(parsed.Fields))
 	}
-	values := map[string]gameSetting{}
-	for _, f := range parsed.fields {
-		values[f.key] = f
+	values := map[string]gamesettings.Setting{}
+	for _, f := range parsed.Fields {
+		values[f.Key] = f
 	}
-	if values["servername"].value != "Literal 世界 😀" || values["playerlimit"].kind != "number" || values["autoPause"].kind != "boolean" || values["port"].kind != "number" || !mindustrySettingManaged("port") {
+	if values["servername"].Value != "Literal 世界 😀" || values["playerlimit"].Kind != "number" || values["autoPause"].Kind != "boolean" || values["port"].Kind != "number" || !gamesettings.MindustrySettingManaged("port") {
 		t.Fatal("native scalar types lost")
 	}
-	updated, err := parsed.patch(map[string]string{"servername": "Updated $() \"quoted\" 世界 😀", "autoPause": "false", "playerlimit": "19"})
+	updated, err := parsed.Patch(map[string]string{"servername": "Updated $() \"quoted\" 世界 😀", "autoPause": "false", "playerlimit": "19"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,16 +73,16 @@ func TestMindustryNativeSpanPreservation(t *testing.T) {
 }
 
 func TestMindustryNativeGuards(t *testing.T) {
-	parsed, err := parseMindustrySettings(mindustryTestFixture(t))
+	parsed, err := gamesettings.ParseMindustrySettings(mindustryTestFixture(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, change := range []map[string]string{{"port": "1"}, {"player-data": "unsafe"}, {"operator-unknown": "unsafe"}, {"autoPause": "1"}, {"playerlimit": "2147483648"}, {"servername": "bad\ncommand"}, {"servername": "bad\x00text"}, {"playerlimit": "-1"}} {
-		if _, err = parsed.patch(change); err == nil {
+		if _, err = parsed.Patch(change); err == nil {
 			t.Fatalf("unsafe change accepted: %v", change)
 		}
 	}
-	same, err := parsed.patch(map[string]string{"servername": "Literal 世界 😀"})
+	same, err := parsed.Patch(map[string]string{"servername": "Literal 世界 😀"})
 	if err != nil || !bytes.Equal(same, mindustryTestFixture(t)) {
 		t.Fatal("idempotent edit changed bytes")
 	}
@@ -91,7 +92,7 @@ func TestMindustryNativeMalformedRefusal(t *testing.T) {
 	valid := mindustryTestFixture(t)
 	cases := [][]byte{nil, {0, 0, 0, 0}, append(append([]byte{}, valid...), 0), valid[:len(valid)-1], mindustryTestData(mindustryTestRow(t, "servername", 4, []byte{0, 1, 0xff})), mindustryTestData(mindustryTestRow(t, "autoPause", 0, []byte{2})), mindustryTestData(mindustryTestRow(t, "playerlimit", 4, mindustryTestUTF(t, "wrong"))), mindustryTestData(mindustryTestRow(t, "binary", 5, []byte{255, 255, 255, 255})), mindustryTestData(mindustryTestRow(t, "unknown", 6, []byte{})), mindustryTestData(mindustryTestRow(t, "servername", 4, mindustryTestUTF(t, "a")), mindustryTestRow(t, "ServerName", 4, mindustryTestUTF(t, "b")))}
 	for i, data := range cases {
-		if _, err := parseMindustrySettings(data); err == nil {
+		if _, err := gamesettings.ParseMindustrySettings(data); err == nil {
 			t.Fatalf("malformed fixture accepted: %d", i)
 		}
 	}
@@ -104,36 +105,36 @@ func TestMindustryNativeCompressionAndUTF(t *testing.T) {
 	_, _ = w.Write(data)
 	_ = w.Close()
 	compressed := b.Bytes()
-	parsed, err := parseMindustrySettings(compressed)
+	parsed, err := gamesettings.ParseMindustrySettings(compressed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	same, err := parsed.patch(map[string]string{"autoPause": "true"})
+	same, err := parsed.Patch(map[string]string{"autoPause": "true"})
 	if err != nil || !bytes.Equal(same, compressed) {
 		t.Fatal("idempotent compressed data changed")
 	}
-	updated, err := parsed.patch(map[string]string{"autoPause": "false"})
+	updated, err := parsed.Patch(map[string]string{"autoPause": "false"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := parseMindustrySettings(updated)
+	again, err := gamesettings.ParseMindustrySettings(updated)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range again.fields {
-		if f.key == "autoPause" && f.value != "false" {
+	for _, f := range again.Fields {
+		if f.Key == "autoPause" && f.Value != "false" {
 			t.Fatal("compressed edit lost")
 		}
 	}
 	for _, text := range []string{"literal", "\x00", "世界😀"} {
 		raw := mindustryTestUTF(t, text)
 		offset := 0
-		got, err := mindustryUTF(raw, &offset)
+		got, err := gamesettings.MindustryUTF(raw, &offset)
 		if err != nil || got != text || offset != len(raw) {
 			t.Fatal("modified UTF roundtrip failed")
 		}
 	}
-	if _, err := parseMindustrySettings(append(append([]byte{}, compressed...), 0)); err == nil {
+	if _, err := gamesettings.ParseMindustrySettings(append(append([]byte{}, compressed...), 0)); err == nil {
 		t.Fatal("compressed trailing data accepted")
 	}
 }
@@ -146,22 +147,22 @@ func TestMindustryNativeAdvancedControlsStayPrivateAndHeld(t *testing.T) {
 		mindustryTestRow(t, "socketInputAddress", 4, mindustryTestUTF(t, "localhost")),
 		mindustryTestRow(t, "autoUpdate", 0, []byte{0}),
 	)
-	parsed, err := parseMindustrySettings(data)
+	parsed, err := gamesettings.ParseMindustrySettings(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range parsed.fields {
-		if f.key == "startCommands" && (!f.secret || f.kind != "readonly") {
+	for _, f := range parsed.Fields {
+		if f.Key == "startCommands" && (!f.Secret || f.Kind != "readonly") {
 			t.Fatal("startup command credentials exposed")
 		}
-		if f.key == "autoUpdate" && f.kind != "boolean" {
+		if f.Key == "autoUpdate" && f.Kind != "boolean" {
 			t.Fatal("managed flag lost its native type")
 		}
-		if _, err := parsed.patch(map[string]string{f.key: f.value}); err == nil {
-			t.Fatalf("advanced/managed edit accepted: %s", f.key)
+		if _, err := parsed.Patch(map[string]string{f.Key: f.Value}); err == nil {
+			t.Fatalf("advanced/managed edit accepted: %s", f.Key)
 		}
 	}
-	if mindustrySettingManaged("socket") || !mindustrySettingManaged("autoUpdate") {
+	if gamesettings.MindustrySettingManaged("socket") || !gamesettings.MindustrySettingManaged("autoUpdate") {
 		t.Fatal("advanced settings mislabeled as platform-owned")
 	}
 }
@@ -178,14 +179,14 @@ func TestMindustryNativeDocumentVersionGate(t *testing.T) {
 		t.Fatal("Mindustry catalog entry missing")
 	}
 	egg := M{"uuid": gameTemplateEggUUID(entry), "startup": "exec bash .voltra/mindustry-start.sh"}
-	if mindustrySettingsDocument(egg, mindustrySettingsPath) {
+	if gamesettings.MindustrySettingsDocument(egg, gamesettings.MindustrySettingsPath) {
 		t.Fatal("old overwriting launcher received native editor authority")
 	}
 	egg["startup"] = "exec bash .voltra/mindustry-native-start.sh"
-	if !mindustrySettingsDocument(egg, mindustrySettingsPath) || !mindustrySettingsManaged(egg, mindustrySettingsPath, "port") {
+	if !gamesettings.MindustrySettingsDocument(egg, gamesettings.MindustrySettingsPath) || !gamesettings.MindustrySettingsManaged(egg, gamesettings.MindustrySettingsPath, "port") {
 		t.Fatal("new exact native document not recognized")
 	}
-	if mindustrySettingsDocument(egg, "/other/settings.bin") || mindustrySettingsManaged(egg, mindustrySettingsPath, "servername") {
+	if gamesettings.MindustrySettingsDocument(egg, "/other/settings.bin") || gamesettings.MindustrySettingsManaged(egg, gamesettings.MindustrySettingsPath, "servername") {
 		t.Fatal("unrelated document or gameplay value became managed")
 	}
 }

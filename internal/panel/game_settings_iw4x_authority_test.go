@@ -4,12 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
-func iw4xAuthorityFixture(t *testing.T) settingsAuthorityInput {
+func iw4xAuthorityFixture(t *testing.T) gamesettings.SettingsAuthorityInput {
 	t.Helper()
-	in := settingsAuthorityInput{Startup: iw4xAuthorityStartup, Env: map[string]string{"INSTALL_MODE": "existing", "SRCDS_APPID": "10190", "WINDOWS_INSTALL": "1", "WINETRICKS_RUN": "vcrun2022", "AUTO_UPDATE": "0"}, Files: map[string][]byte{"userraw/server.cfg": []byte("set sv_motd hello\nset g_allowvote 0\n")}}
-	for name := range iw4xAuthoritySources {
+	in := gamesettings.SettingsAuthorityInput{Startup: gamesettings.Iw4xAuthorityStartup, Env: map[string]string{"INSTALL_MODE": "existing", "SRCDS_APPID": "10190", "WINDOWS_INSTALL": "1", "WINETRICKS_RUN": "vcrun2022", "AUTO_UPDATE": "0"}, Files: map[string][]byte{"userraw/server.cfg": []byte("set sv_motd hello\nset g_allowvote 0\n")}}
+	for name := range gamesettings.Iw4xAuthoritySources {
 		file := filepath.Base(name)
 		if file == "steam_template.py" {
 			file = "steam-template.py"
@@ -28,37 +29,37 @@ func iw4xAuthorityFixture(t *testing.T) settingsAuthorityInput {
 }
 func TestIW4xAuthority(t *testing.T) {
 	in := iw4xAuthorityFixture(t)
-	a, err := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in)
-	if err != nil || a.Path != iw4xSettingsPath {
+	a, err := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in)
+	if err != nil || a.Path != gamesettings.Iw4xSettingsPath {
 		t.Fatal(a, err)
 	}
 	for _, shadow := range []string{"server.cfg", "main/server.cfg", "userraw/autoexec.cfg", "mods/test/server.cfg"} {
 		in := iw4xAuthorityFixture(t)
 		in.Env["MOD_DIR"] = "mods/test"
 		in.Files[shadow] = []byte("opaque")
-		if _, e := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); e == nil {
+		if _, e := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); e == nil {
 			t.Fatal(shadow)
 		}
 	}
 	for _, tail := range []string{"exec other.cfg", "vstr rotation", "set fs_game mods/other", "set x 1; quit"} {
 		in := iw4xAuthorityFixture(t)
 		in.Files["userraw/server.cfg"] = []byte("set sv_motd hello\n" + tail + "\n")
-		if _, e := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); e == nil {
+		if _, e := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); e == nil {
 			t.Fatal(tail)
 		}
 	}
 	in.Env["VOLTRA_STEAM_AUTO_UPDATE"] = "1"
-	if _, e := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); e == nil {
+	if _, e := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); e == nil {
 		t.Fatal("update override")
 	}
 	in = iw4xAuthorityFixture(t)
 	in.Startup += " +exec other.cfg"
-	if _, e := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); e == nil {
+	if _, e := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); e == nil {
 		t.Fatal("startup drift")
 	}
 	in = iw4xAuthorityFixture(t)
 	in.Files[".voltra/arena-native.py"] = []byte("drift")
-	if _, e := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); e == nil {
+	if _, e := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); e == nil {
 		t.Fatal("helper drift")
 	}
 }
@@ -68,19 +69,19 @@ func TestIW4xAuthority(t *testing.T) {
 // This does not prove packed CFG precedence or enable native typed editing.
 func TestIW4xAuthorityCanonicalHelperBytes(t *testing.T) {
 	in := iw4xAuthorityFixture(t)
-	emitted := wave53Emissions(t, iw4xSettingsRecipe)
-	for name := range iw4xAuthoritySources {
+	emitted := wave53Emissions(t, gamesettings.Iw4xSettingsRecipe)
+	for name := range gamesettings.Iw4xAuthoritySources {
 		data, ok := emitted[name]
 		if !ok {
 			t.Fatalf("missing canonical helper: %s", name)
 		}
 		in.Files[name] = data
 	}
-	if authority, err := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); err != nil || authority.Path != iw4xSettingsPath {
+	if authority, err := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); err != nil || authority.Path != gamesettings.Iw4xSettingsPath {
 		t.Fatal("canonical source contract", authority, err)
 	}
 	in.Files[".voltra/native-console.py"] = append(append([]byte{}, in.Files[".voltra/native-console.py"]...), byte('x'))
-	if _, err := iw4xSettingsAuthority(iw4xSettingsRecipe, iw4xAuthorityStartup, in); err == nil {
+	if _, err := gamesettings.Iw4xSettingsAuthority(gamesettings.Iw4xSettingsRecipe, gamesettings.Iw4xAuthorityStartup, in); err == nil {
 		t.Fatal("canonical console byte drift accepted")
 	}
 }

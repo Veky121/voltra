@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestDDNetOriginalSettingsDiscoveryAPI(t *testing.T) {
@@ -27,20 +28,20 @@ func TestDDNetOriginalSettingsDiscoveryAPI(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[ddnetSettingsPath], fixture.State = []byte(ddnetOriginalSeed), "offline"
+	fixture.Files[gamesettings.DdnetSettingsPath], fixture.State = []byte(ddnetOriginalSeed), "offline"
 	fixture.mu.Unlock()
 	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
-	if view["file"] != ddnetSettingsPath || len(asSlice(view["fields"])) != 6 {
+	if view["file"] != gamesettings.DdnetSettingsPath || len(asSlice(view["fields"])) != 6 {
 		t.Fatal("root command document not discovered or specialized parser missing")
 	}
 	encoded, _ := json.Marshal(view)
 	if strings.Contains(string(encoded), "private-player") || strings.Contains(string(encoded), "private-rcon") {
 		t.Fatal("credentials exposed")
 	}
-	infraExpect(t, mux, admin, "PUT", endpoint, M{"file": ddnetSettingsPath, "revision": view["revision"], "settings": M{"sv_name": "Updated", "sv_register": true}}, 200)
+	infraExpect(t, mux, admin, "PUT", endpoint, M{"file": gamesettings.DdnetSettingsPath, "revision": view["revision"], "settings": M{"sv_name": "Updated", "sv_register": true}}, 200)
 	fixture.mu.Lock()
-	updated := string(fixture.Files[ddnetSettingsPath])
+	updated := string(fixture.Files[gamesettings.DdnetSettingsPath])
 	fixture.mu.Unlock()
 	expected := strings.Replace(strings.Replace(ddnetOriginalSeed, `"Original"`, `"Updated"`, 1), "sv_register 0", `sv_register "1"`, 1)
 	if updated != expected {

@@ -1,0 +1,342 @@
+import {Feedback} from '../../../notifications';
+import {ActionButton as MiraAction} from '../../../ui/ActionButton';
+import {Textarea as MiraTextarea} from '../../../components/ui/textarea';
+import {SidebarSection} from '../../../Navigation';
+import {JavaEgg} from './JavaEgg';
+import {useState} from 'react';
+import {Link, useNavigate, useParams} from 'react-router-dom';
+import {
+  Action,
+  DataTable,
+  Editor,
+  ErrorMessage,
+  Heading,
+  Panel,
+  ResourceEditor,
+  ResourceList,
+  api,
+  f,
+  rows,
+  unwrap,
+  useAPI,
+} from '../shared';
+import type {Egg, EggVariable, Nest, Resource, ResourceList as List} from '../../../types/api';
+const nests = '/api/admin/nests',
+  eggs = '/api/admin/eggs';
+export function Nests() {
+  return (
+    <ResourceList
+      title="Template groups"
+      endpoint={nests}
+      base="/admin/nests"
+      columns={['name', 'author', 'description']}
+    />
+  );
+}
+export function Nest() {
+  const {id = 'new'} = useParams();
+  const q = useAPI<List<Egg>>(id === 'new' ? null : `/api/application/nests/${id}/eggs?per_page=100`);
+  return (
+    <ResourceEditor
+      title="Template group"
+      endpoint={nests}
+      base="/admin/nests"
+      id={id}
+      fields={[
+        f('name', 'Name', undefined, {required: true}),
+        f('description', 'Description', 'textarea'),
+        f('author', 'Author email', 'email', {
+          required: true,
+          default: 'admin@localhost',
+        }),
+      ]}
+    >
+      {() => (
+        <>
+          <Panel title="Templates">
+            <div className="actions admin-list-actions">
+              <Link className="button" to={`/admin/eggs/new?nest=${id}`}>
+                Create template
+              </Link>
+            </div>
+            <ErrorMessage error={q.error} />
+            <DataTable
+              loading={q.loading}
+              empty="No eggs in this nest yet."
+              data={q.data ? rows(q.data) : []}
+              columns={[
+                {
+                  label: 'Name',
+                  render: x => <Link to={`/admin/eggs/${x.id}`}>{x.name}</Link>,
+                },
+                {label: 'Author', render: x => x.author},
+                {label: 'Description', render: x => x.description},
+              ]}
+            />
+          </Panel>
+          <EggImport nestID={Number(id)} onSaved={q.reload} />
+        </>
+      )}
+    </ResourceEditor>
+  );
+}
+function EggImport({nestID, eggID, onSaved}: {nestID: number; eggID?: string; onSaved: () => void}) {
+  const [json, setJSON] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState('');
+  return (
+    <Panel title={eggID ? 'Replace from egg file' : 'Import template'} className="admin-egg-import">
+      <p className="muted">
+        Import a Voltra-compatible egg JSON file with its installation script, configuration, variables, and Docker
+        images.
+      </p>
+      <label className="field">
+        <span>Template JSON file</span>
+        <input
+          type="file"
+          accept=".json,application/json"
+          onChange={async e => {
+            const file = e.target.files?.[0];
+            if (file) setJSON(await file.text());
+          }}
+        />
+      </label>
+      <label className="field">
+        <span>Template JSON</span>
+        <MiraTextarea
+          className="admin-code-input"
+          rows={8}
+          value={json}
+          onChange={e => setJSON(e.target.value)}
+          spellCheck={false}
+        />
+      </label>
+      <ErrorMessage error={error} />
+      {success && <Feedback tone="success" message={<>{success}</>} />}
+      <div className="actions admin-form-actions">
+        <MiraAction
+          disabled={busy || !json}
+          onClick={async () => {
+            setError('');
+            setSuccess('');
+            setBusy(true);
+            try {
+              const egg = JSON.parse(json);
+              await api(eggID ? `${eggs}/${eggID}/import` : `${nests}/${nestID}/eggs/import`, {
+                method: 'POST',
+                body: JSON.stringify({egg}),
+              });
+              setSuccess('Template imported.');
+              onSaved();
+            } catch (err) {
+              setError(String(err instanceof Error ? err.message : err));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? 'Importing…' : eggID ? 'Replace egg' : 'Import template'}
+        </MiraAction>
+      </div>
+    </Panel>
+  );
+}
+export function Egg() {
+  const {id = 'new'} = useParams();
+  const navigate = useNavigate();
+  const q = useAPI<Resource<Egg>>(id === 'new' ? null : `${eggs}/${id}`);
+  const nestsQ = useAPI<List<Nest>>(nests);
+  const record = q.data ? unwrap(q.data) : undefined;
+  const [tab, setTab] = useState('details');
+  const [exportError, setExportError] = useState('');
+  const fields = [
+    f('nest_id', 'Template group', 'select', {
+      required: true,
+      disabled: id !== 'new',
+      default: new URLSearchParams(window.location.search).get('nest') ?? '',
+      options: nestsQ.data ? rows(nestsQ.data).map(x => ({value: x.id, label: x.name})) : [],
+    }),
+    f('name', 'Name', undefined, {required: true}),
+    f('author', 'Author email', 'email', {required: true}),
+    f('description', 'Description', 'textarea'),
+    f('startup', 'Startup command', 'textarea', {required: true}),
+    f('docker_images', 'Docker images', 'json', {
+      default: {'Java 21': 'ghcr.io/pterodactyl/yolks:java_21'},
+      hint: 'JSON object mapping display names to container images.',
+    }),
+    f('features', 'Features', 'json', {default: []}),
+    f('file_denylist', 'File denylist', 'json', {default: []}),
+    f('download_headers', 'Remote download headers (optional)', 'json', {
+      default: {},
+      hint: 'Public headers for HTTPS downloads. GIANTS CDN example: {"cdn*.giants-software.com":{"Referer":"https://www.farming-simulator.com/"}}. This pattern covers numbered GIANTS CDNs; other hosts must be exact. Empty disables. Requires Voltra Wings download-header support.',
+    }),
+    f('force_outgoing_ip', 'Force outgoing IP', 'checkbox'),
+    f('update_url', 'Update URL'),
+  ];
+  return (
+    <div className="admin-management-page management-ui">
+      <Heading title={id === 'new' ? 'Create template' : `Template · ${record?.name ?? id}`}>
+        <Link to={record ? `/admin/nests/${record.nest_id}` : '/admin/nests'}>Back to nest</Link>
+        {id !== 'new' && (
+          <>
+            <MiraAction
+              className="secondary"
+              onClick={async () => {
+                try {
+                  const data = await api(`${eggs}/${id}/export`);
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(
+                    new Blob([JSON.stringify(data, null, 2)], {
+                      type: 'application/json',
+                    })
+                  );
+                  a.download = `egg-${record?.name ?? id}.json`;
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                } catch (err) {
+                  setExportError(String(err));
+                }
+              }}
+            >
+              Export template
+            </MiraAction>
+            <Action
+              path={`${eggs}/${id}`}
+              method="DELETE"
+              danger
+              confirm="Delete this egg?"
+              onDone={() => navigate('/admin/nests')}
+            >
+              Delete
+            </Action>
+          </>
+        )}
+      </Heading>
+      <ErrorMessage error={q.error || exportError} />
+      {id !== 'new' && (
+        <SidebarSection label="Template settings" detail>
+          {['details', 'configuration', 'java', 'variables', 'installation', 'import'].map(t => (
+            <MiraAction className={tab === t ? 'active' : 'secondary'} key={t} onClick={() => setTab(t)}>
+              {t}
+            </MiraAction>
+          ))}
+        </SidebarSection>
+      )}
+      {q.loading ? (
+        <p className="admin-loading" role="status">
+          Loading egg...
+        </p>
+      ) : (
+        <>
+          {tab === 'details' && (
+            <Editor
+              fields={fields}
+              endpoint={id === 'new' ? eggs : `${eggs}/${id}`}
+              initial={record}
+              method={id === 'new' ? 'POST' : 'PATCH'}
+              submit={id === 'new' ? 'Create template' : undefined}
+              onSaved={r => (id === 'new' ? navigate(`/admin/eggs/${unwrap(r as Resource<Egg>).id}`) : q.reload())}
+            />
+          )}
+          {record && tab === 'configuration' && (
+            <Editor
+              title="Process and file configuration"
+              endpoint={`${eggs}/${id}`}
+              initial={record}
+              fields={[
+                f('config_from', 'Inherit configuration from egg ID', 'number', {default: ''}),
+                f('config_files', 'Configuration files and replacements', 'json'),
+                f('config_startup', 'Startup detection', 'json'),
+                f('config_logs', 'Log configuration', 'json'),
+                f('config_stop', 'Stop command'),
+              ]}
+              onSaved={q.reload}
+            />
+          )}
+          {record && tab === 'installation' && (
+            <Editor
+              title="Installation script"
+              endpoint={`${eggs}/${id}/scripts`}
+              initial={record}
+              fields={[
+                f('copy_script_from', 'Copy installation script from egg ID', 'number', {default: ''}),
+                f('script_container', 'Installer container image'),
+                f('script_entry', 'Installer entrypoint', undefined, {
+                  default: 'bash',
+                }),
+                f('script_install', 'Installation script', 'textarea'),
+                f('script_is_privileged', 'Privileged installer', 'checkbox'),
+              ]}
+              onSaved={q.reload}
+            />
+          )}
+          {record && tab === 'variables' && <EggVariables eggID={id} />}
+          {record && tab === 'java' && <JavaEgg eggID={id} config={record.java_config} onSaved={q.reload} />}
+          {record && tab === 'import' && <EggImport nestID={record.nest_id} eggID={id} onSaved={q.reload} />}
+        </>
+      )}
+    </div>
+  );
+}
+const variableFields = [
+  f('name', 'Name', undefined, {required: true}),
+  f('description', 'Description', 'textarea'),
+  f('env_variable', 'Environment variable', undefined, {required: true}),
+  f('default_value', 'Default value'),
+  f('rules', 'Validation rules', undefined, {
+    default: 'required|string',
+    hint: 'Laravel validation rules, such as required|string|max:100.',
+  }),
+  f('user_viewable', 'Visible to users', 'checkbox', {default: true}),
+  f('user_editable', 'Editable by users', 'checkbox', {default: true}),
+  f('field_type', 'Field type', undefined, {default: 'text'}),
+];
+function EggVariables({eggID}: {eggID: string}) {
+  const endpoint = `${eggs}/${eggID}/variables`;
+  const q = useAPI<List<EggVariable>>(endpoint);
+  return (
+    <div className="admin-variable-list management-ui">
+      <ErrorMessage error={q.error} />
+      {q.loading && (
+        <p className="admin-loading" role="status">
+          Loading variables...
+        </p>
+      )}
+      {!q.loading && q.data && !rows(q.data).length && (
+        <Panel>
+          <p className="muted">No variables yet. Add a variable to make it available to servers using this egg.</p>
+        </Panel>
+      )}
+      {q.data &&
+        rows(q.data).map(v => (
+          <div key={v.id} className="admin-variable">
+            <Editor
+              title={v.name}
+              endpoint={`${endpoint}/${v.id}`}
+              fields={variableFields}
+              initial={v}
+              onSaved={q.reload}
+            />
+            <Action
+              path={`${endpoint}/${v.id}`}
+              method="DELETE"
+              danger
+              confirm={`Delete variable ${v.env_variable}?`}
+              onDone={q.reload}
+            >
+              Delete variable
+            </Action>
+          </div>
+        ))}
+      <Editor
+        title="New variable"
+        endpoint={endpoint}
+        method="POST"
+        fields={variableFields}
+        onSaved={q.reload}
+        submit="Create variable"
+      />
+    </div>
+  );
+}

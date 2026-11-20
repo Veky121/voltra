@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestWave103CS2API(t *testing.T) {
 	for _, tc := range []struct{ recipe, file, data, key string }{
-		{cs2AuthorityRecipe, sourceSettingsPath, "// retain\r\nmp_limitteams 20\nrcon_password private-fixture-secret\nunknown_cvar 9\n", "mp_limitteams"},
+		{gamesettings.Cs2AuthorityRecipe, gamesettings.SourceSettingsPath, "// retain\r\nmp_limitteams 20\nrcon_password private-fixture-secret\nunknown_cvar 9\n", "mp_limitteams"},
 	} {
 		t.Run(tc.recipe, func(t *testing.T) {
 			a, mux, admin, server, f := quickSetupMinecraftFixture(t)
@@ -26,7 +27,7 @@ func TestWave103CS2API(t *testing.T) {
 			}
 			startup := str(entry.Egg["startup"])
 			allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-				if tc.recipe == starboundAuthorityRecipe {
+				if tc.recipe == gamesettings.StarboundAuthorityRecipe {
 					return 21025
 				}
 				return 29371
@@ -63,7 +64,7 @@ func TestWave103CS2API(t *testing.T) {
 			delete(f.Files, "/server.properties")
 			f.Files[tc.file] = []byte(tc.data)
 			wrapper := "/game/csgo/cfg/voltra-server.cfg"
-			if tc.recipe == gmodSettingsRecipe {
+			if tc.recipe == gamesettings.GmodSettingsRecipe {
 				wrapper = "/garrysmod/cfg/voltra-server.cfg"
 			}
 			f.Files[wrapper] = []byte("exec server.cfg\nexec voltra-managed.cfg\nexec voltra-native.cfg\n")

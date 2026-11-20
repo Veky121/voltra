@@ -59,6 +59,6 @@ receipt = {
     'skipped':['Go/shared regression unchanged, prior proofs reused.','Native, browser, gameplay, current mod schema excluded.','No build, activation/restart retry/bypass, downloads, Docker/service/live actions, SSH/server, publication, commits, nested agents or checkout creation.'],
     'blockers':['Current modded schema/consumption and loader compatibility unverified.','Integrator owns authority hash update and fragment integration.','API/revisions/stopped-state/RBAC/browser retain prior unverified boundary.'],
     'cleanup':{'temporary_layouts':'TemporaryDirectory fixtures removed on exit','resources_acquired':[],'running_operations':[],'live_mutations':False,'shared_canonical_edits':False},
-    'hashes':{str(p):sha(p) for p in sources+[canonical_path,Path('internal/panel/game_settings_stationeers_bepinex.go'),Path('internal/panel/game_settings_stationeers_bepinex_authority.go')]}}
+    'hashes':{str(p):sha(p) for p in sources+[canonical_path,Path('internal/gamesettings/stationeers_bepinex.go'),Path('internal/gamesettings/stationeers_bepinex_authority.go')]}}
 (OUT/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
 print('37 statuses; fragment consistency verified; receipt saved:', OUT/'receipt.json')

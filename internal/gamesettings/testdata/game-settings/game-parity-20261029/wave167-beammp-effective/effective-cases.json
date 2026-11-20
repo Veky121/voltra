@@ -1,0 +1,168 @@
+[
+  {
+    "name": "count101",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nMaxPlayers=101\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "countfloat",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nMaxPlayers=1.5\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "boolint",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nPrivate=1\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "booltext",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nPrivate=\"true\"\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "pathup",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nResourceFolder=\"../escape\"\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "pathabs",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nResourceFolder=\"/tmp\"\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "pathdots",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nResourceFolder=\"./Resources//Client\"\n",
+    "env": {},
+    "valid": true
+  },
+  {
+    "name": "portbool",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nPort=true\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "maxcars",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nMaxCars=11\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "valid",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nPrivate=false\nMaxPlayers=100\nMaxCars=10\n",
+    "env": {},
+    "valid": true
+  },
+  {
+    "name": "textcontrols",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nTags=\"bad\\u007f\"\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "textlimit",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nTags=\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "unicodeauth",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"\n",
+    "env": {},
+    "valid": true
+  },
+  {
+    "name": "missing_auth_seed",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": "seed"
+    },
+    "valid": true
+  },
+  {
+    "name": "missing_auth_empty",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {},
+    "valid": false
+  },
+  {
+    "name": "native_ignores_bad_seeds",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\nMaxPlayers=6\nPrivate=true\nResourceFolder=\"Resources\"\n",
+    "env": {
+      "AUTHKEY": "",
+      "MAX_PLAYERS": "101",
+      "PRIVATE": "garbage",
+      "RESOURCE_FOLDER": "../escape"
+    },
+    "valid": true
+  },
+  {
+    "name": "missing_bad_AUTHKEY",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": ""
+    },
+    "valid": false
+  },
+  {
+    "name": "missing_bad_PRIVATE",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": "seed",
+      "PRIVATE": "yes"
+    },
+    "valid": false
+  },
+  {
+    "name": "missing_bad_MAX_PLAYERS",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": "seed",
+      "MAX_PLAYERS": "101"
+    },
+    "valid": false
+  },
+  {
+    "name": "missing_bad_MAX_CARS",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": "seed",
+      "MAX_CARS": "1.5"
+    },
+    "valid": false
+  },
+  {
+    "name": "missing_bad_RESOURCE_FOLDER",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": "seed",
+      "RESOURCE_FOLDER": "../escape"
+    },
+    "valid": false
+  },
+  {
+    "name": "absent_boolean_numeric_seed",
+    "body": "[General]\nName=\"Before\"\n",
+    "env": {
+      "AUTHKEY": "seed",
+      "PRIVATE": "0",
+      "MAX_PLAYERS": "006"
+    },
+    "valid": true
+  },
+  {
+    "name": "allocation_mismatch",
+    "body": "[General]\nName=\"Before\"\nAuthKey=\"native\"\n",
+    "env": {
+      "SERVER_PORT": "30814",
+      "VOLTRA_ALLOCATED_PORTS": "30815"
+    },
+    "valid": false
+  }
+]

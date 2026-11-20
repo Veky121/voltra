@@ -58,21 +58,21 @@ export function generate(root, receipts = {}) {
   if (!fsPath) throw new Error('FS25 catalog addition not found');
   const sources = [catalogPath, overridesPath, bridgePath, fs25Path,
     'internal/panel/game_library/fs25/upstream-egg.json',
-    'internal/panel/game_templates.go', 'internal/panel/game_settings_documents.go',
-    'internal/panel/game_settings_structured.go', 'web/src/client/GameQuickSetup.tsx',
-    'web/src/client/GameSetupFields.tsx', 'web/src/client/GameSettingsFields.tsx',
-    'web/src/client/Console.tsx', 'web/src/client/consoleLifecycle.ts',
-    'web/src/client/consoleFormatting.ts', 'web/src/client/consoleOutput.ts',
-    'web/src/client/consoleQueue.ts', 'web/src/client/consoleReplay.ts',
-    'web/src/client/powerOperation.ts', 'web/src/client/gameTemplateModel.ts',
-    'web/src/client/gameSetupModel.ts', 'web/src/client/templateSetupValidation.ts',
+    'internal/panel/game_templates.go', 'internal/gamesettings/documents.go',
+    'internal/gamesettings/structured.go', 'web/src/features/server-settings/GameQuickSetup.tsx',
+    'web/src/features/game-library/GameSetupFields.tsx', 'web/src/features/server-settings/GameSettingsFields.tsx',
+    'web/src/features/console/Console.tsx', 'web/src/features/console/consoleLifecycle.ts',
+    'web/src/features/console/consoleFormatting.ts', 'web/src/features/console/consoleOutput.ts',
+    'web/src/features/console/consoleQueue.ts', 'web/src/features/console/consoleReplay.ts',
+    'web/src/features/servers/powerOperation.ts', 'web/src/features/game-library/gameTemplateModel.ts',
+    'web/src/features/game-library/gameSetupModel.ts', 'web/src/features/game-library/templateSetupValidation.ts',
     'internal/panel/game_quick_setup.go', 'internal/panel/steam_games.go',
-    'internal/panel/game_settings_arma.go', 'internal/panel/game_settings_source.go',
-    'internal/panel/game_settings_discovery.go', 'internal/panel/game_settings_ini_safety.go',
-    'internal/panel/game_settings_stk.go', 'internal/panel/game_settings_stk_dispatch.go',
-    'internal/panel/game_settings_ddnet.go', 'internal/panel/game_settings_privacy.go',
-    'internal/panel/game_settings_aska.go', 'internal/panel/game_settings_recipe_managed.go',
-    'internal/panel/game_settings_barotrauma.go'];
+    'internal/gamesettings/arma.go', 'internal/gamesettings/source.go',
+    'internal/gamesettings/discovery.go', 'internal/gamesettings/ini_safety.go',
+    'internal/gamesettings/stk.go', 'internal/gamesettings/stk_dispatch.go',
+    'internal/gamesettings/ddnet.go', 'internal/gamesettings/privacy.go',
+    'internal/gamesettings/aska.go', 'internal/gamesettings/recipe_managed.go',
+    'internal/gamesettings/barotrauma.go'];
   const sharedFingerprint = hash(sources.map(path => hash(readFileSync(resolve(root, path)))).join(':'));
   const entries = [...catalog.entries, { path: fsPath, egg: json(root, 'internal/panel/game_library/fs25/upstream-egg.json'), sha256: hash(fsSource), synthetic: true }];
   const seen = new Set(), warnings = [];
@@ -92,7 +92,7 @@ export function generate(root, receipts = {}) {
       install: egg?.scripts?.installation?.script ? partial('Recipe installer exists; acquisition and isolated install need native evidence.') : unknown('No recipe installer evidence.'),
       setup: egg?.variables?.length ? partial('Recipe variables exist; populated shared setup and validation need campaign evidence.') : unknown('Shared setup needs inspection and native evidence.'),
       console: egg?.config?.startup ? partial('Recipe readiness/stop metadata exists; colors and every lifecycle state need evidence.') : unknown('Console needs inspection and native evidence.'),
-      settings: managed[entry.path] ? { ...partial('Managed bridge has shared native settings discovery; typed controls, preservation and native behavior still require campaign evidence.'), evidence: [...evidence, 'internal/panel/game_settings_documents.go', 'internal/panel/game_quick_setup.go'] } : Object.keys(config).length || Object.keys(override?.settings_documents || {}).length ? partial('Recipe file mappings or declared documents exist; typed shared native settings and preservation need evidence.') : unknown('No recipe config mappings; native settings schema/UI need inspection.'),
+      settings: managed[entry.path] ? { ...partial('Managed bridge has shared native settings discovery; typed controls, preservation and native behavior still require campaign evidence.'), evidence: [...evidence, 'internal/gamesettings/documents.go', 'internal/panel/game_quick_setup.go'] } : Object.keys(config).length || Object.keys(override?.settings_documents || {}).length ? partial('Recipe file mappings or declared documents exist; typed shared native settings and preservation need evidence.') : unknown('No recipe config mappings; native settings schema/UI need inspection.'),
       lifecycle: unknown('Power, persistence, permissions and protocol/security need isolated native evidence.'),
     };
     if (override?.setup_unavailable_reason) gates.setup = { status: 'blocked', kind: 'source', reason: override.setup_unavailable_reason, evidence };

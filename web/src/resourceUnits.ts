@@ -5,7 +5,9 @@ export function gbToMiB(value: string | number): number {
   if (typeof value === 'string' && !value.trim()) return NaN;
   const amount = Number(value);
   const result = Math.round(amount * 1024);
-  return Number.isFinite(amount) && amount >= 0 && Number.isSafeInteger(result) && !(amount > 0 && result === 0) ? result : NaN;
+  return Number.isFinite(amount) && amount >= 0 && Number.isSafeInteger(result) && !(amount > 0 && result === 0)
+    ? result
+    : NaN;
 }
 export function formatBytesGB(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return 'Unavailable';

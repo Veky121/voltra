@@ -26,7 +26,7 @@ func (a *App) satisfactoryPlayersAuthority(ctx context.Context, server, egg M, f
 		return "", err
 	}
 	if str(row["active"]) != "" {
-		return "", APIError{409, "SteamMaintenanceActive", "Wait for Steam maintenance before changing settings."}
+		return "", APIError{Status: 409, Code: "SteamMaintenanceActive", Detail: "Wait for Steam maintenance before changing settings."}
 	}
 	b, err := json.Marshal(row)
 	return string(b), err
@@ -40,7 +40,7 @@ func (a *App) checkSatisfactoryPlayersAuthority(ctx context.Context, server, egg
 		return err
 	}
 	if current != before {
-		return APIError{409, "GameSettingsAuthorityChanged", "Managed settings changed. Reload before saving."}
+		return APIError{Status: 409, Code: "GameSettingsAuthorityChanged", Detail: "Managed settings changed. Reload before saving."}
 	}
 	return nil
 }

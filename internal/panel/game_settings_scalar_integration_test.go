@@ -7,13 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 // Hold the real PostgreSQL mutation lock and observe the pending request's
 // blocker before changing its launcher. Admission-time validation alone cannot
 // protect a write which has already been admitted and is waiting for this lock.
 func TestIntegratedScalarStartupChangedWhileSaveLocked(t *testing.T) {
-	for _, recipe := range []string{towerSettingsRecipe, "windrose/egg-windrose.json", "terratech_worlds/egg-terra-tech-worlds.json"} {
+	for _, recipe := range []string{gamesettings.TowerSettingsRecipe, "windrose/egg-windrose.json", "terratech_worlds/egg-terra-tech-worlds.json"} {
 		t.Run(recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -26,19 +27,19 @@ func TestIntegratedScalarStartupChangedWhileSaveLocked(t *testing.T) {
 				t.Fatal(err)
 			}
 			file, key, original := "/data/Config/options.json", "upnp", "{\"upnp\":false,\"passwordSalt\":\"private\"}\r\n"
-			if recipe == fiveMRecipe {
+			if recipe == gamesettings.FiveMRecipe {
 				wave95InstallReviewed(t, a, server, fixture, egg)
 				file, key, original = "/server.cfg", "sv_lan", "sv_lan 0\r\nsv_hostname \"operator\"\r\nsv_licenseKey private\r\n"
 			}
-			if recipe == sonsSettingsRecipe {
-				file, key, original = sonsSettingsPath, "/LanOnly", "{\"LanOnly\":false,\"Password\":\"private\"}\r\n"
+			if recipe == gamesettings.SonsSettingsRecipe {
+				file, key, original = gamesettings.SonsSettingsPath, "/LanOnly", "{\"LanOnly\":false,\"Password\":\"private\"}\r\n"
 			}
-			if recipe == resoniteSettingsRecipe {
-				file, _ = reviewedNewSettings(egg)
+			if recipe == gamesettings.ResoniteSettingsRecipe {
+				file, _ = gamesettings.ReviewedNewSettings(egg)
 				key, original = "/startWorlds/0/saveOnExit", "{\"loginPassword\":\"private\",\"startWorlds\":[{\"saveOnExit\":false}]}\r\n"
 			}
 			if recipe == "ddnet/egg-d-d-net.json" {
-				file, key, original = ddnetSettingsPath, "sv_register", ddnetOriginalSeed
+				file, key, original = gamesettings.DdnetSettingsPath, "sv_register", ddnetOriginalSeed
 			}
 			file, key, original = scalarSettingsTestInput(recipe)
 			fixture.mu.Lock()
@@ -120,16 +121,16 @@ func TestIntegratedScalarStartupChangedWhileSaveLocked(t *testing.T) {
 
 func scalarSettingsTestInput(recipe string) (string, string, string) {
 	switch recipe {
-	case towerSettingsRecipe:
-		return towerSettingsPath, "DedicatedCondoOptions/CondoAutoSave", "[/Script/TowerNetworking.DedicatedServerOptions]\r\nServerTitle=Operator\r\n[DedicatedCondoOptions]\r\nCondoAutoSave=False\r\nCondoBackupsEnabled=True\r\n"
+	case gamesettings.TowerSettingsRecipe:
+		return gamesettings.TowerSettingsPath, "DedicatedCondoOptions/CondoAutoSave", "[/Script/TowerNetworking.DedicatedServerOptions]\r\nServerTitle=Operator\r\n[DedicatedCondoOptions]\r\nCondoAutoSave=False\r\nCondoBackupsEnabled=True\r\n"
 	case "windrose/egg-windrose.json":
-		return windroseSettingsPath, windroseSettingsPrefix + "UseDirectConnection", `{"ServerDescription_Persistent":{"PersistentServerId":"id","WorldIslandId":"world","ServerName":"Operator","Password":"private","UseDirectConnection":false,"IsPasswordProtected":true}}`
+		return gamesettings.WindroseSettingsPath, gamesettings.WindroseSettingsPrefix + "UseDirectConnection", `{"ServerDescription_Persistent":{"PersistentServerId":"id","WorldIslandId":"world","ServerName":"Operator","Password":"private","UseDirectConnection":false,"IsPasswordProtected":true}}`
 	default:
-		return terraTechSettingsPath, "SlotCount", `{"Password":"private","SlotCount":2,"Port":7777}`
+		return gamesettings.TerraTechSettingsPath, "SlotCount", `{"Password":"private","SlotCount":2,"Port":7777}`
 	}
 }
 func TestIntegratedScalarAPI(t *testing.T) {
-	for _, recipe := range []string{towerSettingsRecipe, "windrose/egg-windrose.json", "terratech_worlds/egg-terra-tech-worlds.json"} {
+	for _, recipe := range []string{gamesettings.TowerSettingsRecipe, "windrose/egg-windrose.json", "terratech_worlds/egg-terra-tech-worlds.json"} {
 		t.Run(recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			egg := batchSettingsRecipeFixture(t, recipe)
@@ -157,12 +158,12 @@ func TestIntegratedScalarAPI(t *testing.T) {
 				if boolean(f["secret"]) && f["value"] != nil {
 					t.Fatal("secret exposed")
 				}
-				if str(f["key"]) == windroseSettingsPrefix+"IsPasswordProtected" && (boolean(f["secret"]) || str(f["type"]) != "boolean") {
+				if str(f["key"]) == gamesettings.WindroseSettingsPrefix+"IsPasswordProtected" && (boolean(f["secret"]) || str(f["type"]) != "boolean") {
 					t.Fatal("boolean masked")
 				}
 			}
 			value := any(true)
-			if file == terraTechSettingsPath {
+			if file == gamesettings.TerraTechSettingsPath {
 				value = "3"
 			}
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{key: value}}, 200)
@@ -180,7 +181,7 @@ func TestIntegratedScalarAPI(t *testing.T) {
 }
 
 func scalarSettingsTestValue(file string) any {
-	if file == terraTechSettingsPath {
+	if file == gamesettings.TerraTechSettingsPath {
 		return "3"
 	}
 	return true

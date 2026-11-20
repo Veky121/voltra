@@ -1,6 +1,9 @@
 package panel
 
-import "testing"
+import (
+	"testing"
+	"voltra/internal/gamesettings"
+)
 
 func TestGameSettingsSnapshotKeepsNativeReadsFresh(t *testing.T) {
 	_, mux, admin, server, node := quickSetupMinecraftFixture(t)
@@ -38,34 +41,34 @@ func TestGameSettingsProfileSnapshotIdentityAndIsolation(t *testing.T) {
 	entries := gameTemplates().Entries
 	first, second := entries[0], entries[1]
 	egg := M{"uuid": gameTemplateEggUUID(first), "startup": "custom startup"}
-	snapshot := withGameSettingsProfileSnapshot(egg)
-	if _, exists := egg[gameSettingsProfileSnapshotKey]; exists {
+	snapshot := gamesettings.WithGameSettingsProfileSnapshot(egg)
+	if _, exists := egg[gamesettings.ProfileSnapshotKey]; exists {
 		t.Fatal("snapshot escaped into original egg")
 	}
-	if got, ok := gameSettingsProfile(snapshot); !ok || got.Path != first.Path {
+	if got, ok := gamesettings.ProfileFor(snapshot); !ok || got.Path != first.Path {
 		t.Fatal("UUID identity was not preserved", got.Path, ok)
 	}
 	snapshot["uuid"] = gameTemplateEggUUID(second)
-	if got, ok := gameSettingsProfile(snapshot); !ok || got.Path != second.Path {
+	if got, ok := gamesettings.ProfileFor(snapshot); !ok || got.Path != second.Path {
 		t.Fatal("changed identity reused stale recipe", got.Path, ok)
 	}
-	unknown := withGameSettingsProfileSnapshot(M{"uuid": "custom", "startup": "unknown startup"})
-	if _, ok := gameSettingsProfile(unknown); ok {
+	unknown := gamesettings.WithGameSettingsProfileSnapshot(M{"uuid": "custom", "startup": "unknown startup"})
+	if _, ok := gamesettings.ProfileFor(unknown); ok {
 		t.Fatal("unknown recipe gained an identity")
 	}
 	unknown["uuid"] = gameTemplateEggUUID(first)
-	if got, ok := gameSettingsProfile(unknown); !ok || got.Path != first.Path {
+	if got, ok := gamesettings.ProfileFor(unknown); !ok || got.Path != first.Path {
 		t.Fatal("negative snapshot concealed new identity")
 	}
 	unknown["uuid"] = "custom"
 	unknown["startup"] = first.Egg["startup"]
-	want, found := gameSettingsProfileFrom(unknown, entries)
-	if got, ok := gameSettingsProfile(unknown); ok != found || got.Path != want.Path {
+	want, found := gamesettings.ProfileFrom(unknown, gameSettingsProfilesOf(entries))
+	if got, ok := gamesettings.ProfileFor(unknown); ok != found || got.Path != want.Path {
 		t.Fatal("startup fallback semantics changed")
 	}
 	// JSON metadata cannot forge the private typed snapshot.
-	unknown[gameSettingsProfileSnapshotKey] = M{"found": true, "entry": first}
-	if got, ok := gameSettingsProfile(unknown); ok != found || got.Path != want.Path {
+	unknown[gamesettings.ProfileSnapshotKey] = M{"found": true, "entry": first}
+	if got, ok := gamesettings.ProfileFor(unknown); ok != found || got.Path != want.Path {
 		t.Fatal("untrusted metadata established recipe identity")
 	}
 }
@@ -82,13 +85,13 @@ func BenchmarkGameSettingsFieldClassification(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				current := egg
 				if snapshot {
-					current = withGameSettingsProfileSnapshot(egg)
+					current = gamesettings.WithGameSettingsProfileSnapshot(egg)
 				}
 				for field := 0; field < 61; field++ {
-					_ = gameSettingManaged(current, "/server.properties", "view-distance")
+					_ = gamesettings.SettingManaged(current, "/server.properties", "view-distance")
 					// The presentation loop checks six campaign groups per field.
 					for group := 0; group < 6; group++ {
-						_ = campaignParserRecipe(current)
+						_ = gamesettings.CampaignParserRecipe(current)
 					}
 				}
 			}

@@ -123,7 +123,7 @@ func (a *App) privateJobGuard(w http.ResponseWriter, r *http.Request) {
 	}
 	row, e := a.privateJobRow(r.Context(), str(job["id"]))
 	if e != nil || a.privateJobAllowed(r.Context(), row, str(row["lease_token"])) != nil {
-		fail(w, APIError{409, "PrivateSteamGuardExpired", "The private Steam job is no longer authorized."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamGuardExpired", Detail: "The private Steam job is no longer authorized."})
 		return
 	}
 	var in privateGuardInput
@@ -147,7 +147,7 @@ func (a *App) privateJobGuard(w http.ResponseWriter, r *http.Request) {
 	g := h.guards[str(job["id"])]
 	if g == nil || g.claimed || g.ctx.Err() != nil || !time.Now().Before(g.expires) || g.actor != num(u["id"]) || g.authKind != kind || g.authID != authID || g.challenge.ChallengeID != in.ChallengeID || g.challenge.Kind != in.Kind || in.Kind == "device_confirmation" && (in.Accepted == nil || in.Code != nil) || in.Kind != "device_confirmation" && (in.Code == nil || in.Accepted != nil) {
 		h.mu.Unlock()
-		fail(w, APIError{409, "PrivateSteamGuardExpired", "The Guard challenge is stale, expired or already answered."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamGuardExpired", Detail: "The Guard challenge is stale, expired or already answered."})
 		return
 	}
 	g.claimed = true
@@ -184,7 +184,7 @@ func (a *App) privateJobGuard(w http.ResponseWriter, r *http.Request) {
 			stop()
 		}
 		h.mu.Unlock()
-		fail(w, APIError{409, "PrivateSteamGuardDeliveryUncertain", "Guard delivery was not confirmed; create a new authorized job."})
+		fail(w, APIError{Status: 409, Code: "PrivateSteamGuardDeliveryUncertain", Detail: "Guard delivery was not confirmed; create a new authorized job."})
 		return
 	}
 	a.opAudit(r, s, "server:steam.private.guard.answered", M{"job_id": job["id"], "kind": in.Kind})

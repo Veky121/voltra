@@ -29,6 +29,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
+
+	"voltra/internal/gamesettings"
 )
 
 func (a *App) registerOperations(mux *http.ServeMux) {
@@ -132,26 +134,9 @@ func (a *App) clientServers(w http.ResponseWriter, r *http.Request) {
 			filtered = append(filtered, s)
 		}
 	}
-	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	if per < 1 {
-		per = 50
-	}
-	if per > 100 {
-		per = 100
-	}
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
+	paging := parseListPage(r.URL.Query(), 50, 100)
 	total := len(filtered)
-	start := (page - 1) * per
-	if start > total {
-		start = total
-	}
-	end := start + per
-	if end > total {
-		end = total
-	}
+	start, end := paging.Bounds(total)
 	out := []any{}
 	ctx := r.Context()
 	if _, ok := ctx.Value(requestReadContextKey{}).(*requestReadScope); !ok {
@@ -171,11 +156,7 @@ func (a *App) clientServers(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, item("server", attrs))
 	}
-	pages := (total + per - 1) / per
-	if pages == 0 {
-		pages = 1
-	}
-	writeJSON(w, 200, M{"object": "list", "data": out, "meta": M{"pagination": M{"total": total, "count": len(out), "per_page": per, "current_page": page, "total_pages": pages, "links": M{}}}})
+	writeJSON(w, 200, M{"object": "list", "data": out, "meta": paging.Meta(total, len(out))})
 }
 func (a *App) clientServerDetail(w http.ResponseWriter, r *http.Request) {
 	s, e := a.server(r, "")
@@ -1353,7 +1334,7 @@ func (a *App) clientStartup(w http.ResponseWriter, r *http.Request) {
 			fail(w, cfxErr)
 			return
 		}
-		if nativeSettingsIsRecipe(cfxEgg, fiveMRecipe) || boolean(d["reset"]) || boolean(changed["secret"]) {
+		if gamesettings.IsRecipe(cfxEgg, gamesettings.FiveMRecipe) || boolean(d["reset"]) || boolean(changed["secret"]) {
 			a.saveStartupField(w, r, s, changed, d, rawValue)
 			return
 		}

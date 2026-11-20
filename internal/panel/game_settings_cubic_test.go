@@ -4,34 +4,35 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 const cubicFixture = "\ufeff//retain\r\nGameParams\r\n{\r\n m_server ServerParams\r\n {\r\n serverName \"Native name\" //name note\r\n privateServer FALSE #privacy note\r\n galaxySeed 000123\r\n nativePassword \"opaque-secret-sentinel\"\r\n addons {\r\n  serverName \"nested untouched\"\r\n  unknown [1 2 { text \"brace } and \\\"quote\\\"\" }]\r\n }\r\n }\r\n m_difficulty DifficultySettings\r\n {\r\n  damagePlayerScale 1\r\n  serverName \"not the server namespace\"\r\n }\r\n}\r\n"
 
 func TestCubicSettingsTypedRoundTrip(t *testing.T) {
-	p, err := parseCubicSettings([]byte(cubicFixture))
+	p, err := gamesettings.ParseCubicSettings([]byte(cubicFixture))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.fields) != 4 {
-		t.Fatalf("wrong fields %#v", p.fields)
+	if len(p.Fields) != 4 {
+		t.Fatalf("wrong fields %#v", p.Fields)
 	}
-	for _, f := range p.fields {
-		if strings.Contains(f.value, "opaque-secret-sentinel") {
+	for _, f := range p.Fields {
+		if strings.Contains(f.Value, "opaque-secret-sentinel") {
 			t.Fatal("unknown credential exposed")
 		}
-		if f.key == "privateServer" && (f.kind != "boolean" || f.on != "TRUE" || f.off != "FALSE") {
+		if f.Key == "privateServer" && (f.Kind != "boolean" || f.On != "TRUE" || f.Off != "FALSE") {
 			t.Fatal("privacy is not a native boolean")
 		}
-		if f.key == "galaxySeed" && (f.kind != "number" || f.value != "000123") {
+		if f.Key == "galaxySeed" && (f.Kind != "number" || f.Value != "000123") {
 			t.Fatal("seed type/bytes changed")
 		}
 	}
-	changes, err := gameSettingsChanges(p.fields, M{"serverName": "New ;#{} 漢字", "privateServer": true, "galaxySeed": "99999999999"}, M{}, cubicSettingsPath)
+	changes, err := gamesettings.Changes(p.Fields, M{"serverName": "New ;#{} 漢字", "privateServer": true, "galaxySeed": "99999999999"}, M{}, gamesettings.CubicSettingsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := p.patch(changes)
+	got, err := p.Patch(changes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,17 +42,17 @@ func TestCubicSettingsTypedRoundTrip(t *testing.T) {
 	if string(got) != want {
 		t.Fatalf("unrelated bytes changed\n%q", got)
 	}
-	if _, err = parseCubicSettings(got); err != nil {
+	if _, err = gamesettings.ParseCubicSettings(got); err != nil {
 		t.Fatal(err)
 	}
-	unchanged, err := p.patch(map[string]string{"galaxySeed": "000123"})
+	unchanged, err := p.Patch(map[string]string{"galaxySeed": "000123"})
 	if err != nil || !bytes.Equal(unchanged, []byte(cubicFixture)) {
 		t.Fatal("unchanged patch rewrote native document")
 	}
 }
 
 func TestCubicSettingsPatchGuards(t *testing.T) {
-	p, err := parseCubicSettings([]byte(cubicFixture))
+	p, err := gamesettings.ParseCubicSettings([]byte(cubicFixture))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +61,7 @@ func TestCubicSettingsPatchGuards(t *testing.T) {
 		{"privateServer": "true"}, {"privateServer": "1"}, {"galaxySeed": "1e5"}, {"galaxySeed": "-1"}, {"galaxySeed": "100000000000"},
 		{"nativePassword": "overwrite"}, {"port": "9999"}, {"addons/serverName": "overwrite"},
 	} {
-		if _, err := p.patch(changes); err == nil {
+		if _, err := p.Patch(changes); err == nil {
 			t.Fatalf("unsafe patch accepted %#v", changes)
 		}
 	}
@@ -77,33 +78,33 @@ func TestCubicSettingsAmbiguityAndBounds(t *testing.T) {
 		"{\n addons {\n" + plain + "}\n}\n", plain + strings.Repeat("unknown row\n", 8001),
 		rows, "{\n" + rows + "}\n", strings.Replace(plain, "m_server ServerParams", "m_Server ServerParams", 1), strings.Replace(plain, " }\n}\n", " }\n m_server ServerParams\n {\n }\n}\n", 1),
 	} {
-		if _, err := parseCubicSettings([]byte(data)); err == nil {
+		if _, err := gamesettings.ParseCubicSettings([]byte(data)); err == nil {
 			t.Fatalf("ambiguous/malformed document accepted %q", data[:min(len(data), 140)])
 		}
 	}
-	if _, err := parseCubicSettings(bytes.Repeat([]byte{'x'}, 8*1024*1024+1)); err == nil {
+	if _, err := gamesettings.ParseCubicSettings(bytes.Repeat([]byte{'x'}, 8*1024*1024+1)); err == nil {
 		t.Fatal("oversized document accepted")
 	}
-	if _, err := parseCubicSettings([]byte("/* serverName \"fake\" */\n" + plain)); err != nil {
+	if _, err := gamesettings.ParseCubicSettings([]byte("/* serverName \"fake\" */\n" + plain)); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCubicSettingsRecipePathBoundary(t *testing.T) {
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path != cubicSettingsRecipe {
+		if entry.Path != gamesettings.CubicSettingsRecipe {
 			continue
 		}
 		egg := M{"uuid": gameTemplateEggUUID(entry)}
-		if !cubicSettingsDocument(egg, cubicSettingsPath) {
+		if !gamesettings.CubicSettingsDocument(egg, gamesettings.CubicSettingsPath) {
 			t.Fatal("valid exact recipe/path rejected")
 		}
 		for _, file := range []string{"config/server_config.txt", "/other/server_config.txt", "/config/../server_config.txt", "/config/Server_Config.txt"} {
-			if cubicSettingsDocument(egg, file) {
+			if gamesettings.CubicSettingsDocument(egg, file) {
 				t.Fatalf("unsafe/wrong document accepted %q", file)
 			}
 		}
-		if cubicSettingsDocument(M{"name": "Cubic Odyssey"}, cubicSettingsPath) {
+		if gamesettings.CubicSettingsDocument(M{"name": "Cubic Odyssey"}, gamesettings.CubicSettingsPath) {
 			t.Fatal("display name selected parser")
 		}
 		return
@@ -113,11 +114,11 @@ func TestCubicSettingsRecipePathBoundary(t *testing.T) {
 
 func TestCubicSettingsCommentPrefixedNamespaceAndRows(t *testing.T) {
 	original := strings.Replace(cubicFixture, " serverName", " /* retained prefix */ serverName", 1)
-	p, err := parseCubicSettings([]byte(original))
+	p, err := gamesettings.ParseCubicSettings([]byte(original))
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := p.patch(map[string]string{"serverName": "Comment-safe"})
+	out, err := p.Patch(map[string]string{"serverName": "Comment-safe"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestCubicSettingsCommentPrefixedNamespaceAndRows(t *testing.T) {
 		t.Fatal("comment or unknown bytes changed")
 	}
 	for _, bad := range []string{strings.Replace(cubicFixture, " nativePassword", " /* prefix */ serverName \"duplicate\"\r\n nativePassword", 1), strings.Replace(cubicFixture, " m_difficulty", " /* prefix */ m_server ServerParams\r\n {\r\n }\r\n m_difficulty", 1)} {
-		if _, err := parseCubicSettings([]byte(bad)); err == nil {
+		if _, err := gamesettings.ParseCubicSettings([]byte(bad)); err == nil {
 			t.Fatal("comment-prefixed duplicate accepted")
 		}
 	}
@@ -134,14 +135,14 @@ func TestCubicSettingsCommentPrefixedNamespaceAndRows(t *testing.T) {
 const cubicActualPublisherSample = "GameParams\r\n{\r\n\tm_server ServerParams\r\n\t{\r\n\t\tstartingPort 0\r\n\t\tendingPort 0\r\n\t\tserverName \"Cubic Odyssey Dedicated Server\"\r\n\t\tserverPassword \"\"\r\n\t\tmaxPlayers 48\r\n\t\tgalaxySeed 0\r\n\t\tallowRelaying FALSE\r\n\t\tprivateServer FALSE\r\n\t\tenableCrashDumps FALSE\r\n\t\tenableLogging FALSE\r\n\t}\r\n\r\n\tm_difficulty DifficultySettings\r\n\t{\r\n\t\tdamagePlayerScale 1\r\n\t\tdamagePirateScale 1\r\n\t\tdamageCreatureScale 1\r\n\t\tdamageDarknessScale 1\r\n\t\tdamagePlayerShipScale 1\r\n\t\tdamagePirateShipScale 1\r\n\t\tcraftingCostScale 1\r\n\t\ttradingCostScale 1\r\n\t\tdamageGearOnDeath true\r\n\t\tloseQbitsOnDeath true\r\n\t}\r\n}\r\n"
 
 func TestCubicSettingsActualPublisherSample(t *testing.T) {
-	p, err := parseCubicSettings([]byte(cubicActualPublisherSample))
+	p, err := gamesettings.ParseCubicSettings([]byte(cubicActualPublisherSample))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.fields) != 16 {
-		t.Fatalf("unexpected exposed fields: %#v", p.fields)
+	if len(p.Fields) != 16 {
+		t.Fatalf("unexpected exposed fields: %#v", p.Fields)
 	}
-	out, err := p.patch(map[string]string{"serverName": "Operator chosen", "privateServer": "TRUE", "galaxySeed": "00042"})
+	out, err := p.Patch(map[string]string{"serverName": "Operator chosen", "privateServer": "TRUE", "galaxySeed": "00042"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,37 +152,37 @@ func TestCubicSettingsActualPublisherSample(t *testing.T) {
 	if string(out) != want {
 		t.Fatal("publisher unknown Difficulty/server fields were changed")
 	}
-	if _, err = parseCubicSettings(out); err != nil {
+	if _, err = gamesettings.ParseCubicSettings(out); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCubicSettingsPublisherDifficultyAndServerBooleans(t *testing.T) {
-	p, err := parseCubicSettings([]byte(cubicActualPublisherSample))
+	p, err := gamesettings.ParseCubicSettings([]byte(cubicActualPublisherSample))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fields := map[string]gameSetting{}
-	for _, f := range p.fields {
-		fields[f.key] = f
+	fields := map[string]gamesettings.Setting{}
+	for _, f := range p.Fields {
+		fields[f.Key] = f
 	}
 	changes := M{"allowRelaying": true, "enableLogging": true, "enableCrashDumps": true, "difficulty/damageGearOnDeath": false, "difficulty/loseQbitsOnDeath": false}
 	want := cubicActualPublisherSample
 	for _, key := range []string{"allowRelaying", "enableLogging", "enableCrashDumps"} {
-		if fields[key].kind != "boolean" || fields[key].on != "TRUE" {
+		if fields[key].Kind != "boolean" || fields[key].On != "TRUE" {
 			t.Fatal("wrong server boolean")
 		}
 		want = strings.Replace(want, key+" FALSE", key+" TRUE", 1)
 	}
 	for _, key := range []string{"damageGearOnDeath", "loseQbitsOnDeath"} {
 		f := fields["difficulty/"+key]
-		if f.kind != "boolean" || f.on != "true" || f.off != "false" {
+		if f.Kind != "boolean" || f.On != "true" || f.Off != "false" {
 			t.Fatal("native Difficulty boolean spelling changed")
 		}
 		want = strings.Replace(want, key+" true", key+" false", 1)
 	}
-	for key := range cubicDifficultyNumbers {
-		if fields["difficulty/"+key].kind != "number" {
+	for key := range gamesettings.CubicDifficultyNumbers {
+		if fields["difficulty/"+key].Kind != "number" {
 			t.Fatal("wrong Difficulty scalar type")
 		}
 		changes["difficulty/"+key] = "1.25"
@@ -192,50 +193,50 @@ func TestCubicSettingsPublisherDifficultyAndServerBooleans(t *testing.T) {
 			t.Fatal("CLI-authoritative field exposed")
 		}
 	}
-	patch, err := gameSettingsChanges(p.fields, changes, M{}, cubicSettingsPath)
+	patch, err := gamesettings.Changes(p.Fields, changes, M{}, gamesettings.CubicSettingsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := p.patch(patch)
+	out, err := p.Patch(patch)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(out) != want {
 		t.Fatal("non-target native bytes changed")
 	}
-	if _, err = parseCubicSettings(out); err != nil {
+	if _, err = gamesettings.ParseCubicSettings(out); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestCubicSettingsDifficultyGuardsAndOptionalFields(t *testing.T) {
-	p, err := parseCubicSettings([]byte(cubicActualPublisherSample))
+	p, err := gamesettings.ParseCubicSettings([]byte(cubicActualPublisherSample))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, value := range []string{"NaN", "Infinity", "1e309", "+1", "01", ".5", "1\nserverName injected", "true"} {
-		if _, err := p.patch(map[string]string{"difficulty/damagePlayerScale": value}); err == nil {
+		if _, err := p.Patch(map[string]string{"difficulty/damagePlayerScale": value}); err == nil {
 			t.Fatalf("unsafe scalar accepted %q", value)
 		}
 	}
 	for _, value := range []string{"-1.25", "0", "1e-5", "1E+2"} {
-		if _, err := p.patch(map[string]string{"difficulty/damagePlayerScale": value}); err != nil {
+		if _, err := p.Patch(map[string]string{"difficulty/damagePlayerScale": value}); err != nil {
 			t.Fatal("invented engine bound", value, err)
 		}
 	}
 	for _, patch := range []map[string]string{{"difficulty/damageGearOnDeath": "TRUE"}, {"enableLogging": "true"}, {"serverPassword": "overwrite"}, {"difficulty/unknown": "overwrite"}} {
-		if _, err := p.patch(patch); err == nil {
+		if _, err := p.Patch(patch); err == nil {
 			t.Fatal("wrong namespace/type/authority accepted")
 		}
 	}
 	for _, bad := range []string{strings.Replace(cubicActualPublisherSample, "damagePlayerScale 1", "damagePlayerScale 1\n\t\t/*prefix*/ damagePlayerScale 2", 1), strings.Replace(cubicActualPublisherSample, "m_difficulty DifficultySettings", "m_Difficulty DifficultySettings", 1), strings.Replace(cubicActualPublisherSample, "damagePlayerScale", "DamagePlayerScale", 1), strings.Replace(cubicActualPublisherSample, "\tm_difficulty DifficultySettings", "\tm_difficulty DifficultySettings\n\t{\n\t}\n\tm_difficulty DifficultySettings", 1)} {
-		if _, err := parseCubicSettings([]byte(bad)); err == nil {
+		if _, err := gamesettings.ParseCubicSettings([]byte(bad)); err == nil {
 			t.Fatal("ambiguous Difficulty accepted")
 		}
 	}
 	minimal := "GameParams\n{\n m_server ServerParams\n {\n serverName \"Name\"\n privateServer FALSE\n galaxySeed 0\n }\n}\n"
-	q, err := parseCubicSettings([]byte(minimal))
-	if err != nil || len(q.fields) != 3 {
+	q, err := gamesettings.ParseCubicSettings([]byte(minimal))
+	if err != nil || len(q.Fields) != 3 {
 		t.Fatal("optional absent native fields invented", err)
 	}
 }

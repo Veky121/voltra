@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func cuberiteBooleanTestEgg(t *testing.T) M {
@@ -20,21 +21,21 @@ func cuberiteBooleanTestEgg(t *testing.T) M {
 func TestCuberiteBooleanOverlayRoundTrip(t *testing.T) {
 	egg := cuberiteBooleanTestEgg(t)
 	data := []byte("; operator comment\r\n[Plugins]\r\nCore=1 ; retain\r\nChatLog=0\r\nUnknown=1\r\n[Server]\r\nPorts=29108\r\nAllowMultiLogin=0\r\n")
-	base, err := parseGameSettings("/settings.ini", data)
+	base, err := gamesettings.Parse("/settings.ini", data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed := cuberiteGameSettingsBooleans(egg, "/settings.ini", base)
-	for _, f := range base.fields {
-		if f.key == "Plugins/Core" && f.kind != "number" {
+	parsed := gamesettings.CuberiteGameSettingsBooleans(egg, "/settings.ini", base)
+	for _, f := range base.Fields {
+		if f.Key == "Plugins/Core" && f.Kind != "number" {
 			t.Fatal("mutated original fields")
 		}
 	}
-	changes, err := gameSettingsChanges(parsed.fields, M{"Plugins/Core": false, "Plugins/ChatLog": true, "Server/AllowMultiLogin": true}, egg, "/settings.ini")
+	changes, err := gamesettings.Changes(parsed.Fields, M{"Plugins/Core": false, "Plugins/ChatLog": true, "Server/AllowMultiLogin": true}, egg, "/settings.ini")
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := parsed.patch(changes)
+	updated, err := parsed.Patch(changes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,15 +45,15 @@ func TestCuberiteBooleanOverlayRoundTrip(t *testing.T) {
 	if !bytes.Equal(updated, []byte(want)) {
 		t.Fatalf("unrelated bytes changed: %q", updated)
 	}
-	for _, f := range parsed.fields {
-		if f.key == "Plugins/Unknown" && f.kind != "number" {
+	for _, f := range parsed.Fields {
+		if f.Key == "Plugins/Unknown" && f.Kind != "number" {
 			t.Fatal("unknown flag coerced")
 		}
 	}
-	if _, err := parsed.patch(map[string]string{"Plugins/Core": "true"}); err == nil {
+	if _, err := parsed.Patch(map[string]string{"Plugins/Core": "true"}); err == nil {
 		t.Fatal("non-native write accepted")
 	}
-	if _, err := gameSettingsChanges(parsed.fields, M{"Plugins/Core": "1"}, egg, "/settings.ini"); err == nil {
+	if _, err := gamesettings.Changes(parsed.Fields, M{"Plugins/Core": "1"}, egg, "/settings.ini"); err == nil {
 		t.Fatal("text API value accepted")
 	}
 }
@@ -61,22 +62,22 @@ func TestCuberiteBooleanOverlayRefusalsAndScope(t *testing.T) {
 	egg := cuberiteBooleanTestEgg(t)
 	for _, value := range []string{"2", "true", "false", "\"1\"", "'0'", "(A=1)", "1\nCore=0"} {
 		t.Run(value, func(t *testing.T) {
-			parsed, err := parseGameSettings("/settings.ini", []byte("[Plugins]\nCore="+value+"\n"))
+			parsed, err := gamesettings.Parse("/settings.ini", []byte("[Plugins]\nCore="+value+"\n"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			parsed = cuberiteGameSettingsBooleans(egg, "/settings.ini", parsed)
-			for _, f := range parsed.fields {
-				if f.key == "Plugins/Core" && f.kind != "readonly" {
+			parsed = gamesettings.CuberiteGameSettingsBooleans(egg, "/settings.ini", parsed)
+			for _, f := range parsed.Fields {
+				if f.Key == "Plugins/Core" && f.Kind != "readonly" {
 					t.Fatalf("invalid flag editable: %+v", f)
 				}
 			}
-			if _, err := parsed.patch(map[string]string{"Plugins/Core": "1"}); err == nil {
+			if _, err := parsed.Patch(map[string]string{"Plugins/Core": "1"}); err == nil {
 				t.Fatal("invalid flag patch accepted")
 			}
 		})
 	}
-	base, err := parseGameSettings("/settings.ini", []byte("[Plugins]\nCore=1\nChatLog=0\n"))
+	base, err := gamesettings.Parse("/settings.ini", []byte("[Plugins]\nCore=1\nChatLog=0\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,9 +85,9 @@ func TestCuberiteBooleanOverlayRefusalsAndScope(t *testing.T) {
 		egg  M
 		file string
 	}{{M{"name": "Cuberite"}, "/settings.ini"}, {egg, "/webadmin.ini"}, {egg, "/other/settings.ini"}} {
-		got := cuberiteGameSettingsBooleans(tc.egg, tc.file, base)
-		for _, f := range got.fields {
-			if f.kind != "number" {
+		got := gamesettings.CuberiteGameSettingsBooleans(tc.egg, tc.file, base)
+		for _, f := range got.Fields {
+			if f.Kind != "number" {
 				t.Fatal("overlay escaped authority")
 			}
 		}
@@ -99,32 +100,32 @@ func TestCuberiteBooleanOverlayExactNativeKeys(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			section, name, _ := strings.Cut(key, "/")
 			for _, value := range []string{"0", "1"} {
-				parsed, err := parseGameSettings("/settings.ini", []byte("["+section+"]\n"+name+"="+value+"\n"))
+				parsed, err := gamesettings.Parse("/settings.ini", []byte("["+section+"]\n"+name+"="+value+"\n"))
 				if err != nil {
 					t.Fatal(err)
 				}
-				parsed = cuberiteGameSettingsBooleans(egg, "/settings.ini", parsed)
-				if len(parsed.fields) != 1 || parsed.fields[0].kind != "boolean" || parsed.fields[0].on != "1" || parsed.fields[0].off != "0" {
+				parsed = gamesettings.CuberiteGameSettingsBooleans(egg, "/settings.ini", parsed)
+				if len(parsed.Fields) != 1 || parsed.Fields[0].Kind != "boolean" || parsed.Fields[0].On != "1" || parsed.Fields[0].Off != "0" {
 					t.Fatal("native flag not boolean")
 				}
 			}
 		})
 	}
 	data := []byte("[Plugins]\nCore=1\ncore=0\nUnknown=2\n")
-	parsed, err := parseGameSettings("/settings.ini", data)
+	parsed, err := gamesettings.Parse("/settings.ini", data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed = cuberiteGameSettingsBooleans(egg, "/settings.ini", parsed)
-	for _, f := range parsed.fields {
-		if strings.EqualFold(f.key, "Plugins/Core") && f.kind != "readonly" {
+	parsed = gamesettings.CuberiteGameSettingsBooleans(egg, "/settings.ini", parsed)
+	for _, f := range parsed.Fields {
+		if strings.EqualFold(f.Key, "Plugins/Core") && f.Kind != "readonly" {
 			t.Fatal("case collision made editable")
 		}
 	}
-	if _, err := parsed.patch(map[string]string{"Plugins/Core": "0"}); err == nil {
+	if _, err := parsed.Patch(map[string]string{"Plugins/Core": "0"}); err == nil {
 		t.Fatal("case collision patched")
 	}
-	updated, err := parsed.patch(map[string]string{"Plugins/Unknown": "3"})
+	updated, err := parsed.Patch(map[string]string{"Plugins/Unknown": "3"})
 	if err != nil || string(updated) != strings.Replace(string(data), "Unknown=2", "Unknown=3", 1) {
 		t.Fatalf("unknown edit damaged native aliases: %q %v", updated, err)
 	}

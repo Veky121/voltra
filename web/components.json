@@ -5,5 +5,11 @@
   "tsx": true,
   "iconLibrary": "lucide",
   "tailwind": {"config": "", "css": "src/shadcn.css", "baseColor": "zinc", "cssVariables": true, "prefix": "scn"},
-  "aliases": {"components": "@/components", "utils": "@/lib/utils", "ui": "@/components/ui", "lib": "@/lib", "hooks": "@/hooks"}
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  }
 }

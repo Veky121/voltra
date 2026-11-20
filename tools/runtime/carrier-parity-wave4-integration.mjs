@@ -5,7 +5,7 @@ const fingerprint = path => ({path, sha256: crypto.createHash('sha256').update(f
 const report = {
   scope: 'canonical Carrier implementation and parser; root shared integration remains pending',
   complete: false,
-  files: ['internal/panel/game_library/scripts/carrier-file-authority.py', 'internal/panel/game_settings_carrier.go', 'internal/panel/game_settings_carrier_test.go', 'tools/runtime/carrier-parity-wave4-test.py', 'tools/runtime/carrier-parity-wave4-stage.mjs'].map(fingerprint),
+  files: ['internal/panel/game_library/scripts/carrier-file-authority.py', 'internal/gamesettings/carrier.go', 'internal/panel/game_settings_carrier_test.go', 'tools/runtime/carrier-parity-wave4-test.py', 'tools/runtime/carrier-parity-wave4-stage.mjs'].map(fingerprint),
   checks: {
     linux: {engine: 'desktop-linux npipe:////./pipe/dockerDesktopLinuxEngine', network: 'none', memory_mib: 256, swap_extra_mib: 0, cpus: 1, source_mount: 'readonly', carrier_tests: 10, cube_tests: 8, existing_vehicle_tests: 14, existing_cube_tests: 19, total: 51},
     go: 'Carrier and Barotrauma focused parser tests passed 1.513s',

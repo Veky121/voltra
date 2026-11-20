@@ -10,11 +10,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 // Requires the retained licensed game/plugin payload; never part of ordinary CI.
 func TestValheimPlusAPI(t *testing.T) {
-	rawBytes, err := os.ReadFile("testdata/game-settings/game-parity-20261029/wave382-valheim-plus-settings/native-valheim-plus.cfg")
+	rawBytes, err := os.ReadFile("../gamesettings/testdata/game-settings/game-parity-20261029/wave382-valheim-plus-settings/native-valheim-plus.cfg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,13 +25,13 @@ func TestValheimPlusAPI(t *testing.T) {
 	ctx := context.Background()
 	var entry gameTemplate
 	for _, e := range gameTemplates().Entries {
-		if e.Path == valheimPlusSettingsRecipe {
+		if e.Path == gamesettings.ValheimPlusSettingsRecipe {
 			entry = e
 		}
 	}
 	startup := str(entry.Egg["startup"])
 	allocation, err := a.insert(ctx, "allocations", M{"node_id": server["node_id"], "server_id": server["id"], "ip": "127.0.0.1", "port": func() int {
-		if valheimPlusSettingsRecipe == starboundAuthorityRecipe {
+		if gamesettings.ValheimPlusSettingsRecipe == gamesettings.StarboundAuthorityRecipe {
 			return 21025
 		}
 		return 29371
@@ -64,7 +65,7 @@ func TestValheimPlusAPI(t *testing.T) {
 		}
 		f.Files["/"+name] = []byte(expected + "\n")
 	}
-	f.Files[valheimPlusSettingsPath] = []byte(raw)
+	f.Files[gamesettings.ValheimPlusSettingsPath] = []byte(raw)
 	tarFile, err := os.Open("../../artifacts/game-parity-20261029/wave375-valheim-plus-followup/full-payload.tar")
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +82,7 @@ func TestValheimPlusAPI(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			f.Files[valheimPlusPluginPath] = b
+			f.Files[gamesettings.ValheimPlusPluginPath] = b
 			break
 		}
 	}
@@ -111,15 +112,15 @@ func TestValheimPlusAPI(t *testing.T) {
 	endpoint := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	f.State = "offline"
 	view := asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
-	if str(view["file"]) != valheimPlusSettingsPath || len(asSlice(view["fields"])) != 7 {
+	if str(view["file"]) != gamesettings.ValheimPlusSettingsPath || len(asSlice(view["fields"])) != 7 {
 		t.Fatal("wrong default document or fields", view)
 	}
-	infraExpect(t, mux, admin, "GET", endpoint+"?file="+valheimPlusSettingsPath, nil, 200)
+	infraExpect(t, mux, admin, "GET", endpoint+"?file="+gamesettings.ValheimPlusSettingsPath, nil, 200)
 	infraExpect(t, mux, admin, "GET", endpoint+"?file=/doorstop_config.ini", nil, 404)
 	for _, value := range []string{"false", "true"} {
 		infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{"Server/enabled": value == "true"}}, 200)
 		expected := strings.Replace(raw, "[Server]\r\n\r\n## Change false to true to enable this section.\r\n# Setting type: Boolean\r\n# Default value: true\r\nenabled = true", "[Server]\r\n\r\n## Change false to true to enable this section.\r\n# Setting type: Boolean\r\n# Default value: true\r\nenabled = "+value, 1)
-		if !bytes.Equal(f.Files[valheimPlusSettingsPath], []byte(expected)) {
+		if !bytes.Equal(f.Files[gamesettings.ValheimPlusSettingsPath], []byte(expected)) {
 			t.Fatal("bytes outside boolean changed")
 		}
 		view = asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
@@ -127,7 +128,7 @@ func TestValheimPlusAPI(t *testing.T) {
 	}
 	for _, value := range []string{"1", "32"} {
 		infraExpect(t, mux, admin, "PUT", endpoint, M{"revision": view["revision"], "settings": M{"Server/maxPlayers": value}}, 200)
-		if !bytes.Equal(f.Files[valheimPlusSettingsPath], []byte(strings.Replace(raw, "maxPlayers = 10", "maxPlayers = "+value, 1))) {
+		if !bytes.Equal(f.Files[gamesettings.ValheimPlusSettingsPath], []byte(strings.Replace(raw, "maxPlayers = 10", "maxPlayers = "+value, 1))) {
 			t.Fatal("numeric edit changed unrelated bytes")
 		}
 		view = asMap(infraExpect(t, mux, admin, "GET", endpoint, nil, 200)["attributes"])
@@ -157,12 +158,12 @@ func TestValheimPlusAPI(t *testing.T) {
 			break
 		}
 	}
-	plugin := f.Files[valheimPlusPluginPath]
-	f.Files[valheimPlusPluginPath] = []byte("wrong plugin")
+	plugin := f.Files[gamesettings.ValheimPlusPluginPath]
+	f.Files[gamesettings.ValheimPlusPluginPath] = []byte("wrong plugin")
 	infraExpect(t, mux, admin, "PUT", endpoint, input, 404)
-	f.Files[valheimPlusPluginPath] = plugin
-	delete(f.Files, valheimPlusSettingsPath)
-	infraExpect(t, mux, admin, "GET", endpoint+"?file="+valheimPlusSettingsPath, nil, 404)
+	f.Files[gamesettings.ValheimPlusPluginPath] = plugin
+	delete(f.Files, gamesettings.ValheimPlusSettingsPath)
+	infraExpect(t, mux, admin, "GET", endpoint+"?file="+gamesettings.ValheimPlusSettingsPath, nil, 404)
 	if f.Writes != before {
 		t.Fatal("rejection wrote files")
 	}

@@ -341,8 +341,16 @@ CREATE TABLE IF NOT EXISTS console_log_collectors (
 );
 ALTER TABLE console_log_collectors ADD COLUMN IF NOT EXISTS run_start_id bigint NOT NULL DEFAULT 0;
 
--- Commit-scoped hints for active readers. No row values enter NOTIFY.
+-- Commit-scoped hints for active readers. The only row value in NOTIFY is the
+-- internal ID of the server a row belongs to, so the panel can tell only that
+-- server's viewers; the panel never forwards the ID itself.
 CREATE OR REPLACE FUNCTION voltra_notify_read_change() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  new_row jsonb;
+  old_row jsonb;
+  server_key text := CASE WHEN TG_TABLE_NAME = 'servers' THEN 'id' ELSE 'server_id' END;
+  server text;
+  old_server text;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     IF (to_jsonb(OLD) - ARRAY['updated_at','last_used_at','last_seen_at']) IS NOT DISTINCT FROM
@@ -350,7 +358,16 @@ BEGIN
       RETURN NULL;
     END IF;
   END IF;
-  PERFORM pg_notify('voltra_read_changes', json_build_object('schema',TG_TABLE_SCHEMA,'table',TG_TABLE_NAME)::text);
+  IF TG_LEVEL = 'ROW' THEN
+    IF TG_OP <> 'DELETE' THEN new_row := to_jsonb(NEW); END IF;
+    IF TG_OP <> 'INSERT' THEN old_row := to_jsonb(OLD); END IF;
+    server := COALESCE(new_row->>server_key, old_row->>server_key);
+    -- A row moved to another server changes both servers' reads.
+    IF new_row IS NOT NULL AND old_row IS NOT NULL AND (old_row->>server_key) IS DISTINCT FROM (new_row->>server_key) THEN
+      old_server := old_row->>server_key;
+    END IF;
+  END IF;
+  PERFORM pg_notify('voltra_read_changes', json_build_object('schema',TG_TABLE_SCHEMA,'table',TG_TABLE_NAME,'server',server,'old_server',old_server)::text);
   RETURN NULL;
 END $$;
 DO $$

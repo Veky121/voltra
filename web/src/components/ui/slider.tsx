@@ -1,9 +1,9 @@
-import { Slider as SliderPrimitive } from "@base-ui/react/slider"
-import { cn } from "@/lib/utils"
+import {Slider as SliderPrimitive} from '@base-ui/react/slider';
+import {cn} from '@/lib/utils';
 
 function Slider({
   className,
-  "aria-label": ariaLabel,
+  'aria-label': ariaLabel,
   defaultValue,
   value,
   min = 0,
@@ -14,11 +14,11 @@ function Slider({
     ? value
     : Array.isArray(defaultValue)
       ? defaultValue
-      : [typeof value === "number" ? value : typeof defaultValue === "number" ? defaultValue : min]
+      : [typeof value === 'number' ? value : typeof defaultValue === 'number' ? defaultValue : min];
 
   return (
     <SliderPrimitive.Root
-      className={cn("scn:data-[orientation=horizontal]:w-full scn:data-[orientation=vertical]:h-full", className)}
+      className={cn('scn:data-[orientation=horizontal]:w-full scn:data-[orientation=vertical]:h-full', className)}
       data-slot="slider"
       defaultValue={defaultValue}
       value={value}
@@ -37,7 +37,7 @@ function Slider({
             className="scn:bg-primary scn:select-none scn:data-[orientation=horizontal]:h-full scn:data-[orientation=vertical]:w-full"
           />
         </SliderPrimitive.Track>
-        {Array.from({ length: _values.length }, (_, index) => (
+        {Array.from({length: _values.length}, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             aria-label={ariaLabel}
@@ -47,8 +47,7 @@ function Slider({
         ))}
       </SliderPrimitive.Control>
     </SliderPrimitive.Root>
-  )
+  );
 }
 
-export { Slider }
-
+export {Slider};

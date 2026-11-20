@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"voltra/internal/gamesettings"
 )
 
 func TestWave171BrickadiaPublication(t *testing.T) {
@@ -26,7 +27,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 	if _, e = a.update(ctx, "servers", num(s["id"]), M{"startup": egg["startup"], "allocation_id": alloc["id"]}); e != nil {
 		t.Fatal(e)
 	}
-	entry, _ := gameSettingsProfile(egg)
+	entry, _ := gamesettings.ProfileFor(egg)
 	for _, value := range asSlice(entry.Egg["variables"]) {
 		v := asMap(value)
 		row := M{}
@@ -70,11 +71,11 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 	if count != 7 {
 		t.Fatal(count)
 	}
-	raw := "; retained\r\n[" + strings.TrimSuffix(brickadiaSection, "/") + "]\r\nServerName=Before\r\nServerPassword=fixture-private\r\nbPubliclyListed=False\r\nPort=29100\r\nUnknownScalar=9007199254740993\r\n+Array=A\r\n+Array=B\r\n"
-	f.Files[brickadiaPath] = []byte(raw)
+	raw := "; retained\r\n[" + strings.TrimSuffix(gamesettings.BrickadiaSection, "/") + "]\r\nServerName=Before\r\nServerPassword=fixture-private\r\nbPubliclyListed=False\r\nPort=29100\r\nUnknownScalar=9007199254740993\r\n+Array=A\r\n+Array=B\r\n"
+	f.Files[gamesettings.BrickadiaPath] = []byte(raw)
 	f.Files["/unrelated.ini"] = []byte("Name=Other\n")
 	f.State = "offline"
-	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + url.QueryEscape(brickadiaPath)
+	route := "/api/client/servers/" + str(s["uuid_short"]) + "/game-settings?file=" + url.QueryEscape(gamesettings.BrickadiaPath)
 
 	helperPath := ""
 	for p := range f.Files {
@@ -85,12 +86,12 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 	}
 	get := func(user int64) M { return asMap(infraExpect(t, mux, user, "GET", route, nil, 200)["attributes"]) }
 	put := func(user int64, v M) int {
-		status, _, _ := infraRequest(t, mux, user, "PUT", route, M{"revision": v["revision"], "settings": M{brickadiaSection + "ServerName": "5"}})
+		status, _, _ := infraRequest(t, mux, user, "PUT", route, M{"revision": v["revision"], "settings": M{gamesettings.BrickadiaSection + "ServerName": "5"}})
 		return status
 	}
 	unchanged := func(writes int, b []byte) {
 		t.Helper()
-		if f.Writes != writes || !bytes.Equal(f.Files[brickadiaPath], b) {
+		if f.Writes != writes || !bytes.Equal(f.Files[gamesettings.BrickadiaPath], b) {
 			t.Fatal("refused mutation wrote native bytes")
 		}
 	}
@@ -98,7 +99,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 	found := false
 	for _, raw := range asSlice(view["fields"]) {
 		field := asMap(raw)
-		if str(field["key"]) == brickadiaSection+"Port" {
+		if str(field["key"]) == gamesettings.BrickadiaSection+"Port" {
 			found = true
 			if !boolean(field["readonly"]) {
 				t.Fatal("managed port not readonly")
@@ -116,7 +117,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	before := append([]byte(nil), f.Files[brickadiaPath]...)
+	before := append([]byte(nil), f.Files[gamesettings.BrickadiaPath]...)
 	writes := f.Writes
 	if put(num(reader["id"]), get(num(reader["id"]))) != 403 {
 		t.Fatal("read-only user accepted")
@@ -138,7 +139,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 		base = http.DefaultTransport
 	}
 	a.HTTP.Transport = wave161Transport{base, func(r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == brickadiaPath {
+		if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == gamesettings.BrickadiaPath {
 			reads++
 		}
 	}}
@@ -159,7 +160,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 	for _, kind := range []string{"startup", "helper", "actor", "content"} {
 		t.Run("final-read-"+kind, func(t *testing.T) {
 			view := get(admin)
-			before := append([]byte(nil), f.Files[brickadiaPath]...)
+			before := append([]byte(nil), f.Files[gamesettings.BrickadiaPath]...)
 			writes := f.Writes
 			n := 0
 			fired := false
@@ -167,15 +168,15 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 			transportBase := base
 			if kind == "content" {
 				transportBase = wave171BeforeTransport{base, func(r *http.Request) {
-					if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == brickadiaPath && n+1 == finalRead {
+					if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == gamesettings.BrickadiaPath && n+1 == finalRead {
 						f.mu.Lock()
-						f.Files[brickadiaPath] = []byte(strings.Replace(string(before), "ServerName=5", "ServerName=external", 1))
+						f.Files[gamesettings.BrickadiaPath] = []byte(strings.Replace(string(before), "ServerName=5", "ServerName=external", 1))
 						f.mu.Unlock()
 					}
 				}}
 			}
 			a.HTTP.Transport = wave161Transport{transportBase, func(r *http.Request) {
-				if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == brickadiaPath {
+				if strings.HasSuffix(r.URL.Path, "/files/contents") && r.URL.Query().Get("file") == gamesettings.BrickadiaPath {
 					n++
 					if n == finalRead {
 						fired = true
@@ -188,7 +189,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 							f.mu.Unlock()
 						case "content":
 							f.mu.Lock()
-							f.Files[brickadiaPath] = []byte(strings.Replace(string(before), "ServerName=5", "ServerName=external", 1))
+							f.Files[gamesettings.BrickadiaPath] = []byte(strings.Replace(string(before), "ServerName=5", "ServerName=external", 1))
 							f.mu.Unlock()
 						case "actor":
 							_, e = a.update(ctx, "users", admin, M{"disabled": true})
@@ -208,7 +209,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 				if f.Writes != writes {
 					t.Fatal("content refusal wrote")
 				}
-				f.Files[brickadiaPath] = before
+				f.Files[gamesettings.BrickadiaPath] = before
 			} else {
 				unchanged(writes, before)
 			}
@@ -228,7 +229,7 @@ func TestWave171BrickadiaPublication(t *testing.T) {
 				f.Files[helperPath] = helperBefore
 			}()
 			view := get(admin)
-			before := append([]byte(nil), f.Files[brickadiaPath]...)
+			before := append([]byte(nil), f.Files[gamesettings.BrickadiaPath]...)
 			writes := f.Writes
 			conn, e := a.DB.Acquire(ctx)
 			if e != nil {

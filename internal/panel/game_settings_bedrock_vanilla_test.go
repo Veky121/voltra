@@ -3,6 +3,7 @@ package panel
 import (
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 // Source-only packet: use the shared parser and validator, never a native process.
@@ -17,15 +18,15 @@ func TestBedrockVanillaSharedSettingsPacket(t *testing.T) {
 		t.Fatal("exact recipe missing")
 	}
 	input := []byte("# operator\r\nserver-name=Original\r\nmax-players=7\r\nallow-list=true\r\nserver-port=28020\r\nserver-portv6=28020\r\nserver-udp-ports=28020:28020\r\ntransport=nethernet\r\ncustom=keep\r\n")
-	parsed, err := parseGameSettings("/server.properties", input)
+	parsed, err := gamesettings.Parse("/server.properties", input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	patch, err := gameSettingsChanges(parsed.fields, M{"max-players": "8", "allow-list": false}, egg, "/server.properties")
+	patch, err := gamesettings.Changes(parsed.Fields, M{"max-players": "8", "allow-list": false}, egg, "/server.properties")
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated, err := parsed.patch(patch)
+	updated, err := parsed.Patch(patch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +35,7 @@ func TestBedrockVanillaSharedSettingsPacket(t *testing.T) {
 			t.Fatalf("lost %q", keep)
 		}
 	}
-	if _, err := gameSettingsChanges(parsed.fields, M{"server-port": "12345"}, egg, "/server.properties"); err == nil {
+	if _, err := gamesettings.Changes(parsed.Fields, M{"server-port": "12345"}, egg, "/server.properties"); err == nil {
 		t.Fatal("allocated primary port accepted")
 	}
 	// Record actual admissions for the shared owner. These are observations,
@@ -44,7 +45,7 @@ func TestBedrockVanillaSharedSettingsPacket(t *testing.T) {
 		if key == "server-portv6" {
 			value = "29000"
 		}
-		_, err := gameSettingsChanges(parsed.fields, M{key: value}, egg, "/server.properties")
-		t.Logf("authority observation: %s managed=%v admission_error=%v", key, gameSettingManaged(egg, "/server.properties", key), err)
+		_, err := gamesettings.Changes(parsed.Fields, M{key: value}, egg, "/server.properties")
+		t.Logf("authority observation: %s managed=%v admission_error=%v", key, gamesettings.SettingManaged(egg, "/server.properties", key), err)
 	}
 }

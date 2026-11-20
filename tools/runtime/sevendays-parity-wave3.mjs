@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 const base = 'artifacts/game-parity-20261029/sevendays-wave3';
-const sourcePath = 'internal/panel/game_settings_recipe_managed.go';
+const sourcePath = 'internal/gamesettings/recipe_managed.go';
 const input = fs.readFileSync(sourcePath, 'utf8');
 const marker = 'func gameSettingsRecipeManaged(egg M, file, key string) bool {';
 const branch = `

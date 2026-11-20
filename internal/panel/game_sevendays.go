@@ -3,9 +3,9 @@ package panel
 import (
 	"context"
 	"fmt"
+	"voltra/internal/gamesettings"
 )
 
-const sevenDaysSettingsPath = "/serverconfig.xml"
 const sevenDaysStartup = "exec bash .voltra/sevendays-start.sh"
 
 // The game does not consume console commands on stdin. Keep its telnet console
@@ -50,7 +50,7 @@ func (a *App) sevenDaysAfterInstall(ctx context.Context, server, settings M) err
 	if err != nil || initialized {
 		return err
 	}
-	content, exists, err := a.quickSetupRead(ctx, server, sevenDaysSettingsPath)
+	content, exists, err := a.quickSetupRead(ctx, server, gamesettings.SevenDaysSettingsPath)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (a *App) sevenDaysAfterInstall(ctx context.Context, server, settings M) err
 		}
 	}
 	patch := map[string]string{"ServerName": str(settings["name"]), "ServerPassword": password, "ServerMaxPlayerCount": fmt.Sprint(num(settings["max_players"])), "ServerPort": str(allocation["port"]), "ServerVisibility": "0", "TelnetEnabled": "true", "TelnetPort": "8081", "TelnetPassword": "", "WebDashboardEnabled": "false"}
-	content, err = quickPatchXMLProperties(content, "ServerSettings", patch)
+	content, err = gamesettings.QuickPatchXMLProperties(content, "ServerSettings", patch)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (a *App) sevenDaysAfterInstall(ctx context.Context, server, settings M) err
 	if err = a.quickSetupWrite(ctx, server, "/.voltra/sevendays-start.sh", []byte(sevenDaysLauncher)); err != nil {
 		return err
 	}
-	if err = a.quickSetupWrite(ctx, server, sevenDaysSettingsPath, content); err != nil {
+	if err = a.quickSetupWrite(ctx, server, gamesettings.SevenDaysSettingsPath, content); err != nil {
 		return err
 	}
 	configuration, _, err := a.steamCatalogLoad(ctx, server)

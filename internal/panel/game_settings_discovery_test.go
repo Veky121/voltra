@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestDiscoveryIdentityAndPaths(t *testing.T) {
@@ -24,21 +25,21 @@ func TestDiscoveryIdentityAndPaths(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"../settings.json", "/config.json", "a//b.json", "mods/config.json", "x/Plugins/config.json", "a/{{VAR}}.json", "a/*.json", "a\\b.json", "a/../b.json"} {
-		if safeSettingsDocument(p) {
+		if gamesettings.SafeSettingsDocument(p) {
 			t.Fatal("unsafe", p)
 		}
 	}
-	if !safeSettingsDocument("ShooterGame/Saved/Config/LinuxServer/Game.ini") {
+	if !gamesettings.SafeSettingsDocument("ShooterGame/Saved/Config/LinuxServer/Game.ini") {
 		t.Fatal("literal path rejected")
 	}
 	entries := []gameTemplate{{Path: "one", SHA256: "a", Egg: M{"startup": "exact"}}, {Path: "two", SHA256: "b", Egg: M{"startup": "exact"}}}
-	if _, ok := gameSettingsProfileFrom(M{"startup": "exact", "name": "one"}, entries); ok {
+	if _, ok := gamesettings.ProfileFrom(M{"startup": "exact", "name": "one"}, gameSettingsProfilesOf(entries)); ok {
 		t.Fatal("ambiguous startup")
 	}
-	if got, ok := gameSettingsProfileFrom(M{"uuid": gameTemplateEggUUID(entries[0]), "startup": "exact"}, entries); !ok || got.Path != "one" {
+	if got, ok := gamesettings.ProfileFrom(M{"uuid": gameTemplateEggUUID(entries[0]), "startup": "exact"}, gameSettingsProfilesOf(entries)); !ok || got.Path != "one" {
 		t.Fatal("UUID did not win")
 	}
-	if _, ok := gameSettingsProfileFrom(M{"startup": "exact extra"}, entries[:1]); ok {
+	if _, ok := gamesettings.ProfileFrom(M{"startup": "exact extra"}, gameSettingsProfilesOf(entries[:1])); ok {
 		t.Fatal("partial startup match")
 	}
 }
@@ -50,7 +51,7 @@ func discoveryOverlay(t *testing.T) {
 	gameTemplates()
 	old := templates
 	t.Cleanup(func() { templates = old })
-	data, err := os.ReadFile("testdata/game-settings/game-parity-20261029/discovery-profile.json")
+	data, err := os.ReadFile("../gamesettings/testdata/game-settings/game-parity-20261029/discovery-profile.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,19 +72,19 @@ func TestDiscoveryEcoJSONAndUnsupported(t *testing.T) {
 	for _, entry := range gameTemplates().Entries {
 		egg := M{"uuid": gameTemplateEggUUID(entry), "startup": entry.Egg["startup"]}
 		if entry.Path == "eco/egg-eco.json" {
-			if gameSettingsDiscoveryFormat(egg, "/Configs/Network.eco") != "json" || gameSettingsDiscoveryFormat(egg, "/Configs/Other.eco") != "" {
+			if gamesettings.DiscoveryFormat(egg, "/Configs/Network.eco") != "json" || gamesettings.DiscoveryFormat(egg, "/Configs/Other.eco") != "" {
 				t.Fatal("Eco format scope")
 			}
-			parsed, err := parseDiscoveredGameSettings(egg, "/Configs/Network.eco", []byte(`{"PublicServer":true,"MaxPlayers":20}`))
-			if err != nil || len(parsed.fields) != 2 {
+			parsed, err := gamesettings.ParseDiscovered(egg, "/Configs/Network.eco", []byte(`{"PublicServer":true,"MaxPlayers":20}`))
+			if err != nil || len(parsed.Fields) != 2 {
 				t.Fatal("Eco JSON", err)
 			}
-			if _, err = parseDiscoveredGameSettings(egg, "/Configs/Network.eco", []byte(`{"x":1,"x":2}`)); err == nil {
+			if _, err = gamesettings.ParseDiscovered(egg, "/Configs/Network.eco", []byte(`{"x":1,"x":2}`)); err == nil {
 				t.Fatal("duplicate JSON accepted")
 			}
 		}
 		if entry.Path == "foundry/egg-foundry.json" || entry.Path == "ddnet/egg-d-d-net.json" {
-			if gameSettingsDiscoveryFormat(egg, "/server.cfg") != "" {
+			if gamesettings.DiscoveryFormat(egg, "/server.cfg") != "" {
 				t.Fatal("executable CFG enabled")
 			}
 		}
@@ -140,7 +141,7 @@ func TestDiscoveryExistingParentGate(t *testing.T) {
 	}
 	f.Files["/ss14/server_config.toml"] = []byte("[game]\nhostname=\"Existing\"\n")
 	f.mu.Unlock()
-	docs, _, err := a.gameSettingsDocuments(context.Background(), server, egg, false, false)
+	docs, _, err := a.gameSettingsService().Documents(context.Background(), server, egg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +157,7 @@ func TestDiscoveryExistingParentGate(t *testing.T) {
 	f.mu.Lock()
 	delete(f.Files, "/ss14/server_config.toml")
 	f.mu.Unlock()
-	docs, _, err = a.gameSettingsDocuments(context.Background(), server, egg, false, false)
+	docs, _, err = a.gameSettingsService().Documents(context.Background(), server, egg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +166,7 @@ func TestDiscoveryExistingParentGate(t *testing.T) {
 			t.Fatal("nonexistent document exposed")
 		}
 	}
-	if quickFileEntry(M{"file": true, "symlink": true}) {
+	if gamesettings.QuickFileEntry(M{"file": true, "symlink": true}) {
 		t.Fatal("symlink accepted")
 	}
 }

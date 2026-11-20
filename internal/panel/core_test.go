@@ -43,7 +43,7 @@ func TestEncryptedSecrets(t *testing.T) {
 	}
 }
 func TestErrorResponseTypes(t *testing.T) {
-	for _, err := range []error{APIError{403, "ForbiddenException", "blocked"}, &APIError{403, "ForbiddenException", "blocked"}, pgx.ErrNoRows, errors.New("secret internal database error")} {
+	for _, err := range []error{APIError{Status: 403, Code: "ForbiddenException", Detail: "blocked"}, &APIError{Status: 403, Code: "ForbiddenException", Detail: "blocked"}, pgx.ErrNoRows, errors.New("secret internal database error")} {
 		w := httptest.NewRecorder()
 		fail(w, err)
 		if w.Code == 500 && strings.Contains(w.Body.String(), "secret internal") {

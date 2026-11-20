@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestLuantiNativeFolderLinks(t *testing.T) {
@@ -15,7 +16,7 @@ func TestLuantiNativeFolderLinks(t *testing.T) {
 	}
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[luantiSettingsPath] = []byte("server_name=Folder fixture\n")
+	fixture.Files[gamesettings.LuantiSettingsPath] = []byte("server_name=Folder fixture\n")
 	for _, file := range []string{"/.minetest/mods/example/init.lua", "/.minetest/games/minetest/game.conf", "/.minetest/worlds/world/world.mt"} {
 		fixture.Files[file] = []byte("fixture-private-folder-contents")
 	}
@@ -66,11 +67,11 @@ func TestBatch9LuantiActualSettingsAPI(t *testing.T) {
 	original := "# operator\r\nserver_name = Operator\r\ncreative_mode = yes\r\nenable_damage = 1\r\nenable_pvp = on\r\nmax_users = 12\r\nport = 30000\r\nbind_address = 0.0.0.0\r\ndefault_game = minetest\r\ndefault_password = fixture-private-admin\r\nfuture = literal#tail=retained\r\nmod_settings = {\r\n default_password = fixture-private-nested\r\n creative_mode = no\r\n}\r\n"
 	fixture.mu.Lock()
 	delete(fixture.Files, "/server.properties")
-	fixture.Files[luantiSettingsPath], fixture.State = []byte(original), "offline"
+	fixture.Files[gamesettings.LuantiSettingsPath], fixture.State = []byte(original), "offline"
 	fixture.mu.Unlock()
 	route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings"
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
-	if view["file"] != luantiSettingsPath || len(asSlice(view["documents"])) != 1 {
+	if view["file"] != gamesettings.LuantiSettingsPath || len(asSlice(view["documents"])) != 1 {
 		t.Fatal("Custom Luanti declaration or dispatch missing")
 	}
 	encoded, _ := json.Marshal(view)
@@ -104,7 +105,7 @@ func TestBatch9LuantiActualSettingsAPI(t *testing.T) {
 	want = strings.Replace(want, "enable_damage = 1", "enable_damage = 0", 1)
 	want = strings.Replace(want, "future = literal#tail=retained", `future = "literal#value=kept\path"`, 1)
 	fixture.mu.Lock()
-	after := string(fixture.Files[luantiSettingsPath])
+	after := string(fixture.Files[gamesettings.LuantiSettingsPath])
 	fixture.mu.Unlock()
 	if after != want {
 		t.Fatal("Native byte-span editor changed CRLF, literal quotes/hash, credentials or opaque body")
@@ -126,10 +127,10 @@ func TestBatch9LuantiMissingOpaqueAndDuplicateAPI(t *testing.T) {
 	if len(asSlice(missing["fields"])) != 0 || missing["file"] != "" {
 		t.Fatal("Missing native file invented settings defaults")
 	}
-	infraExpect(t, mux, admin, "GET", route+"?file="+luantiSettingsPath, nil, 404)
+	infraExpect(t, mux, admin, "GET", route+"?file="+gamesettings.LuantiSettingsPath, nil, 404)
 	data := "server_name=First\nserver_name=Second\nmod_settings={\n password=fixture-private-group\n}\nmessage=\"\"\"\nfixture-private-multiline\n\"\"\"\n"
 	fixture.mu.Lock()
-	fixture.Files[luantiSettingsPath] = []byte(data)
+	fixture.Files[gamesettings.LuantiSettingsPath] = []byte(data)
 	fixture.mu.Unlock()
 	view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 	encoded, _ := json.Marshal(view)
@@ -143,7 +144,7 @@ func TestBatch9LuantiMissingOpaqueAndDuplicateAPI(t *testing.T) {
 	}
 	infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"server_name": "Third"}}, 422)
 	fixture.mu.Lock()
-	unchanged := string(fixture.Files[luantiSettingsPath])
+	unchanged := string(fixture.Files[gamesettings.LuantiSettingsPath])
 	fixture.mu.Unlock()
 	if unchanged != data {
 		t.Fatal("Refused duplicate patch modified original bytes")

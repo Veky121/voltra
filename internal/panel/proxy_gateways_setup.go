@@ -42,7 +42,7 @@ func (a *App) proxyClientRoutes(w http.ResponseWriter, r *http.Request) {
 		fail(w, e)
 		return
 	}
-	rows, e := a.query(r.Context(), `SELECT r.id,g.public_host,r.public_port,r.local_port,r.protocol,r.status FROM proxy_routes r JOIN proxy_gateways g ON g.id=r.gateway_id WHERE r.server_id=$1 AND r.desired_present ORDER BY r.id`, num(s["id"]))
+	rows, e := a.query(r.Context(), `SELECT r.id,g.public_host,r.public_port,r.local_ip,r.local_port,r.protocol,r.status FROM proxy_routes r JOIN proxy_gateways g ON g.id=r.gateway_id WHERE r.server_id=$1 AND r.desired_present ORDER BY r.id`, num(s["id"]))
 	if e != nil {
 		fail(w, e)
 		return

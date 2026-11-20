@@ -98,6 +98,9 @@ func TestLiveEventsPostgres(t *testing.T) {
 	if err := a.exec(ctx, "INSERT INTO browser_sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '1 hour')", pairingHash(token), u["id"]); err != nil {
 		t.Fatal(err)
 	}
+	// Committed row changes reach sockets as hints, as in production.
+	a.startLiveChanges()
+	defer a.stopLiveChanges()
 	server := httptest.NewServer(a.Handler())
 	defer server.Close()
 	a.Config.PublicURL = server.URL
@@ -138,16 +141,17 @@ func TestLiveEventsPostgres(t *testing.T) {
 	if read()["type"] != "navigation.invalidated" {
 		t.Fatal("missing mutation event")
 	}
-	// Logout must invalidate the already-upgraded connection before delivery.
+	// Ending the session closes the already-upgraded connection: the deleted
+	// row arrives as an access hint and the socket re-checks its cached identity.
 	if err = a.exec(ctx, "DELETE FROM browser_sessions WHERE token_hash=$1", pairingHash(token)); err != nil {
 		t.Fatal(err)
 	}
-	a.liveEvents.navigationChanged(num(u["id"]))
 	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	var message M
 	if err = conn.ReadJSON(&message); err == nil {
-		t.Fatal("event delivered after session revocation")
+		t.Fatalf("event delivered after session revocation: %v", message)
 	}
+	a.liveEvents.navigationChanged(num(u["id"]))
 	_, res, err = websocket.DefaultDialer.Dial(wsURL, headers)
 	if err == nil {
 		t.Fatal("revoked session upgraded")
@@ -170,4 +174,89 @@ func TestLiveEventsPostgres(t *testing.T) {
 		t.Fatalf("origin status: %v", res)
 	}
 	res.Body.Close()
+}
+
+// Without any change signal (a session that expires on its own), a socket
+// still re-checks its identity before sending once liveAuthTTL has passed.
+func TestLiveEventIdentityCacheIsBoundedPostgres(t *testing.T) {
+	previous := liveAuthTTL
+	liveAuthTTL = 100 * time.Millisecond
+	defer func() { liveAuthTTL = previous }()
+	a, ctx := collabTestApp(t)
+	defer a.liveEvents.close()
+	u, _ := collabFixture(t, a, ctx, "http://127.0.0.1:1")
+	server := httptest.NewServer(a.Handler())
+	defer server.Close()
+	a.Config.PublicURL = server.URL
+	conn := liveTestConnect(t, a, server, num(u["id"]))
+	a.liveEvents.navigationChanged(num(u["id"]))
+	if liveRead(t, conn, func(m M) bool { return m["type"] == "navigation.invalidated" }) == nil {
+		t.Fatal("missing event")
+	}
+	// No listener runs here, so the expiry produces no hint.
+	if err := a.exec(ctx, "UPDATE browser_sessions SET expires_at=now()-interval '1 second' WHERE user_id=$1", u["id"]); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * liveAuthTTL)
+	a.liveEvents.navigationChanged(num(u["id"]))
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	var message M
+	if err := conn.ReadJSON(&message); err == nil {
+		t.Fatalf("event delivered after the session expired: %v", message)
+	}
+}
+
+// State changes and row hints name their server: only that server's viewers
+// hear of them, with the identifiers their client paths use.
+func TestLiveReadHintsScopedByServerPostgres(t *testing.T) {
+	a, ctx := collabTestApp(t)
+	defer a.liveSnapshots.close()
+	ownerA, serverA := collabFixture(t, a, ctx, "http://127.0.0.1:1")
+	ownerB, err := a.insert(ctx, "users", M{"uuid": newUUID(), "username": "other-owner", "email": "other-owner@example.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	uuid := newUUID()
+	serverB, err := a.insert(ctx, "servers", M{"uuid": uuid, "uuid_short": uuid[:8], "identifier": uuid[:8], "name": "other", "owner_id": ownerB["id"], "node_id": serverA["node_id"], "nest_id": serverA["nest_id"], "egg_id": serverA["egg_id"], "image": "alpine:latest", "installed_at": time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(a.Handler())
+	defer server.Close()
+	a.Config.PublicURL = server.URL
+	socketA := liveTestConnect(t, a, server, num(ownerA["id"]))
+	socketB := liveTestConnect(t, a, server, num(ownerB["id"]))
+	for _, c := range []*websocket.Conn{socketA, socketB} {
+		if err = c.WriteJSON(M{"type": "subscribe", "revision": 1, "paths": []string{}, "domains": []string{"backups", "servers"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(100 * time.Millisecond)
+	a.startLiveChanges()
+	defer a.stopLiveChanges()
+	// The listener's start-up "all" hint reaches both, without servers.
+	for _, c := range []*websocket.Conn{socketA, socketB} {
+		packet := liveRead(t, c, func(m M) bool { return m["type"] == "reads.invalidated" })
+		if _, scoped := packet["servers"]; scoped {
+			t.Fatalf("global hint scoped: %v", packet)
+		}
+	}
+	if _, err = a.insert(ctx, "backups", M{"uuid": newUUID(), "server_id": serverA["id"], "name": "Only A"}); err != nil {
+		t.Fatal(err)
+	}
+	a.publishServerReadChanges([]int64{num(serverA["id"])}, "servers")
+	packet := liveRead(t, socketA, func(m M) bool { return m["type"] == "reads.invalidated" })
+	servers := asSlice(packet["servers"])
+	names := map[string]bool{}
+	for _, value := range servers {
+		names[str(value)] = true
+	}
+	if !names[str(serverA["uuid"])] || !names[str(serverA["uuid_short"])] || names[str(serverB["uuid"])] {
+		t.Fatalf("scoped hint: %v", packet)
+	}
+	_ = socketB.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	var leaked M
+	if socketB.ReadJSON(&leaked) == nil {
+		t.Fatalf("another owner heard of server A: %v", leaked)
+	}
 }

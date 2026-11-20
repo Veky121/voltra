@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestSourceReviewedSettings(t *testing.T) {
@@ -25,9 +26,9 @@ func TestSourceReviewedSettings(t *testing.T) {
 				ports = 1
 			}
 			expectedProfile := "source-native-v1"
-			if recipe == hl2dmSettingsRecipe {
+			if recipe == gamesettings.Hl2dmSettingsRecipe {
 				expectedProfile = "hl2dm-gameplay-wave10-candidate"
-				if str(entry.Egg["startup"]) != hl2dmSettingsStartup {
+				if str(entry.Egg["startup"]) != gamesettings.Hl2dmSettingsStartup {
 					t.Fatal("HL2DM reviewed launcher missing")
 				}
 			}
@@ -55,7 +56,7 @@ func TestSourceReviewedSettings(t *testing.T) {
 			}
 			script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 			sources := []string{"source-runtime.py", "source-install.py", "steam-template.py", "native-console.py", "bundle-debian-python.py"}
-			if recipe == hl2dmSettingsRecipe {
+			if recipe == gamesettings.Hl2dmSettingsRecipe {
 				sources = append(sources, "hl2dm-runtime.py", "hl2dm-gameplay.py")
 			}
 			for _, source := range sources {

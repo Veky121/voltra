@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
-func rustStagingAuthorityFixture(t *testing.T) rustStagingAuthorityInput {
+func rustStagingAuthorityFixture(t *testing.T) gamesettings.RustStagingAuthorityInput {
 	t.Helper()
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path != rustStagingSettingsRecipe {
+		if entry.Path != gamesettings.RustStagingSettingsRecipe {
 			continue
 		}
-		in := rustStagingAuthorityInput{Recipe: entry.Path, Startup: str(entry.Egg["startup"]), EggStartup: str(entry.Egg["startup"]), Path: "/server/rust/cfg/server.cfg", ConfigFiles: json.RawMessage(`{}`), Env: map[string]string{}, Files: map[string][]byte{}}
+		in := gamesettings.RustStagingAuthorityInput{Recipe: entry.Path, Startup: str(entry.Egg["startup"]), EggStartup: str(entry.Egg["startup"]), Path: "/server/rust/cfg/server.cfg", ConfigFiles: json.RawMessage(`{}`), Env: map[string]string{}, Files: map[string][]byte{}}
 		script := str(asMap(asMap(entry.Egg["scripts"])["installation"])["script"])
 		for _, chunk := range strings.Split(script, "cat > ")[1:] {
 			head, body, ok := strings.Cut(chunk, "\n")
@@ -33,7 +34,7 @@ func rustStagingAuthorityFixture(t *testing.T) rustStagingAuthorityInput {
 		return in
 	}
 	t.Fatal("missing canonical recipe")
-	return rustStagingAuthorityInput{}
+	return gamesettings.RustStagingAuthorityInput{}
 }
 
 func TestRustStagingAuthorityCanonicalPatch(t *testing.T) {
@@ -44,15 +45,15 @@ func TestRustStagingAuthorityCanonicalPatch(t *testing.T) {
 		delete(in.Files, in.Path)
 		in.Path = "/server/" + id + "/cfg/server.cfg"
 		in.Files[in.Path] = old
-		got, err := resolveRustStagingAuthority(in)
+		got, err := gamesettings.ResolveRustStagingAuthority(in)
 		if err != nil || got.Path != in.Path || got.Revision == "" {
 			t.Fatalf("authority: %+v %v", got, err)
 		}
-		p, err := parseRustStagingSettings(in.Files[got.Path])
+		p, err := gamesettings.ParseRustStagingSettings(in.Files[got.Path])
 		if err != nil {
 			t.Fatal(err)
 		}
-		next, err := p.patch(map[string]string{"server.tags": "monthly,NA"})
+		next, err := p.Patch(map[string]string{"server.tags": "monthly,NA"})
 		if err != nil || string(next) != strings.Replace(string(old), "weekly,EU", "monthly,NA", 1) {
 			t.Fatalf("patch: %q %v", next, err)
 		}
@@ -60,33 +61,33 @@ func TestRustStagingAuthorityCanonicalPatch(t *testing.T) {
 }
 
 func TestRustStagingAuthorityRefusals(t *testing.T) {
-	cases := map[string]func(*rustStagingAuthorityInput){
-		"recipe":         func(i *rustStagingAuthorityInput) { i.Recipe = "rust/rust/egg-rust.json" },
-		"startup":        func(i *rustStagingAuthorityInput) { i.Startup += " +server.tags monthly" },
-		"egg startup":    func(i *rustStagingAuthorityInput) { i.EggStartup = "./RustDedicated" },
-		"mapping":        func(i *rustStagingAuthorityInput) { i.ConfigFiles = json.RawMessage(`{"server.cfg":{}}`) },
-		"null mappings":  func(i *rustStagingAuthorityInput) { i.ConfigFiles = json.RawMessage(`null`) },
-		"missing config": func(i *rustStagingAuthorityInput) { delete(i.Files, i.Path) },
-		"inactive path":  func(i *rustStagingAuthorityInput) { i.Path = "/server/other/cfg/server.cfg" },
+	cases := map[string]func(*gamesettings.RustStagingAuthorityInput){
+		"recipe":         func(i *gamesettings.RustStagingAuthorityInput) { i.Recipe = "rust/rust/egg-rust.json" },
+		"startup":        func(i *gamesettings.RustStagingAuthorityInput) { i.Startup += " +server.tags monthly" },
+		"egg startup":    func(i *gamesettings.RustStagingAuthorityInput) { i.EggStartup = "./RustDedicated" },
+		"mapping":        func(i *gamesettings.RustStagingAuthorityInput) { i.ConfigFiles = json.RawMessage(`{"server.cfg":{}}`) },
+		"null mappings":  func(i *gamesettings.RustStagingAuthorityInput) { i.ConfigFiles = json.RawMessage(`null`) },
+		"missing config": func(i *gamesettings.RustStagingAuthorityInput) { delete(i.Files, i.Path) },
+		"inactive path":  func(i *gamesettings.RustStagingAuthorityInput) { i.Path = "/server/other/cfg/server.cfg" },
 	}
 	for _, key := range []string{"ADDITIONAL_ARGS", "PYTHONPATH", "LD_PRELOAD", "FRAMEWORK"} {
 		k := key
-		cases[k] = func(i *rustStagingAuthorityInput) { i.Env[k] = "override" }
+		cases[k] = func(i *gamesettings.RustStagingAuthorityInput) { i.Env[k] = "override" }
 	}
 	for _, value := range []string{"", "../escape", "/rust", "a/b", "a\\b", strings.Repeat("a", 65), "rust\n"} {
 		v := value
-		cases["identity:"+v] = func(i *rustStagingAuthorityInput) { i.Env["SERVER_ID"] = v }
+		cases["identity:"+v] = func(i *gamesettings.RustStagingAuthorityInput) { i.Env["SERVER_ID"] = v }
 	}
-	for name := range rustStagingAuthorityHelpers {
+	for name := range gamesettings.RustStagingAuthorityHelpers {
 		n := name
-		cases["altered:"+n] = func(i *rustStagingAuthorityInput) { i.Files[n] = append(i.Files[n], '\n') }
-		cases["missing:"+n] = func(i *rustStagingAuthorityInput) { delete(i.Files, n) }
+		cases["altered:"+n] = func(i *gamesettings.RustStagingAuthorityInput) { i.Files[n] = append(i.Files[n], '\n') }
+		cases["missing:"+n] = func(i *gamesettings.RustStagingAuthorityInput) { delete(i.Files, n) }
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
 			in := rustStagingAuthorityFixture(t)
 			mutate(&in)
-			got, err := resolveRustStagingAuthority(in)
+			got, err := gamesettings.ResolveRustStagingAuthority(in)
 			if err == nil || got.Path != "" {
 				t.Fatal("ambiguous authority accepted")
 			}

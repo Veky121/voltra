@@ -4,11 +4,12 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func hl2dmFixtureHelpers(t *testing.T, fixture *steamGamesWings) {
 	t.Helper()
-	for name, body := range wave46CanonicalHelpers(t, hl2dmSettingsRecipe) {
+	for name, body := range wave46CanonicalHelpers(t, gamesettings.Hl2dmSettingsRecipe) {
 		fixture.Files["/"+strings.TrimPrefix(name, "/")] = body
 	}
 }
@@ -31,7 +32,7 @@ func TestHL2DMInstalledHelperAuthority(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			ctx := context.Background()
-			egg := batchSettingsRecipeFixture(t, hl2dmSettingsRecipe)
+			egg := batchSettingsRecipeFixture(t, gamesettings.Hl2dmSettingsRecipe)
 			egg["java_config"] = M{}
 			if _, err := a.update(ctx, "eggs", num(server["egg_id"]), egg); err != nil {
 				t.Fatal(err)
@@ -43,10 +44,10 @@ func TestHL2DMInstalledHelperAuthority(t *testing.T) {
 			fixture.mu.Lock()
 			delete(fixture.Files, "/server.properties")
 			hl2dmFixtureHelpers(t, fixture)
-			fixture.Files[hl2dmSettingsPath] = []byte("mp_teamplay 0\n")
+			fixture.Files[gamesettings.Hl2dmSettingsPath] = []byte("mp_teamplay 0\n")
 			fixture.State = "offline"
 			fixture.mu.Unlock()
-			route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + hl2dmSettingsPath
+			route := "/api/client/servers/" + str(server["uuid_short"]) + "/game-settings?file=" + gamesettings.Hl2dmSettingsPath
 			view := asMap(infraExpect(t, mux, admin, "GET", route, nil, 200)["attributes"])
 			fixture.mu.Lock()
 			if mode == "missing" {
@@ -60,7 +61,7 @@ func TestHL2DMInstalledHelperAuthority(t *testing.T) {
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{"mp_teamplay": true}}, 404)
 			fixture.mu.Lock()
 			defer fixture.mu.Unlock()
-			if fixture.Writes != writes || string(fixture.Files[hl2dmSettingsPath]) != "mp_teamplay 0\n" {
+			if fixture.Writes != writes || string(fixture.Files[gamesettings.Hl2dmSettingsPath]) != "mp_teamplay 0\n" {
 				t.Fatal("unsupported helper changed gameplay config")
 			}
 		})

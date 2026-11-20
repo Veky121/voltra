@@ -1183,9 +1183,9 @@ func collabMySQLError(err error) error {
 	}
 	var me *mysql.MySQLError
 	if errors.As(err, &me) {
-		return APIError{502, "DatabaseHostException", fmt.Sprintf("Database host rejected the operation, MySQL error %d.", me.Number)}
+		return APIError{Status: 502, Code: "DatabaseHostException", Detail: fmt.Sprintf("Database host rejected the operation, MySQL error %d.", me.Number)}
 	}
-	return APIError{502, "DatabaseHostException", "Unable to connect to or execute the operation on the game database host."}
+	return APIError{Status: 502, Code: "DatabaseHostException", Detail: "Unable to connect to or execute the operation on the game database host."}
 }
 func (a *App) collabMySQL(ctx context.Context, host M) (*sql.DB, error) {
 	password, err := a.unseal(str(host["password"]))
@@ -1250,7 +1250,7 @@ func collabMySQLCleanupPrivileges(ctx context.Context, db *sql.DB) error {
 		return collabMySQLError(err)
 	}
 	if !drop || !createUser {
-		return APIError{422, "DatabaseHostPermissionException", "The database host account requires global DROP and CREATE USER privileges so failed provisioning can be cleaned up safely."}
+		return APIError{Status: 422, Code: "DatabaseHostPermissionException", Detail: "The database host account requires global DROP and CREATE USER privileges so failed provisioning can be cleaned up safely."}
 	}
 	return nil
 }
@@ -1518,7 +1518,7 @@ func (a *App) collabCreateDatabase(ctx context.Context, server, data M, applicat
 			if cleanupErr != nil {
 				a.audit(cleanup, 0, num(server["id"]), "server:database.cleanup_failed", M{"database": name, "username": username, "host_id": host["id"]})
 				result = nil
-				resultErr = APIError{502, "DatabaseCleanupException", "Database provisioning failed and the database host could not clean up the partial resources. Check the database host and server activity log."}
+				resultErr = APIError{Status: 502, Code: "DatabaseCleanupException", Detail: "Database provisioning failed and the database host could not clean up the partial resources. Check the database host and server activity log."}
 			}
 		}
 	}()
@@ -1732,18 +1732,9 @@ func (a *App) collabActivity(w http.ResponseWriter, r *http.Request) {
 	if server != nil && !boolean(user["root_admin"]) {
 		where += " AND NOT EXISTS (SELECT 1 FROM settings WHERE key='activity:hide_admin_activity' AND value='true'::jsonb AND EXISTS (SELECT 1 FROM users au WHERE au.id=activity_logs.actor_id AND au.root_admin AND NOT EXISTS(SELECT 1 FROM subusers su WHERE su.server_id=$1 AND su.user_id=au.id) AND au.id<>(SELECT owner_id FROM servers WHERE id=$1)))"
 	}
-	page := collabID(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	per := collabID(r.URL.Query().Get("per_page"))
-	if per < 1 {
-		per = 25
-	}
-	if per > 100 {
-		per = 100
-	}
-	var total int64
+	paging := parseListPage(r.URL.Query(), 25, 100)
+	per, page := paging.PerPage, paging.Page
+	var total int
 	if err = a.DB.QueryRow(ctx, "SELECT count(*) FROM activity_logs WHERE "+where, args...).Scan(&total); err != nil {
 		fail(w, err)
 		return
@@ -1776,10 +1767,6 @@ func (a *App) collabActivity(w http.ResponseWriter, r *http.Request) {
 		logs[i] = out
 	}
 	out := collection("activity_log", logs)
-	pages := (total + per - 1) / per
-	if pages < 1 {
-		pages = 1
-	}
-	out["meta"] = M{"pagination": M{"total": total, "count": len(logs), "per_page": per, "current_page": page, "total_pages": pages, "links": M{}}}
+	out["meta"] = paging.Meta(total, len(logs))
 	writeJSON(w, 200, out)
 }

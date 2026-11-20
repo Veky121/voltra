@@ -1,6 +1,9 @@
 package panel
 
-import "testing"
+import (
+	"testing"
+	"voltra/internal/gamesettings"
+)
 
 func TestGameSettingsRecipeListeners(t *testing.T) {
 	for _, tc := range []struct {
@@ -22,18 +25,18 @@ func TestGameSettingsRecipeListeners(t *testing.T) {
 				t.Fatal("missing recipe")
 			}
 			for _, key := range tc.keys {
-				if !gameSettingManaged(egg, tc.file, key) {
+				if !gamesettings.SettingManaged(egg, tc.file, key) {
 					t.Fatalf("editable listener %s", key)
 				}
-				fields := []gameSetting{{key: key, kind: "text"}}
-				if _, err := gameSettingsChanges(fields, M{key: "other"}, egg, tc.file); err == nil {
+				fields := []gamesettings.Setting{{Key: key, Kind: "text"}}
+				if _, err := gamesettings.Changes(fields, M{key: "other"}, egg, tc.file); err == nil {
 					t.Fatal("listener patch accepted")
 				}
-				if gameSettingsRecipeManaged(egg, "/other.json", key) || gameSettingsRecipeManaged(M{"name": "Impostor"}, tc.file, key) {
+				if gamesettings.RecipeManaged(egg, "/other.json", key) || gamesettings.RecipeManaged(M{"name": "Impostor"}, tc.file, key) {
 					t.Fatal("guard escaped its recipe/document")
 				}
 			}
-			if gameSettingManaged(egg, "/config.json", "/gameplay/port") {
+			if gamesettings.SettingManaged(egg, "/config.json", "/gameplay/port") {
 				t.Fatal("unrelated gameplay key blocked")
 			}
 		})

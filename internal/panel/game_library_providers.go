@@ -34,7 +34,7 @@ func (a *App) minecraftProviderBytes(ctx context.Context, address, key string, l
 	defer res.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
 	if err != nil || int64(len(data)) > limit {
-		return nil, APIError{502, "MinecraftProviderInvalid", "The provider response exceeded the supported size or could not be read."}
+		return nil, APIError{Status: 502, Code: "MinecraftProviderInvalid", Detail: "The provider response exceeded the supported size or could not be read."}
 	}
 	return data, nil
 }
@@ -69,26 +69,26 @@ func (a *App) minecraftProviderResponse(ctx context.Context, address, key string
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, APIError{502, "MinecraftProviderUnavailable", "The Minecraft provider could not be reached. Try again shortly."}
+		return nil, APIError{Status: 502, Code: "MinecraftProviderUnavailable", Detail: "The Minecraft provider could not be reached. Try again shortly."}
 	}
 	if res.StatusCode == 200 {
 		return res, nil
 	}
 	res.Body.Close()
 	if res.StatusCode == 404 {
-		return nil, APIError{422, "MinecraftSelectionUnavailable", "This version is not available from the selected provider. Choose another version."}
+		return nil, APIError{Status: 422, Code: "MinecraftSelectionUnavailable", Detail: "This version is not available from the selected provider. Choose another version."}
 	}
 	if res.StatusCode == 401 || res.StatusCode == 403 {
-		return nil, APIError{422, "ProviderAccessDenied", "The provider denied access. Check the global integration key and the project's download permissions."}
+		return nil, APIError{Status: 422, Code: "ProviderAccessDenied", Detail: "The provider denied access. Check the global integration key and the project's download permissions."}
 	}
-	return nil, APIError{502, "MinecraftProviderUnavailable", "The Minecraft provider returned an error. Try again shortly."}
+	return nil, APIError{Status: 502, Code: "MinecraftProviderUnavailable", Detail: "The Minecraft provider returned an error. Try again shortly."}
 }
 
 func (a *App) minecraftProviderJSON(ctx context.Context, address, key string, target any) error {
 	data, err := a.providerMetadataJSON(ctx, address, key, "minecraft", func(ctx context.Context) ([]byte, error) {
 		data, err := a.minecraftProviderBytes(ctx, address, key, 16<<20, minecraftAPIHosts)
 		if err == nil && !json.Valid(data) {
-			return nil, APIError{502, "MinecraftProviderInvalid", "The Minecraft provider returned invalid metadata."}
+			return nil, APIError{Status: 502, Code: "MinecraftProviderInvalid", Detail: "The Minecraft provider returned invalid metadata."}
 		}
 		return data, err
 	})
@@ -96,7 +96,7 @@ func (a *App) minecraftProviderJSON(ctx context.Context, address, key string, ta
 		return err
 	}
 	if json.Unmarshal(data, target) != nil {
-		return APIError{502, "MinecraftProviderInvalid", "The Minecraft provider returned invalid metadata."}
+		return APIError{Status: 502, Code: "MinecraftProviderInvalid", Detail: "The Minecraft provider returned invalid metadata."}
 	}
 	return nil
 }
@@ -120,7 +120,7 @@ func (a *App) minecraftCurseKey(ctx context.Context) (string, error) {
 		}
 	}
 	if key == "" {
-		return "", APIError{422, "CurseForgeMissingKey", "Add an enabled global CurseForge API key in Integrations to browse or install CurseForge packs."}
+		return "", APIError{Status: 422, Code: "CurseForgeMissingKey", Detail: "Add an enabled global CurseForge API key in Integrations to browse or install CurseForge packs."}
 	}
 	return key, nil
 }
@@ -155,7 +155,7 @@ func minecraftVerify(data []byte, file minecraftDownload) error {
 		actual = hex.EncodeToString(h[:])
 	}
 	if !strings.EqualFold(actual, file.Hash) {
-		return APIError{502, "MinecraftChecksumMismatch", "The provider download did not match its checksum. Try again later."}
+		return APIError{Status: 502, Code: "MinecraftChecksumMismatch", Detail: "The provider download did not match its checksum. Try again later."}
 	}
 	return nil
 }

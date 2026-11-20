@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func TestSoldatIntegratedActualStartupAPI(t *testing.T) {
-	for _, recipe := range []string{soldatClassicRecipe, soldat2Recipe} {
+	for _, recipe := range []string{gamesettings.SoldatClassicRecipe, gamesettings.Soldat2Recipe} {
 		t.Run(recipe, func(t *testing.T) {
 			a, mux, admin, server, fixture := quickSetupMinecraftFixture(t)
 			egg := batchSettingsRecipeFixture(t, recipe)
@@ -19,7 +20,7 @@ func TestSoldatIntegratedActualStartupAPI(t *testing.T) {
 				t.Fatal(e)
 			}
 			file, key, body := "/soldat.ini", "NETWORK/Lobby_Register", "[NETWORK]\nLobby_Register=0\nPort=29120\nServer_Name=Before\nAdmin_Password=fixture-secret\n"
-			if recipe == soldat2Recipe {
+			if recipe == gamesettings.Soldat2Recipe {
 				file, key, body = "/autoconfig.ini", "GameServerConfig/AllowSpectators", "[GameServerConfig]\nAllowSpectators=False\nName=Before\nServerPassword=fixture-secret\n"
 			}
 			fixture.mu.Lock()
@@ -34,7 +35,7 @@ func TestSoldatIntegratedActualStartupAPI(t *testing.T) {
 				t.Fatal("secret exposed")
 			}
 			managed := "NETWORK/Port"
-			if recipe == soldat2Recipe {
+			if recipe == gamesettings.Soldat2Recipe {
 				managed = "GameServerConfig/Name"
 			}
 			infraExpect(t, mux, admin, "PUT", route, M{"revision": view["revision"], "settings": M{managed: "changed"}}, 422)

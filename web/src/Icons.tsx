@@ -49,61 +49,78 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-const icons={
-  star:Star,
-  logout:LogOut,
-  dashboard:LayoutDashboard,
-  console:Terminal,
-  schedules:CalendarClock,
-  network:Network,
-  startup:Rocket,
-  settings:Settings2,
-  files:FolderOpen,
-  databases:Database,
-  backups:HardDriveDownload,
-  users:Users,
-  activity:Activity,
-  cpu:Cpu,
-  memory:MemoryStick,
-  disk:HardDrive,
-  server:Server,
-  nodes:Workflow,
-  locations:MapPin,
-  eggs:Egg,
-  mounts:FolderSymlink,
-  key:KeyRound,
-  back:ArrowLeft,
-  download:Download,
-  upload:Upload,
-  play:Play,
-  plus:Plus,
-  restart:RotateCcw,
-  stop:Square,
-  more:Ellipsis,
-  search:Search,
-  file:FileText,
-  newFile:FilePlus,
-  folderPlus:FolderPlus,
-  archive:Archive,
-  copy:Copy,
-  edit:Pencil,
-  trash:Trash2,
-  lock:Lock,
-  close:X,
-  chevron:ChevronRight,
-  info:Info,
-  wrench:Wrench,
-  pause:Pause,
-  clock:Clock,
-  send:Send,
-} satisfies Record<string,LucideIcon>;
-export type IconName=keyof typeof icons;
+const icons = {
+  star: Star,
+  logout: LogOut,
+  dashboard: LayoutDashboard,
+  console: Terminal,
+  schedules: CalendarClock,
+  network: Network,
+  startup: Rocket,
+  settings: Settings2,
+  files: FolderOpen,
+  databases: Database,
+  backups: HardDriveDownload,
+  users: Users,
+  activity: Activity,
+  cpu: Cpu,
+  memory: MemoryStick,
+  disk: HardDrive,
+  server: Server,
+  nodes: Workflow,
+  locations: MapPin,
+  eggs: Egg,
+  mounts: FolderSymlink,
+  key: KeyRound,
+  back: ArrowLeft,
+  download: Download,
+  upload: Upload,
+  play: Play,
+  plus: Plus,
+  restart: RotateCcw,
+  stop: Square,
+  more: Ellipsis,
+  search: Search,
+  file: FileText,
+  newFile: FilePlus,
+  folderPlus: FolderPlus,
+  archive: Archive,
+  copy: Copy,
+  edit: Pencil,
+  trash: Trash2,
+  lock: Lock,
+  close: X,
+  chevron: ChevronRight,
+  info: Info,
+  wrench: Wrench,
+  pause: Pause,
+  clock: Clock,
+  send: Send,
+} satisfies Record<string, LucideIcon>;
+export type IconName = keyof typeof icons;
 
-export function Icon({name,...props}:SVGProps<SVGSVGElement>&{name:IconName}){
-  const Component=icons[name];
-  return <Component width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}/>;
+export function Icon({name, ...props}: SVGProps<SVGSVGElement> & {name: IconName}) {
+  const Component = icons[name];
+  return (
+    <Component
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    />
+  );
 }
 
-export function NavIcon({name}:{name:IconName}){
-  return <span className="nav-icon" data-icon={name}><Icon name={name}/></span>;
+export function NavIcon({name}: {name: IconName}) {
+  return (
+    <span className="nav-icon" data-icon={name}>
+      <Icon name={name} />
+    </span>
+  );
 }

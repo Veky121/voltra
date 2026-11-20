@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"voltra/internal/gamesettings"
 )
 
 func foundryStartupFixture(t *testing.T) (*operationsFixture, M) {
 	t.Helper()
 	f := operationsFixtureNew(t)
 	for _, entry := range gameTemplates().Entries {
-		if entry.Path != foundryVTTRecipe {
+		if entry.Path != gamesettings.FoundryVTTRecipe {
 			continue
 		}
 		egg, variables, err := parseEggDocument(entry.Egg)
