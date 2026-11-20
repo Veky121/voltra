@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {ActionButton as MiraAction} from '../../../ui/ActionButton';
 import {useEffect, useRef, useState} from 'react';
 import {useAPI as useCoreAPI} from '../../../lib';
@@ -72,11 +73,15 @@ export function Servers() {
               onChange={e => setSearch(e.target.value)}
             />
             <span className="muted admin-record-count" role="status">
-              {loading
-                ? 'Loading...'
-                : range.total
-                  ? `${range.from}–${range.to} of ${range.total} ${range.total === 1 ? 'server' : 'servers'}`
-                  : '0 servers'}
+              {loading ? (
+                <>
+                  <TerminalSpinner /> Loading...
+                </>
+              ) : range.total ? (
+                `${range.from}–${range.to} of ${range.total} ${range.total === 1 ? 'server' : 'servers'}`
+              ) : (
+                '0 servers'
+              )}
             </span>
           </div>
           <div className="admin-table-scroll">
@@ -122,6 +127,7 @@ export function Servers() {
                                   : 'outline'
                             }
                           >
+                            {state.tone === 'busy' && <TerminalSpinner />}
                             {state.label}
                           </Badge>
                         </MiraTableCell>

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -56,6 +57,7 @@ type templateAgreement struct {
 	EffectiveDate string `json:"effective_date"`
 	ReviewedDate  string `json:"reviewed_date,omitempty"`
 	AcceptValue   string `json:"accept_value"`
+	SourceURL     string `json:"source_url,omitempty"`
 }
 
 // Agreements bind explicit consent to the exact reviewed publisher text, never a
@@ -228,6 +230,10 @@ func gameTemplateOverrideDigest(override gameTemplateOverride) string {
 	override.Verification = ""
 	override.Detail = ""
 	override.SetupSteps = nil
+	override.Agreements = slices.Clone(override.Agreements)
+	for i := range override.Agreements {
+		override.Agreements[i].SourceURL = ""
+	}
 	body, _ := json.Marshal(override)
 	digest := sha256.Sum256(body)
 	return hex.EncodeToString(digest[:])
@@ -490,6 +496,7 @@ func (a *App) gameTemplateOptions(w http.ResponseWriter, r *http.Request) {
 	if len(entry.Defaults) > 0 {
 		out["defaults"] = entry.Defaults
 	}
+	addTemplateRecommendations(out, entry, variables, gameRecommendations.Templates[entry.Path])
 	writeJSON(w, 200, item("game_template_options", out))
 }
 

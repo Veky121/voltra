@@ -15,14 +15,20 @@ export type UpdateStatus = {
   available_version?: string;
   error?: string;
 };
+type UpdateProgress = {
+  stage: 'downloading' | 'preparing';
+  written: number;
+  total: number;
+};
 type Snapshot = {
+  progress: UpdateProgress | null;
   status: UpdateStatus | null;
   busy: boolean;
   operation: string | null;
   error: string;
   checkedAt: number | null;
 };
-let snapshot: Snapshot = {status: null, busy: false, operation: null, error: '', checkedAt: null};
+let snapshot: Snapshot = {status: null, progress: null, busy: false, operation: null, error: '', checkedAt: null};
 const listeners = new Set<() => void>();
 const publish = (value: Partial<Snapshot>) => {
   snapshot = {...snapshot, ...value};
@@ -49,7 +55,9 @@ export async function updateAction(path: string, body: unknown = {}, automatic =
       (snapshot.checkedAt !== null && Date.now() - snapshot.checkedAt < 60 * 60 * 1000))
   )
     return false;
-  publish({busy: true, operation: path, error: ''});
+  publish({busy: true, operation: path, error: '', progress: null});
+  const tracker = path === 'update-install' ? trackUpdateDownload() : undefined;
+  let succeeded = false;
   try {
     const response = await fetch(`/desktop/${path}`, {
       method: path === 'update-status' ? 'GET' : 'POST',
@@ -67,14 +75,43 @@ export async function updateAction(path: string, body: unknown = {}, automatic =
       ...(path === 'updates' ? {checkedAt: Date.now()} : {}),
       ...(path === 'update-channel' ? {checkedAt: null} : {}),
     });
+    succeeded = true;
     return true;
   } catch (error) {
     publish({error: (error as Error).message, ...(path === 'updates' ? {checkedAt: Date.now()} : {})});
     return false;
   } finally {
-    publish({busy: false, operation: null});
+    tracker?.();
+    // A failed download keeps its last sample on screen; the next attempt clears it.
+    publish({busy: false, operation: null, ...(succeeded ? {progress: null} : {})});
   }
 }
+function trackUpdateDownload() {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout>;
+  const poll = async () => {
+    try {
+      const response = await fetch('/desktop/update-progress', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        const progress: UpdateProgress | null = await response.json();
+        if (progress && !controller.signal.aborted) publish({progress});
+      }
+    } catch {
+      // The install response owns errors. A missing progress sample is indeterminate.
+    } finally {
+      if (!controller.signal.aborted) timer = setTimeout(poll, 500);
+    }
+  };
+  timer = setTimeout(poll, 500);
+  return () => {
+    clearTimeout(timer);
+    controller.abort();
+  };
+}
+
 export function startUpdateChecks() {
   let active = true;
   const initial = window.setTimeout(() => {

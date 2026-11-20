@@ -4,7 +4,7 @@ import {
   templateSetupProblems,
   templateSetupDependencyVariables,
 } from '../src/features/game-library/templateSetupValidation.ts';
-import {templateVariableProblem} from '../src/features/game-library/gameTemplateModel.ts';
+import {templateDeclinedValue, templateVariableProblem} from '../src/features/game-library/gameTemplateModel.ts';
 
 const password = {
   name: 'Web portal password',
@@ -104,11 +104,61 @@ test('resource, host, runtime, and port blockers are explained', () => {
 });
 test('Steam and publisher agreement gates remain enforced', () => {
   assert.ok(templateSetupProblems(ready({steamError: true})).some(p => /Steam/.test(p.message)));
-  assert.ok(templateSetupProblems(ready({privateContent: true})).some(p => /trusted worker/.test(p.message)));
+  // A recipe without private support points at the Steam choice, not at a host.
+  assert.ok(
+    templateSetupProblems(ready({privateContent: true})).some(
+      p => p.field === 'game-template-steam' && /Anonymous Steam installation/.test(p.message)
+    )
+  );
+  // A supported recipe needs a host with a trusted worker.
+  assert.ok(
+    templateSetupProblems(ready({privateContent: true, privateSupported: true})).some(
+      p => p.field === 'game-server-node' && /trusted private Steam worker/.test(p.message)
+    )
+  );
   assert.ok(
     templateSetupProblems(
       ready({agreements: [{environment: 'EULA', title: 'Terms', accept_value: 'a'.repeat(64)}]})
-    ).some(p => /publisher terms/.test(p.message))
+    ).some(p => p.field === 'game-template-EULA' && p.message === 'Accept the Terms.')
+  );
+});
+
+test('required acceptances focus their toggles and optional consents stay optional', () => {
+  const licence = {
+    environment: 'ACCEPT_WINDOWS_RUNTIME_LICENSES',
+    title: 'Windows runtime licences',
+    accept_value: 'true',
+  };
+  const scp = {environment: 'SCPSL_ACCEPT_EULA', title: 'SCP:SL EULA', accept_value: '1'};
+  const hytale = {environment: 'HYTALE_ACCEPT_EARLY_PLUGINS', title: 'Hytale early plugins', accept_value: '1'};
+  const optional = {environment: 'OPTIONAL_TERMS', title: 'Optional terms', accept_value: '1'};
+  const input = ready({
+    acceptances: [licence, scp, hytale, optional],
+    variables: [
+      password,
+      {name: optional.title, env_variable: optional.environment, rules: 'nullable|boolean', default_value: '0'},
+    ],
+  });
+  assert.deepEqual(templateSetupProblems(input), [
+    {field: 'game-template-ACCEPT_WINDOWS_RUNTIME_LICENSES', message: 'Accept the Windows runtime licences.'},
+  ]);
+  input.environment[licence.environment] = 'true';
+  assert.deepEqual(templateSetupProblems(input), []);
+  assert.equal(
+    templateDeclinedValue(licence, [
+      {env_variable: licence.environment, rules: 'required|in:true,false', default_value: 'true'},
+    ]),
+    'false'
+  );
+  assert.equal(
+    templateDeclinedValue(scp, [{env_variable: scp.environment, rules: 'required|boolean', default_value: '0'}]),
+    '0'
+  );
+  assert.equal(
+    templateDeclinedValue(scp, [
+      {env_variable: scp.environment, rules: 'required|in:0,1,true,false', default_value: 'true'},
+    ]),
+    '0'
   );
 });
 test('optional blanks stay optional; conditional and excluded values are checked safely', () => {

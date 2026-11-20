@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {SectionTabs} from '../../ui/SectionTabs';
@@ -268,7 +269,7 @@ function MinecraftContentView({server}: {server: string}) {
                 )}
                 {catalog.loading ? (
                   <p className="mc-content-empty" role="status">
-                    Searching...
+                    <TerminalSpinner /> Searching...
                   </p>
                 ) : (
                   isCurrent &&
@@ -360,6 +361,7 @@ function MinecraftContentView({server}: {server: string}) {
               Cancel
             </Button>
             <Button variant="danger" disabled={busy} onClick={remove}>
+              {busy && <TerminalSpinner />}
               {busy ? 'Removing...' : 'Remove file'}
             </Button>
           </div>
@@ -433,7 +435,11 @@ function ContentVersions({
       }}
     >
       <ErrorBox>{result.error || error}</ErrorBox>
-      {result.loading && <p role="status">Loading compatible versions...</p>}
+      {result.loading && (
+        <p role="status">
+          <TerminalSpinner /> Loading compatible versions...
+        </p>
+      )}
       {data && (
         <>
           {data.versions.length === 0 ? (
@@ -504,6 +510,7 @@ function ContentVersions({
                   }
                   onClick={install}
                 >
+                  {busy && <TerminalSpinner />}
                   {busy ? 'Installing and checking dependencies...' : 'Install'}
                 </Button>
               </div>

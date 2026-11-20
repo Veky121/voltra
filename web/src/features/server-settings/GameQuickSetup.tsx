@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {ActionButton as MiraAction} from '../../ui/ActionButton';
 import {PendingSettings, usePendingSetting} from '../shared/PendingSettings';
@@ -312,7 +313,7 @@ function GameFolders({
           )}
           {folderRequest.loading && (
             <p className="muted" role="status">
-              Finding game folders...
+              <TerminalSpinner /> Finding game folders...
             </p>
           )}
           {folderRequest.error && (

@@ -263,7 +263,7 @@ func (h *desktopHost) desktop(w http.ResponseWriter, r *http.Request) {
 		}
 		go h.revoke(s)
 		desktopJSON(w, 200, map[string]bool{"unlinked": true})
-	case "GET /desktop/update-status", "POST /desktop/updates", "POST /desktop/update-channel", "POST /desktop/update-install", "POST /desktop/update-restart":
+	case "GET /desktop/update-status", "GET /desktop/update-progress", "POST /desktop/updates", "POST /desktop/update-channel", "POST /desktop/update-install", "POST /desktop/update-restart":
 		h.serveUpdates(w, r)
 	default:
 		http.NotFound(w, r)

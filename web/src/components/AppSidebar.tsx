@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../ui/TerminalProgress';
 import {DesktopUpdateControl} from '../features/desktop/DesktopUpdateControl';
 import {SidebarWidthHandle} from './SidebarWidthHandle';
 import {Feedback} from '../notifications';
@@ -203,6 +204,7 @@ function AccountMenu({account}: {account: Account}) {
                 }}
               >
                 <Icon name="logout" />
+                {busy && <TerminalSpinner />}
                 {busy ? 'Logging out…' : 'Logout'}
               </DropdownMenuItem>
             </DropdownMenuContent>

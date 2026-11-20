@@ -4,6 +4,11 @@ import {forwardRef, useEffect, useImperativeHandle, useRef, useState} from 'reac
 import Uppy from '@uppy/core';
 import Tus from '@uppy/tus';
 import Dashboard from '@uppy/react/dashboard';
+import {useUppyState} from '@uppy/react';
+import {Collapsible, CollapsibleContent, CollapsibleTrigger} from '../../components/ui/collapsible';
+import {Button} from '../../components/ui/button';
+import {TerminalProgress} from '../../ui/TerminalProgress';
+import {bytesProgressValue, formatBytesProgress} from '../../ui/terminalProgressModel';
 import {api} from '../../lib';
 import type {Resource} from '../../types/api';
 import {can} from '../shared/common';
@@ -42,6 +47,51 @@ export type FileTransfersProps = {
   onComplete: () => void;
   onPendingChange?: (pending: boolean) => void;
 };
+
+function UploadProgress({queue, perFile = false}: {queue: Queue; perFile?: boolean}) {
+  const files = useUppyState(queue, state => state.files);
+  const totalProgress = useUppyState(queue, state => state.totalProgress);
+  const started = Object.values(files).filter(file => file.progress.uploadStarted && !file.progress.uploadComplete);
+  if (!started.length) return null;
+  const failed = started.every(file => !!file.error);
+  const paused = started.every(file => file.isPaused || !!file.error);
+  if (!perFile)
+    return (
+      <div className="file-upload-progress">
+        <TerminalProgress
+          label={failed ? 'Upload failed' : paused ? 'Uploads paused' : 'Uploading files'}
+          ariaLabel="Uploading files"
+          statusText=""
+          value={totalProgress}
+          state={failed ? 'failed' : paused ? 'waiting' : 'running'}
+          width={18}
+        />
+      </div>
+    );
+  return (
+    <Collapsible className="file-upload-progress">
+      <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>Per-file progress</CollapsibleTrigger>
+      <CollapsibleContent>
+        {started.map(file => {
+          const {bytesUploaded, bytesTotal} = file.progress;
+          const sent = bytesUploaded === false ? null : bytesUploaded;
+          return (
+            <TerminalProgress
+              key={file.id}
+              label={file.name}
+              ariaLabel={`Uploading ${file.name}`}
+              statusText={file.isPaused && !file.error ? 'Paused' : undefined}
+              value={bytesProgressValue(sent, bytesTotal)}
+              detail={formatBytesProgress(sent, bytesTotal)}
+              state={file.error ? 'failed' : file.isPaused ? 'waiting' : 'running'}
+              width={18}
+            />
+          );
+        })}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 const FileTransfers = forwardRef<FileTransfersHandle, FileTransfersProps>(function FileTransfers(props, ref) {
   const current = useRef(props);
@@ -279,19 +329,23 @@ const FileTransfers = forwardRef<FileTransfersHandle, FileTransfersProps>(functi
           resume from their last uploaded chunk. Uploaded files appear after saving to the server finishes.
         </p>
         {uppy && (
-          <Dashboard
-            uppy={uppy}
-            theme="dark"
-            height={320}
-            width="100%"
-            proudlyDisplayPoweredByUppy={false}
-            hideProgressDetails={false}
-            hideRetryButton={false}
-            hidePauseResumeButton={false}
-            hideCancelButton={false}
-            disabled={!can(props.permissions, 'file.create')}
-            note={`Add files to ${props.directory}`}
-          />
+          <>
+            <UploadProgress queue={uppy} />
+            <Dashboard
+              uppy={uppy}
+              theme="dark"
+              height={320}
+              width="100%"
+              proudlyDisplayPoweredByUppy={false}
+              hideProgressDetails={false}
+              hideRetryButton={false}
+              hidePauseResumeButton={false}
+              hideCancelButton={false}
+              disabled={!can(props.permissions, 'file.create')}
+              note={`Add files to ${props.directory}`}
+            />
+            <UploadProgress queue={uppy} perFile />
+          </>
         )}
         {Object.values(finalizations).map(entry => (
           <div key={entry.id} className={`file-transfer-result is-${entry.state}`}>
@@ -299,15 +353,20 @@ const FileTransfers = forwardRef<FileTransfersHandle, FileTransfersProps>(functi
               <strong>{entry.name}</strong>
               <small>{entry.directory}</small>
             </span>
-            <span>
-              {entry.state === 'saving' ? (
-                'Saving to server'
-              ) : entry.state === 'complete' ? (
-                'Saved to server'
-              ) : (
-                <Feedback title={entry.name} message={entry.error} tone="error" />
-              )}
-            </span>
+            <div className="file-transfer-state" role="status">
+              <TerminalProgress
+                label={
+                  entry.state === 'saving'
+                    ? 'Saving to server…'
+                    : entry.state === 'complete'
+                      ? 'Saved to server'
+                      : 'Save failed'
+                }
+                state={entry.state === 'complete' ? 'done' : entry.state === 'failed' ? 'failed' : 'running'}
+                value={null}
+              />
+            </div>
+            {entry.state === 'failed' && <Feedback title={entry.name} message={entry.error} tone="error" />}
             {entry.state === 'failed' && (
               <>
                 <button type="button" onClick={() => void finalizeRef.current(entry)}>

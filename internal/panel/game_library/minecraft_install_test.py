@@ -1,3 +1,4 @@
+from contextlib import redirect_stdout
 import hashlib
 import importlib.util
 import io
@@ -105,6 +106,31 @@ class MinecraftInstallerTests(unittest.TestCase):
             self.assertEqual((root / 'mods/server.jar').read_bytes(), b'content')
             self.assertFalse((root / 'run.sh').exists())
 
+    def test_archive_byte_progress_uses_content_length_and_throttles_updates(self):
+        data = b"x" * 1000
+        selection = {"url": "https://cdn.modrinth.com/pack.zip", "algorithm": "sha256",
+                     "hash": hashlib.sha256(data).hexdigest()}
+
+        class SmallChunks(io.BytesIO):
+            def read(self, count):
+                return super().read(min(count, 2))
+
+        for known_length in (True, False):
+            with self.subTest(known_length=known_length), tempfile.TemporaryDirectory() as directory:
+                response = SmallChunks(data)
+                response.headers = {"Content-Length": str(len(data))} if known_length else {}
+                output = io.StringIO()
+                path = Path(directory) / "pack.zip"
+                with mock.patch.object(installer.OPENER, "open", return_value=response), redirect_stdout(output):
+                    installer.verified_archive(selection, path)
+                self.assertEqual(path.read_bytes(), data)
+                lines = output.getvalue().splitlines()
+                expected = [
+                    f"[voltra:progress] {percent} {percent * 10}/1000 bytes"
+                    for percent in range(101)
+                ] if known_length else []
+                self.assertEqual(lines, expected)
+
     def test_archive_failure_cleanup_and_size_boundary(self):
         selection = {'url': 'https://cdn.modrinth.com/pack.zip', 'algorithm': 'sha256', 'hash': hashlib.sha256(b'good').hexdigest()}
         for payload, length, maximum in [(b'bad', None, 100), (b'good', '200', 100), (b'x' * 101, None, 100), (b'good', '5', 100)]:
@@ -162,6 +188,17 @@ class MinecraftInstallerTests(unittest.TestCase):
             self.assertFalse((root / "config/client.cfg").exists())
             self.assertFalse((root / "run.sh").exists())
             self.assertFalse((root / "world").exists())
+
+    def test_archive_reports_processed_server_files(self):
+        data = archive({"mods/one.jar": b"one", "mods/two.jar": b"two", "run.sh": b"ignore"})
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory, redirect_stdout(output):
+            installer.unpack(data, Path(directory), [""])
+        self.assertEqual(output.getvalue().splitlines(), [
+            "[voltra:progress] 0 0/2",
+            "[voltra:progress] 50 1/2",
+            "[voltra:progress] 100 2/2",
+        ])
 
     def test_zip_slip_and_special_files(self):
         for name in ["../escape", "/absolute", "C:/drive", "a\\b", "overrides/../../escape",

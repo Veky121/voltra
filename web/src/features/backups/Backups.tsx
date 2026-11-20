@@ -1,8 +1,8 @@
+import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
 import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {BackupOverview, backupDisplayName, backupOriginLabel, backupCreated} from './BackupOverview';
 import {LockKeyhole} from 'lucide-react';
 import './backups.css';
-import '../servers/powerProgress.css';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {useEffect, useRef, useState} from 'react';
 import {api, useAPI, Button, Input, Textarea, Field, Card, Modal} from '../../lib';
@@ -20,7 +20,7 @@ import {
   useServer,
 } from '../shared/common';
 import type {BackupList} from '../../types/api';
-function BackupStateBadge({pending, successful}: {pending: boolean; successful: boolean}) {
+function BackupState({pending, successful}: {pending: boolean; successful: boolean}) {
   const wasPending = useRef(pending);
   const [created, setCreated] = useState(false);
   useEffect(() => {
@@ -38,23 +38,19 @@ function BackupStateBadge({pending, successful}: {pending: boolean; successful: 
   }, [pending, successful]);
   const label = pending ? 'In progress' : !successful ? 'Failed' : created ? 'Created' : '';
   return (
-    <span
-      role="status"
-      aria-hidden={!label}
-      style={{visibility: label ? 'visible' : 'hidden'}}
-      className={`badge ${pending ? 'operations-status-pending' : !successful ? 'operations-status-error' : 'operations-status-success'}`}
-    >
-      {label || 'Created'}
-    </span>
+    <div role="status" hidden={!label}>
+      {label && (
+        <TerminalProgress label={label} value={null} state={pending ? 'running' : successful ? 'done' : 'failed'} />
+      )}
+    </div>
   );
 }
 
 export function Backups() {
-  const {base, permissions} = useServer();
+  const {base, permissions, server} = useServer();
   const [page, setPage] = useState(1);
   const r = useAPI<BackupList>(`${base}/backups?page=${page}&per_page=20`);
   const [activeAction, setActiveAction] = useState<{id: string; label: string} | null>(null);
-  const [feedback, setFeedback] = useState<{id: string; message: string; failed: boolean} | null>(null);
   const a = useAction();
   const [open, setOpen] = useState(false),
     [name, setName] = useState(''),
@@ -62,23 +58,14 @@ export function Backups() {
     [locked, setLocked] = useState(false),
     [restore, setRestore] = useState<any>(null),
     [truncate, setTruncate] = useState(false);
-  useEffect(() => {
-    if (!feedback) return;
-    const timer = setTimeout(() => setFeedback(null), 5000);
-    return () => clearTimeout(timer);
-  }, [feedback]);
   const runBackup = (id: string, label: string, success: string, fn: () => Promise<any>, done?: () => void) =>
     a.run(async () => {
       setActiveAction({id, label});
-      setFeedback(null);
       try {
         const result = await fn();
-        setFeedback({id, message: success, failed: false});
+        a.setSuccess(success);
         done?.();
         return result;
-      } catch (error) {
-        setFeedback({id, message: error instanceof Error ? error.message : 'Action failed. Try again.', failed: true});
-        throw error;
       } finally {
         setActiveAction(null);
       }
@@ -92,7 +79,6 @@ export function Backups() {
       () => {
         r.reload();
         setRestore(null);
-        if (method === 'DELETE') a.setSuccess('Backup deleted.');
       }
     );
   return (
@@ -104,6 +90,8 @@ export function Backups() {
         {can(permissions, 'backup.create') && <Button onClick={() => setOpen(true)}>Create backup</Button>}
       </div>
       <BackupOverview response={r.data} error={r.error} />
+      <Notice action={a} />
+      {server.status === 'restoring_backup' && <TerminalProgress label="Restoring backup" />}
       <PageError error={r.error} />
       {r.error && (
         <Button variant="secondary" onClick={r.reload}>
@@ -115,7 +103,6 @@ export function Backups() {
         {items(r.data).map(b => {
           const created = backupCreated(b.created_at);
           const active = activeAction?.id === b.uuid ? activeAction : null;
-          const result = feedback?.id === b.uuid ? feedback : null;
           const pending = !b.completed_at;
           return (
             <Card
@@ -129,13 +116,15 @@ export function Backups() {
               <div className="backup-card-heading">
                 <div className="backup-card-title">
                   <h3 title={backupDisplayName(b.name)}>{backupDisplayName(b.name)}</h3>
-                  <p
-                    className={`backup-card-feedback ${result?.failed ? 'backup-card-error' : ''}`}
-                    role="status"
-                    title={active?.label || result?.message || backupOriginLabel(b.origin)}
-                  >
-                    {active?.label || (pending ? 'Creating backup...' : result?.message) || backupOriginLabel(b.origin)}
-                  </p>
+                  {active ? (
+                    <div className="backup-card-feedback" role="status" title={active.label}>
+                      <TerminalProgress label={active.label} />
+                    </div>
+                  ) : (
+                    <p className="backup-card-feedback" role="status" title={backupOriginLabel(b.origin)}>
+                      {pending ? 'Creating backup...' : backupOriginLabel(b.origin)}
+                    </p>
+                  )}
                 </div>
                 <div className="backup-card-status">
                   <span
@@ -146,7 +135,7 @@ export function Backups() {
                     <LockKeyhole size={14} aria-hidden="true" />
                     Locked
                   </span>
-                  <BackupStateBadge pending={pending} successful={!!b.is_successful} />
+                  <BackupState pending={pending} successful={!!b.is_successful} />
                 </div>
               </div>
               <div className="backup-card-footer">
@@ -223,7 +212,6 @@ export function Backups() {
       <Pager data={r.data} page={page} setPage={setPage} />
       {open && (
         <Modal title="Create backup" onClose={() => setOpen(false)}>
-          <Notice action={a} />
           <form
             onSubmit={e => {
               e.preventDefault();
@@ -245,6 +233,7 @@ export function Backups() {
             </Field>
             <Check label="Lock backup against deletion" checked={locked} onChange={setLocked} />
             <Button type="submit" disabled={a.busy}>
+              {a.busy && <TerminalSpinner />}
               Start backup
             </Button>
           </form>
@@ -252,10 +241,10 @@ export function Backups() {
       )}
       {restore && (
         <Modal title={`Restore ${restore.name}`} onClose={() => setRestore(null)}>
-          <Notice action={a} />
           <p>The server will stop. Existing files may be overwritten by this backup.</p>
           <Check label="Delete all existing files before restoring" checked={truncate} onChange={setTruncate} />
           <Button variant="danger" disabled={a.busy} onClick={() => perform(restore.uuid, 'restore', {truncate})}>
+            {activeAction && <TerminalSpinner />}
             Restore backup
           </Button>
         </Modal>

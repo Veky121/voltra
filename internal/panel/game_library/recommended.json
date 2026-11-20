@@ -1,0 +1,1516 @@
+{
+ "steam": {
+  "7days": {
+   "confidence": "official",
+   "disk": 34816,
+   "memory": 16384,
+   "note": "The Fun Pimps recommend 16 GB RAM, and the Linux server depot is about 16.6 GiB before generated worlds.",
+   "players": null,
+   "source": "https://support.7daystodie.com/hc/en-us/articles/48451066199188-System-Requirements-for-Dedicated-Server"
+  },
+  "palworld": {
+   "confidence": "official",
+   "disk": 32768,
+   "memory": 16384,
+   "note": "Pocketpair lists 16 GB RAM for a dedicated server and 32 GB for long, stable sessions; the Linux install is about 4.6 GB.",
+   "players": null,
+   "source": "https://docs.palworldgame.com/getting-started/requirements/"
+  },
+  "satisfactory": {
+   "confidence": "community",
+   "disk": 20480,
+   "memory": 16384,
+   "note": "The official wiki's community guidance recommends 16 GB RAM for larger saves or more than four players and lists 8 GB disk for Linux, above the 4 GiB depot budget.",
+   "players": null,
+   "source": "https://satisfactory.wiki.gg/wiki/Server"
+  },
+  "valheim": {
+   "confidence": "community",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "The community wiki recommends 4 GB RAM or more, used here for a full vanilla server with a roughly 2 GiB Linux install.",
+   "players": 10,
+   "source": "https://valheim.fandom.com/wiki/Dedicated_servers"
+  }
+ },
+ "templates": {
+  "7_days_to_die/egg-7-days-to-die.json": {
+   "confidence": "official",
+   "disk": 34816,
+   "memory": 16384,
+   "note": "The publisher recommends 16 GB of server RAM, and Steam app 294420 installs about 16.6 GiB on Linux.",
+   "players": null,
+   "source": "https://support.7daystodie.com/hc/en-us/articles/48451066199188-System-Requirements-for-Dedicated-Server"
+  },
+  "Archean/egg-archean.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 8192,
+   "note": "The developer recommends an 8 GB starting configuration without a separate higher tier, and Steam app 3557220 installs about 3.2 GiB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://wiki.archean.space/en/multiplayer/settingup.html"
+  },
+  "Aska/egg-aska.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 6144,
+   "note": "LOW.MS budgets 4–6 GB for four players, and Steam app 3246670 installs about 1.1 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": 4,
+   "source": "https://low.ms/blog/how-to-host-aska-dedicated-server"
+  },
+  "League Sandbox/egg-league-sandbox.json": {
+   "agreements": [
+    {
+     "environment": "ACKNOWLEDGE_LEGACY_PREREQUISITES",
+     "title": "League Sandbox prerequisites",
+     "url": "https://github.com/LeagueSandbox/GameServer#readme"
+    }
+   ],
+   "confidence": "none",
+   "disk": 4096,
+   "memory": 2048,
+   "note": "The archived server project gives setup instructions without a hardware recommendation.",
+   "players": null,
+   "source": ""
+  },
+  "Nightingale/egg-nightingale.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "Survival Servers budgets 6–8 GB per realm server, and Steam app 3796810 installs about 10.4 GiB on Linux. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://www.survivalservers.com/wiki/Nightingale_Dedicated_Server_Setup_Guide"
+  },
+  "abiotic_factor/egg-abiotic-factor.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "ReNode budgets 6 GB for a mature six-player world, and Steam app 2857200 installs about 3.0 GiB. Voltra keeps the recipe's tested 8 GB of memory and 32 GB of storage.",
+   "players": 6,
+   "source": "https://renode.space/blog/abiotic-factor-dedicated-server"
+  },
+  "among_us/impostor_server/egg-among-us--impostor-server.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 512,
+   "note": "Torchlite reports about 30 MB RAM and a 2 MB install for Impostor, so the template uses the requested resource floors. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://torchlite.host/guides/among-us-impostor-server"
+  },
+  "ark_survival_ascended/egg-ark-survival-ascended.json": {
+   "confidence": "estimate",
+   "disk": 65536,
+   "memory": 16384,
+   "note": "Flux measured about 11 GB at idle on The Island under Proton and budgets 16 GB for about ten players on one map. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": 10,
+   "source": "https://runonflux.com/games/ark/server-requirements"
+  },
+  "ark_survival_evolved/egg-ark--survival-evolved.json": {
+   "confidence": "estimate",
+   "disk": 196608,
+   "memory": 8192,
+   "note": "Map measurements support 8 GB for about ten players on a lighter stock map, and the public Steam build installs about 21.3 GiB. Voltra keeps the recipe's tested 192 GB of storage.",
+   "players": 10,
+   "source": "https://dedicatedgameservers.net/articles/ark-survival-evolved-dedicated-server-requirements-2026/"
+  },
+  "arma/arma3/egg-arma3.json": {
+   "confidence": "official",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "Bohemia's dedicated-server table recommends 4 GB RAM and 32 GB free SSD space, while the stock Steam app 233780 install is about 5 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://wiki.arma3.io/topics/Dedicated_Server.html"
+  },
+  "arma/arma_reforger/egg-arma-reforger.json": {
+   "agreements": [
+    {
+     "environment": "REFORGER_ACCEPT_EULA",
+     "title": "Arma Reforger Server EULA",
+     "url": "https://store.steampowered.com/eula/1874900_eula_0"
+    },
+    {
+     "environment": "REFORGER_ACCEPT_BATTLEYE",
+     "title": "BattlEye EULA",
+     "url": "https://www.battleye.com/downloads/EULA.txt"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 65536,
+   "memory": 6144,
+   "note": "A live example used about 3.3 GB with two players and AI, and Bohemia's Docker example allocates 6 GB. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": null,
+   "source": "https://loafhosts.com/guides/arma-reforger-memory-use/"
+  },
+  "astroneer/egg-astroneer-dedicated-server.json": {
+   "confidence": "estimate",
+   "disk": 20480,
+   "memory": 8192,
+   "note": "IONOS recommends 8 GB for the dedicated server, and Steam app 728470 installs about 2.4 GiB for the eight-player game. Voltra keeps the recipe's tested 20 GB of storage.",
+   "players": 8,
+   "source": "https://www.ionos.com/digitalguide/server/know-how/astroneer-dedicated-server/"
+  },
+  "avorion/egg-avorion.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 6144,
+   "note": "HyperDC budgets 6 GB for the default ten-player galaxy, and the stock Linux depots for Steam app 565060 total about 76 MiB. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 10,
+   "source": "https://hyperdc.com/game-server-hosting/avorion"
+  },
+  "barotrauma/egg-barotrauma.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 3072,
+   "note": "ReNode budgets up to 2 GB for 8–16 vanilla players, and the Linux server depot installs about 149 MiB. Voltra keeps the recipe's tested 3 GB of memory and 8 GB of storage.",
+   "players": 16,
+   "source": "https://renode.space/blog/barotrauma-dedicated-server"
+  },
+  "beamng/beammp/egg-beam-m-p-server.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 512,
+   "note": "BeamMP lists a 50 MiB minimum and a 10 MiB base install, so the template uses the requested resource floors before mods.",
+   "players": null,
+   "source": "https://docs.beammp.com/FAQ/server-faq/"
+  },
+  "black_mesa/egg-black-mesa.json": {
+   "confidence": "estimate",
+   "disk": 45056,
+   "memory": 4096,
+   "note": "The dedicated server depots occupy about 32 GB; no RAM recommendation is published, so the memory default is unchanged.",
+   "players": null,
+   "source": "https://steamdb.info/app/346680/depots/"
+  },
+  "clone_hero/egg-clone-hero.json": {
+   "confidence": "community",
+   "disk": 2048,
+   "memory": 512,
+   "note": "The egg maintainer lists 80 MiB RAM and 100 MiB storage for the standalone server, both below the requested floors.",
+   "players": null,
+   "source": "https://eggs.pterodactyl.io/egg/games-clone-hero"
+  },
+  "conan_exiles/egg-conan-exiles-enhanced.json": {
+   "confidence": "estimate",
+   "disk": 65536,
+   "memory": 10240,
+   "note": "ServerVote recommends about 10 GB free RAM after measuring 9.3 GB idle on Enhanced, and Steam app 443030 installs about 4.2 GiB on Windows. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": null,
+   "source": "https://servervote.com/articles/conan-exiles-dedicated-server-setup"
+  },
+  "conan_exiles/egg-conan-exiles.json": {
+   "confidence": "official",
+   "disk": 65536,
+   "memory": 8192,
+   "note": "Funcom's original server manual specifies 8 GB RAM for ten players, and the Steam legacy Windows depot installs about 4.2 GiB. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": 10,
+   "source": "https://cdn.funcom.com/downloads/ConanExiles_TechManual.pdf"
+  },
+  "core_keeper/egg-core-keeper.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "PlayNHost measured about 1.3 GB for an empty world, so 4 GB allows room for an eight-player world to grow. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 8,
+   "source": "https://playnhost.com/knowledgebase/core-keeper/Core-Keeper-server-FAQ/"
+  },
+  "counter_strike/counter_strike_2/egg-counter--strike2.json": {
+   "confidence": "community",
+   "disk": 163840,
+   "memory": 4096,
+   "note": "The community deployment recommends 4 GB from eleven players, and the standard Linux Steam app 730 install is about 66.3 GiB. Voltra keeps the recipe's tested 160 GB of storage.",
+   "players": 16,
+   "source": "https://github.com/INAPP-Mobile/cs2"
+  },
+  "counter_strike/counter_strike_source/egg-counter--strike--source.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "HostMyServers recommends 2 GB RAM, and the stock Linux Steam app 232330 install is about 2.2 GiB. Voltra keeps the recipe's tested 4 GB of memory and 8 GB of storage.",
+   "players": null,
+   "source": "https://helpdocs.hostmyservers.fr/en/docs/cloud/linux/serveurs-jeux/counter-strike-source-server-install/"
+  },
+  "craftopia/egg-craftopia.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "A community test ran on 4 GB with swap advised, so the existing 8 GB allows headroom for the current 10.6 GiB Linux build. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=2829129437"
+  },
+  "cryofall/egg-cryo-fall.json": {
+   "confidence": "official",
+   "disk": 8192,
+   "memory": 3072,
+   "note": "AtomicTorch lists 1.5 GB RAM for its smallest tier of up to 30 players, and Steam app 1061710 installs about 618 MiB. Voltra keeps the recipe's tested 3 GB of memory and 8 GB of storage.",
+   "players": 30,
+   "source": "https://wiki.atomictorch.com/CryoFall/Server/Setup"
+  },
+  "cubic_odyssey/egg-cubic-odyssey.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "Normandin Systems budgets 4 GB for a small vanilla group, and Steam app 3858450 installs about 1 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://normandinsystems.com/cubic-odyssey"
+  },
+  "dayz/egg-dayz.json": {
+   "confidence": "community",
+   "disk": 32768,
+   "memory": 16384,
+   "note": "The DayZ Modding Wiki recommends 16 GB RAM, and the Linux Steam app 223350 server depots total about 5.5 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://stardz-team.github.io/DayZ-Modding-Wiki/en/09-server-admin/01-server-setup"
+  },
+  "dont_starve/egg-don-t-starve-together.json": {
+   "confidence": "community",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "The community guide recommends 1 GB per shard, so surface and caves together use a 2 GB budget. Voltra keeps the recipe's tested 4 GB of memory and 16 GB of storage.",
+   "players": null,
+   "source": "https://github.com/mathielo/dst-dedicated-server/blob/main/docs/ServerPerformance.md"
+  },
+  "eft/egg-stay-in-tarkov.json": {
+   "agreements": [
+    {
+     "environment": "ACKNOWLEDGE_LEGACY_PREREQUISITES",
+     "title": "Stay In Tarkov prerequisites",
+     "url": "https://github.com/stayintarkov/SIT.Aki-Server-Mod#readme"
+    }
+   ],
+   "confidence": "none",
+   "disk": 4096,
+   "memory": 4096,
+   "note": "The Stay In Tarkov docs provide a Linux server image without a RAM recommendation for the dedicated backend.",
+   "players": null,
+   "source": ""
+  },
+  "empyrion/egg-empyrion--galactic-survival.json": {
+   "confidence": "estimate",
+   "disk": 49152,
+   "memory": 12288,
+   "note": "HyperDC budgets 12 GB for a small group using multiple playfields, and Steam app 530870 installs about 17.6 GiB. Voltra keeps the recipe's tested 48 GB of storage.",
+   "players": 10,
+   "source": "https://hyperdc.com/game-server-hosting/empyrion-galactic-survival"
+  },
+  "enshrouded/egg-enshrouded.json": {
+   "confidence": "official",
+   "disk": 32768,
+   "memory": 16384,
+   "note": "Keen recommends 16 GB RAM for 16 players and 30 GB free SSD space, while the stock server depot occupies about 7.5 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": 16,
+   "source": "https://enshrouded.zendesk.com/hc/en-us/articles/16055628734109-Recommended-Server-Specifications"
+  },
+  "factorio/factorio-modupdate/egg-factorio-modupdate.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 2048,
+   "note": "A fresh 2.0.77 test supports 2 GiB as a starting point, with extra memory and disk depending on the installed mods. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://mc-node.net/blog/en/factorio-headless-dedicated-server/"
+  },
+  "factorio/factorio/egg-factorio-a-r-m64.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 2048,
+   "note": "The x64 headless test supports 2 GiB as a starting point, with Box64 overhead unmeasured. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://mc-node.net/blog/en/factorio-headless-dedicated-server/"
+  },
+  "factorio/factorio/egg-factorio.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 2048,
+   "note": "A host recommends 2 GiB for a new factory after testing the 55 MiB headless 2.0.77 release. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://mc-node.net/blog/en/factorio-headless-dedicated-server/"
+  },
+  "fortresscraft_evolved/egg-fortresscraft-evolved.json": {
+   "confidence": "estimate",
+   "disk": 17408,
+   "memory": 8192,
+   "note": "A host recommends 8 GiB for a typical co-op group, and the Steam server depot is 8.05 GiB.",
+   "players": null,
+   "source": "https://www.thecrewhost.com/en/games/fortresscraft-evolved"
+  },
+  "foundry/egg-foundry.json": {
+   "confidence": "estimate",
+   "disk": 20480,
+   "memory": 4096,
+   "note": "ZAP-Hosting recommends 4 GiB with eight slots selected, and the Windows Steam server depot is 2.27 GiB. Voltra keeps the recipe's tested 20 GB of storage.",
+   "players": 8,
+   "source": "https://zap-hosting.com/en/tools/server-tools/game-server-installer?game=foundry"
+  },
+  "foundry_vtt/egg-FoundryVTT.json": {
+   "confidence": "official",
+   "disk": 4096,
+   "memory": 4096,
+   "note": "Foundry recommends 4 GiB of RAM and lists 1 GiB as the dedicated-server storage minimum. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://foundryvtt.com/article/requirements/"
+  },
+  "frozen_flame/egg-frozen-flame.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 6144,
+   "note": "A host sizes 10 players at 6 GiB, and the Linux dedicated payload is about 2.4 GiB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 10,
+   "source": "https://hyperdc.com/game-server-hosting/frozen-flame"
+  },
+  "gmod/egg-garry-s-mod.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "A server setup guide suggests starting at 4 GiB, and the Steam dedicated install is about 6.5 GiB before addons. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://games-tools.game-rank.com/en/docs/garrys-mod/installation"
+  },
+  "ground_branch/egg-ground-branch.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 5120,
+   "note": "Gaming Deluxe allots 5 GiB to eight-player co-op, and the Windows Steam server install is 1.72 GiB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 8,
+   "source": "https://www.gamingdeluxe.co.uk/eu/ground-branch-server-hosting/"
+  },
+  "gta/fivem/egg-five-m.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "A lab measured a 350 MB Legacy install and suggests 4 GiB for basic setups before heavier scripts and databases. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://rscomputers-ks.com/fivem-server-hosting-vds-txadmin/"
+  },
+  "holdfast/egg-holdfast-na-w.json": {
+   "confidence": "estimate",
+   "disk": 20480,
+   "memory": 4096,
+   "note": "A host's small-server tier allows 2 GiB for 20 players, and the Linux Steam payload is about 9.5 GiB. Voltra keeps the recipe's tested 4 GB of memory.",
+   "players": 20,
+   "source": "https://new.hebergtonserv.com/en/tutoriels/install-holdfast-server-steamcmd/"
+  },
+  "humanitz/egg-humanit-z.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "A host measured 3.3 GB idle on version 1.1 and recommends 6 to 8 GiB for small groups with a roughly 1.5 GB Linux install. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://wiki.supercraft.host/wiki/humanitz/setup_guide/"
+  },
+  "hytale/egg-hytale.json": {
+   "agreements": [
+    {
+     "environment": "HYTALE_ACCEPT_EARLY_PLUGINS",
+     "title": "Hytale early plugin notice",
+     "url": "https://support.hytale.com/hc/en-us/articles/45326769420827-Hytale-Server-Manual"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 6144,
+   "note": "Flux sizes 10 players at 6 GiB with moderate view distance and puts the server with assets at about 3.6 GB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 10,
+   "source": "https://runonflux.com/games/hytale/server-requirements"
+  },
+  "icarus/egg-icarus--dedicated.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft core fonts EULA",
+     "url": "https://corefonts.sourceforge.net/eula.htm"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 12288,
+   "note": "Hosting guidance sizes an eight-player Open World at 12 GiB, and the Windows Steam server installs at 9.76 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": 8,
+   "source": "https://gameserverhosting.co.uk/icarus/server-requirements-ram/"
+  },
+  "insurgency_sandstorm/egg-insurgency--sandstorm.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "HyperNode allots 3 GiB to 16 slots, and the Linux Steam server is under 4.75 GiB before mods. Voltra keeps the recipe's tested 8 GB of memory and 32 GB of storage.",
+   "players": 16,
+   "source": "https://hypernode.gg/game-servers/insurgency-sandstorm"
+  },
+  "iosoccer/eggs-iosoccer.json": {
+   "confidence": "estimate",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "A hosting guide recommends 3 GiB for 8v8 with spectators, and the Steam depots total under 4.9 GiB. Voltra keeps the recipe's tested 4 GB of memory.",
+   "players": 16,
+   "source": "https://gamezservers.com/guides/how-to-host-an-iosoccer-server"
+  },
+  "just_cause/just_cause_3/egg-j-c3-m-p.json": {
+   "confidence": "community",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The JC3:MP server guide lists 1 GiB of RAM without a slot target, and the Steam server files total under 1 GiB. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://steamcommunity.com/sharedfiles/filedetails/?id=1094953641"
+  },
+  "killing_floor_2/egg-killing-floor2.json": {
+   "confidence": "community",
+   "disk": 65536,
+   "memory": 4096,
+   "note": "A community guide recommends 4 GiB after running the server, and the Steam server files total just under 30 GiB. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": null,
+   "source": "https://steamcommunity.com/app/232090/discussions/0/1693785669846855564/"
+  },
+  "ksp/DMP/egg-k-s-p-d-m-p.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 2048,
+   "note": "A host recommends 1 GiB for a small sandbox group and 2 GiB for career mode, with the existing 2 GiB disk floor retained. Voltra keeps the recipe's tested 2 GB of memory.",
+   "players": null,
+   "source": "https://gamezservers.com/guides/how-to-host-a-kerbal-space-program-multiplayer-server-with-dmp"
+  },
+  "left4dead/egg-left4dead.json": {
+   "confidence": "estimate",
+   "disk": 17408,
+   "memory": 5120,
+   "note": "Gaming Deluxe allots 5 GiB to eight slots, and the Steam server is about 8 GiB before custom maps.",
+   "players": 8,
+   "source": "https://www.gamingdeluxe.co.uk/eu/left-4-dead-game-server-hosting/"
+  },
+  "left4dead_2/egg-left4dead_2.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "A host recommends 2 to 3 GiB for eight-player Versus, and the Linux Steam depots total about 9.1 GiB. Voltra keeps the recipe's tested 4 GB of memory and 32 GB of storage.",
+   "players": 8,
+   "source": "https://hyperdc.com/game-server-hosting/left-4-dead-2"
+  },
+  "longvinter/egg-longvinter.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 3072,
+   "note": "A host allots 3 GiB for eight players, and the Linux Steam depot plus Steamworks files total about 1.8 GiB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 8,
+   "source": "https://hyperdc.com/game-server-hosting/longvinter"
+  },
+  "midnight_ghost_hunt/egg-midnight-ghost-hunt.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "Physgun allots 3 GiB to a 4v4 match, and the Windows Steam server payload is 1.87 GiB. Voltra keeps the recipe's tested 4 GB of memory and 16 GB of storage.",
+   "players": 8,
+   "source": "https://physgun.com/games/midnight-ghost-hunt-server-hosting/"
+  },
+  "mindustry/egg-mindustry.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 1024,
+   "note": "A host measured about 235 MB running a 20 MB server jar, so 1 GiB leaves headroom for Java and larger maps.",
+   "players": null,
+   "source": "https://torchlite.host/guides/mindustry-server-setup"
+  },
+  "minecraft/bedrock/LeviLamina/egg-levi-lamina.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 4096,
+   "note": "Mojang lists 4 GiB of RAM and up to 1 GiB of disk for the underlying server before LeviLamina plugins. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.minecraft.net/en-us/download/server/bedrock"
+  },
+  "minecraft/bedrock/LiteLoader-bedrock/egg-LiteLoader-bedrock.json": {
+   "agreements": [
+    {
+     "environment": "BEDROCK_TERMS_ACCEPTED",
+     "title": "Minecraft EULA",
+     "url": "https://www.minecraft.net/en-us/eula"
+    },
+    {
+     "environment": "BEDROCK_TERMS_ACCEPTED",
+     "title": "Minecraft Usage Guidelines",
+     "url": "https://www.minecraft.net/en-us/usage-guidelines"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 4096,
+   "note": "The underlying Bedrock Dedicated Server lists 4 GiB of RAM and up to 1 GiB on disk before LiteLoader plugins. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.minecraft.net/en-us/download/server/bedrock"
+  },
+  "minecraft/bedrock/PowerNukkitX/egg-powernukkitx.json": {
+   "agreements": [
+    {
+     "environment": "PNX_LICENSE_ACCEPTED",
+     "title": "PowerNukkitX licence (LGPL 3.0)",
+     "url": "https://www.gnu.org/licenses/lgpl-3.0.html"
+    }
+   ],
+   "confidence": "official",
+   "disk": 5120,
+   "memory": 4096,
+   "note": "PowerNukkitX recommends 4 GiB of RAM and 5 GiB free storage, while the 82 MiB release jar rounds to the 2 GiB install budget.",
+   "players": null,
+   "source": "https://powernukkitx.org/docs/requirements"
+  },
+  "minecraft/bedrock/bedrock/egg-vanilla-bedrock-ARM64.json": {
+   "agreements": [
+    {
+     "environment": "BEDROCK_TERMS_ACCEPTED",
+     "title": "Minecraft EULA",
+     "url": "https://www.minecraft.net/en-us/eula"
+    },
+    {
+     "environment": "BEDROCK_TERMS_ACCEPTED",
+     "title": "Minecraft Usage Guidelines",
+     "url": "https://www.minecraft.net/en-us/usage-guidelines"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 4096,
+   "note": "The x64 Bedrock Dedicated Server baseline is 4 GiB of RAM and up to 1 GiB of disk, with ARM64 emulation overhead unmeasured. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.minecraft.net/en-us/download/server/bedrock"
+  },
+  "minecraft/bedrock/bedrock/egg-vanilla-bedrock.json": {
+   "agreements": [
+    {
+     "environment": "BEDROCK_TERMS_ACCEPTED",
+     "title": "Minecraft EULA",
+     "url": "https://www.minecraft.net/en-us/eula"
+    },
+    {
+     "environment": "BEDROCK_TERMS_ACCEPTED",
+     "title": "Minecraft Usage Guidelines",
+     "url": "https://www.minecraft.net/en-us/usage-guidelines"
+    }
+   ],
+   "confidence": "official",
+   "disk": 4096,
+   "memory": 4096,
+   "note": "Mojang lists 4 GiB of RAM and 180 MB to 1 GB of disk for Bedrock Dedicated Server. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.minecraft.net/en-us/download/server/bedrock"
+  },
+  "minecraft/java/canvas-mc/egg-canvas-mc.json": {
+   "confidence": "official",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "Canvas recommends at least 4 GiB of RAM, and the build 991 server jar is about 54 MiB. Voltra keeps the recipe's tested 10 GB of storage.",
+   "players": null,
+   "source": "https://docs.canvasmc.io/canvas/getting-started/installation/"
+  },
+  "minecraft/java/fabric/egg-fabric.json": {
+   "confidence": "estimate",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "The Fabric wiki uses a 2 GiB maximum heap, so the estimate adds 512 MiB for JVM overhead and keeps the existing disk budget. Voltra keeps the recipe's tested 4 GB of memory.",
+   "players": null,
+   "source": "https://wiki.fabricmc.net/player:tutorials:server:windows"
+  },
+  "minecraft/java/magma/egg-magma.json": {
+   "agreements": [
+    {
+     "environment": "EULA_ACCEPTED",
+     "title": "Minecraft EULA",
+     "url": "https://www.minecraft.net/en-us/eula"
+    }
+   ],
+   "confidence": "none",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "No credible recommended RAM surfaced for the MagmaMaintained 1.20.1 build used here.",
+   "players": null,
+   "source": "https://github.com/TonimatasDEV-Storage/MagmaMaintained-1.20.1/releases/tag/b4bdd80"
+  },
+  "minecraft/java/mohist/egg-mohist.json": {
+   "agreements": [
+    {
+     "environment": "EULA_ACCEPTED",
+     "title": "Minecraft EULA",
+     "url": "https://www.minecraft.net/en-us/eula"
+    }
+   ],
+   "confidence": "none",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "No verified small-server RAM recommendation surfaced for the Mohist build used here.",
+   "players": null,
+   "source": "https://mohistmc.com/"
+  },
+  "minecraft/java/nanolimbo/egg-nano-limbo.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 1024,
+   "note": "The official proxy JAR is 5.13 MiB, and the RAM default is retained.",
+   "players": null,
+   "source": "https://github.com/Nan1t/NanoLimbo/releases/tag/v1.13.0"
+  },
+  "minecraft/java/paper/egg-paper.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 8192,
+   "note": "PaperMC recommends a 6–10 GiB heap with room for JVM overhead, and the disk default is retained.",
+   "players": null,
+   "source": "https://docs.papermc.io/paper/aikars-flags/"
+  },
+  "minecraft/java/purpur/egg-purpur.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 8192,
+   "note": "Purpur is a drop-in Paper replacement, so the estimate uses PaperMC’s 6 GiB heap starting point plus JVM overhead.",
+   "players": null,
+   "source": "https://purpurmc.org/docs/purpur/"
+  },
+  "minecraft/java/spongeforge/egg-sponge-forge.json": {
+   "agreements": [
+    {
+     "environment": "EULA_ACCEPTED",
+     "title": "Minecraft EULA",
+     "url": "https://www.minecraft.net/en-us/eula"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "Sponge’s older guide recommends at least 2 GiB for a basic server and more for mods, so the modded defaults are retained.",
+   "players": null,
+   "source": "https://docs.spongepowered.org/stable/en/server/quickstart.html"
+  },
+  "minecraft/java/spongevanilla/egg-sponge-vanilla.json": {
+   "confidence": "estimate",
+   "disk": 10240,
+   "memory": 4096,
+   "note": "Sponge’s older guide recommends 2 GiB for a basic server, and the disk default is retained. Voltra keeps the recipe's tested 4 GB of memory.",
+   "players": null,
+   "source": "https://docs.spongepowered.org/stable/en/server/quickstart.html"
+  },
+  "minecraft/proxy/bedrock/waterdog_pe/egg-waterdog-p-e.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The official proxy JAR is 70.53 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://github.com/WaterdogPE/WaterdogPE/releases/tag/latest"
+  },
+  "minecraft/proxy/bedrock/waterdog_pe/egg-waterdog-pe.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The official proxy JAR is 70.53 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://github.com/WaterdogPE/WaterdogPE/releases/tag/latest"
+  },
+  "minecraft/proxy/java/velocity/egg-velocity.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 2048,
+   "note": "PaperMC’s player-based heap guidance and container sizing rule yield about 2 GiB for 16 proxy users.",
+   "players": 16,
+   "source": "https://docs.papermc.io/velocity/tuning/"
+  },
+  "minecraft/proxy/java/viaaas/egg-v-i-aaa-s.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 2048,
+   "note": "The official standalone proxy JAR is 38.90 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://github.com/ViaVersion/VIAaaS/releases/tag/v0.5.2"
+  },
+  "minecraft/proxy/java/waterfall/egg-waterfall.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "PaperMC’s launch example uses a 512 MiB heap, which leaves room for JVM overhead in the existing 1 GiB RAM allocation.",
+   "players": null,
+   "source": "https://docs.papermc.io/waterfall/getting-started/"
+  },
+  "minetest/egg-minetest.json": {
+   "confidence": "official",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "Luanti suggests 4 GB RAM for about 10 players on a light game; a small world fits in 8 GB of storage.",
+   "players": 10,
+   "source": "https://docs.luanti.org/for-server-hosts/setup/#choosing-hardware"
+  },
+  "modiverse/egg-modiverse.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "The Linux dedicated-server depot is about 220 MiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1549820/depots/"
+  },
+  "mordhau/egg-mordhau-wine.json": {
+   "confidence": "estimate",
+   "disk": 24576,
+   "memory": 4096,
+   "note": "The Windows dedicated-server depot is 4.00 GiB before Wine overhead, and the RAM default is retained. Voltra keeps the recipe's tested 24 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/629800/depots/"
+  },
+  "mordhau/egg-mordhau.json": {
+   "confidence": "estimate",
+   "disk": 24576,
+   "memory": 4096,
+   "note": "The dedicated-server depot is 5.14 GiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 24 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/629800/depots/"
+  },
+  "mount_blade_II_bannerlord/egg-mount--blade-i-i--bannerlord.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "The dedicated-server depot is 2.38 GiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1863440/depots/"
+  },
+  "myth_of_empires/egg-myth-of-empires.json": {
+   "confidence": "estimate",
+   "disk": 49152,
+   "memory": 12288,
+   "note": "The dedicated-server depot is 7.74 GiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 48 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1794810/depots/"
+  },
+  "necesse/egg-necesse.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 2048,
+   "note": "The Linux dedicated-server depot is about 182 MiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1169370/depots/"
+  },
+  "night_of_the_dead/egg-night-of-the-dead.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft core fonts EULA",
+     "url": "https://corefonts.sourceforge.net/eula.htm"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 16384,
+   "note": "The Windows dedicated-server install is 6.83 GiB before Wine overhead, and the RAM default is retained. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1420710/depots/"
+  },
+  "nmrih/egg-nmrih.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "The Linux server and shared depots total about 5.66 GiB before Steam redistributables, and the RAM default is retained. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/317670/depots/"
+  },
+  "no_love_lost/egg-no-love-lost.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "The Windows dedicated-server install is 4.18 GiB, and the RAM default is retained. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/2833050/depots/"
+  },
+  "no_one_survived/egg-no-one-survived.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft core fonts EULA",
+     "url": "https://corefonts.sourceforge.net/eula.htm"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "The Windows dedicated-server install is about 12 GiB before Wine overhead, and the RAM default is retained. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/2329680/depots/"
+  },
+  "novalife_amboise/egg-nova--life--amboise.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 8192,
+   "note": "The Linux dedicated-server install is about 7.6 GiB, and the RAM default is retained. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1665030/depots/"
+  },
+  "nuclear_option/egg-nuclear-option.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 2048,
+   "note": "The dedicated-server install is about 1.72 GiB, and the RAM default is retained. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/3930080/depots/"
+  },
+  "onset/egg-onset.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "Onset lists a 50 MB disk requirement and only a RAM minimum, so storage uses the 2 GiB floor and RAM retains its default. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://dev.playonset.com/wiki/DedicatedServer"
+  },
+  "openarena/egg-open-arena.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 512,
+   "note": "The publisher’s archive containing the OpenArena dedicated server is about 425 MB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://sourceforge.net/projects/oarena/files/"
+  },
+  "openra/openra_dune2000/egg-open-r-a--dune2000.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The server-capable Linux AppImage for the pinned release is 45.67 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.openra.net/download/"
+  },
+  "openra/openra_red_alert/egg-open-r-a.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The server-capable Linux AppImage for the pinned release is 41.99 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.openra.net/download/"
+  },
+  "openra/openra_tiberian_dawn/egg-open-r-a--tiberian-dawn.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The server-capable Linux AppImage for the pinned release is 52.76 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://www.openra.net/download/"
+  },
+  "openrct2/egg-openrct2.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The official Linux archive is about 83 MiB before adding legacy RollerCoaster Tycoon assets, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://github.com/OpenRCT2/OpenRCT2/releases/tag/v0.5.7"
+  },
+  "openttd/egg-open-t-t-d-server.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 512,
+   "note": "The official Linux server-capable archive is 22 MiB, and the RAM default is retained.",
+   "players": null,
+   "source": "https://www.openttd.org/downloads/openttd-releases/latest"
+  },
+  "operation_harsh_doorstop/egg-operation-harsh-doorstop.json": {
+   "confidence": "estimate",
+   "disk": 49152,
+   "memory": 8192,
+   "note": "The Linux dedicated-server depot is 6.53 GiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 48 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/950900/depots/"
+  },
+  "palworld/egg-palworld-proton.json": {
+   "confidence": "official",
+   "disk": 12288,
+   "memory": 16384,
+   "note": "Pocketpair lists 16 GB RAM for a dedicated server and 32 GB for long, stable sessions; the Windows install is about 5.4 GB.",
+   "players": null,
+   "source": "https://docs.palworldgame.com/getting-started/requirements/"
+  },
+  "palworld/egg-palworld.json": {
+   "confidence": "official",
+   "disk": 10240,
+   "memory": 16384,
+   "note": "Pocketpair lists 16 GB RAM for a dedicated server and 32 GB for long, stable sessions; the Linux install is about 4.5 GB. Voltra keeps the recipe's tested 10 GB of storage.",
+   "players": null,
+   "source": "https://docs.palworldgame.com/getting-started/requirements/"
+  },
+  "path_of_titans/egg-path-of-titans.json": {
+   "agreements": [
+    {
+     "environment": "POT_HOSTING_AGREEMENT",
+     "title": "Path of Titans Server Hosting Agreement",
+     "url": "https://alderongames.com/legal/server-hosting-agreement"
+    }
+   ],
+   "confidence": "none",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "Alderon’s community-server setup guide provides no verified RAM or disk sizing recommendation.",
+   "players": null,
+   "source": ""
+  },
+  "pavlov_vr/egg-pavlov-v-r.json": {
+   "confidence": "community",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "The Pavlov wiki lists 2 GiB for a vanilla 10-player server, and Steam app 622970 installs about 8.2 GiB. Voltra keeps the recipe's tested 4 GB of memory and 32 GB of storage.",
+   "players": 10,
+   "source": "https://pavlovwiki.com/index.php/Setting_up_a_dedicated_server"
+  },
+  "pixark/egg-pix-a-r-k.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "The Windows dedicated-server install is 2.24 GiB before Wine overhead, and the RAM default is retained. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/824360/depots/"
+  },
+  "plains_of_pain/egg-plains-of-pain.json": {
+   "agreements": [
+    {
+     "environment": "PLAINS_ACCEPT_EULA",
+     "title": "Plains of Pain EULA",
+     "url": "https://store.steampowered.com//eula/2218970_eula_0"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "The Linux dedicated-server depot is about 644 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/2227360/depots/"
+  },
+  "portal_knights/egg-portal-knights.json": {
+   "confidence": "estimate",
+   "disk": 21504,
+   "memory": 2048,
+   "note": "The Steam install path needs the 10.27 GiB depot that supplies the dedicated-server archive, and the RAM default is retained.",
+   "players": null,
+   "source": "https://steamdb.info/depot/374041/"
+  },
+  "post_scriptum/egg-post-scriptum.json": {
+   "confidence": "estimate",
+   "disk": 65536,
+   "memory": 8192,
+   "note": "The Linux Squad 44 dedicated-server depot is 32.39 GiB, and the RAM default is retained. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/746200/depots/"
+  },
+  "project_zomboid/egg-project-zomboid.json": {
+   "confidence": "official",
+   "disk": 32768,
+   "memory": 10240,
+   "note": "The Indie Stone recommends 2 GiB plus about 500 MB per player, which rounds to 10 GiB for 16 players, and the server depot is about 6.4 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": 16,
+   "source": "https://theindiestone.com/forums/topic/69425-working-with-vanilla-dedicated-server/"
+  },
+  "puck/egg-puck.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 1024,
+   "note": "The Linux dedicated-server depot is about 206 MiB, and the RAM default is retained. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/3481440/depots/"
+  },
+  "quake_live/egg-quake-live.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 1024,
+   "note": "The dedicated-server depot is 1.07 GiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/349090/depots/"
+  },
+  "renown/egg-renown.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "The Linux dedicated-server depot is about 12 GiB on disk, and the RAM default is retained. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://steamdb.info/app/1512690/depots/"
+  },
+  "return_to_moria/egg-the-lord-of-the-rings--return-to-moria.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 9216,
+   "memory": 4096,
+   "note": "The Windows dedicated-server install is 4.00 GiB before Wine overhead, and the RAM default is retained.",
+   "players": null,
+   "source": "https://steamdb.info/app/3349480/depots/"
+  },
+  "rimworld/open_world/egg-rimworld-open-world.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 512,
+   "note": "The mod’s Linux x64 server download is about 0.31 MiB, and the RAM default is retained.",
+   "players": null,
+   "source": "https://github.com/D12-Dev/OpenWorld/releases/tag/v1.0.4"
+  },
+  "rimworld/together/egg-rimworld-together.json": {
+   "confidence": "estimate",
+   "disk": 2048,
+   "memory": 512,
+   "note": "The mod’s Linux x64 server archive is about 30 MiB, and the RAM default is retained.",
+   "players": null,
+   "source": "https://github.com/RimWorld-Together/Rimworld-Together/releases/tag/26.11.2.1"
+  },
+  "rising_world/legacy/egg-rising-world-legacy.json": {
+   "confidence": "estimate",
+   "disk": 12288,
+   "memory": 4096,
+   "note": "For the four-slot template, the estimate uses the low end of the developer’s 4–8 GiB range for several players, with disk unchanged.",
+   "players": 4,
+   "source": "https://forum.rising-world.net/thread/8075-dedicated-server-setup-java-version/"
+  },
+  "rising_world/unity/egg-rising-world-unity.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "The developer gives a 3 GiB RAM floor and says exploration drives usage, so the 4 GiB default is paired with storage based on the 2.40 GiB Linux depot. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://forum.rising-world.net/thread/12174-what-are-the-requirements-for-a-server-running-the-new-unity-version-with-around/?postID=90487"
+  },
+  "risk_of_rain_2/egg-risk-of-rain2.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Wine Mono licence",
+     "url": "https://github.com/wine-mono/wine-mono/blob/main/COPYING"
+    }
+   ],
+   "confidence": "community",
+   "disk": 10240,
+   "memory": 2048,
+   "note": "The community server wrapper recommends at least 2 GiB for decent performance, and Steam depot 1180761 occupies about 2.99 GiB before Wine Mono. Voltra keeps the recipe's tested 10 GB of storage.",
+   "players": 4,
+   "source": "https://github.com/avivace/ror2-server"
+  },
+  "romestead/egg-romestead.json": {
+   "confidence": "community",
+   "disk": 8192,
+   "memory": 8192,
+   "note": "The Romestead wiki lists 8 GB RAM for five or more players or large-world generation, and the server depot is about 79 MiB. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 8,
+   "source": "https://romestead.wiki.gg/wiki/Romestead_Dedicated_Server_Setup_Guide"
+  },
+  "rust/rust_autowipe/egg-rust-autowipe.json": {
+   "confidence": "official",
+   "disk": 32768,
+   "memory": 12288,
+   "note": "Facepunch lists 12 GB free RAM and 15 GB free disk, above the 8 GiB budget calculated from the Linux depot. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://wiki.facepunch.com/rust/Creating-a-server"
+  },
+  "rust/rust_staging/egg-rust-staging.json": {
+   "confidence": "official",
+   "disk": 32768,
+   "memory": 12288,
+   "note": "Facepunch lists 12 GB free RAM and 15 GB free disk, and the staging disk estimate uses the public Linux depot as a proxy. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://wiki.facepunch.com/rust/Creating-a-server"
+  },
+  "satisfactory/egg-satisfactory.json": {
+   "confidence": "community",
+   "disk": 12288,
+   "memory": 16384,
+   "note": "The official wiki's community guidance recommends 16 GB RAM for larger saves or more than four players and lists 8 GB disk for Linux, above the 4 GiB depot budget.",
+   "players": null,
+   "source": "https://satisfactory.wiki.gg/wiki/Server"
+  },
+  "scpsl/dedicated/egg-scpsl.json": {
+   "agreements": [
+    {
+     "environment": "SCPSL_ACCEPT_EULA",
+     "title": "SCP: Secret Laboratory EULA",
+     "url": "https://link.scpslgame.com/eula"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "WinterNode budgets up to 4 GB RAM for 15 players, and Northwood lists 4 GB free disk against a sub-1 GiB Linux install. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 15,
+   "source": "https://winternode.com/blog/scp-secret-laboratory/scp-secret-laboratory-server-ram-guide"
+  },
+  "scpsl/exiled/egg-s-c-p--s-l--exiled.json": {
+   "agreements": [
+    {
+     "environment": "SCPSL_ACCEPT_EULA",
+     "title": "SCP: Secret Laboratory EULA",
+     "url": "https://link.scpslgame.com/eula"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 5120,
+   "note": "WinterNode's small-server budget plus its allowance for a handful of EXILED plugins gives 5 GB RAM, and Northwood lists 4 GB free disk for vanilla. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 15,
+   "source": "https://winternode.com/blog/scp-secret-laboratory/scp-secret-laboratory-server-ram-guide"
+  },
+  "scum/egg-scum.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 14336,
+   "note": "Flux budgets 14 GB RAM for a 16-player server, and SteamDB reports about 14.6 GiB installed for Windows. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": 16,
+   "source": "https://runonflux.com/games/scum/server-requirements"
+  },
+  "smalland_survive_the_wilds/egg-smalland--survive-the-wilds.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 8192,
+   "note": "Gaming Deluxe budgets 8 GB RAM for six players, and the Linux dedicated depot occupies about 1.65 GiB. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 6,
+   "source": "https://www.gamingdeluxe.co.uk/smalland-server-hosting/"
+  },
+  "soldat/egg-soldat.json": {
+   "confidence": "community",
+   "disk": 4096,
+   "memory": 512,
+   "note": "The Soldat wiki recommends 256 MB RAM, rounded to the 512 MiB floor, and the dedicated depot is about 54 MiB. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://wiki.soldat.pl/index.php/Server#Recommended"
+  },
+  "sonsoftheforest/egg-sons-of-the-forest.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Wine Mono licence",
+     "url": "https://github.com/wine-mono/wine-mono/blob/main/COPYING"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 12288,
+   "note": "Renode budgets 10 GB RAM for four to six players, and the Windows depot occupies about 3.25 GiB before Wine prerequisites. Voltra keeps the recipe's tested 12 GB of memory and 32 GB of storage.",
+   "players": 6,
+   "source": "https://renode.space/blog/sons-of-the-forest-server-performance"
+  },
+  "soulmask/egg-soulmask.json": {
+   "confidence": "community",
+   "disk": 32768,
+   "memory": 16384,
+   "note": "The community server guide lists 16 GB RAM and 20 GB free disk as the minimum.",
+   "players": null,
+   "source": ""
+  },
+  "sourcecoop/egg-source-coop.json": {
+   "confidence": "community",
+   "disk": 62464,
+   "memory": 4096,
+   "note": "The SourceCoop egg maintainers recommend 2 to 4 GiB RAM and the Black Mesa Linux server with English assets occupies about 32 GiB.",
+   "players": null,
+   "source": "https://github.com/pelican-eggs/games-steamcmd/blob/main/sourcecoop/README.md"
+  },
+  "space_engineers/default/egg-space-engineers.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Wine Mono licence",
+     "url": "https://github.com/wine-mono/wine-mono/blob/main/COPYING"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft core fonts EULA",
+     "url": "https://corefonts.sourceforge.net/eula.htm"
+    }
+   ],
+   "confidence": "official",
+   "disk": 24576,
+   "memory": 10240,
+   "note": "Keen recommends 10 GB RAM for the dedicated server, and the Windows install is about 8.1 GiB before Wine prerequisites. Voltra keeps the recipe's tested 24 GB of storage.",
+   "players": null,
+   "source": "https://www.spaceengineersgame.com/dedicated-servers/"
+  },
+  "space_engineers/torch/egg-space-engineers--torch-server.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft core fonts EULA",
+     "url": "https://corefonts.sourceforge.net/eula.htm"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": ".NET Framework 4.8 licence",
+     "url": "https://dotnet.microsoft.com/en-us/download/dotnet-framework/thank-you/net48-offline-installer"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 24576,
+   "memory": 10240,
+   "note": "Keen's 10 GB vanilla RAM recommendation is the baseline for Torch, and the 8.1 GiB base install excludes plugins and Wine prerequisites. Voltra keeps the recipe's tested 24 GB of storage.",
+   "players": null,
+   "source": "https://www.spaceengineersgame.com/dedicated-servers/"
+  },
+  "squad/egg-squad.json": {
+   "confidence": "estimate",
+   "disk": 65536,
+   "memory": 12288,
+   "note": "Offworld's licensing policy budgets 8 GB RAM per host plus 4 GB per instance, and the Linux server install is about 13.6 GiB. Voltra keeps the recipe's tested 64 GB of storage.",
+   "players": null,
+   "source": "https://www.joinsquad.com/server-licensing-and-administration-policies"
+  },
+  "starbound/egg-starbound.json": {
+   "confidence": "estimate",
+   "disk": 12288,
+   "memory": 3072,
+   "note": "HyperDC budgets 3 GB RAM for eight players, and the Linux install that includes the server is about 1.05 GiB. Voltra keeps the recipe's tested 12 GB of storage.",
+   "players": 8,
+   "source": "https://hyperdc.com/game-server-hosting/starbound"
+  },
+  "starrupture/egg-star-rupture-wine.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    }
+   ],
+   "confidence": "none",
+   "disk": 40960,
+   "memory": 8192,
+   "note": "Creepy Jar froze the dedicated server at 0.3.5, and the available idle measurements do not establish a small-community RAM recommendation.",
+   "players": null,
+   "source": ""
+  },
+  "stationeers/stationeers_bepinex/egg-stationeers--bep-in-ex.json": {
+   "confidence": "community",
+   "disk": 10240,
+   "memory": 16384,
+   "note": "The community recommends 16 GB RAM for the base server, and the roughly 4.7 GiB Linux install excludes optional plugins.",
+   "players": null,
+   "source": "https://stationeers-wiki.com/Dedicated_Server_Guide#General_Requirements"
+  },
+  "stationeers/stationeers_vanilla/egg-stationeers.json": {
+   "confidence": "community",
+   "disk": 10240,
+   "memory": 16384,
+   "note": "The community dedicated-server guide advises 16 GB RAM for stability and the Linux depot is about 4.7 GiB.",
+   "players": null,
+   "source": "https://stationeers-wiki.com/Dedicated_Server_Guide#General_Requirements"
+  },
+  "sunkenland/egg-sunkenland.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Wine Mono licence",
+     "url": "https://github.com/wine-mono/wine-mono/blob/main/COPYING"
+    },
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    }
+   ],
+   "confidence": "community",
+   "disk": 34816,
+   "memory": 8192,
+   "note": "The template maintainers recommend at least 8 GB RAM, and the Windows server install is about 16.4 GiB before Wine prerequisites.",
+   "players": null,
+   "source": "https://eggs.pterodactyl.io/egg/games-sunkenland/"
+  },
+  "svencoop/egg-sven-co-op.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 2048,
+   "note": "Slashplay recommends 2 GB RAM for its 12-slot server, and the Linux dedicated install is about 2.6 GiB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 12,
+   "source": "https://slashplay.gg/docs/games/sven-co-op"
+  },
+  "swords_'n_Magic_and_Stuff/egg-swords-n-magic-and-stuff.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Microsoft Visual C++ Runtime licence",
+     "url": "https://visualstudio.microsoft.com/license-terms/vs2022-cruntime/"
+    }
+   ],
+   "confidence": "none",
+   "disk": 10240,
+   "memory": 2048,
+   "note": "I found the dedicated server package and community setup instructions, but no substantiated RAM recommendation.",
+   "players": null,
+   "source": ""
+  },
+  "team_fortress_2/egg-team-fortress-2.json": {
+   "confidence": "community",
+   "disk": 32768,
+   "memory": 4096,
+   "note": "The template maintainers recommend 2 to 4 GB RAM, and the Linux server install is about 14.2 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://eggs.pterodactyl.io/egg/games-team-fortress-2"
+  },
+  "terraria/tmodloader/egg-t-modloader.json": {
+   "confidence": "estimate",
+   "disk": 8192,
+   "memory": 3072,
+   "note": "Flux budgets 3 GB RAM for light mods, and the pinned base release download is about 58 MiB before additional mods. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 8,
+   "source": "https://runonflux.com/games/tmodloader/server-requirements"
+  },
+  "terraria/tshock/egg-tshock-legacy.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 2048,
+   "note": "The older TShock 4.x manual asks for 2 GB free RAM, and the pinned 4.5.18 download is about 8 MiB. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": null,
+   "source": "https://tshock.readme.io/v4.3.26/docs/getting-started"
+  },
+  "terraria/vanilla/egg-terraria-vanilla.json": {
+   "confidence": "estimate",
+   "disk": 4096,
+   "memory": 2048,
+   "note": "Loafhosts sizes its eight-player vanilla tier at 2 GB RAM, and the publisher's server download is about 44 MiB. Voltra keeps the recipe's tested 4 GB of storage.",
+   "players": 8,
+   "source": "https://loafhosts.com/guides/terraria-server-memory-and-sizes/"
+  },
+  "the_forest/egg-the-forest.json": {
+   "agreements": [
+    {
+     "environment": "ACCEPT_WINDOWS_RUNTIME_LICENSES",
+     "title": "Wine licence (LGPL 2.1)",
+     "url": "https://github.com/wine-mirror/wine/blob/master/COPYING.LIB"
+    }
+   ],
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "EgoPvP budgets 4 GB RAM for up to four players, and the 1.6 GiB install runs in a Wine prefix that defaults to sound configuration only. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 4,
+   "source": "https://dev.egopvp-hosting.com/en/help/the-forest/the-forest-settings"
+  },
+  "the_isle/evrima/egg-the-isle.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 8192,
+   "note": "Renode budgets 6 GB RAM for up to 20 players, and PlayNHost measured a 1.5 GB Linux Evrima install in November 2026. Voltra keeps the recipe's tested 8 GB of memory and 32 GB of storage.",
+   "players": 20,
+   "source": "https://renode.space/blog/the-isle-evrima-server-guide"
+  },
+  "thefront/egg-the-front.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 10240,
+   "note": "The server idled at about 7.1 GB RAM in a published test, so the 10 GB template budget was retained for play with a roughly 3.1 GiB Linux install. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": null,
+   "source": "https://gamesomg.com/the-front-dedicated-server-setup/"
+  },
+  "tower_unite/egg-tower-unite.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 8192,
+   "note": "A forum operator reported a smooth 12-player session on an 8 GB host, and the Linux server install is about 4 GiB. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 12,
+   "source": "https://forums.pixeltailgames.com/t/recommended-hardware-and-os-for-a-small-server/45772"
+  },
+  "unturned/egg-unturned.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 4096,
+   "note": "HostMyServers recommends at least 4 GB RAM, and the Linux server files occupy about 1.8 GiB before Workshop content. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": null,
+   "source": "https://helpdocs.hostmyservers.fr/en/docs/cloud/linux/serveurs-jeux/survie/unturned-server-install/"
+  },
+  "v_rising/v_rising_bepinex/egg-v-rising-bep-in-ex.json": {
+   "confidence": "estimate",
+   "disk": 32768,
+   "memory": 12288,
+   "note": "The vanilla template recommends up to 6 GiB RAM, used here as a baseline for the roughly 1.9 GiB server install before BepInEx plugins. Voltra keeps the recipe's tested 12 GB of memory and 32 GB of storage.",
+   "players": null,
+   "source": "https://eggs.pterodactyl.io/egg/games-v-rising/"
+  },
+  "v_rising/v_rising_vanilla/egg-v-rising.json": {
+   "confidence": "community",
+   "disk": 32768,
+   "memory": 12288,
+   "note": "The template maintainers recommend 4 to 6 GiB RAM and at least 5 GB disk, above the 3 GiB budget calculated from the Windows depot. Voltra keeps the recipe's tested 12 GB of memory and 32 GB of storage.",
+   "players": null,
+   "source": "https://eggs.pterodactyl.io/egg/games-v-rising/"
+  },
+  "valheim/valheim_bepinex/egg-valheim-bep-i-nex.json": {
+   "confidence": "estimate",
+   "disk": 12288,
+   "memory": 6144,
+   "note": "The host recommends 6 GB RAM for light BepInEx mods, and the roughly 2 GiB Linux base install excludes optional mods. Voltra keeps the recipe's tested 12 GB of storage.",
+   "players": 10,
+   "source": "https://berrybyte.net/wiki/games/valheim/ram-requirements"
+  },
+  "valheim/valheim_plus/egg-valheim-plus-mod.json": {
+   "confidence": "community",
+   "disk": 12288,
+   "memory": 8192,
+   "note": "The Valheim Plus-compatible server project recommends 8 GB host RAM, and the roughly 2 GiB Linux base install excludes optional mods. Voltra keeps the recipe's tested 12 GB of storage.",
+   "players": null,
+   "source": "https://github.com/community-valheim-tools/valheim-server-docker"
+  },
+  "valheim/valheim_vanilla/egg-valheim.json": {
+   "confidence": "community",
+   "disk": 12288,
+   "memory": 4096,
+   "note": "The community wiki recommends 4 GB RAM or more, used here for a full vanilla server with a roughly 2 GiB Linux install. Voltra keeps the recipe's tested 12 GB of storage.",
+   "players": 10,
+   "source": "https://valheim.fandom.com/wiki/Dedicated_servers"
+  },
+  "vein/egg-v-e-i-n.json": {
+   "confidence": "community",
+   "disk": 32768,
+   "memory": 16384,
+   "note": "The official wiki's community testing recommends 16 GB RAM at three active players, and the Linux server depot occupies about 9 GiB. Voltra keeps the recipe's tested 32 GB of storage.",
+   "players": 3,
+   "source": "https://vein.wiki.gg/wiki/Vein_Dedicated_Server_Information"
+  },
+  "vintage_story/egg-vintage-story.json": {
+   "confidence": "official",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "The official wiki's 1 GB base plus 300 MB per player gives 4 GB RAM for ten players, and the Linux server download is about 51 MiB. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": 10,
+   "source": "https://wiki.vintagestory.at/Guide:_Dedicated_Server#Technical_specifications"
+  },
+  "voyagers_of_nera/egg-voyagers-of-nera.json": {
+   "confidence": "estimate",
+   "disk": 16384,
+   "memory": 10240,
+   "note": "HyperDC budgets 10 GB RAM for up to ten players, and the Windows server install is about 7.3 GiB before Wine. Voltra keeps the recipe's tested 16 GB of storage.",
+   "players": 10,
+   "source": "https://hyperdc.com/game-server-hosting/voyagers-of-nera"
+  },
+  "windrose/egg-windrose.json": {
+   "confidence": "official",
+   "disk": 35840,
+   "memory": 16384,
+   "note": "The developer recommends 16 GB RAM and 35 GB SSD for ten players, above the 5 GiB budget calculated from the Windows depot. Voltra keeps the recipe's tested 35 GB of storage.",
+   "players": 10,
+   "source": "https://playwindrose.com/dedicated-server-guide"
+  },
+  "wurm_unlimited/egg-wurm-unlimited.json": {
+   "confidence": "community",
+   "disk": 8192,
+   "memory": 4096,
+   "note": "The template maintainers recommend 4 GiB RAM and 3 GiB storage, above the 2 GiB depot-based budget for the Linux install. Voltra keeps the recipe's tested 8 GB of storage.",
+   "players": null,
+   "source": "https://eggs.pterodactyl.io/egg/games-wurm-unlimited"
+  }
+ }
+}

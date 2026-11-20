@@ -1,5 +1,11 @@
 import {createContext, useContext, useEffect, useRef, useState} from 'react';
-import {mergeTransfers, reconcileTransfers, transferPollDelay, type RemoteTransfer} from './remoteTransferModel';
+import {
+  mergeTransfers,
+  reconcileTransfers,
+  transferPollDelay,
+  transferReadRestricted,
+  type RemoteTransfer,
+} from './remoteTransferModel';
 export type {RemoteTransfer} from './remoteTransferModel';
 import {api} from '../../lib';
 import {can} from '../shared/common';
@@ -11,22 +17,28 @@ type TransferList = {transfers?: RemoteTransfer[]};
 export type RemoteOptions = {url: string; directory: string; filename?: string; use_header?: boolean};
 export const RemoteTransferContext = createContext<ReturnType<typeof useRemoteTransferQueue> | null>(null);
 
-export function useRemoteTransferQueue(base: string, permissions: string[], onComplete: () => void) {
+export function useRemoteTransferQueue(
+  base: string,
+  permissions: string[],
+  onComplete: () => void,
+  filesAvailable = true
+) {
   const [records, setRecords] = useState<Record<string, RemoteTransfer>>({}),
     [error, setError] = useState('');
   const [operations, setOperations] = useState<OperationEvent[]>([]);
-  const current = useRef({onComplete});
-  current.current = {onComplete};
+  const current = useRef({onComplete, filesAvailable});
+  current.current = {onComplete, filesAvailable};
   const known = useRef<Record<string, RemoteTransfer>>({});
   const generation = useRef(0);
   const loadRef = useRef<() => Promise<void>>(async () => {});
+  const updateFileAccess = useRef<(available: boolean) => void>(() => {});
   const mergeRef = useRef<(entries: RemoteTransfer[]) => void>(() => {});
   useEffect(() => {
     generation.current++;
     let active = true,
-      loading = false,
       socketReady = false,
       lastSnapshot = 0;
+    let pending: AbortController | undefined;
     known.current = {};
     setRecords({});
     setOperations([]);
@@ -54,32 +66,45 @@ export function useRemoteTransferQueue(base: string, permissions: string[], onCo
     };
     mergeRef.current = merge;
     const load = async () => {
-      if (loading || !active || !canFiles) return;
-      loading = true;
+      if (pending || !active || !canFiles || !current.current.filesAvailable) return;
+      const controller = new AbortController();
+      pending = controller;
+      const {signal} = controller;
       lastSnapshot = Date.now();
       const started = known.current;
       try {
         const results = await Promise.allSettled([
-          api<TransferList>(`${base}/files/pulls`),
-          api<TransferList>(`${base}/files/transfer-progress`),
+          api<TransferList>(`${base}/files/pulls`, {signal}),
+          api<TransferList>(`${base}/files/transfer-progress`, {signal}),
         ]);
-        if (active) {
+        if (active && !signal.aborted && current.current.filesAvailable) {
           const failures: string[] = [];
           for (const [index, result] of results.entries()) {
             if (result.status === 'fulfilled') {
               const entries = result.value.transfers || [];
               merge(entries, index === 0 ? 'download' : 'upload', started);
-            } else failures.push(result.reason instanceof Error ? result.reason.message : String(result.reason));
+            } else if (!transferReadRestricted(result.reason)) {
+              failures.push(result.reason instanceof Error ? result.reason.message : String(result.reason));
+            }
           }
           setError(failures.join(' '));
         }
       } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : String(e));
+        if (active && !signal.aborted && current.current.filesAvailable && !transferReadRestricted(e))
+          setError(e instanceof Error ? e.message : String(e));
       } finally {
-        loading = false;
+        if (pending === controller) pending = undefined;
       }
     };
     loadRef.current = load;
+    updateFileAccess.current = available => {
+      if (available) void load();
+      else {
+        pending?.abort();
+        pending = undefined;
+        setError('');
+      }
+    };
     if (!canFiles && !canConsole)
       return () => {
         active = false;
@@ -129,6 +154,7 @@ export function useRemoteTransferQueue(base: string, permissions: string[], onCo
       stopped = true;
       generation.current++;
       active = false;
+      pending?.abort();
       clearInterval(timer);
       stopFocus?.();
       unsubscribe?.();
@@ -149,6 +175,9 @@ export function useRemoteTransferQueue(base: string, permissions: string[], onCo
       window.removeEventListener('desktop-session-rejected', reset);
     };
   }, [base, permissions.join(',')]);
+  useEffect(() => {
+    updateFileAccess.current(filesAvailable);
+  }, [filesAvailable]);
   async function start(options: RemoteOptions) {
     const currentGeneration = generation.current;
     const result = await api<{identifier?: string} | undefined>(`${base}/files/pull`, {
@@ -175,7 +204,7 @@ export function useRemoteTransferQueue(base: string, permissions: string[], onCo
   return {
     transfers: canFilesNow ? Object.values(records).sort((a, b) => a.updated - b.updated) : [],
     operations: can(permissions, 'websocket.connect') ? operations : [],
-    error: canFilesNow ? error : '',
+    error: canFilesNow && filesAvailable ? error : '',
     start,
     reload: () => loadRef.current(),
   };

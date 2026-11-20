@@ -61,9 +61,16 @@ type updateController struct {
 
 // Only the selected channel is queried. Release accepts final and beta builds;
 // nightly remains isolated. Signed bytes must also come from version assets.
+type updateDownloadProgress struct {
+	Stage   string `json:"stage"`
+	Written int64  `json:"written"`
+	Total   int64  `json:"total"`
+}
+
 type channelProvider struct {
 	base, channel  string
 	explicitSwitch bool
+	progress       atomic.Pointer[updateDownloadProgress]
 }
 
 func updateHTTPClient(download bool) *http.Client {
@@ -157,7 +164,16 @@ func (p *channelProvider) Download(ctx context.Context, rel *updater.Release, w 
 	if err != nil {
 		return err
 	}
-	return ep.Download(ctx, rel, w, progress)
+	err = ep.Download(ctx, rel, w, func(written, total int64) {
+		p.progress.Store(&updateDownloadProgress{Stage: "downloading", Written: written, Total: total})
+		if progress != nil {
+			progress(written, total)
+		}
+	})
+	if err == nil {
+		p.progress.Store(&updateDownloadProgress{Stage: "preparing"})
+	}
+	return err
 }
 func loadUpdateChannel(dir string) (string, error) {
 	b, err := os.ReadFile(filepath.Join(dir, "updates.json"))
@@ -248,6 +264,10 @@ func (c *updateController) action(action string) error {
 		if c.status.State != "available" {
 			return errors.New("check for an available update before installing")
 		}
+		if c.provider != nil {
+			c.provider.progress.Store(&updateDownloadProgress{Stage: "downloading"})
+			defer c.provider.progress.Store(nil)
+		}
 		err = c.engine.DownloadAndInstall(ctx)
 		if err == nil {
 			c.status.State = "ready"
@@ -312,6 +332,16 @@ func (c *updateController) errorSnapshot(err error) updateStatus {
 func (h *desktopHost) serveUpdates(w http.ResponseWriter, r *http.Request) {
 	if h.updates == nil {
 		desktopError(w, 409, "Updates are not configured for this build.")
+		return
+	}
+	if r.URL.Path == "/desktop/update-progress" {
+		// The install action holds the controller mutex until staging finishes.
+		// Read the transfer snapshot without blocking on that action.
+		var progress *updateDownloadProgress
+		if h.updates.provider != nil {
+			progress = h.updates.provider.progress.Load()
+		}
+		desktopJSON(w, 200, progress)
 		return
 	}
 	if r.URL.Path == "/desktop/update-channel" {

@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import base64
 import hashlib
 import io
+from itertools import groupby
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -30,6 +31,19 @@ HOSTS = {
 }
 CONTENT = {"mods", "config", "defaultconfigs", "kubejs", "scripts",
            "datapacks", "resources", "global_packs", "resourcepacks"}
+
+
+def install_stage(stage):
+    print("[voltra:stage] " + stage, flush=True)
+
+
+def install_progress(done, total):
+    if total and (done == 0 or (done * 100 // total) > ((done - 1) * 100 // total)):
+        print(f"[voltra:progress] {done * 100 // total} {done}/{total}", flush=True)
+
+
+def file_stage(file):
+    return "content" if file["path"].split("/", 1)[0] in {"mods", "plugins"} else "download"
 
 
 def allowed_url(address):
@@ -85,10 +99,17 @@ def verified_archive(file, destination, maximum=MAX_PACK_ARCHIVE):
     output = None
     try:
         with OPENER.open(request, timeout=120) as response, destination.open('xb') as output:
-            length = response.headers.get('Content-Length')
-            if length and int(length) > maximum:
-                raise ValueError('The pack download exceeds the supported 2 GiB archive size')
+            raw_length = response.headers.get('Content-Length')
+            length = int(raw_length) if raw_length else None
+            if length is not None:
+                if length < 0:
+                    raise ValueError('The pack download declared an invalid length')
+                if length > maximum:
+                    raise ValueError('The pack download exceeds the supported 2 GiB archive size')
             size = 0
+            last_percent = 0
+            if length:
+                print(f"[voltra:progress] 0 0/{length} bytes", flush=True)
             while True:
                 block = response.read(min(1024**2, maximum - size + 1))
                 if not block:
@@ -98,10 +119,17 @@ def verified_archive(file, destination, maximum=MAX_PACK_ARCHIVE):
                     raise ValueError('The pack download exceeds the supported 2 GiB archive size')
                 checksum.update(block)
                 output.write(block)
-            if length and size != int(length):
+                if length and size < length:
+                    percent = size * 100 // length
+                    if percent > last_percent:
+                        print(f"[voltra:progress] {percent} {size}/{length} bytes", flush=True)
+                        last_percent = percent
+            if length is not None and size != length:
                 raise ValueError('The pack download was interrupted')
             if checksum.hexdigest().lower() != expected.lower():
                 raise ValueError('A download did not match its checksum')
+            if length:
+                print(f"[voltra:progress] 100 {size}/{length} bytes", flush=True)
     except BaseException:
         if output is not None:
             destination.unlink(missing_ok=True)
@@ -145,20 +173,22 @@ def unpack(data, root, prefixes):
                 raise ValueError("The pack contains a symlink or special file")
             if entry.file_size > 512 * 1024**2:
                 raise ValueError("The pack contains an oversized file")
+        selected = []
         for prefix in prefixes:
             for entry in entries:
-                if entry.is_dir() or not entry.filename.startswith(prefix):
-                    continue
-                name = entry.filename[len(prefix):]
-                relative = safe_name(name)
-                if relative.parts[0] not in CONTENT and name != "server.properties":
-                    continue
-                target = safe_target(root, name)
-                if name == "server.properties" and target.exists():
-                    continue
+                if not entry.is_dir() and entry.filename.startswith(prefix):
+                    name = entry.filename[len(prefix):]
+                    relative = safe_name(name)
+                    if relative.parts[0] in CONTENT or name == "server.properties":
+                        selected.append((entry, name))
+        install_progress(0, len(selected))
+        for done, (entry, name) in enumerate(selected, 1):
+            target = safe_target(root, name)
+            if name != "server.properties" or not target.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with archive.open(entry) as source, target.open("wb") as output:
                     shutil.copyfileobj(source, output)
+            install_progress(done, len(selected))
 
 
 def bootstrap_java(major, directory):
@@ -367,24 +397,35 @@ def install(plan, root, work_directory=None):
     with tempfile.TemporaryDirectory(prefix="voltra-minecraft-", dir=work_directory or root) as temporary:
         staging = Path(temporary) / "server"
         staging.mkdir()
-        for file in plan["files"]:
-            target = safe_target(staging, file["path"])
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(verified(file))
-        for index, archive in enumerate(plan.get("archives", [])):
+        for stage, files in groupby(plan["files"], key=file_stage):
+            files = list(files)
+            install_stage(stage)
+            install_progress(0, len(files))
+            for done, file in enumerate(files, 1):
+                target = safe_target(staging, file["path"])
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(verified(file))
+                install_progress(done, len(files))
+        archives = plan.get("archives", [])
+        for index, archive in enumerate(archives):
             downloaded = Path(temporary) / ("pack-" + str(index) + ".zip")
             try:
+                install_stage("pack-download")
                 verified_archive(archive["file"], downloaded)
+                install_stage("pack-extract")
                 unpack(downloaded, staging, archive["prefixes"])
             finally:
                 downloaded.unlink(missing_ok=True)
         installer = plan.get("installer")
         if installer:
+            install_stage("prepare")
             java_root = Path(temporary) / "java"
             java_root.mkdir()
             java = bootstrap_java(plan["java"], java_root)
+            install_stage("loader-download")
             installer_path = Path(temporary) / "installer.jar"
             installer_path.write_bytes(verified(installer))
+            install_stage("loader")
             command = [java, "-jar", str(installer_path)]
             if plan["loader"] == "fabric":
                 command += ["server", "-mcversion", plan["version"], "-loader", plan["loader_version"]]
@@ -409,6 +450,7 @@ def install(plan, root, work_directory=None):
             raise ValueError("The loader installer did not generate its launch target")
         replacing_pack = bool(plan.get("archives"))
         from contextlib import nullcontext
+        install_stage("content" if replacing_pack else "configure")
         with pack_content_transaction(staging, root) if replacing_pack else nullcontext():
             for source in staging.rglob("*"):
                 if source.is_symlink():
@@ -429,6 +471,8 @@ def install(plan, root, work_directory=None):
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, target)
+            if replacing_pack:
+                install_stage("configure")
             properties = safe_target(root, "server.properties")
             if not properties.exists():
                 properties.write_text(
@@ -447,6 +491,7 @@ def main():
         raise ValueError("Accept the Minecraft EULA before installing")
     plan = json.loads(zlib.decompress(base64.b64decode(os.environ["MINECRAFT_INSTALL_PLAN"])))
     install(plan, "/mnt/server")
+    print("[voltra:install] complete", flush=True)
     print("Minecraft " + plan["version"] + " " + plan["loader"] + " installed.")
 
 

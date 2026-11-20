@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {AdminResourceSummary} from '../admin/overview/FleetSummary';
 import {ResourceSummary, ResourceMetric} from '../../ui/ResourceSummary';
 import {queryCacheEpoch} from '../../hooks/queryCache';
@@ -26,7 +27,7 @@ import {fallbackArtwork, getServerBannerArtwork, type ServerArtwork} from './ser
 import {ServerIdentityIcon} from './ServerIdentityIcon';
 import {getServerSoftwareArtwork} from './serverSoftwareArtwork';
 import {artworkColor} from './artworkColor';
-import {serverStatus} from '../../serverStatus';
+import {serverStatus, serverStatusIsPending} from '../../serverStatus';
 import {
   gameIconFallback,
   readOverviewLayout,
@@ -400,7 +401,7 @@ function serverPresentation(s: ServerRecord) {
 function StatePill({status}: {status: ReturnType<typeof serverStatus>}) {
   return (
     <span className={`overview-state state-${status.key}`} data-tone={status.tone}>
-      <span className="status-dot" />
+      {serverStatusIsPending(status.key) ? <TerminalSpinner /> : <span className="status-dot" />}
       {status.label}
     </span>
   );

@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {usePendingSetting} from '../shared/PendingSettings';
 import {confirmAction} from '../../ui/ConfirmAction';
@@ -179,7 +180,13 @@ export function DataTable({
           onChange={e => setSearch(e.target.value)}
         />
         <span className="muted admin-record-count" role="status">
-          {loading ? 'Loading...' : `${filtered.length} ${filtered.length === 1 ? 'record' : 'records'}`}
+          {loading ? (
+            <>
+              <TerminalSpinner /> Loading...
+            </>
+          ) : (
+            `${filtered.length} ${filtered.length === 1 ? 'record' : 'records'}`
+          )}
         </span>
       </div>
       <div className="admin-table-scroll">
@@ -454,6 +461,7 @@ export function Editor({
         {(!shared || method === 'POST') && (
           <div className="actions admin-form-actions">
             <MiraAction disabled={busy} type="submit">
+              {busy && <TerminalSpinner />}
               {busy ? 'Saving…' : submit}
             </MiraAction>
           </div>
@@ -515,6 +523,7 @@ export function Action({
           }
         }}
       >
+        {busy && <TerminalSpinner />}
         {busy ? 'Working…' : children}
       </MiraAction>
       <ErrorMessage error={error} />
@@ -550,7 +559,7 @@ export function ResourceList({
       <ErrorMessage error={q.error} />
       {q.loading && !q.data ? (
         <p className="admin-loading" role="status">
-          Loading records...
+          <TerminalSpinner /> Loading records...
         </p>
       ) : (
         <Panel>
@@ -626,7 +635,7 @@ export function ResourceEditor({
       <ErrorMessage error={q.error} />
       {!creating && q.loading ? (
         <p className="admin-loading" role="status">
-          Loading details...
+          <TerminalSpinner /> Loading details...
         </p>
       ) : (
         <Editor

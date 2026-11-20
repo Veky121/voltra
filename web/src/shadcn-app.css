@@ -163,10 +163,7 @@ button.desktop-account-update{width:30px;height:30px;min-height:30px;flex:0 0 30
 button.desktop-account-update:hover{background:var(--ui-hover);color:var(--text)}
 button.desktop-account-update[data-available]{color:var(--accent);border-color:currentColor;background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .desktop-account-update svg{width:16px;height:16px}
-.desktop-update-spinner{animation:desktop-update-spin 1s linear infinite}
-@keyframes desktop-update-spin{to{transform:rotate(360deg)}}
 @media(min-width:768px){.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-row{flex-direction:column}.voltra-shadcn-shell [data-collapsible=icon] .voltra-account-row .voltra-account-trigger{flex:none}}
-@media(prefers-reduced-motion:reduce){.desktop-update-spinner{animation:none}}
 
 .voltra-sidebar-width-handle{position:absolute;inset:0 -4px 0 auto;width:8px;z-index:20;cursor:col-resize;touch-action:none;user-select:none;--wails-draggable:no-drag}
 .voltra-sidebar-width-handle::after{content:"";position:absolute;inset:0 auto 0 3px;width:1px;background:transparent;pointer-events:none;transition:background-color 160ms ease}

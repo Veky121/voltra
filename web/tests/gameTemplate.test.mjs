@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   templateAgreementsAccepted,
   templateMemoryWarning,
+  templatePlayerLimit,
   templateStorageWarning,
   templateVariableControl,
   templateAdditionalPorts,
@@ -642,4 +643,14 @@ test('template boolean enums keep the native wire values behind switches', () =>
     templateVariableControl({env_variable: 'DIFFICULTY', rules: 'in:0,1,2', default_value: '1'}).boolean,
     false
   );
+});
+
+test('summary player limits come from the variables recipes configure', () => {
+  assert.equal(templatePlayerLimit({SERVER_MAX_USERS: '15'}), 15); // Luanti
+  assert.equal(templatePlayerLimit({MAX_CONNECTIONS: '10'}), 10); // Subnautica Nitrox
+  assert.equal(templatePlayerLimit({PLAYERS: '32'}), 32); // Holdfast
+  assert.equal(templatePlayerLimit({SERVER_PLAYERS: '12', PLAYER_COUNT: '8'}), 12);
+  // Not limits: RCON connections, minimum players, save slots.
+  assert.equal(templatePlayerLimit({RCON_MAX_CONNECTIONS: '5', MIN_PLAYERS: '2', SAVE_SLOTS: '3'}), null);
+  assert.equal(templatePlayerLimit({}), null);
 });

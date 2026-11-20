@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {PageHeading} from '../../ui/PageHeading';
 import {RadioGroup, RadioGroupItem} from '../../components/ui/radio-group';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
@@ -8,7 +9,7 @@ import './games-ui.css';
 import {useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
 import {Link, useNavigate, useSearchParams} from 'react-router-dom';
-import {api, Button, Card, ErrorBox, Field, Input, rows, Select} from '../../lib';
+import {api, Button, ErrorBox, Field, Input, rows, Select} from '../../lib';
 import {GameIcon} from './GameIcon';
 import {MinecraftLoaderIcon} from './MinecraftLoaderIcon';
 import {MinecraftCatalog, MinecraftPackIcon} from './MinecraftCatalog';
@@ -18,6 +19,13 @@ import {MinecraftSegments} from './MinecraftSegments';
 import {GamePorts, useGamePortPlan} from './GamePorts';
 import {gameNodeAvailable} from './gamePortsModel';
 import {GameNameField, GameNodeField} from './GameSetupFields';
+import {
+  GameSetupAgreement,
+  GameSetupIdentity,
+  GameSetupSection,
+  GameSetupSummary,
+  GameSetupUnitInput,
+} from './GameSetupLayout';
 import {json, value} from '../shared/common';
 import type {InstalledServer, Resource} from '../../types/api';
 
@@ -51,9 +59,9 @@ export function MinecraftSetup() {
     : null;
   return (
     <div className="page workspace-page mc-page games-ui">
-      <header className="page-header mc-page-header">
+      <header className="page-header game-setup-header">
         <div>
-          <Link className="mc-back" to="/game-library">
+          <Link className="game-setup-back" to="/game-library">
             ← Game Library
           </Link>
           <PageHeading title={mode === 'modpack' && !pack ? 'Minecraft modpacks' : 'Create a Minecraft server'} />
@@ -89,7 +97,7 @@ export function MinecraftSetup() {
       )}
       {request.loading && (
         <div className="mc-state" role="status">
-          <span className="spinner" />
+          <TerminalSpinner />
           Loading Minecraft options...
         </div>
       )}
@@ -273,35 +281,30 @@ function MinecraftSetupForm({
   }
 
   return (
-    <form className="mc-setup-layout" onSubmit={install}>
-      <fieldset className="mc-form-fields" disabled={busy}>
-        <Card className={`mc-setup-identity${pack ? ' is-modpack' : ''}`}>
-          {pack && (
-            <div className="mc-selected-pack">
-              <MinecraftPackIcon pack={pack.project} />
-              <div>
-                <h2>{pack.project.name}</h2>
-                <p>
-                  {pack.version.name} · {pack.provider === 'curseforge' ? 'CurseForge' : 'Modrinth'}
-                </p>
+    <form className="game-setup-layout" onSubmit={install}>
+      <fieldset className="game-setup-fields" disabled={busy}>
+        <GameSetupIdentity
+          icon={!pack && <GameIcon minecraft />}
+          selection={
+            pack && (
+              <div className="mc-selected-pack">
+                <MinecraftPackIcon pack={pack.project} />
+                <div>
+                  <h2>{pack.project.name}</h2>
+                  <p>
+                    {pack.version.name} · {pack.provider === 'curseforge' ? 'CurseForge' : 'Modrinth'}
+                  </p>
+                </div>
+                <Button variant="secondary" onClick={onChangePack}>
+                  Change
+                </Button>
               </div>
-              <Button variant="secondary" onClick={onChangePack}>
-                Change
-              </Button>
-            </div>
-          )}
-          <div className="mc-identity">
-            {!pack && <GameIcon minecraft />}
-            <div>
-              <GameNameField value={form.name} onChange={name => set('name', name)} />
-            </div>
-          </div>
-        </Card>
-        <Card className="mc-config-card">
-          <div className="mc-section-heading">
-            <span className="mc-section-number">1</span>
-            <h2>Game and loader</h2>
-          </div>
+            )
+          }
+        >
+          <GameNameField value={form.name} onChange={name => set('name', name)} />
+        </GameSetupIdentity>
+        <GameSetupSection number={1} title="Game and loader">
           {pack ? (
             <>
               <dl className="mc-version-detail">
@@ -398,7 +401,7 @@ function MinecraftSetupForm({
                   )}
                   {loaderRequest.loading ? (
                     <p className="muted" role="status">
-                      Loading {loaderName} versions...
+                      <TerminalSpinner /> Loading {loaderName} versions...
                     </p>
                   ) : (
                     loaderRequest.data &&
@@ -433,12 +436,8 @@ function MinecraftSetupForm({
               )}
             </>
           )}
-        </Card>
-        <Card className="mc-config-card">
-          <div className="mc-section-heading">
-            <span className="mc-section-number">2</span>
-            <h2>Java and memory</h2>
-          </div>
+        </GameSetupSection>
+        <GameSetupSection number={2} title="Java and memory">
           <div className="form-grid">
             <Field label="Java runtime">
               <Select value={form.runtime} onChange={e => set('runtime', e.target.value)}>
@@ -455,7 +454,7 @@ function MinecraftSetupForm({
               label="Server memory"
               hint={memoryMiB !== null ? `${formatMiBGB(memoryMiB)}` : 'Enter a size in GB.'}
             >
-              <div className="mc-unit-input">
+              <GameSetupUnitInput>
                 <Input
                   type="number"
                   required
@@ -466,14 +465,13 @@ function MinecraftSetupForm({
                   value={form.memory}
                   onChange={e => set('memory', e.target.value)}
                 />
-                <span>GB</span>
-              </div>
+              </GameSetupUnitInput>
             </Field>
           </div>
           <p className="muted mc-help">Automatic selects the Java version required by the game and loader.</p>
           {runtimeRequest.loading && (
             <p className="muted" role="status">
-              Loading registered Java runtimes...
+              <TerminalSpinner /> Loading registered Java runtimes...
             </p>
           )}
           <ErrorBox>{runtimeRequest.error}</ErrorBox>
@@ -485,14 +483,14 @@ function MinecraftSetupForm({
           {!runtimeRequest.loading && !runtimeRequest.error && enabledRuntimes.length === 0 && (
             <p className="muted">No enabled Java runtimes. Ask an administrator to register one.</p>
           )}
-          <Disclosure className="mc-advanced">
+          <Disclosure className="game-setup-advanced">
             <DisclosureTrigger>Advanced memory and Java arguments</DisclosureTrigger>
             <div className="form-grid">
               <Field
                 label="Initial Java heap"
                 hint={xmsMiB !== null ? `${formatMiBGB(xmsMiB)}` : 'Enter a size in GB.'}
               >
-                <div className="mc-unit-input">
+                <GameSetupUnitInput>
                   <Input
                     type="number"
                     required
@@ -501,8 +499,7 @@ function MinecraftSetupForm({
                     value={form.xms}
                     onChange={e => set('xms', e.target.value)}
                   />
-                  <span>GB</span>
-                </div>
+                </GameSetupUnitInput>
               </Field>
               <Field
                 label="Maximum Java heap"
@@ -514,7 +511,7 @@ function MinecraftSetupForm({
                       : 'Enter a size in GB.'
                 }
               >
-                <div className="mc-unit-input">
+                <GameSetupUnitInput>
                   <Input
                     type="number"
                     required={!form.autoHeap}
@@ -524,8 +521,7 @@ function MinecraftSetupForm({
                     value={form.autoHeap ? String(miBToGB(Math.max(0, heapBudget))) : form.xmx}
                     onChange={e => set('xmx', e.target.value)}
                   />
-                  <span>GB</span>
-                </div>
+                </GameSetupUnitInput>
               </Field>
             </div>
             <label className="check">
@@ -550,12 +546,8 @@ function MinecraftSetupForm({
             </Field>
           </Disclosure>
           {(!validMemory || !validHeap) && <ErrorBox>{validation}</ErrorBox>}
-        </Card>
-        <Card className="mc-config-card">
-          <div className="mc-section-heading">
-            <span className="mc-section-number">3</span>
-            <h2>Host machine</h2>
-          </div>
+        </GameSetupSection>
+        <GameSetupSection number={3} title="Host machine">
           <div className="form-grid">
             <GameNodeField value={form.node} onChange={node => set('node', node)} nodes={options.nodes} automatic />
           </div>
@@ -564,72 +556,49 @@ function MinecraftSetupForm({
             creation.
           </p>
           <GamePorts plan={ports.data} loading={ports.loading} error={ports.error} retry={ports.reload} />
-        </Card>
+        </GameSetupSection>
       </fieldset>
-      <aside className="mc-install-summary">
-        <Card>
-          <div className="mc-summary-heading">
-            {pack ? <MinecraftPackIcon pack={pack.project} /> : <GameIcon minecraft />}
-            <div>
-              <h2>{pack?.project.name ?? 'Minecraft'}</h2>
-              <p>{pack ? pack.version.name : 'Java Edition'}</p>
-            </div>
-          </div>
-          <dl>
-            <div>
-              <dt>Version</dt>
-              <dd>{form.version}</dd>
-            </div>
-            <div>
-              <dt>Loader</dt>
-              <dd>
-                {loaderName}
-                {!pack && selectedLoaderVersion ? ` ${selectedLoaderVersion}` : ''}
-              </dd>
-            </div>
-            <div>
-              <dt>Java</dt>
-              <dd>
-                {form.runtime === 'auto'
-                  ? 'Automatic'
-                  : (enabledRuntimes.find(runtime => String(runtime.id) === form.runtime)?.name ?? 'Unavailable')}
-              </dd>
-            </div>
-            <div>
-              <dt>Memory</dt>
-              <dd>{form.memory || '0'} GB</dd>
-            </div>
-            <div>
-              <dt>Storage</dt>
-              <dd>10 GB</dd>
-            </div>
-          </dl>
-          <label className="check mc-eula">
-            <GameSwitch
-              checked={form.eula}
-              disabled={busy}
-              required
-              onCheckedChange={checked => set('eula', checked)}
-            />
-            <span>
-              I agree to the{' '}
-              <a href="https://www.minecraft.net/en-us/eula" target="_blank" rel="noreferrer">
-                Minecraft EULA
-              </a>
-              .
-            </span>
-          </label>
-          <ErrorBox>{error || (submitted ? validation : '')}</ErrorBox>
-          {!options.can_install && <p className="mc-inline-empty">An administrator must install new servers.</p>}
-          {!validNode && (
-            <p className="mc-inline-empty">No available node. Connect a compatible node, then reload setup.</p>
-          )}
-          <Button type="submit" disabled={busy || !canSubmit || !form.eula}>
-            {busy ? 'Creating server...' : pack ? 'Install modpack' : 'Install Minecraft'}
-          </Button>
-          <p className="muted mc-install-note">Follow installation progress in the console.</p>
-        </Card>
-      </aside>
+      <GameSetupSummary
+        icon={pack ? <MinecraftPackIcon pack={pack.project} /> : <GameIcon minecraft />}
+        name={pack?.project.name ?? 'Minecraft'}
+        subtitle={pack ? pack.version.name : 'Java Edition'}
+        rows={[
+          {label: 'Version', value: form.version},
+          {
+            label: 'Loader',
+            value: !pack && selectedLoaderVersion ? `${loaderName} ${selectedLoaderVersion}` : loaderName,
+          },
+          {
+            label: 'Java',
+            value:
+              form.runtime === 'auto'
+                ? 'Automatic'
+                : (enabledRuntimes.find(runtime => String(runtime.id) === form.runtime)?.name ?? 'Unavailable'),
+          },
+          {label: 'Memory', value: `${form.memory || '0'} GB`},
+          {label: 'Storage', value: '10 GB'},
+        ]}
+        agreements={
+          <GameSetupAgreement
+            title="Minecraft EULA"
+            url="https://www.minecraft.net/en-us/eula"
+            checked={form.eula}
+            disabled={busy}
+            required
+            onCheckedChange={checked => set('eula', checked)}
+          />
+        }
+        error={error || (submitted ? validation : '')}
+        install={pack ? 'Install modpack' : 'Install Minecraft'}
+        busy={busy}
+        disabled={!canSubmit || !form.eula}
+        note="Follow installation progress in the console."
+      >
+        {!options.can_install && <p className="mc-inline-empty">An administrator must install new servers.</p>}
+        {!validNode && (
+          <p className="mc-inline-empty">No available node. Connect a compatible node, then reload setup.</p>
+        )}
+      </GameSetupSummary>
     </form>
   );
 }

@@ -24,6 +24,7 @@ function load(file, mocks = {}) {
     format,
     'features/admin/freshValues': freshValues,
     notifications: {Feedback: ({message}) => React.createElement('span', null, message)},
+    'ui/TerminalProgress': {TerminalSpinner: 'terminal-spinner'},
     'ui/ConfirmAction': {confirmAction: async () => true},
     'features/shared/PendingSettings': {usePendingSetting() {}, useDiscardSettings: () => async () => true},
     'ui/PageHeading': {PageHeading: ({children}) => React.createElement(React.Fragment, null, children)},

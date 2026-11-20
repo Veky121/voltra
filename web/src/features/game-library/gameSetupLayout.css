@@ -1,0 +1,97 @@
+@import "./games-ui.css";
+
+:is(.page.mc-page,.page.game-setup-page){max-width:1440px}
+.game-setup-back,.mc-back{display:inline-block;font-size:calc(12px * var(--ui-font-scale,1));color:var(--muted);margin-bottom:10px}
+.game-setup-header{align-items:center}
+.game-setup-header h1{font-size:calc(22px * var(--ui-font-scale,1));margin:0;overflow-wrap:anywhere}
+.game-setup-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:20px;align-items:start}
+.game-setup-fields{min-width:0;margin:0;padding:0;border:0}
+:is(.mc-page,.game-setup-page) .card{padding:var(--ui-card-padding);margin-bottom:18px}
+:is(.mc-page,.game-setup-page) .card h2{font-size:calc(15px * var(--ui-font-scale,1))}
+:is(.mc-page,.game-setup-page) .field{font-size:calc(13px * var(--ui-font-scale,1))}
+:is(.mc-page,.game-setup-page) .muted{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.game-setup-name{display:flex;align-items:center;gap:20px}
+.game-setup-name>.game-icon{width:58px;height:58px}
+.game-setup-name>div{flex:1;min-width:0}
+.game-setup-name .field{margin:0}
+.game-setup-name input{font-size:calc(14px * var(--ui-font-scale,1))}
+:is(.mc-page,.game-setup-page) .game-setup-identity{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:center}
+:is(.mc-page,.game-setup-page) .game-setup-identity.has-selection{grid-template-columns:minmax(0,1.2fr) minmax(220px,1fr)}
+.game-setup-identity.has-selection>.game-setup-name{min-width:0;padding-left:24px;border-left:1px solid var(--ui-divider)}
+.game-setup-identity>.mc-selected-pack{min-width:0}
+.game-setup-identity .mc-selected-pack>.mc-pack-icon{flex-shrink:0}
+.game-setup-identity .mc-selected-pack>button{flex-shrink:0}
+@media(max-width:700px){:is(.mc-page,.game-setup-page) .game-setup-identity.has-selection{grid-template-columns:minmax(0,1fr)}.game-setup-identity.has-selection>.game-setup-name{padding-left:0;padding-top:18px;border-left:0;border-top:1px solid var(--ui-divider)}}
+.game-setup-section-heading{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.game-setup-section-heading h2{margin:0!important}
+.game-setup-section-heading>span{display:grid;place-items:center;width:24px;height:24px;flex-shrink:0;border-radius:7px;background:var(--ui-hover);color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1))}
+.game-setup-unit-input{display:flex;align-items:center;position:relative;min-width:0}
+.game-setup-unit-input input{padding-right:46px}
+.game-setup-unit-input>span{position:absolute;right:13px;font-size:calc(12px * var(--ui-font-scale,1));pointer-events:none;color:var(--muted)}
+.game-setup-unit-input input::-webkit-inner-spin-button{margin-right:28px}
+.game-setup-advanced{margin-top:22px;border-top:1px solid var(--ui-border);padding-top:17px}
+.game-setup-advanced [data-voltra-disclosure-trigger]{font-size:calc(12px * var(--ui-font-scale,1));font-weight:500;color:var(--muted);cursor:pointer}
+.game-setup-page .game-setup-advanced [data-voltra-disclosure-trigger][aria-expanded=true]{margin-bottom:12px}
+.game-setup-advanced .check{font-size:calc(12px * var(--ui-font-scale,1));margin:0 0 20px}
+.game-setup-advanced>.field:last-child{margin-bottom:0}
+.game-setup-summary{position:sticky;top:24px}
+.game-setup-summary-heading{display:flex;gap:13px;align-items:center;min-width:0}
+.game-setup-summary-heading>.game-icon,.game-setup-summary-heading>.mc-pack-icon{width:45px;height:45px;flex-shrink:0}
+.game-setup-summary-heading>div{min-width:0}
+.game-setup-summary-heading h2{margin:0 0 4px!important;line-height:1.4;overflow-wrap:anywhere}
+.game-setup-summary-heading p{font-size:calc(11px * var(--ui-font-scale,1));color:var(--muted);margin:0;overflow-wrap:anywhere}
+.game-setup-install dl{display:block;margin:22px 0}
+.game-setup-install dl>div{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--ui-border);font-size:calc(12px * var(--ui-font-scale,1))}
+.game-setup-install dt{flex-shrink:0}
+.game-setup-install dd{text-align:right;overflow-wrap:anywhere}
+.game-setup-agreement{margin:0 0 20px}
+.game-setup-agreement .check{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.7;align-items:flex-start;margin:0;gap:4px}
+.game-setup-agreement .check input{margin-top:5px;flex-shrink:0}
+.game-setup-install button[type=submit]{width:100%}
+.game-setup-install-note{margin:13px 0 0;text-align:center;font-size:calc(11px * var(--ui-font-scale,1))!important}
+@media(max-width:1100px){.game-setup-layout{grid-template-columns:minmax(0,1fr) 270px;gap:18px}:is(.mc-page,.game-setup-page) .card{padding:16px}}
+@media(max-width:900px){.game-setup-layout{grid-template-columns:minmax(0,1fr)}.game-setup-summary{position:static}.game-setup-summary .card{max-width:none}}
+@media(max-width:560px){.game-setup-header{align-items:stretch}.game-setup-header h1{font-size:calc(20px * var(--ui-font-scale,1))}.game-setup-header .mc-segments{width:100%}:is(.mc-page,.game-setup-page) .card{padding:18px}.game-setup-name{gap:14px}.game-setup-name>.game-icon{width:40px;height:40px}}
+
+.template-readiness{margin:16px 0;padding:14px 16px;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:var(--ui-hover);font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6}
+.template-readiness>p{margin:0 0 8px;font-weight:500;color:var(--text)}
+.template-readiness>ul{padding-left:18px;margin:0}
+.template-readiness li+li{margin-top:6px}
+.template-readiness a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.template-readiness a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.game-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}
+.game-setup-grid>.field,.game-setup-unit-input>input,.game-setup-summary,.game-setup-install,.game-setup-about{min-width:0}
+.game-setup-page .game-setup-install button[type=submit]{white-space:normal;height:auto;overflow-wrap:anywhere}
+.game-setup-page .game-setup-about [data-voltra-disclosure-trigger]{white-space:normal;text-align:left}
+.game-setup-page .game-setup-advanced select{max-width:100%}
+.game-setup-art{object-fit:cover;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);flex-shrink:0}
+.game-setup-art[data-fit=contain]{object-fit:contain}
+.game-setup-name>.game-setup-art{width:58px;height:58px}
+.game-setup-summary-heading>.game-setup-art{width:45px;height:45px}
+.game-setup-terms,.game-setup-recipe{margin-top:8px}
+.game-setup-recipe{border-top:1px solid var(--ui-divider);padding-top:8px}
+.game-setup-terms pre{max-height:14rem;overflow:auto;white-space:pre-wrap;font:inherit}
+.game-setup-agreement .muted,.game-setup-terms pre{margin:6px 0 0}
+.game-setup-about{font-size:calc(12px * var(--ui-font-scale,1));line-height:1.6;overflow-wrap:anywhere}
+.game-setup-about p{margin:4px 0 8px}
+.game-setup-about h3{font-size:inherit;margin:12px 0 4px}
+.game-setup-about ol{margin:0 0 8px;padding-left:20px}
+.game-setup-about li+li{margin-top:4px}
+.game-setup-about .game-help{gap:8px;margin:10px 0 0}
+.game-setup-about .game-help p{font-size:inherit}
+@media(min-width:901px){
+  .game-setup-summary:has(.game-setup-about){max-height:calc(100dvh - 48px);overflow:auto}
+}
+@media(max-width:700px){
+  .game-setup-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:560px){
+  .game-setup-name>.game-setup-art{width:40px;height:40px}
+}
+/* Games without a square logo show their initials. */
+.game-setup-monogram{display:grid;place-items:center;border:1px solid var(--ui-border);border-radius:var(--ui-control-radius);background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 32%,transparent),color-mix(in srgb,var(--primary) 8%,transparent));color:var(--foreground);font-weight:700;letter-spacing:.02em;font-size:calc(18px * var(--ui-font-scale,1))}
+.game-setup-summary-heading>.game-setup-monogram{font-size:calc(15px * var(--ui-font-scale,1))}
+/* A value the setup fixes reads as information, not as a field to edit. */
+.game-setup-unit-input input[readonly]{background:transparent;cursor:default;color:var(--muted-foreground)}
+.game-setup-about h3{margin:4px 0 0;font-size:calc(13px * var(--ui-font-scale,1))}
+.game-setup-steps{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--muted-foreground)}

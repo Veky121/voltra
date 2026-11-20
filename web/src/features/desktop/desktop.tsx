@@ -1,4 +1,5 @@
-import {DesktopUpdatesEnabled} from './DesktopUpdateControl';
+import {TerminalSpinner} from '../../ui/TerminalProgress';
+import {DesktopUpdateProgress, DesktopUpdatesEnabled} from './DesktopUpdateControl';
 import {Feedback} from '../../notifications';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {ActionButton as MiraAction} from '../../ui/ActionButton';
@@ -116,6 +117,7 @@ export function DesktopAppInfo() {
                 </div>
               }
             >
+              <DesktopUpdateProgress />
               {status?.state === 'up-to-date' && (
                 <span className="settings-note" role="status">
                   No newer build on {status.channel === 'release' ? 'Release' : 'Nightly'}.
@@ -396,6 +398,7 @@ export default function DesktopGate({children}: {children: ReactNode}) {
           Cancel
         </Button>
         <Button variant="danger" disabled={busy} onClick={() => void unlink()}>
+          {busy && <TerminalSpinner />}
           {busy ? 'Unlinking…' : 'Unlink panel'}
         </Button>
       </div>
@@ -524,6 +527,7 @@ export default function DesktopGate({children}: {children: ReactNode}) {
               <Input required maxLength={100} value={name} onChange={e => setName(e.target.value)} disabled={busy} />
             </Field>
             <Button type="submit" disabled={busy}>
+              {busy && <TerminalSpinner />}
               {busy ? 'Connecting...' : 'Connect account'}
             </Button>
             {status.linked && (

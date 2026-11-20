@@ -1,13 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
+import {loadModule} from './loadModule.mjs';
+import * as transferModel from '../src/features/servers/remoteTransferModel.ts';
+
+const {
   mergeTransfers,
   reconcileTransfers,
   transferActive,
   transferRecentlyActive,
   transferPollDelay,
   transferProgress,
-} from '../src/features/servers/remoteTransferModel.ts';
+  transferRecentlyCompleted,
+  transferCompletionWindow,
+} = transferModel;
 
 const transfer = {identifier: 'one', name: 'world.zip', directory: '/', state: 'downloading', updated: 100};
 
@@ -80,4 +85,104 @@ test('paused uploads remain resumable without active animation or frequent idle 
       .received_bytes,
     20
   );
+});
+
+test('only a recent confirmed transfer completion is shown as done', () => {
+  const receipt = {state: 'complete', updated: 10000};
+  assert.equal(transferRecentlyCompleted(receipt, 10000), true);
+  assert.equal(transferRecentlyCompleted(receipt, 9999), false);
+  assert.equal(transferRecentlyCompleted(receipt, 10000 + transferCompletionWindow), false);
+  assert.equal(transferRecentlyCompleted({...receipt, state: 'saving'}, 10000), false);
+});
+
+test('file transfer reads pause for server restrictions, resume on recovery, and report actual failures', async () => {
+  const calls = [];
+  const slots = [];
+  let index = 0;
+  let effects = [];
+  const react = {
+    createContext: () => ({}),
+    useRef: current => (slots[index++] ??= {current}),
+    useState: initial => {
+      const slot = index++;
+      const cell = (slots[slot] ??= {value: initial});
+      return [cell.value, value => (cell.value = value)];
+    },
+    useEffect: (effect, dependencies) => {
+      const cell = (slots[index++] ??= {});
+      if (dependencies.some((value, i) => value !== cell.dependencies?.[i])) {
+        cell.dependencies = dependencies;
+        effects.push(() => {
+          cell.cleanup?.();
+          cell.cleanup = effect();
+        });
+      }
+    },
+  };
+  const {useRemoteTransferQueue} = loadModule(
+    new URL('../src/features/servers/useRemoteTransfers.ts', import.meta.url),
+    {
+      react,
+      './remoteTransferModel': transferModel,
+      '../../lib': {
+        api: (path, {signal}) => new Promise((resolve, reject) => calls.push({path, signal, resolve, reject})),
+      },
+      '../shared/common': {can: (permissions, permission) => permissions.includes(permission)},
+      '../../hooks/focusRevalidation': {onFocusRevalidate: () => () => {}},
+    },
+    {window: new EventTarget()}
+  );
+  const permissions = ['file.read'];
+  const ready = {status: null, is_suspended: false, is_transferring: false, is_node_under_maintenance: false};
+  const render = (server = ready) => {
+    index = 0;
+    const queue = useRemoteTransferQueue(
+      '/server',
+      permissions,
+      () => {},
+      transferModel.transferFilesAvailable(server)
+    );
+    effects.splice(0).forEach(effect => effect());
+    return queue;
+  };
+  const settle = () => new Promise(resolve => setImmediate(resolve));
+  try {
+    for (const restricted of [{status: 'installing'}, {is_transferring: true}, {is_node_under_maintenance: true}]) {
+      const blocked = render({...ready, ...restricted});
+      await blocked.reload();
+      assert.equal(calls.length, 0);
+      assert.equal(blocked.error, '');
+    }
+    render();
+    assert.deepEqual(
+      calls.map(call => call.path),
+      ['/server/files/pulls', '/server/files/transfer-progress']
+    );
+    const conflict = Object.assign(new Error('Installation started'), {code: 'ServerStateConflict', status: 409});
+    calls.splice(0).forEach(call => call.reject(conflict));
+    await settle();
+    assert.equal(render().error, '');
+
+    void render().reload();
+    const interrupted = calls.splice(0);
+    render({...ready, status: 'installing'});
+    assert.ok(interrupted.every(call => call.signal.aborted));
+    interrupted.forEach(call => call.resolve({transfers: []}));
+    render();
+    assert.equal(calls.length, 2);
+    calls[0].reject(new Error('Node unavailable'));
+    calls[1].resolve({transfers: []});
+    await settle();
+    assert.equal(render().error, 'Node unavailable');
+  } finally {
+    slots.forEach(slot => slot.cleanup?.());
+  }
+});
+
+test('a failed transfer keeps its last measured percentage', () => {
+  assert.equal(
+    transferProgress({...transfer, state: 'failed', size_known: true, total_bytes: 200, received_bytes: 126}),
+    63
+  );
+  assert.equal(transferProgress({...transfer, state: 'failed', size_known: false}), null);
 });

@@ -46,6 +46,7 @@ func (a *App) registerOperations(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/client/servers/{server}/power", a.clientPower)
 	mux.HandleFunc("GET /api/client/servers/{server}/websocket", a.clientWebsocket)
 	mux.HandleFunc("GET /api/client/servers/{server}/console-history", a.clientConsoleHistory)
+	mux.HandleFunc("GET /api/client/servers/{server}/install-progress", a.clientInstallProgress)
 	mux.HandleFunc("GET /api/client/servers/{server}/ws", a.clientSocketProxy)
 	for _, op := range []string{"list", "contents", "download", "upload"} {
 		mux.HandleFunc("GET /api/client/servers/{server}/files/"+op, a.clientFiles)
@@ -1462,13 +1463,29 @@ func (a *App) clientSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		cycle := "pending:reinstall:" + newUUID()
-		if _, e = a.one(r.Context(), `UPDATE servers SET status='installing',installation_id=$2,updated_at=NOW() WHERE id=$1 AND (status IS NULL OR status='reinstall_failed') AND installation_id IS NOT DISTINCT FROM $3 AND NOT EXISTS(SELECT 1 FROM server_transfers WHERE server_id=$1 AND successful IS NULL) RETURNING *`, num(s["id"]), cycle, s["installation_id"]); e != nil {
+		tx, e := a.DB.Begin(r.Context())
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		defer tx.Rollback(r.Context())
+		id := num(s["id"])
+		if e = tx.QueryRow(r.Context(), `UPDATE servers SET status='installing',installation_id=$2,updated_at=NOW() WHERE id=$1 AND (status IS NULL OR status='reinstall_failed') AND installation_id IS NOT DISTINCT FROM $3 AND NOT EXISTS(SELECT 1 FROM server_transfers WHERE server_id=$1 AND successful IS NULL) RETURNING id`, id, cycle, s["installation_id"]).Scan(&id); e != nil {
 			if errors.Is(e, pgx.ErrNoRows) {
 				e = &APIError{Status: 409, Code: "ServerStateConflict", Detail: "The server is already processing another operation"}
 			}
 			fail(w, e)
 			return
 		}
+		if e = a.persistConsoleInstallStart(r.Context(), tx, id, cycle); e != nil {
+			fail(w, e)
+			return
+		}
+		if e = tx.Commit(r.Context()); e != nil {
+			fail(w, e)
+			return
+		}
+
 		resp, e := a.daemonServer(r.Context(), s, "POST", "/reinstall", M{})
 		if e != nil {
 			_ = a.exec(r.Context(), `UPDATE servers SET status=$2,installation_id=$3,installed_at=$4,updated_at=NOW() WHERE id=$1 AND installation_id=$5 AND status='installing'`, num(s["id"]), s["status"], s["installation_id"], s["installed_at"], cycle)

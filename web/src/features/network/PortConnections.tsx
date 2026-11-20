@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {useEffect, useState} from 'react';
@@ -426,7 +427,7 @@ export default function PortConnections() {
                 )}
                 {port.is_default && domainData.cleanup_pending && (
                   <p className="network-status-note" role="status">
-                    Subdomain removal pending.
+                    <TerminalSpinner /> Subdomain removal pending.
                   </p>
                 )}
               </div>
@@ -542,6 +543,7 @@ export default function PortConnections() {
                           type="submit"
                           disabled={busy || !!setup.error || setup.loading || !selectedClient || !protocols.length}
                         >
+                          {busy && <TerminalSpinner />}
                           {busy ? 'Applying...' : 'Forward port'}
                         </Button>
                       </div>
@@ -593,6 +595,7 @@ export default function PortConnections() {
                       type="submit"
                       disabled={busy || !!domain.error || domain.loading || !validLabel || !selectedDomainRoute}
                     >
+                      {busy && <TerminalSpinner />}
                       {busy ? 'Saving...' : 'Save subdomain'}
                     </Button>
                     {domainData.hostname && (

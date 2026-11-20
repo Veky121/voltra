@@ -14,7 +14,6 @@ h1{font-size:calc(25px * var(--ui-font-scale,1));line-height:1.3;letter-spacing:
 .modal>header button.button{width:28px;height:28px;min-height:28px;padding:0;border-color:transparent;background:transparent;color:var(--muted);font-size:calc(20px * var(--ui-font-scale,1));box-shadow:none}
 .modal>header button.button:hover{background:var(--ui-hover);color:var(--text);filter:none}
 .loading,.empty{font-size:calc(13px * var(--ui-font-scale,1));color:var(--muted)}
-.loading .spinner{width:17px;height:17px;border-width:2px}
 .skip-link{border-radius:8px;font-size:calc(13px * var(--ui-font-scale,1))}
 .sidebar-nav-error{border:1px solid #edc48224;border-radius:8px;background:#edc48208}
 .sidebar-account-menu .account-menu-heading{font-size:calc(10px * var(--ui-font-scale,1));color:var(--muted)}

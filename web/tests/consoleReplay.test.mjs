@@ -8,17 +8,23 @@ import {ConsoleLineQueue, CONSOLE_QUEUE_FRAME_MS} from '../src/features/console/
 import {consoleOutput} from '../src/features/console/consoleOutput.ts';
 import {consoleClock, consoleStateLine} from '../src/features/console/consoleLifecycle.ts';
 import {consoleRunID, consoleRunChanged} from '../src/features/console/consoleRun.ts';
+import * as installProgress from '../src/features/console/installProgress.ts';
 import {loadServerSocket} from './serverSocketModule.mjs';
 
-function fixture() {
+function fixture({regular = false, server = {}} = {}) {
   const effects = [],
     timers = new Map(),
     requests = [],
-    sockets = [];
+    sockets = [],
+    feedback = [];
   const doc = Object.assign(new EventTarget(), {hidden: false});
   let history = emptyConsoleHistory(),
+    installHistory = emptyConsoleHistory(),
+    safeStages = [],
+    installation = installProgress.emptyInstallProgress,
+    historyHook = 0,
     nextTimer = 0,
-    cleanup,
+    cleanups = [],
     subscriber,
     fresh = false;
   const react = {
@@ -26,11 +32,15 @@ function fixture() {
     useRef: current => ({current}),
     useState: initial => {
       let state = typeof initial === 'function' ? initial() : initial;
+      const historyIndex = initial === emptyConsoleHistory ? historyHook++ : -1;
       return [
         state,
         update => {
           state = typeof update === 'function' ? update(state) : update;
-          if (initial === emptyConsoleHistory) history = state;
+          if (historyIndex === 0) history = state;
+          if (historyIndex === 1) installHistory = state;
+          if (initial === installProgress.emptyInstallProgress) installation = state;
+          if (state?.stages && typeof state.phase === 'string') safeStages = state.stages;
         },
       ];
     },
@@ -49,6 +59,11 @@ function fixture() {
     }
   }
   const api = path => new Promise((resolve, reject) => requests.push({path, resolve, reject}));
+  const Feedback = () => null;
+  const create = (type, props) => {
+    if (type === Feedback) feedback.push(props);
+    return null;
+  };
   const modules = {
     react,
     '../../hooks/liveEvents': {
@@ -60,17 +75,24 @@ function fixture() {
       },
       isLivePathFresh: () => fresh,
     },
-    'react/jsx-runtime': {jsx: () => null, jsxs: () => null},
-    '../../lib': {api},
+    'react/jsx-runtime': {jsx: create, jsxs: create},
+    '../../notifications': {Feedback},
+    '../../lib': {
+      api,
+      useAPI: () => ({data: {root_admin: !regular}}),
+      unwrap: data => data,
+    },
     '../servers/ServerDashboard': {useServerTelemetry: () => ({state: 'unknown'})},
     './consoleHistory': {emptyConsoleHistory, appendConsoleHistory},
     './consoleQueue': {ConsoleLineQueue, CONSOLE_QUEUE_FRAME_MS},
     './consoleReplay': {ConsoleReplayOverlap},
     './consoleOutput': {consoleOutput},
     './consoleLifecycle': {consoleClock, consoleStateLine},
+    './installProgress': installProgress,
     '../servers/serverPower': {consolePowerEvent: 'power'},
     '../shared/common': {
-      useServer: () => ({base: '/server', server: {}, permissions: []}),
+      can: (permissions, permission) => permissions.includes(permission),
+      useServer: () => ({base: '/server', server, permissions: ['websocket.connect']}),
       useAction: () => ({}),
       value: r => r,
     },
@@ -109,7 +131,7 @@ function fixture() {
   exports.default();
   for (const effect of effects) {
     const result = effect();
-    if (result) cleanup = result;
+    if (result) cleanups.push(result);
   }
   // The shared socket fetches its credentials through a couple more promise steps.
   const tick = async () => {
@@ -127,7 +149,11 @@ function fixture() {
     const request = requests.find(r => r.path.includes('console-history'));
     assert.ok(request);
     requests.splice(requests.indexOf(request), 1);
-    request.resolve(data);
+    const start = BigInt(data.cursor) - BigInt(data.data?.length ?? 0) + 1n;
+    request.resolve({
+      ...data,
+      data: data.data?.map((entry, i) => ({id: String(start + BigInt(i)), ...entry})),
+    });
     await tick();
     await run(0);
   };
@@ -146,10 +172,126 @@ function fixture() {
     },
     emit: data => subscriber?.({status: 200, data}),
     text: () => consoleHistoryText(history),
-    cleanup: () => cleanup(),
+    installText: () => consoleHistoryText(installHistory),
+    installation: () => installation,
+    safeStages: () => safeStages,
+    feedback,
+    cleanup: () => cleanups.forEach(fn => fn()),
   };
 }
 const entry = line => ({event: 'console output', line});
+
+test('install progress redraws stay in the full log and survive gameplay history rotation', async () => {
+  const f = fixture();
+  try {
+    const redraws = '### 20.0%\r###### 60.0%\r########## 100.0%';
+    await f.respond({
+      run_start: '0',
+      cursor: '603',
+      capture: {connected: true},
+      data: [
+        {event: 'install output', line: 'Downloading server'},
+        {event: 'install output', line: redraws},
+        {event: 'install output', line: 'Extracting archive'},
+      ],
+    });
+    assert.doesNotMatch(f.text(), /\d+\.0%/);
+    assert.equal(f.installText(), `Downloading server\n${redraws.replaceAll('\r', '\n')}\nExtracting archive`);
+    assert.deepEqual(
+      f.installation().stages.map(stage => stage.id),
+      ['download', 'extract']
+    );
+    await f.run(1000);
+    await f.respond({run_start: '604', cursor: '605', capture: {connected: true}, data: [entry('New startup')]});
+    await f.run(10);
+    await f.respond({
+      run_start: '604',
+      cursor: '605',
+      capture: {connected: true},
+      data: [
+        {id: '603', event: 'install output', line: 'Extracting archive'},
+        {
+          id: '604',
+          event: 'panel message',
+          line: '[Voltra]: Server is starting. Preparing the container and launching the process.',
+        },
+        entry('New startup'),
+      ],
+    });
+    assert.equal(f.installation().runtime, 'starting');
+    assert.equal(f.installText().split('Extracting archive').length - 1, 1);
+    assert.match(f.installText(), /### 20.0%/);
+    assert.match(f.text(), /New startup/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('saved retry boundaries replace the full log and keep installer lines out of the live console', async () => {
+  const f = fixture();
+  try {
+    await f.respond({
+      cursor: '2',
+      capture: {connected: true},
+      data: [
+        {event: 'install output', line: 'Downloading server'},
+        {event: 'install output', line: 'Installation failed: previous diagnostic'},
+      ],
+    });
+    assert.equal(f.installation().outcome, 'failed');
+    await f.run(1000);
+    await f.respond({
+      cursor: '5',
+      capture: {connected: true},
+      data: [
+        {event: 'panel message', line: installProgress.installAttemptBoundary},
+        {event: 'install output', line: '### 37%'},
+        {event: 'install output', line: 'Current diagnostic'},
+      ],
+    });
+    assert.equal(f.installation().outcome, undefined);
+    assert.equal(f.installation().stages[0].progress.value, 37);
+    assert.equal(f.installText(), '### 37%\nCurrent diagnostic');
+    assert.doesNotMatch(f.text(), /diagnostic|Installer attempt started/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('installation failure sends role-appropriate recovery guidance to the island', () => {
+  for (const regular of [false, true]) {
+    const f = fixture({regular, server: {status: 'install_failed'}});
+    try {
+      const message = f.feedback.find(event => event.title === 'Installation failed');
+      assert.equal(message.tone, 'error');
+      assert.match(message.message, regular ? /Ask your server administrator/ : /Review the full install log/);
+    } finally {
+      f.cleanup();
+    }
+  }
+});
+
+test('regular console access replays and polls the safe install feed', async () => {
+  const f = fixture({regular: true, server: {status: 'installing'}});
+  try {
+    const path = '/server/install-progress';
+    const response = value => ({
+      stages: [{id: 'download', label: 'Downloading server', state: 'running', progress: {value}}],
+    });
+    const first = f.requests.find(request => request.path === path);
+    first.resolve(response(29));
+    await f.tick();
+    assert.equal(f.safeStages()[0].progress.value, 29);
+    await f.run(1000);
+    const next = f.requests.filter(request => request.path === path).at(-1);
+    assert.notEqual(next, first);
+    next.resolve(response(37));
+    await f.tick();
+    assert.equal(f.safeStages()[0].progress.value, 37);
+  } finally {
+    f.cleanup();
+  }
+});
 
 test('deferred recovery includes disconnected output, suppresses live copies, resumes saved cursor', async () => {
   const f = fixture();

@@ -143,12 +143,7 @@ test('actual shared form submits sanitized values, hides both credential alias f
   ]);
   const view = f.mount(options);
   // The Steam mode starts from the template's own default.
-  assert.equal(
-    view.find(
-      n => n.type === 'select' && n.props.id === undefined && n.children.some(o => o.props?.value === 'private')
-    ).props.value,
-    'private'
-  );
+  assert.equal(view.find(n => n.type === 'select' && n.props.id === 'game-template-steam').props.value, 'private');
   // Credential variables of either alias family get no input, even when required; the branch and game controls stay.
   const ids = view.findAll(n => n.type === 'input' && n.props.id?.startsWith('game-template-')).map(n => n.props.id);
   assert.deepEqual(ids.sort(), ['game-template-MAX_PLAYER', 'game-template-SRCDS_BETAID']);
@@ -172,6 +167,31 @@ test('actual shared form submits sanitized values, hides both credential alias f
   assert.equal(f.requests[0].body.private_content, true);
   // The port preview asks with the same sanitized values.
   assert.deepEqual(f.ports.at(-1), {node: '1', environment, enabled: true});
+});
+
+test('summary acceptance starts off, updates readiness and submits the egg value', async () => {
+  const f = templateForm();
+  const options = privateReady([steamVariable('POT_HOSTING_AGREEMENT', '1', {rules: 'required|boolean'})]);
+  options.acceptances = [
+    {
+      environment: 'POT_HOSTING_AGREEMENT',
+      title: 'Hosting Agreement',
+      url: 'https://example.invalid/terms',
+      accept_value: '1',
+    },
+  ];
+  const view = f.mount(options);
+  const toggle = () => view.find(n => n.props.id === 'game-template-POT_HOSTING_AGREEMENT');
+  assert.equal(toggle().props['aria-checked'], false);
+  assert.equal(f.disabled(view), true);
+  assert.ok(view.find(n => n.props.href === '#game-template-POT_HOSTING_AGREEMENT'));
+  view.change(toggle(), true);
+  assert.equal(f.disabled(view), false);
+  view.change(toggle(), false);
+  assert.equal(f.disabled(view), true);
+  view.change(toggle(), true);
+  await view.submit(view.find(n => n.type === 'form'));
+  assert.equal(f.requests[0].body.environment.POT_HOSTING_AGREEMENT, '1');
 });
 test('a corrected invalid default stays in the creation form', () => {
   const f = templateForm();

@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {confirmAction} from '../../../ui/ConfirmAction';
 import {Disclosure, DisclosureTrigger} from '../../../ui/Disclosure';
@@ -269,6 +270,7 @@ export function NodeConnection({
             if (await mutation.run('check', `/api/admin/nodes/${nodeId}/check`)) connection.reload();
           }}
         >
+          {mutation.busy === 'check' && <TerminalSpinner />}
           {mutation.busy === 'check' ? 'Checking...' : 'Check again'}
         </Button>
         <ReconnectNode
@@ -352,6 +354,7 @@ function ReconnectNode({nodeId, nodeName, onChanged}: {nodeId: number; nodeName:
           if (result) setEnrollment({...result.value, recovery_node_id: nodeId, recovery_node_name: nodeName});
         }}
       >
+        {mutation.busy && <TerminalSpinner />}
         {mutation.busy ? 'Opening...' : 'Reconnect'}
       </Button>
       <ErrorMessage error={mutation.error} />
@@ -487,6 +490,7 @@ function NodePairingWizard({
                   }
                 }}
               >
+                {mutation.busy === 'close' && <TerminalSpinner />}
                 {mutation.busy === 'close' ? 'Closing...' : 'Close enrollment'}
               </Button>
             )}
@@ -610,6 +614,7 @@ function NodePairingWizard({
             <p className="muted node-pairing-intro">Install on each Linux machine, then approve it here.</p>
             <form id="node-pairing-create" onSubmit={createEnrollment}>
               <Button type="submit" disabled={!!mutation.busy}>
+                {mutation.busy === 'create' && <TerminalSpinner />}
                 {mutation.busy === 'create' ? 'Getting started...' : 'Get started'}
               </Button>
             </form>
@@ -629,7 +634,7 @@ function NodePairingWizard({
                 <span role="status">
                   {state === 'Open' ? (
                     <>
-                      <span className="spinner" aria-hidden="true" />
+                      <TerminalSpinner />
                       Waiting for nodes{pendingCount ? ` · ${pendingCount} pending` : ''}
                     </>
                   ) : (
@@ -702,7 +707,11 @@ function InstallInstructions({
     <>
       <ol className="node-pairing-commands">
         <li>
-          {latest.loading && <p role="status">Finding the latest Linux node installer...</p>}
+          {latest.loading && (
+            <p role="status">
+              <TerminalSpinner /> Finding the latest Linux node installer...
+            </p>
+          )}
           <CopyValue label="Run installer" value={command} disabled={unavailable} />
           <small className="muted">
             {enrollment.recovery_node_id
@@ -925,6 +934,7 @@ function IncomingNode({
             {pending ? (
               <>
                 <Button type="submit" disabled={!!mutation.busy || !canApprove}>
+                  {mutation.busy === 'approve' && <TerminalSpinner />}
                   {mutation.busy === 'approve' ? 'Approving...' : 'Approve'}
                 </Button>
                 <Button
@@ -937,6 +947,7 @@ function IncomingNode({
                     }
                   }}
                 >
+                  {mutation.busy === 'reject' && <TerminalSpinner />}
                   {mutation.busy === 'reject' ? 'Rejecting...' : 'Reject'}
                 </Button>
               </>
@@ -957,6 +968,7 @@ function IncomingNode({
                       if (await mutation.run('check', `/api/admin/nodes/${nodeId}/check`)) onChanged();
                     }}
                   >
+                    {mutation.busy === 'check' && <TerminalSpinner />}
                     {mutation.busy === 'check' ? 'Checking...' : 'Check again'}
                   </Button>
                 )}

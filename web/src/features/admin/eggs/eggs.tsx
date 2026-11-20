@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {ActionButton as MiraAction} from '../../../ui/ActionButton';
 import {Textarea as MiraTextarea} from '../../../components/ui/textarea';
@@ -136,6 +137,7 @@ function EggImport({nestID, eggID, onSaved}: {nestID: number; eggID?: string; on
             }
           }}
         >
+          {busy && <TerminalSpinner />}
           {busy ? 'Importing…' : eggID ? 'Replace egg' : 'Import template'}
         </MiraAction>
       </div>
@@ -225,7 +227,7 @@ export function Egg() {
       )}
       {q.loading ? (
         <p className="admin-loading" role="status">
-          Loading egg...
+          <TerminalSpinner /> Loading egg...
         </p>
       ) : (
         <>
@@ -300,7 +302,7 @@ function EggVariables({eggID}: {eggID: string}) {
       <ErrorMessage error={q.error} />
       {q.loading && (
         <p className="admin-loading" role="status">
-          Loading variables...
+          <TerminalSpinner /> Loading variables...
         </p>
       )}
       {!q.loading && q.data && !rows(q.data).length && (

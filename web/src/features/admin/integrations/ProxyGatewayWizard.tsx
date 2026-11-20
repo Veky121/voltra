@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {IntegrationLayout, IntegrationField as Field} from './IntegrationLayout';
 import {confirmAction} from '../../../ui/ConfirmAction';
@@ -267,7 +268,7 @@ export function ProxyGatewayWizard({onClose, onSaved}: {onClose: () => void; onS
         </fieldset>
         {busy && (
           <p role="status" className="proxy-gateways__status">
-            {busy}...
+            <TerminalSpinner /> {busy}...
           </p>
         )}
         <p className="muted proxy-gateways__wizard-note">

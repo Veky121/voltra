@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -422,5 +423,36 @@ func TestUpdateHTTPDeadlinesAndStreaming(t *testing.T) {
 	}
 	if err == nil {
 		t.Fatal("ignored cancellation")
+	}
+}
+
+func TestUpdateProgressDoesNotWaitForInstallLock(t *testing.T) {
+	provider := &channelProvider{}
+	provider.progress.Store(&updateDownloadProgress{Stage: "downloading", Written: 1024, Total: 4096})
+	controller := &updateController{provider: provider}
+	host := &desktopHost{updates: controller}
+	read := func() *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		host.serveUpdates(w, httptest.NewRequest(http.MethodGet, "/desktop/update-progress", nil))
+		return w
+	}
+	controller.mu.Lock()
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() { done <- read() }()
+	select {
+	case w := <-done:
+		controller.mu.Unlock()
+		var progress updateDownloadProgress
+		if err := json.Unmarshal(w.Body.Bytes(), &progress); err != nil ||
+			w.Code != http.StatusOK || progress.Stage != "downloading" || progress.Written != 1024 || progress.Total != 4096 {
+			t.Fatalf("progress returned %d %s", w.Code, w.Body.String())
+		}
+	case <-time.After(time.Second):
+		controller.mu.Unlock()
+		t.Fatal("progress read waited for the install lock")
+	}
+	provider.progress.Store(nil)
+	if w := read(); w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != "null" {
+		t.Fatalf("idle progress returned %d %s", w.Code, w.Body.String())
 	}
 }

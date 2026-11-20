@@ -1,3 +1,4 @@
+import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
 import {Checkbox} from '../../components/ui/checkbox';
 import {lazy, Suspense, useEffect, useRef, useState, type ReactNode} from 'react';
 import {useSearchParams} from 'react-router-dom';
@@ -90,6 +91,7 @@ export default function Files() {
     file ? null : `${base}/files/list?directory=${encodeURIComponent(directory)}`
   );
   const a = useAction();
+  const [fileActivity, setFileActivity] = useState('');
   const [selected, setSelected] = useState<string[]>([]),
     [search, setSearch] = useState(''),
     [sort, setSort] = useState({key: 'name', ascending: true});
@@ -211,43 +213,51 @@ export default function Files() {
     if (kind === 'chmod') setMode(entries.find(f => f.name === from)?.mode_bits || '644');
     a.setSuccess('');
   }
+  async function trackFileActivity<T>(label: string, perform: () => Promise<T>) {
+    setFileActivity(label);
+    try {
+      return await perform();
+    } finally {
+      setFileActivity('');
+    }
+  }
   function action(path: string, body: unknown, method = 'POST', message = 'Changes saved.') {
     setMenu(null);
     // api() already refreshes this server's listings after a successful write.
-    return a.run(
-      () => api(`${base}/files/${path}`, json(method, body)),
-      () => {
-        setSelected([]);
-        setDialog('');
-        a.setSuccess(message);
-      }
-    );
+    const label = path === 'compress' ? 'Creating archive…' : path === 'decompress' ? 'Extracting archive…' : '';
+    const perform = () => api(`${base}/files/${path}`, json(method, body));
+    return a.run(label ? () => trackFileActivity(label, perform) : perform, () => {
+      setSelected([]);
+      setDialog('');
+      a.setSuccess(message);
+    });
   }
   async function upload(list: FileList | null, folders = false) {
     if (!list?.length || a.busy) return;
     const files = Array.from(list);
     await a.run(
-      async () => {
-        // Wings strips paths from multipart filenames. Upload each directory separately.
-        const groups = new Map<string, File[]>();
-        for (const f of files) {
-          const relativePath = folders ? containerPath(f.webkitRelativePath).split('/').slice(0, -1).join('/') : '';
-          const group = groups.get(relativePath);
-          if (group) group.push(f);
-          else groups.set(relativePath, [f]);
-        }
-        for (const [relativePath, group] of groups) {
-          if (relativePath)
-            await api(`${base}/files/create-folder`, json('POST', {root: directory, name: relativePath}));
-          const d = value(await api<Resource<{url: string}>>(`${base}/files/upload`)),
-            uploadURL = new URL(d.url, location.href);
-          uploadURL.searchParams.set('directory', relativePath ? full(relativePath) : directory);
-          const body = new FormData();
-          for (const f of group) body.append('files', f, f.name);
-          const response = await fetch(uploadURL, {method: 'POST', body});
-          if (!response.ok) throw new Error(`Upload failed (${response.status}): ${await response.text()}`);
-        }
-      },
+      () =>
+        trackFileActivity('Uploading files…', async () => {
+          // Wings strips paths from multipart filenames. Upload each directory separately.
+          const groups = new Map<string, File[]>();
+          for (const f of files) {
+            const relativePath = folders ? containerPath(f.webkitRelativePath).split('/').slice(0, -1).join('/') : '';
+            const group = groups.get(relativePath);
+            if (group) group.push(f);
+            else groups.set(relativePath, [f]);
+          }
+          for (const [relativePath, group] of groups) {
+            if (relativePath)
+              await api(`${base}/files/create-folder`, json('POST', {root: directory, name: relativePath}));
+            const d = value(await api<Resource<{url: string}>>(`${base}/files/upload`)),
+              uploadURL = new URL(d.url, location.href);
+            uploadURL.searchParams.set('directory', relativePath ? full(relativePath) : directory);
+            const body = new FormData();
+            for (const f of group) body.append('files', f, f.name);
+            const response = await fetch(uploadURL, {method: 'POST', body});
+            if (!response.ok) throw new Error(`Upload failed (${response.status}): ${await response.text()}`);
+          }
+        }),
       () => a.setSuccess(`${files.length} ${files.length === 1 ? 'file' : 'files'} uploaded.`)
     );
     r.reload();
@@ -419,6 +429,11 @@ export default function Files() {
         />
       </header>
       <Notice action={a} />
+      {fileActivity && (
+        <div role="status">
+          <TerminalProgress label={fileActivity} />
+        </div>
+      )}
       <PageError error={r.error} />
       <div className={`files-workspace${file ? ' is-editing' : ''}`}>
         {file && (
@@ -453,7 +468,9 @@ export default function Files() {
               </div>
               <PageError error={fileError} />
               {editing || (!fileError && draft.path !== file) ? (
-                <p role="status">Loading file…</p>
+                <p role="status">
+                  <TerminalSpinner /> Loading file…
+                </p>
               ) : draft.path === file && !fileError ? (
                 <FileEditorBoundary
                   key={`${base}:${file}:${draft.revision}`}
@@ -463,7 +480,13 @@ export default function Files() {
                   onChange={content => setDraft(current => ({...current, content}))}
                   onSave={() => void save()}
                 >
-                  <Suspense fallback={<p role="status">Loading code editor…</p>}>
+                  <Suspense
+                    fallback={
+                      <div role="status">
+                        <TerminalProgress label="Loading code editor…" />
+                      </div>
+                    }
+                  >
                     <FileEditor
                       key={`${base}:${file}:${draft.revision}`}
                       storageKey={base}
@@ -511,6 +534,7 @@ export default function Files() {
                     Discard
                   </Button>
                   <Button className="draft-save" disabled={a.busy || !editable} onClick={() => void save()}>
+                    {a.busy && <TerminalSpinner />}
                     {a.busy ? 'Saving…' : 'Save changes'}
                   </Button>
                 </div>
@@ -648,7 +672,9 @@ export default function Files() {
               {!visible.length && (
                 <div className="files-empty">
                   {r.loading ? (
-                    <span role="status">Loading directory…</span>
+                    <span role="status">
+                      <TerminalSpinner /> Loading directory…
+                    </span>
                   ) : r.error ? (
                     'The file list could not be loaded. Use File tools to retry.'
                   ) : search ? (
@@ -781,7 +807,11 @@ export default function Files() {
                   onClick={() => {
                     const path = full(menu.file!.name);
                     closeMenu();
-                    void a.run(() => download(`${base}/files/download?file=${encodeURIComponent(path)}`));
+                    void a.run(() =>
+                      trackFileActivity('Preparing download…', () =>
+                        download(`${base}/files/download?file=${encodeURIComponent(path)}`)
+                      )
+                    );
                   }}
                 >
                   Download
@@ -978,6 +1008,7 @@ export default function Files() {
                     Cancel
                   </Button>
                   <Button type="submit" variant={dialog === 'delete' ? 'danger' : 'default'} disabled={a.busy}>
+                    {a.busy && <TerminalSpinner />}
                     {a.busy
                       ? 'Working…'
                       : dialog === 'delete'

@@ -47,6 +47,7 @@ async function load(entry) {
             else if (name === 'components/ui/checkbox') contents = 'export const Checkbox="input";';
             else if (name === 'components/ui/input') contents = 'export const Input="input";';
             else if (name === 'notifications') contents = 'export const Feedback="Feedback";';
+            else if (name === 'ui/TerminalProgress') contents = 'export const TerminalSpinner="terminal-spinner";';
             else if (name === 'ui/ActionButton') contents = 'export const ActionButton="button";';
             else if (name === 'desktop/desktop') contents = 'export const DesktopRecoveryActions="recovery";';
             else if (name === 'signedOut')

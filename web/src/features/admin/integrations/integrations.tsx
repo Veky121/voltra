@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {IntegrationLayout} from './IntegrationLayout';
 import {usePendingSetting} from '../../shared/PendingSettings';
 import {Badge as MiraBadge} from '../../../components/ui/badge';
@@ -494,6 +495,7 @@ function IntegrationForm({record}: {record: any}) {
               {(!record || !managed) && (
                 <div className="settings-actions">
                   <MiraAction className="button" type="submit" disabled={busy}>
+                    {busy && <TerminalSpinner />}
                     {busy ? 'Saving...' : record ? 'Save integration' : 'Add integration'}
                   </MiraAction>
                 </div>

@@ -166,3 +166,49 @@ test('automatic and manual operations expose busy state and prevent duplicate re
     globalThis.fetch = originalFetch;
   }
 });
+
+test('the updater reports measured download bytes and ignores a poll after staging completes', async t => {
+  const {createElement} = await import('react');
+  const {renderToStaticMarkup} = await import('react-dom/server');
+  let observed;
+  function Probe() {
+    observed = useDesktopUpdates();
+    return null;
+  }
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const originalFetch = globalThis.fetch;
+  let finish, finishPoll, signal;
+  let polls = 0;
+  globalThis.fetch = (url, options) => {
+    if (url === '/desktop/update-install')
+      return new Promise(resolve => {
+        finish = resolve;
+      });
+    assert.equal(url, '/desktop/update-progress');
+    signal = options.signal;
+    if (++polls === 1) return Promise.resolve(Response.json({stage: 'downloading', written: 10, total: 20}));
+    return new Promise(resolve => {
+      finishPoll = resolve;
+    });
+  };
+  try {
+    const pending = updateAction('update-install');
+    t.mock.timers.tick(500);
+    await new Promise(resolve => setImmediate(resolve));
+    renderToStaticMarkup(createElement(Probe));
+    assert.deepEqual(observed.progress, {stage: 'downloading', written: 10, total: 20});
+    t.mock.timers.tick(500);
+    finish(Response.json({channel: 'release', state: 'ready', version: '1.0.0'}));
+    assert.equal(await pending, true);
+    assert.equal(signal.aborted, true);
+    finishPoll(Response.json({stage: 'preparing', written: 0, total: 0}));
+    await new Promise(resolve => setImmediate(resolve));
+    renderToStaticMarkup(createElement(Probe));
+    assert.equal(observed.progress, null);
+    assert.equal(observed.status.state, 'ready');
+    t.mock.timers.tick(500);
+    assert.equal(polls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

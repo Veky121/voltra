@@ -439,7 +439,7 @@ async function suite() {
       !input('Maximum players') && !input('Server password') && !input('Preset'),
       'Creation still asks for gameplay settings'
     );
-    await click('Create server');
+    await click('Install Palworld');
     const request = calls.find(call => call.path.endsWith('/install'))!;
     assert(
       request.body.max_players === 32 && request.body.preset === 'default' && !request.body.server_password,
@@ -454,7 +454,7 @@ async function suite() {
     );
     assert(button('Install Minecraft').disabled, 'EULA bypassed');
     await act(async () => {
-      (document.querySelector('.mc-eula [role=switch]') as HTMLButtonElement).click();
+      (document.querySelector('.game-setup-agreement [role=switch]') as HTMLButtonElement).click();
     });
     await click('Install Minecraft');
     const request = calls.find(call => call.path.endsWith('/install'))!;
@@ -472,13 +472,13 @@ async function suite() {
       !input('Gameplay option') && input('Game version') && input('Required installation key'),
       'Template fields not simplified'
     );
-    assert(button('Create server').disabled, 'Missing required key allowed');
+    assert(button('Install Custom game').disabled, 'Missing required key allowed');
     await change('Required installation key', 'valid-key');
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 350));
     });
     assert(input('Required installation key'), 'Corrected required field disappeared');
-    await click('Create server');
+    await click('Install Custom game');
     const request = calls.find(call => call.path.endsWith('/install'))!;
     assert(
       request.body.environment.CUSTOM_GAME_OPTION === 'default' &&
@@ -549,9 +549,9 @@ async function suite() {
   });
   await test('Palworld defaults and idempotent install retry', async () => {
     await show('/game-library/palworld', {installFail: true});
-    assert(input('Memory (GiB)').value === '16', 'Memory default is not API driven');
-    await click('Create server');
-    await click('Create server');
+    assert(input('Memory').value === '16', 'Memory default is not API driven');
+    await click('Install Palworld');
+    await click('Install Palworld');
     const requests = calls.filter(call => call.path.endsWith('/install'));
     assert(
       requests.length === 2 && requests[0].body.request_id === requests[1].body.request_id,
@@ -564,8 +564,8 @@ async function suite() {
   });
   await test('Changed install values receive new request ID', async () => {
     const previous = calls.find(call => call.path.endsWith('/install'))!.body.request_id;
-    await change('Server name', 'New server');
-    await click('Create server');
+    await change('Panel name', 'New server');
+    await click('Install Palworld');
     assert(
       calls.filter(call => call.path.endsWith('/install')).at(-1)!.body.request_id !== previous,
       'Changed install reused ID'
@@ -574,38 +574,35 @@ async function suite() {
   await test('Palworld warns below 16 GiB, permits 8 GiB and removes the warning at default or above', async () => {
     await show('/game-library/palworld', {installFail: true});
     assert(!document.getElementById('steam-memory-warning'), 'Warning shown at default RAM');
-    await change('Memory (GiB)', '8');
+    await change('Memory', '8');
     const warning = document.getElementById('steam-memory-warning');
     assert(
-      warning?.textContent?.includes('Palworld defaults to 16 GiB') && warning.textContent.includes('risk of crashes'),
+      warning?.textContent?.includes('Palworld defaults to 16 GB') && warning.textContent.includes('risk of crashes'),
       'Missing below-default RAM warning'
     );
-    assert(
-      input('Memory (GiB)').getAttribute('aria-describedby') === warning?.id,
-      'Warning not associated with RAM input'
-    );
-    assert(!button('Create server').disabled, 'Warning blocks valid minimum RAM');
-    await click('Create server');
+    assert(input('Memory').getAttribute('aria-describedby') === warning?.id, 'Warning not associated with RAM input');
+    assert(!button('Install Palworld').disabled, 'Warning blocks valid minimum RAM');
+    await click('Install Palworld');
     assert(
       calls.find(call => call.path.endsWith('/install'))?.body.memory === 8192,
       'Minimum RAM selection changed in request'
     );
     for (const memory of ['16', '32']) {
-      await change('Memory (GiB)', memory);
+      await change('Memory', memory);
       assert(
-        !document.getElementById('steam-memory-warning') && !input('Memory (GiB)').hasAttribute('aria-describedby'),
+        !document.getElementById('steam-memory-warning') && !input('Memory').hasAttribute('aria-describedby'),
         'RAM warning remained at default or above'
       );
     }
   });
   await test('No capable node blocks provisioning', async () => {
     await show('/game-library/satisfactory', {noNodes: true});
-    assert(button('Create server').disabled, 'Install enabled without node');
-    assert(document.body.textContent?.includes('No connected compatible'), 'Missing node guidance');
+    assert(button('Install Satisfactory').disabled, 'Install enabled without node');
+    assert(document.body.textContent?.includes('connect a compatible Linux x64 Steam node'), 'Missing node guidance');
   });
   await test('Create permission blocks provisioning', async () => {
     await show('/game-library/palworld', {noInstall: true});
-    assert(button('Create server').disabled, 'Install enabled without permission');
+    assert(button('Install Palworld').disabled, 'Install enabled without permission');
   });
   await test('Satisfactory directs players to built-in Server Manager', async () => {
     await show('/server/fixture/quick-setup', {game: 'satisfactory', folders: false});
@@ -801,7 +798,7 @@ async function suite() {
   });
   await test('Successful provisioning opens Steam installation progress', async () => {
     await show('/game-library/palworld');
-    await click('Create server');
+    await click('Install Palworld');
     for (let turn = 0; turn < 3; turn++) await act(async () => {});
     assert(document.body.textContent?.includes('Steam maintenance'), 'Install did not open progress page');
   });

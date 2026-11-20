@@ -458,7 +458,7 @@ func (a *App) clientServer(ctx context.Context, user M, s M) (M, error) {
 	if err != nil {
 		return nil, err
 	}
-	return M{"server_owner": num(user["id"]) == num(s["owner_id"]), "identifier": s["uuid_short"], "__deprecated_uuid_short": s["uuid_short"], "server_identifier": s["identifier"], "internal_id": s["id"], "uuid": s["uuid"], "name": s["name"], "node": node["name"], "is_node_under_maintenance": node["maintenance_mode"], "sftp_details": a.clientSFTPDetails(ctx, node), "description": s["description"], "limits": serverLimits(s), "feature_limits": serverFeatures(s), "invocation": invocation, "java_managed": javaDisplay["java_managed"], "java_effective_error": javaDisplay["java_effective_error"], "docker_image": s["image"], "game": clientGameID(egg), "minecraft_content_supported": minecraftContentSupported, "steam_managed": steamGameID(egg) != "", "egg_features": egg["features"], "console_input_supported": serverConsoleInputSupported(s, egg), "status": s["status"], "is_suspended": str(s["status"]) == "suspended", "is_installing": !serverInstalled(s), "is_transferring": len(transfers) > 0, "skip_scripts": s["skip_scripts"], "artwork": a.clientArtworkMetadata(ctx, user, s, egg), "relationships": M{"allocations": collection("allocation", visible), "variables": collection("egg_variable", variables)}}, nil
+	return M{"server_owner": num(user["id"]) == num(s["owner_id"]), "identifier": s["uuid_short"], "__deprecated_uuid_short": s["uuid_short"], "server_identifier": s["identifier"], "internal_id": s["id"], "uuid": s["uuid"], "name": s["name"], "node": node["name"], "is_node_under_maintenance": node["maintenance_mode"], "sftp_details": a.clientSFTPDetails(ctx, node), "description": s["description"], "limits": serverLimits(s), "feature_limits": serverFeatures(s), "invocation": invocation, "java_managed": javaDisplay["java_managed"], "java_effective_error": javaDisplay["java_effective_error"], "docker_image": s["image"], "game": clientGameID(egg), "minecraft_content_supported": minecraftContentSupported, "steam_managed": steamGameID(egg) != "", "egg_features": egg["features"], "console_input_supported": serverConsoleInputSupported(s, egg), "status": s["status"], "installation_attempt": consoleInstallationAttempt(str(s["installation_id"])), "is_suspended": str(s["status"]) == "suspended", "is_installing": !serverInstalled(s) || strings.HasPrefix(str(s["installation_id"]), "pending:"), "is_transferring": len(transfers) > 0, "skip_scripts": s["skip_scripts"], "artwork": a.clientArtworkMetadata(ctx, user, s, egg), "relationships": M{"allocations": collection("allocation", visible), "variables": collection("egg_variable", variables)}}, nil
 }
 
 func (a *App) applicationServer(ctx context.Context, s M) (M, error) {
@@ -1116,6 +1116,9 @@ func (a *App) createServer(ctx context.Context, input M) (M, error) {
 			return nil, err
 		}
 	}
+	if err = a.persistConsoleInstallStart(ctx, tx, id, str(d["installation_id"])); err != nil {
+		return nil, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -1752,7 +1755,7 @@ func (a *App) lifecycleReinstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	locked, e := tx.Query(r.Context(), "SELECT * FROM servers WHERE id=$1 FOR UPDATE", s["id"])
+	locked, e := lockServerForReinstall(r.Context(), tx, num(s["id"]))
 	if e != nil {
 		fail(w, e)
 		return
@@ -1782,6 +1785,10 @@ func (a *App) lifecycleReinstall(w http.ResponseWriter, r *http.Request) {
 	cycle := "pending:reinstall:" + newUUID()
 	_, e = tx.Exec(r.Context(), "UPDATE servers SET status=$2,installation_id=$3,updated_at=NOW() WHERE id=$1", s["id"], status, cycle)
 	if e != nil {
+		fail(w, e)
+		return
+	}
+	if e = a.persistConsoleInstallStart(r.Context(), tx, num(s["id"]), cycle); e != nil {
 		fail(w, e)
 		return
 	}
@@ -2086,6 +2093,9 @@ func (a *App) remoteInstall(w http.ResponseWriter, r *http.Request) {
 		}
 		egg = fs25ReinstallEgg(s, egg)
 		egg["script_install"] = minecraftLegacyCurseForgeInstaller(str(egg["script_install"]))
+		if !boolean(s["skip_scripts"]) && (str(s["status"]) == "installing" || strings.HasPrefix(str(s["installation_id"]), "pending:")) {
+			a.awaitConsoleInstallCapture(r.Context(), num(s["id"]))
+		}
 		writeJSON(w, 200, M{"container_image": egg["script_container"], "entrypoint": egg["script_entry"], "script": egg["script_install"]})
 		return
 	}

@@ -2,12 +2,21 @@ import {Feedback} from '../../notifications';
 import {useEffect, useState, type ReactNode} from 'react';
 import {Link} from 'react-router-dom';
 import {Button} from '../../lib';
-import {Progress} from '../../components/ui/progress';
-import {bytes, can} from '../shared/common';
+import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
+import {formatBytesProgress} from '../../ui/terminalProgressModel';
+import {can, useServer} from '../shared/common';
 import {RemoteTransferContext, useRemoteTransferQueue} from './useRemoteTransfers';
-import {transferActive, transferRecentlyActive, transferProgress, type RemoteTransfer} from './remoteTransferModel';
+import {
+  transferActive,
+  transferFilesAvailable,
+  transferCompletionWindow,
+  transferRecentlyActive,
+  transferRecentlyCompleted,
+  transferProgress,
+  type RemoteTransfer,
+} from './remoteTransferModel';
 import {OperationReports} from './OperationStatus';
-import {operationPending, operationRecentlyActive} from './operationEvents';
+import {operationMessages, operationPending, operationRecentlyActive} from './operationEvents';
 import './serverTransfers.css';
 
 const noChange = () => {};
@@ -20,14 +29,56 @@ export function ServerTransfers({
   permissions: string[];
   children: ReactNode;
 }) {
-  const queue = useRemoteTransferQueue(base, permissions, noChange);
+  const {server} = useServer();
+  const queue = useRemoteTransferQueue(base, permissions, noChange, transferFilesAvailable(server));
   return (
     <RemoteTransferContext.Provider value={queue}>
       {children}
       {(can(permissions, 'file.read') || can(permissions, 'file.create') || can(permissions, 'websocket.connect')) && (
-        <TransferDock key={`${base}:${permissions.join(',')}`} base={base} queue={queue} />
+        <>
+          <TransferFeedback base={base} queue={queue} />
+          <TransferDock key={`${base}:${permissions.join(',')}`} base={base} queue={queue} />
+        </>
       )}
     </RemoteTransferContext.Provider>
+  );
+}
+
+function TransferFeedback({base, queue}: {base: string; queue: ReturnType<typeof useRemoteTransferQueue>}) {
+  return (
+    <>
+      <Feedback
+        tone="error"
+        eventKey={`transfer-refresh:${base}`}
+        message={queue.error ? 'Progress could not be refreshed. The displayed values may be out of date.' : ''}
+      />
+      {queue.transfers.map(entry => (
+        <Feedback
+          key={entry.identifier}
+          tone="error"
+          eventKey={`file-transfer:${entry.identifier}`}
+          title={entry.kind === 'upload' ? 'Upload failed' : 'Download failed'}
+          message={
+            entry.state === 'failed'
+              ? entry.error ||
+                'The node could not complete this transfer. Check available disk space, then retry from Files.'
+              : ''
+          }
+        />
+      ))}
+      {queue.operations.map(entry => {
+        const info = operationMessages[entry.code];
+        return (
+          <Feedback
+            key={entry.id}
+            tone="error"
+            eventKey={`game-operation:${entry.id}`}
+            title={info.message}
+            message={entry.state === 'failed' ? info.recovery || 'Check the server console before retrying.' : ''}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -40,8 +91,21 @@ function TransferDock({base, queue}: {base: string; queue: ReturnType<typeof use
     const timer = setInterval(() => setClock(Date.now()), 15000);
     return () => clearInterval(timer);
   }, [queue.operations, queue.transfers]);
+  const now = Math.max(clock, Date.now());
+  const completed = queue.transfers.filter(entry => transferRecentlyCompleted(entry, now));
+  const nextExpiry = completed.reduce(
+    (time, entry) => Math.min(time, entry.updated + transferCompletionWindow),
+    Infinity
+  );
+  useEffect(() => {
+    if (!Number.isFinite(nextExpiry)) return;
+    const timer = setTimeout(() => setClock(Math.max(nextExpiry, Date.now())), Math.max(0, nextExpiry - Date.now()));
+    return () => clearTimeout(timer);
+  }, [nextExpiry]);
   const visible = queue.transfers.filter(
-    entry => transferActive(entry) || (entry.state === 'failed' && !dismissed.has(entry.identifier))
+    entry =>
+      transferActive(entry) ||
+      (!dismissed.has(entry.identifier) && (entry.state === 'failed' || transferRecentlyCompleted(entry, now)))
   );
   const operations = queue.operations.filter(
     entry =>
@@ -49,9 +113,22 @@ function TransferDock({base, queue}: {base: string; queue: ReturnType<typeof use
       ((entry.state === 'failed' || entry.restart_required) && !dismissed.has(`operation:${entry.id}`))
   );
   const active =
-    visible.filter(entry => transferRecentlyActive(entry, Math.max(clock, Date.now()))).length +
-    operations.filter(entry => operationRecentlyActive(entry, Math.max(clock, Date.now()))).length;
+    visible.filter(entry => transferRecentlyActive(entry, now)).length +
+    operations.filter(entry => operationRecentlyActive(entry, now)).length;
   const count = visible.length + operations.length;
+  const completeCount = visible.filter(entry => entry.state === 'complete').length;
+  const failedCount =
+    visible.filter(entry => entry.state === 'failed').length +
+    operations.filter(entry => entry.state === 'failed').length;
+  const pendingCount = count - active - completeCount - failedCount;
+  const summary = [
+    active && `${active} active`,
+    failedCount && `${failedCount} failed`,
+    pendingCount && `${pendingCount} pending`,
+    completeCount && `${completeCount} complete`,
+  ]
+    .filter(Boolean)
+    .join(' ? ');
   useEffect(() => {
     if (active) setExpanded(true);
   }, [active]);
@@ -66,11 +143,8 @@ function TransferDock({base, queue}: {base: string; queue: ReturnType<typeof use
           aria-controls="server-transfer-list"
           onClick={() => setExpanded(value => !value)}
         >
-          {active > 0 && <span className="server-transfer-pulse" aria-hidden="true" />}
-          Transfers{' '}
-          <span>
-            {queue.error && !count ? 'Progress unavailable' : active ? `${active} active` : `${count} pending`}
-          </span>
+          {active > 0 && <TerminalSpinner />}
+          Transfers <span>{summary || 'Progress unavailable'}</span>
           <span>{expanded ? 'Hide' : 'Show'}</span>
         </Button>
         {(visible.some(entry => !transferActive(entry)) || operations.some(entry => !operationPending(entry))) && (
@@ -98,21 +172,15 @@ function TransferDock({base, queue}: {base: string; queue: ReturnType<typeof use
             change pages.
           </p>
           {queue.error && (
-            <>
-              <Feedback
-                tone="error"
-                message={<>Progress could not be refreshed. Values below may be out of date. </>}
-              />
-              <Button variant="secondary" onClick={() => void queue.reload()}>
-                Check again
-              </Button>
-            </>
+            <Button variant="secondary" onClick={() => void queue.reload()}>
+              Check again
+            </Button>
           )}
           {visible.map(entry => (
             <TransferRow
               key={entry.identifier}
               entry={entry}
-              clock={Math.max(clock, Date.now())}
+              clock={now}
               filesPath={filesPath}
               dismiss={() => setDismissed(current => new Set([...current, entry.identifier]))}
             />
@@ -151,45 +219,30 @@ function TransferRow({
     complete: 'Saved to server',
     failed: entry.kind === 'upload' ? 'Upload failed' : 'Download failed',
   };
-  const received =
-    Number.isFinite(entry.received_bytes) && entry.received_bytes! >= 0 ? bytes(entry.received_bytes!) : null;
-  const total =
-    entry.size_known && Number.isFinite(entry.total_bytes) && entry.total_bytes! >= 0
-      ? bytes(entry.total_bytes!)
-      : null;
+  const total = entry.size_known ? entry.total_bytes : undefined;
+  const detail = formatBytesProgress(entry.received_bytes, total);
+  const state = entry.state === 'failed' ? 'failed' : !active ? 'done' : recent ? 'running' : 'waiting';
   return (
     <article className={`server-transfer-row is-${entry.state}`}>
       <div className="server-transfer-title">
         <strong>{entry.name}</strong>
-        <span>
-          {active && !recent ? 'No recent update' : labels[entry.state]}
-          {percent !== null && recent ? ` ${Math.floor(percent)}%` : ''}
-        </span>
       </div>
       <div className="server-transfer-meta">
         <span>To {entry.directory}</span>
-        <span>
-          {received ? `${received}${total ? ` of ${total}` : ' received'}` : total ? `${total} total` : ''}
-          {!total && active ? ' · Total size unavailable' : ''}
-        </span>
+        {(total === undefined || !Number.isFinite(total) || total < 0) && active && <span>Total size unavailable</span>}
       </div>
-      {recent && (
-        <Progress
-          className={percent === null ? 'server-transfer-indeterminate' : ''}
-          value={percent}
-          aria-label={`${labels[entry.state]} ${entry.name}`}
-        />
-      )}
+      <TerminalProgress
+        label={active && !recent ? 'No recent update' : labels[entry.state]}
+        ariaLabel={`${labels[entry.state]} ${entry.name}`}
+        value={entry.state === 'queued' ? null : percent}
+        detail={detail}
+        state={state}
+        width={18}
+      />
       {active && !recent && <small>Upload paused or disconnected. Resume it from Files.</small>}
       {entry.state === 'queued' && <small>Waiting for the node to begin the download.</small>}
       {entry.state === 'awaiting_save' && (
         <small>All bytes received. Waiting for the uploader to finish saving the file.</small>
-      )}
-      {entry.state === 'failed' && (
-        <p className="server-transfer-failure">
-          {entry.error ||
-            'The node could not complete this download. Check the source and available disk space, then start it again from Files.'}
-        </p>
       )}
       {!active && (
         <div className="server-transfer-actions">

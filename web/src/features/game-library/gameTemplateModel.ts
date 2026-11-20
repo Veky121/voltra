@@ -1,13 +1,33 @@
 import {miBToGB} from '../../resourceUnits.ts';
 export type TemplateVariableDefinition = {env_variable: string; rules: string; default_value: string};
-export type GameAgreement = {
+export type GameAcceptance = {
   environment: string;
   title: string;
-  text: string;
-  effective_date: string;
-  reviewed_date?: string;
+  url: string;
+  /** Every document the variable covers, such as Bedrock's EULA and Usage Guidelines. */
+  links?: {title: string; url: string}[];
   accept_value: string;
 };
+export type GameAgreement = Omit<GameAcceptance, 'url'> & {
+  text: string;
+  source_url?: string;
+  effective_date: string;
+  reviewed_date?: string;
+};
+
+export function templateAcceptanceRequired(acceptance: GameAcceptance) {
+  // These variables allow opt-in during setup. SCP:SL also accepts in Console,
+  // and Hytale only needs the acknowledgement when enabling early plugins.
+  return !['SCPSL_ACCEPT_EULA', 'HYTALE_ACCEPT_EARLY_PLUGINS'].includes(acceptance.environment);
+}
+
+export function templateDeclinedValue(acceptance: GameAcceptance, variables: TemplateVariableDefinition[]) {
+  const variable = variables.find(item => item.env_variable === acceptance.environment);
+  if (!variable) return '';
+  const negative = /^(0|false|no|off|decline[ds]?|reject(ed)?)$/i;
+  if (negative.test(variable.default_value)) return variable.default_value;
+  return templateVariableControl(variable).choices?.find(value => negative.test(value)) ?? '';
+}
 
 export function templateAgreementsAccepted(
   agreements: GameAgreement[] | undefined,
@@ -637,4 +657,19 @@ export function templateVariableProblem(
       return `Use no more than ${control.maximum} characters.`;
   }
   return '';
+}
+
+// Variables recipes use for their player limit, such as MAX_PLAYERS,
+// SERVER_MAX_USERS (Luanti) or MAX_CONNECTIONS (Nitrox). RCON and minimum
+// player settings are not limits.
+const playerLimitVariable =
+  /MAX_?(?:PLAYERS?|CLIENTS?)$|^(?:(?:SERVER|NUM|SC)_)?PLAYERS$|^PLAYER_?(?:LIMIT|COUNT)$|^(?:(?:SRV|SERVER|MAX)_)?SLOTS$|^(?:SERVER_|VR_)?MAX_USERS$|^MAX_CONNECTIONS$/i;
+
+/** The player limit a recipe is configured with, or null when it sets none. */
+export function templatePlayerLimit(environment: Record<string, string>): number | null {
+  for (const [key, value] of Object.entries(environment)) {
+    const limit = Number(value);
+    if (playerLimitVariable.test(key) && Number.isInteger(limit) && limit > 0) return limit;
+  }
+  return null;
 }

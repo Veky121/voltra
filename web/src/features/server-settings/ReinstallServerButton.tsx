@@ -1,3 +1,4 @@
+import {TerminalProgress} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {useEffect, useRef, useState} from 'react';
 import {api, Button, Modal, useFreshAPI} from '../../lib';
@@ -56,7 +57,9 @@ export function ReinstallServerButton({
         >
           <Notice action={a} />
           {r.loading ? (
-            <p role="status">Loading backup options...</p>
+            <div role="status">
+              <TerminalProgress label="Loading backup options..." />
+            </div>
           ) : (
             <>
               <p>
@@ -98,9 +101,9 @@ export function ReinstallServerButton({
             </>
           )}
           {reinstallStage && (
-            <p role="status" aria-live="polite">
-              {reinstallStage}
-            </p>
+            <div role="status" aria-live="polite">
+              <TerminalProgress label={reinstallStage} />
+            </div>
           )}
           <div className="settings-actions">
             <Button

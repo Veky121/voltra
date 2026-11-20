@@ -1,3 +1,4 @@
+import {TerminalProgress} from './ui/TerminalProgress';
 import './notifications.css';
 import {createContext, isValidElement, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import type {ReactNode} from 'react';
@@ -113,7 +114,12 @@ function Island({entry}: {entry: NotificationEvent}) {
         {!(entry.tone === 'success' && entry.title === 'Done') && <strong>{entry.title}</strong>}
         <p>{entry.message}</p>
         {entry.progress !== undefined && (
-          <progress aria-label="Operation progress" value={Math.max(0, Math.min(1, entry.progress))} max={1} />
+          <TerminalProgress
+            label="Operation progress"
+            value={entry.progress * 100}
+            state={entry.tone === 'error' ? 'failed' : entry.progress >= 1 ? 'done' : 'running'}
+            width={18}
+          />
         )}
       </div>
       <div className="notification-controls">

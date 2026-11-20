@@ -1,3 +1,4 @@
+import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
 import {pickUploadFolder, type DirectoryPickerWindow} from './folderPicker';
 import {Feedback} from '../../notifications';
 import {confirmAction} from '../../ui/ConfirmAction';
@@ -60,7 +61,7 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
   const [epoch, setEpoch] = useState(0),
     [selected, setSelected] = useState<string[]>([]),
     [count, setCount] = useState(0),
-    [busy, setBusy] = useState(false),
+    [activity, setActivity] = useState(''),
     [error, setError] = useState(''),
     [notice, setNotice] = useState('');
   const [documentDirty, setDocumentDirty] = useState(false),
@@ -83,6 +84,7 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
     directoryEntries = useRef(new Map<string, FileEntry[]>()),
     latest = useRef({directory, opened, query, permissions});
   latest.current = {directory, opened, query, permissions};
+  const busy = !!activity;
   const busyRef = useRef(false),
     active = useRef(true);
   useEffect(() => {
@@ -147,10 +149,10 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
     setCount(0);
     setEpoch(n => n + 1);
   }
-  async function run(action: () => Promise<unknown>, message: string) {
+  async function run(action: () => Promise<unknown>, message: string, label = 'Working…') {
     if (busyRef.current) return;
     busyRef.current = true;
-    setBusy(true);
+    setActivity(label);
     setError('');
     setNotice('');
     // A successful api() write already refreshes this server's file listings and
@@ -164,7 +166,7 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       busyRef.current = false;
-      setBusy(false);
+      setActivity('');
     }
   }
   function show(kind: Dialog['kind'], paths = selected) {
@@ -277,7 +279,8 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
             break;
         }
       },
-      kind === 'pull' ? `Download queued to ${dialog.target}. Follow its progress in Transfers.` : 'Changes saved.'
+      kind === 'pull' ? `Download queued to ${dialog.target}. Follow its progress in Transfers.` : 'Changes saved.',
+      kind === 'pull' ? 'Requesting download…' : 'Working…'
     );
   }
   async function deletePaths(paths: string[]) {
@@ -408,6 +411,11 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
         </div>
       </header>
       <PageError error={error} />
+      {activity && !dialog && (
+        <div role="status">
+          <TerminalProgress label={activity} />
+        </div>
+      )}
       {notice && (
         <>
           <Feedback tone="success" message={<>{notice}</>} />
@@ -536,7 +544,8 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
                       `${base}/files/compress`,
                       json('POST', {root: '/', files: selected.map(path => path.slice(1))})
                     ),
-                  'Archive created.'
+                  'Archive created.',
+                  'Creating archive…'
                 )
               }
             >
@@ -555,7 +564,8 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
                       `${base}/files/decompress`,
                       json('POST', {root: parentPath(selected[0]), file: fileName(selected[0])})
                     ),
-                  'Archive extracted.'
+                  'Archive extracted.',
+                  'Extracting archive…'
                 )
               }
             >
@@ -627,7 +637,8 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
                     `${base}/files/compress`,
                     json('POST', {root: parentPath(rowMenu.id), files: [fileName(rowMenu.id)]})
                   ),
-                'Archive created.'
+                'Archive created.',
+                'Creating archive…'
               );
             })}
           {isArchive(menuFile) &&
@@ -639,7 +650,8 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
                     `${base}/files/decompress`,
                     json('POST', {root: parentPath(rowMenu.id), file: fileName(rowMenu.id)})
                   ),
-                'Archive extracted.'
+                'Archive extracted.',
+                'Extracting archive…'
               );
             })}
           {menuAction('Details', 'info', () => show('details', [rowMenu.id]))}
@@ -728,7 +740,8 @@ function Workspace({base, permissions}: {base: string; permissions: string[]}) {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={busy} variant="default">
-                  {busy ? 'Working…' : dialog.kind === 'pull' ? 'Download' : 'Save'}
+                  {activity && <TerminalSpinner />}
+                  {activity || (dialog.kind === 'pull' ? 'Download' : 'Save')}
                 </Button>
               </div>
             </form>

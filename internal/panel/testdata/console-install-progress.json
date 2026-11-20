@@ -1,0 +1,596 @@
+[
+  {
+    "name": "Steam stages and app-only completion",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Update state (0x05) preallocating, progress: 14.2"
+      },
+      {
+        "event": "install output",
+        "line": "Update state (0x61) downloading, progress: 52.30"
+      },
+      {
+        "event": "install output",
+        "line": "Update state (0x81) verifying update, progress: 91.72"
+      },
+      {
+        "event": "install output",
+        "line": "Success! App '258550' fully installed."
+      },
+      {
+        "event": "install output",
+        "line": "Writing server.properties"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "prepare",
+        "label": "Setting up environment",
+        "state": "done",
+        "progress": {
+          "value": 14.2
+        }
+      },
+      {
+        "id": "download",
+        "label": "Downloading server",
+        "state": "done",
+        "progress": {
+          "value": 52.3
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Verifying files",
+        "state": "done",
+        "progress": {
+          "value": 100
+        }
+      },
+      {
+        "id": "configure",
+        "label": "Configuring server",
+        "state": "running"
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "CR redraws, wget and curl",
+    "events": [
+      {
+        "event": "install output",
+        "line": "\u001b[32mDownloading archive\u001b[0m\r#### 14.2%\r8192K .......... .......... 71% 29M 1s"
+      },
+      {
+        "event": "install output",
+        "line": "server.zip 85%[=========> ] 12.7M/s"
+      },
+      {
+        "event": "install output",
+        "line": "100 127M 47 60.3M 0 0 8231k 0 0:00:15 0:00:07 0:00:08"
+      },
+      {
+        "event": "install output",
+        "line": "sha256sum --check checksums.txt"
+      },
+      {
+        "event": "install output",
+        "line": "Archive: server.zip"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "download",
+        "label": "Downloading server",
+        "state": "done",
+        "progress": {
+          "value": 47
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Verifying files",
+        "state": "done"
+      },
+      {
+        "id": "extract",
+        "label": "Extracting files",
+        "state": "running"
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Environment meters and nested loader and mod downloads",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Get:1 https://packages.example/ stable"
+      },
+      {
+        "event": "install output",
+        "line": "Package ━━━╸── 1.4/2.8 MB"
+      },
+      {
+        "event": "install output",
+        "line": "java -jar forge-installer.jar --installServer"
+      },
+      {
+        "event": "install output",
+        "line": "Downloading library net.minecraftforge:installertools"
+      },
+      {
+        "event": "install output",
+        "line": "#### 36%"
+      },
+      {
+        "event": "install output",
+        "line": "Installing mods"
+      },
+      {
+        "event": "install output",
+        "line": "Downloading dependency"
+      },
+      {
+        "event": "install output",
+        "line": "#### 82%"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "prepare",
+        "label": "Setting up environment",
+        "state": "done",
+        "progress": {
+          "value": 50
+        }
+      },
+      {
+        "id": "loader",
+        "label": "Installing loader",
+        "state": "done",
+        "progress": {
+          "value": 36
+        }
+      },
+      {
+        "id": "content",
+        "label": "Installing mods and plugins",
+        "state": "running",
+        "progress": {
+          "value": 82
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Validated byte and file counts with fixed stage names",
+    "events": [
+      {
+        "event": "install output",
+        "line": "\u001b]0;secret\u0007[voltra:install] begin"
+      },
+      {
+        "event": "install output",
+        "line": "\u001b[32m[voltra:stage] pack-download\u001b[0m"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 50 1048576/2097152 bytes"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 51 1/9007199254740992 bytes"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:stage] phase"
+      },
+      {
+        "event": "install output",
+        "line": "unzip nested.zip"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:stage] pack-extract"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 44 12/27"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 67 50/27"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 900"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 54 https://private.example/"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "pack-download",
+        "label": "Downloading modpack",
+        "state": "done",
+        "progress": {
+          "value": 50,
+          "completed": 1048576,
+          "total": 2097152,
+          "unit": "bytes"
+        }
+      },
+      {
+        "id": "pack-extract",
+        "label": "Extracting modpack files",
+        "state": "running",
+        "progress": {
+          "value": 44,
+          "completed": 12,
+          "total": 27
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Wings retry clears a failed attempt",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Installing Fabric"
+      },
+      {
+        "event": "install output",
+        "line": "Installation failed: private link"
+      },
+      {
+        "event": "panel message",
+        "line": "[Voltra]: Installer attempt started."
+      },
+      {
+        "event": "install output",
+        "line": "### 37%"
+      },
+      {
+        "event": "console output",
+        "line": "Installation failed"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "download",
+        "label": "Downloading server",
+        "state": "running",
+        "progress": {
+          "value": 37
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Explicit begin clears a failed attempt",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Installing Fabric"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:install] failed"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:install] begin"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:stage] pack-download"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 37 0/10 bytes"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "pack-download",
+        "label": "Downloading modpack",
+        "state": "running",
+        "progress": {
+          "value": 37,
+          "completed": 0,
+          "total": 10,
+          "unit": "bytes"
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Completed install replay follows first startup failure",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Downloading server"
+      },
+      {
+        "event": "install output",
+        "line": "Installation complete."
+      },
+      {
+        "event": "panel message",
+        "line": "[Voltra]: Server is starting. Preparing the container and launching the process."
+      },
+      {
+        "event": "panel message",
+        "line": "[Voltra]: Server went offline during startup. Check the output above."
+      }
+    ],
+    "phase": "installed",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "download",
+        "label": "Downloading server",
+        "state": "done"
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "failed"
+      }
+    ]
+  },
+  {
+    "name": "Installer failure ends before first startup",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Downloading server"
+      },
+      {
+        "event": "install output",
+        "line": "installer exited with status 1"
+      },
+      {
+        "event": "panel message",
+        "line": "[Voltra]: Server is starting. Preparing the container and launching the process."
+      }
+    ],
+    "phase": "failed",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "download",
+        "label": "Downloading server",
+        "state": "failed"
+      }
+    ]
+  },
+  {
+    "name": "A revisited phase replaces its previous row",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Downloading archive"
+      },
+      {
+        "event": "install output",
+        "line": "### 63%"
+      },
+      {
+        "event": "install output",
+        "line": "Checking checksum"
+      },
+      {
+        "event": "install output",
+        "line": "Downloading more"
+      },
+      {
+        "event": "install output",
+        "line": "### 4%"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "verify",
+        "label": "Verifying files",
+        "state": "done"
+      },
+      {
+        "id": "download",
+        "label": "Downloading server",
+        "state": "running",
+        "progress": {
+          "value": 4
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Unknown output and forged runtime messages do not classify",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Hello from the installer"
+      },
+      {
+        "event": "install output",
+        "line": "[Voltra]: Current server state: running."
+      },
+      {
+        "event": "console output",
+        "line": "[voltra:stage] pack-download"
+      },
+      {
+        "event": "daemon message",
+        "line": "Downloading server"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "install",
+        "label": "Installing server",
+        "state": "running"
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Npm meters take precedence over generic redraws",
+    "events": [
+      {
+        "event": "install output",
+        "line": "[======> ] 62% npm reify"
+      }
+    ],
+    "phase": "installing",
+    "runtime": "offline",
+    "stages": [
+      {
+        "id": "prepare",
+        "label": "Setting up environment",
+        "state": "running",
+        "progress": {
+          "value": 62
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "Lifecycle success wins even when the retry boundary was missed",
+    "phase": "installed",
+    "runtime": "offline",
+    "events": [
+      {
+        "event": "install output",
+        "line": "Installing Forge"
+      },
+      {
+        "event": "install output",
+        "line": "Installation failed."
+      },
+      {
+        "event": "install output",
+        "line": "Writing server.properties"
+      }
+    ],
+    "stages": [
+      {
+        "id": "loader",
+        "label": "Installing loader",
+        "state": "done"
+      },
+      {
+        "id": "configure",
+        "label": "Configuring server",
+        "state": "done"
+      },
+      {
+        "id": "start",
+        "label": "Ready to start",
+        "state": "waiting"
+      }
+    ]
+  },
+  {
+    "name": "A script completion marker keeps running until lifecycle completion",
+    "phase": "installing",
+    "runtime": "offline",
+    "events": [
+      {
+        "event": "install output",
+        "line": "[voltra:install] begin"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:stage] configure"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:progress] 72"
+      },
+      {
+        "event": "install output",
+        "line": "[voltra:install] complete"
+      }
+    ],
+    "stages": [
+      {
+        "id": "configure",
+        "label": "Configuring server",
+        "state": "running",
+        "progress": {
+          "value": 72
+        }
+      },
+      {
+        "id": "start",
+        "label": "Starting server",
+        "state": "waiting"
+      }
+    ]
+  }
+]

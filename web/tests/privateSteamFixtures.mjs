@@ -27,12 +27,8 @@ const stubs = {
   notifications: `import {jsx} from 'react/jsx-runtime';export const Feedback=({message,id})=>jsx('p',{id,role:'status',children:message});`,
   disclosure: `import {jsx} from 'react/jsx-runtime';export const Disclosure=({children})=>jsx('details',{children}),DisclosureTrigger=({children})=>jsx('summary',{children});`,
   heading: `export const PageHeading=({children})=>children;`,
-  gameSwitch: `import {jsx} from 'react/jsx-runtime';export const GameSwitch=({checked,onCheckedChange})=>jsx('button',{type:'button',role:'switch','aria-checked':checked,onCheckedChange});`,
-  setupFields: `import {jsx} from 'react/jsx-runtime';
-    export const GameNameField=({value,onChange})=>jsx('input',{id:'game-server-name',value,onChange:e=>onChange(e.target.value)});
-    export const GameNodeField=({value,onChange})=>jsx('select',{id:'game-server-node',value,onChange:e=>onChange(e.target.value)});
-    export const GameMemoryField=({value,onChange})=>jsx('input',{id:'game-server-memory',value,onChange:e=>onChange(e.target.value)});
-    export const GameAgreementField=()=>null;`,
+  gameSwitch: `import {jsx} from 'react/jsx-runtime';export const GameSwitch=({checked,onCheckedChange,...props})=>jsx('button',{type:'button',role:'switch','aria-checked':checked,onCheckedChange,...props});`,
+  gameIcon: `export const GameIcon=()=>null;`,
   ports: `export const GamePorts=()=>null,rememberInstallationPorts=()=>{};
     export const useGamePortPlan=(_path,node,environment,enabled)=>{${current}.ports.push({node,environment,enabled});return {data:{ports:[]},loading:false,error:'',reload(){}}};`,
   common: `export const json=(method,body)=>({method,body:JSON.stringify(body)}),can=()=>true,date=value=>String(value),useServer=()=>${current}.server;`,
@@ -49,7 +45,7 @@ const routes = [
   [/ui\/Disclosure$/, 'disclosure'],
   [/ui\/PageHeading$/, 'heading'],
   [/\/GameSwitch$/, 'gameSwitch'],
-  [/\/GameSetupFields$/, 'setupFields'],
+  [/\/GameIcon$/, 'gameIcon'],
   [/\/GamePorts$/, 'ports'],
   [/^\.\.\/shared\/common$/, 'common'],
   [/\/useGameRequest$/, 'gameRequest'],

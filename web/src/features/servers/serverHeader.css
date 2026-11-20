@@ -58,11 +58,7 @@
 .server-power .button.server-power-button[data-power][aria-busy=true]{opacity:1;cursor:wait}
 .server-power .button.server-power-button[data-power][data-feedback=success]{opacity:1}
 .server-power .actions>.button:not([data-power]){background:var(--theme-button,var(--accent));color:var(--theme-button-ink,var(--accent-ink,#fff));border-color:transparent}
-.server-power-progress{min-width:160px;margin-top:10px;color:var(--muted);font-size:calc(11px * var(--ui-font-scale,1));line-height:1.4}
-.server-power-progress-track{height:3px;margin-top:6px;overflow:hidden;border-radius:999px;background:var(--ui-divider)}
-.server-power-progress-track>span{display:block;width:38%;height:100%;border-radius:inherit;background:var(--accent);animation:server-power-wait 1.25s ease-in-out infinite}
-@keyframes server-power-wait{from{transform:translateX(-110%)}to{transform:translateX(370%)}}
-@media(prefers-reduced-motion:reduce){.server-power-progress-track>span{animation:none;width:100%;opacity:.65}.server-power .button.server-power-button[data-power]{transition:none}}
+@media(prefers-reduced-motion:reduce){.server-power .button.server-power-button[data-power]{transition:none}}
 
 .server-topbar .server-state-line{flex-wrap:wrap;white-space:normal}
 

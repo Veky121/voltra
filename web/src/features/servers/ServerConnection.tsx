@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {useEffect, type ReactNode} from 'react';
 import {RefreshCw} from 'lucide-react';
@@ -78,7 +79,9 @@ export function ConnectionOverview({domainQuery}: {domainQuery: DomainQuery}) {
         {failed ? (
           <Feedback tone="error" message={<>Connection details unavailable. Retry above.</>} />
         ) : loading && !info.query.data ? (
-          <span role="status">Loading address...</span>
+          <span role="status">
+            <TerminalSpinner /> Loading address...
+          </span>
         ) : info.connection ? (
           <CopyButton
             className="button secondary"

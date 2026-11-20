@@ -24,7 +24,6 @@ input:focus,select:focus,textarea:focus{border-color:#93b2ee;box-shadow:0 0 0 3p
 .success{color:#b6c9eb}
 .modal{background:var(--surface);border-color:var(--line-strong)}
 .console-output{background:#0d0d0f;border-color:#303034;color:#d7d7dd}
-.spinner{border-color:var(--line-strong);border-top-color:var(--accent)}
 .page{padding:32px}
 .page-header{margin-bottom:28px;align-items:center}
 

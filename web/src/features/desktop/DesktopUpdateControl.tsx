@@ -5,22 +5,66 @@ import {ActionButton} from '../../ui/ActionButton';
 import {Feedback} from '../../notifications';
 import {notifications} from '../../notificationEvents';
 import {formatDesktopVersion, updateAction, useDesktopUpdates} from './desktopUpdates';
+import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
+import {bytesProgressValue, formatBytesProgress} from '../../ui/terminalProgressModel';
 
 export const DesktopUpdatesEnabled = createContext(false);
 
+function activityLabel(operation: string | null, stage?: string) {
+  switch (operation) {
+    case 'update-install':
+      return stage === 'preparing' ? 'Verifying and preparing update' : 'Downloading update';
+    case 'update-restart':
+      return 'Restarting app';
+    case 'update-channel':
+      return 'Switching update channel';
+    default:
+      return 'Checking for updates';
+  }
+}
+
+export function DesktopUpdateProgress() {
+  const {status, busy, operation, error, progress} = useDesktopUpdates();
+  const downloading = operation === 'update-install' && progress?.stage === 'downloading';
+  const total = downloading && progress.total > 0 ? progress.total : undefined;
+  const failed = !!error || status?.state === 'error';
+  const label = busy
+    ? activityLabel(operation, progress?.stage)
+    : failed
+      ? 'App update failed'
+      : status?.state === 'ready'
+        ? 'Ready to restart'
+        : '';
+  return (
+    <>
+      {busy && (
+        <span className="scn:sr-only" role="status">
+          {label}
+        </span>
+      )}
+      {label && (
+        <TerminalProgress
+          label={label}
+          ariaLabel={operation === 'update-install' ? 'Installing app update' : label}
+          statusText=""
+          state={busy ? 'running' : failed ? 'failed' : 'done'}
+          value={downloading ? bytesProgressValue(progress.written, total) : null}
+          detail={downloading ? formatBytesProgress(progress.written, total) : undefined}
+          width={18}
+        />
+      )}
+    </>
+  );
+}
+
 export function DesktopUpdateControl() {
   const enabled = useContext(DesktopUpdatesEnabled);
-  const {status, busy, operation, error} = useDesktopUpdates();
+  const {status, busy, operation, error, progress} = useDesktopUpdates();
   const [open, setOpen] = useState(false);
   if (!enabled) return null;
   const available = status?.state === 'available',
     ready = status?.state === 'ready';
-  const activity =
-    operation === 'update-install'
-      ? 'Downloading update'
-      : operation === 'update-restart'
-        ? 'Restarting app'
-        : 'Checking for updates';
+  const activity = activityLabel(operation, progress?.stage);
   const label = busy
     ? activity
     : ready
@@ -55,7 +99,7 @@ export function DesktopUpdateControl() {
         onClick={() => void check()}
       >
         {busy ? (
-          <RefreshCw className="desktop-update-spinner" aria-hidden="true" />
+          <TerminalSpinner />
         ) : ready ? (
           <RotateCw aria-hidden="true" />
         ) : available ? (
@@ -76,6 +120,7 @@ export function DesktopUpdateControl() {
               ? 'Restart Voltra to finish installing the update.'
               : `Download the update from ${status?.channel === 'nightly' ? 'Nightly' : 'Release'}. You can restart when you are ready.`}
           </p>
+          <DesktopUpdateProgress />
           <div className="actions">
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Later

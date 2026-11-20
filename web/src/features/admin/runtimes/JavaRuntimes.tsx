@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {usePendingSetting} from '../../shared/PendingSettings';
 import {Badge as MiraBadge} from '../../../components/ui/badge';
@@ -107,7 +108,9 @@ export function JavaRuntimes() {
         </Button>
       )}
       {query.loading ? (
-        <p role="status">Loading Java runtimes...</p>
+        <p role="status">
+          <TerminalSpinner /> Loading Java runtimes...
+        </p>
       ) : (
         query.data && (
           <form

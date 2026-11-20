@@ -13,6 +13,7 @@ import {
   quickSettings,
   safeFolderLink,
   steamJobLabel,
+  steamJobProgressState,
   steamMemoryWarning,
   stoppedServer,
 } from '../src/features/game-library/gameSetupModel.ts';
@@ -264,4 +265,13 @@ test('setup resource drafts preserve stored MiB through decimal editing and JSON
   assert.equal(memoryMiB('8'), 8192);
   assert.equal(memoryMiB('1.2345'), 1264);
   for (const invalid of ['', ' ', '-0.0001', '-1', 'NaN', 'Infinity', '1e300']) assert.equal(memoryMiB(invalid), null);
+});
+
+test('Steam progress retains the reported outcome and shows cancelled work without a failure glyph', () => {
+  assert.equal(steamJobProgressState({status: 'running'}), 'running');
+  assert.equal(steamJobProgressState({status: 'queued'}), 'running');
+  assert.equal(steamJobProgressState({status: 'succeeded'}), 'done');
+  assert.equal(steamJobProgressState({status: 'interrupted'}), 'failed');
+  assert.equal(steamJobProgressState({status: 'failed'}), 'failed');
+  assert.equal(steamJobProgressState({status: 'cancelled'}), 'waiting');
 });

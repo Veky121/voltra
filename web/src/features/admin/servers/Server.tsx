@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import '../../server-settings/serverAdminTools.css';
 import {Navigate, useParams} from 'react-router-dom';
 import {ErrorMessage, unwrap, useAPI} from '../shared';
@@ -11,6 +12,11 @@ export function Server() {
   if (id === 'new') return <Navigate to="/game-library" replace />;
   const record = q.data ? unwrap(q.data) : null;
   if (q.error) return <ErrorMessage error={q.error} />;
-  if (!record) return <p role="status">Loading server...</p>;
+  if (!record)
+    return (
+      <p role="status">
+        <TerminalSpinner /> Loading server...
+      </p>
+    );
   return <Navigate to={`/server/${record.identifier || record.uuid}/runtime`} replace />;
 }

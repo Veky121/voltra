@@ -148,6 +148,7 @@ export type Server = {
   console_input_supported: boolean;
   status: string | null;
   is_suspended: boolean;
+  installation_attempt?: string;
   is_installing: boolean;
   is_transferring: boolean;
   skip_scripts: boolean;

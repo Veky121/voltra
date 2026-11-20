@@ -1,3 +1,4 @@
+import {TerminalProgress} from './ui/TerminalProgress';
 import {Feedback} from './notifications';
 import {Field as MiraField} from './components/ui/field';
 import {Skeleton} from './components/ui/skeleton';
@@ -243,7 +244,7 @@ export function Loading() {
   return (
     <div className="loading" role="status">
       <Skeleton className="loading-skeleton" />
-      Loading…
+      <TerminalProgress label="Loading…" />
     </div>
   );
 }

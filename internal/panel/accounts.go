@@ -232,7 +232,7 @@ func (a *App) server(r *http.Request, permission string) (M, error) {
 	steamStatus := r.Method == http.MethodGet && r.URL.Path == base+"/steam"
 	navigation := r.URL.Path == base+"/navigation" && (r.Method == http.MethodPost || r.Method == http.MethodPut)
 	adminSocket := boolean(u["root_admin"]) && (r.URL.Path == base+"/websocket" || r.URL.Path == base+"/ws")
-	consoleHistory := r.Method == http.MethodGet && r.URL.Path == base+"/console-history"
+	consoleHistory := r.Method == http.MethodGet && (r.URL.Path == base+"/console-history" || r.URL.Path == base+"/install-progress")
 	status := str(s["status"])
 	if ((status != "" && status != "reinstall_failed") || boolean(s["node_maintenance"]) || boolean(s["transferring"])) && !view && !adminSocket && !steamStatus && !navigation && !consoleHistory {
 		if status == "" {

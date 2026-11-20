@@ -11,6 +11,14 @@ export type GameProfile = {
   password: {enabled: boolean; required: boolean; min_length: number; max_length: number};
 };
 export type Choice = {value: string; label: string};
+export type GameRecommendation = {
+  memory: number;
+  disk: number;
+  players: number | null;
+  confidence: 'official' | 'community' | 'estimate' | 'none';
+  source: string;
+  note: string;
+};
 export type GameHelp = {label: string; url?: string; text?: string};
 export type SteamAdvancedField = {
   key: string;
@@ -41,6 +49,8 @@ export type SteamOptions = GameProfile & {
   can_install: boolean;
   nodes: SetupNode[];
   defaults: {memory: number; disk?: number; max_players: number};
+  recommendation?: GameRecommendation;
+  runtime_image?: string;
   minimum_memory: number;
   maximum_memory: number;
   minimum_players: number;
@@ -51,6 +61,13 @@ export type SteamOptions = GameProfile & {
   supports_install_only?: boolean;
   supports_game_name?: boolean;
 };
+
+export function recommendedGB(recommendation: GameRecommendation | undefined, resource: 'memory' | 'disk') {
+  const amount = recommendation?.[resource];
+  return recommendation?.confidence !== 'none' && amount && amount > 0
+    ? `Recommended: ${miBToGB(amount)} GB`
+    : 'Using the recipe default. No published recommendation exists.';
+}
 
 export function steamAdvancedEnvironment(
   fields: SteamAdvancedField[],
@@ -209,6 +226,13 @@ export function activeSteamJob(job?: SteamJob | null): boolean {
     !['completed', 'succeeded', 'success', 'failed', 'cancelled', 'canceled', 'interrupted'].includes(job.status)
   );
 }
+export function steamJobProgressState(job: SteamJob) {
+  if (activeSteamJob(job)) return 'running';
+  if (['completed', 'succeeded', 'success'].includes(job.status)) return 'done';
+  if (['failed', 'interrupted'].includes(job.status)) return 'failed';
+  return 'waiting';
+}
+
 export function steamJobLabel(job: SteamJob): string {
   if (job.operation === 'start')
     return job.restart || /restart/.test(job.stage) ? 'Preparing restart' : 'Preparing server';

@@ -9,7 +9,6 @@
 .backups-page .backup-card-title p { margin:4px 0 0; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .backups-page .backup-card-status { display:flex; flex-direction:column-reverse; align-items:flex-end; gap:4px; font-size:12px; }
 .backups-page .backup-card-status > span { display:inline-flex; align-items:center; gap:5px; }
-.backups-page .backup-card-status .badge { width:100px; justify-content:center; white-space:nowrap; }
 .backups-page .backup-card-footer { display:grid; grid-template-columns:minmax(0,1fr) 80px; gap:12px 16px; align-content:space-between; min-height:0; }
 .backups-page .backup-meta-label { display:block; margin-bottom:4px; color:var(--muted); font-size:11px; }
 .backups-page .backup-created time { display:flex; flex-direction:column; gap:3px; font-size:13px; }
@@ -21,14 +20,11 @@
 .backups-page .backup-card:hover { border-color:var(--line-strong); }
 .backups-page .backup-card[data-backup-active] { --backup-line:var(--accent); border-color:color-mix(in srgb,var(--backup-line) 45%,var(--line)); }
 .backups-page .backup-card[data-backup-state=creating] { --backup-line:var(--amber,#edc482); }
-.backups-page .backup-card[data-backup-active]::after { content:""; position:absolute; pointer-events:none; bottom:0; left:12px; right:12px; height:3px; border-radius:3px; background:linear-gradient(90deg,transparent,var(--backup-line),transparent) -50% 0/35% 100% no-repeat; background-color:color-mix(in srgb,var(--backup-line) 12%,transparent); animation:server-power-sweep 1.8s linear infinite; }
-.backups-page .backup-card-title .backup-card-feedback { margin:4px 0 0; height:20px; line-height:20px; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.backups-page .backup-card-title .backup-card-error { color:var(--red); }
+.backups-page .backup-card-title .backup-card-feedback { margin:4px 0 0; min-height:20px; line-height:20px; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media(max-width:420px) {
   .backups-page .backup-card[data-slot=card] { height:272px; }
   .backups-page .backup-card-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media(prefers-reduced-motion:reduce) {
   .backups-page .backup-card[data-slot=card] { animation:none; transition:none; }
-  .backups-page .backup-card[data-backup-active]::after { animation:none; background:var(--backup-line); opacity:.7; }
 }

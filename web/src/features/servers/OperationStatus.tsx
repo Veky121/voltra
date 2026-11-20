@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
-import {Progress} from '../../components/ui/progress';
+import {TerminalProgress} from '../../ui/TerminalProgress';
+import {bytesProgressValue, formatBytesProgress} from '../../ui/terminalProgressModel';
 import {Button} from '../../lib';
-import {bytes as size} from '../shared/common';
 import {formatDateTime} from '../../format';
 import {operationMessages, operationPending, operationRecentlyActive, type OperationEvent} from './operationEvents';
 import './operationStatus.css';
@@ -20,28 +20,15 @@ export function OperationReports({events, onDismiss}: {events: OperationEvent[];
         const info = operationMessages[event.code],
           active = operationPending(event);
         const stale = active && !operationRecentlyActive(event, Math.max(clock, Date.now()));
-        const percent =
-          event.total && event.bytes !== undefined ? Math.min(100, (event.bytes / event.total) * 100) : null;
+        const percent = bytesProgressValue(event.bytes, event.total);
+        const detail = formatBytesProgress(event.bytes, event.total);
+        const state =
+          event.state === 'completed' ? 'done' : event.state === 'failed' ? 'failed' : stale ? 'waiting' : 'running';
         return (
           <div key={event.id} className="operation-status">
             <details>
-              <summary>
-                <span>{info.message}</span>
-                <small>
-                  {stale
-                    ? 'No recent update'
-                    : event.state === 'completed'
-                      ? 'Completed'
-                      : event.state === 'failed'
-                        ? 'Failed'
-                        : `Reported ${event.phase}`}
-                  {event.bytes !== undefined
-                    ? ` · ${size(event.bytes)}${event.total ? ` / ${size(event.total)}` : ' received'}`
-                    : ''}
-                </small>
-              </summary>
+              <summary>{info.message}</summary>
               <div className="operation-status-details">
-                {info.recovery && event.state === 'failed' && <p>{info.recovery}</p>}
                 {event.restart_required && <p>Restart required to apply this change.</p>}
                 {active && (
                   <p>Last reported {formatDateTime(event.at)}. This report does not confirm that the game is ready.</p>
@@ -59,7 +46,22 @@ export function OperationReports({events, onDismiss}: {events: OperationEvent[];
                 )}
               </div>
             </details>
-            {active && !stale && <Progress aria-label={info.message} value={percent} />}
+            <TerminalProgress
+              label={
+                stale
+                  ? 'No recent update'
+                  : state === 'done'
+                    ? 'Completed'
+                    : state === 'failed'
+                      ? 'Failed'
+                      : `Reported ${event.phase}`
+              }
+              ariaLabel={info.message}
+              value={stale ? null : percent}
+              state={state}
+              detail={detail}
+              width={18}
+            />
           </div>
         );
       })}

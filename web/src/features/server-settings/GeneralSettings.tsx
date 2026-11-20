@@ -1,7 +1,6 @@
 import {ReinstallServerButton} from './ReinstallServerButton';
 import {usePendingSetting} from '../shared/PendingSettings';
 import '../backups/backups.css';
-import '../servers/powerProgress.css';
 import {useEffect, useState, type ReactNode} from 'react';
 import {SettingsRow, SettingsSection} from '../../ui/Settings';
 import {Link} from 'react-router-dom';

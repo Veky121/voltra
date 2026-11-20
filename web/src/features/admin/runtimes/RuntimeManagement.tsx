@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {useEffect, useState} from 'react';
 import {api, Button, Field, Select, rows, useAPI} from '../../../lib';
@@ -188,7 +189,14 @@ function NodeRuntime({node, name, maintenance}: {node: string; name: string; mai
           </SettingsRow>
         )}
         {!images.data && images.loading && (
-          <SettingsRow label={<span role="status">Loading images…</span>} control={null} />
+          <SettingsRow
+            label={
+              <span role="status">
+                <TerminalSpinner /> Loading images…
+              </span>
+            }
+            control={null}
+          />
         )}
         {images.data && (
           <>
@@ -204,11 +212,15 @@ function NodeRuntime({node, name, maintenance}: {node: string; name: string; mai
                 key={image.reference}
                 label={image.reference}
                 description={
-                  image.busy
-                    ? 'Checking…'
-                    : image.candidate_id && image.candidate_id !== image.approved_id
-                      ? 'Update ready to approve'
-                      : 'Approved'
+                  image.busy ? (
+                    <>
+                      <TerminalSpinner /> Checking…
+                    </>
+                  ) : image.candidate_id && image.candidate_id !== image.approved_id ? (
+                    'Update ready to approve'
+                  ) : (
+                    'Approved'
+                  )
                 }
                 info={
                   <>
@@ -295,7 +307,14 @@ function NodeRuntime({node, name, maintenance}: {node: string; name: string; mai
           </SettingsRow>
         )}
         {!steam.data && steam.loading && (
-          <SettingsRow label={<span role="status">Loading SteamCMD…</span>} control={null} />
+          <SettingsRow
+            label={
+              <span role="status">
+                <TerminalSpinner /> Loading SteamCMD…
+              </span>
+            }
+            control={null}
+          />
         )}
         {steam.data && (
           <>
@@ -303,7 +322,7 @@ function NodeRuntime({node, name, maintenance}: {node: string; name: string; mai
               label={steam.data.version ? `Version ${steam.data.version}` : 'Not checked yet'}
               description={
                 steam.data.busy
-                  ? 'Checking for updates…'
+                  ? undefined
                   : steam.data.last_checked_at
                     ? `Checked ${at(steam.data.last_checked_at)}`
                     : 'Run a check to get started.'
@@ -326,6 +345,7 @@ function NodeRuntime({node, name, maintenance}: {node: string; name: string; mai
                   disabled={disabled || !!steam.error || !steam.data.supported || steam.data.busy}
                   onClick={() => void act('steamcmd', 'check')}
                 >
+                  {steam.data.busy && <TerminalSpinner />}
                   {steam.data.busy ? 'Checking…' : 'Check updates'}
                 </Button>
               }

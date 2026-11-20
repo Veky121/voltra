@@ -1,3 +1,4 @@
+import {TerminalProgress, TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
 import {GameSwitch} from '../shared/GameSwitch';
@@ -5,7 +6,7 @@ import './games-ui.css';
 import {useEffect, useRef, useState, type FormEvent} from 'react';
 import {api, Button, Card, ErrorBox, Field, Input, Select, rows, unwrap} from '../../lib';
 import {can, date, json, useServer} from '../shared/common';
-import {activeSteamJob, stoppedServer, type SteamJob} from './gameSetupModel';
+import {activeSteamJob, steamJobProgressState, stoppedServer, type SteamJob} from './gameSetupModel';
 import {useGameRequest} from './useGameRequest';
 import {useServerTelemetry} from '../servers/ServerDashboard';
 import {privateOriginalLabel, validatePrivateOriginal, type SteamOriginalControls} from './privateSteamTemplateModel';
@@ -46,6 +47,7 @@ export default function PrivateSteamMaintenance({
   const history = rows(jobs.data) as PrivateJob[];
   const active = history.find(activeSteamJob);
   const current = useGameRequest<PrivateJob>(active ? `${endpoint}/jobs/${encodeURIComponent(active.id)}` : null, 1000);
+  const shownJob = current.data || active;
   const guard = current.data?.guard;
   const [username, setUsername] = useState(''),
     [password, setPassword] = useState(''),
@@ -228,6 +230,7 @@ export default function PrivateSteamMaintenance({
           )}
           {!stopped && <p className="muted">Stop the server before checking its downloaded files.</p>}
           <Button variant="secondary" disabled={recoveryBlocked} onClick={() => void recover()}>
+            {recovering && <TerminalSpinner />}
             {recovering ? 'Checking downloaded files…' : 'Recover download result'}
           </Button>
           {recovering && (
@@ -353,11 +356,16 @@ export default function PrivateSteamMaintenance({
           </fieldset>
         </form>
       </Disclosure>
-      {active && (
+      {active && shownJob && (
         <div className="steam-job">
-          <p role="status">
-            {active.operation} · {active.status} · {current.data?.detail || active.detail}
-          </p>
+          <div role="status">
+            <TerminalProgress
+              label={`${shownJob.operation} · ${shownJob.status}`}
+              detail={shownJob.detail || active.detail}
+              state={steamJobProgressState(shownJob)}
+              value={null}
+            />
+          </div>
           {guard && privateGuardUsable(guard, now) && (
             <form
               onSubmit={event => {
@@ -438,10 +446,12 @@ export default function PrivateSteamMaintenance({
           <ul>
             {history.map(job => (
               <li key={job.id}>
-                <strong>
-                  {job.operation} · {job.status.replaceAll('_', ' ')}
-                </strong>
-                <p>{job.detail || job.stage}</p>
+                <TerminalProgress
+                  label={`${job.operation} · ${job.status.replaceAll('_', ' ')}`}
+                  detail={job.detail || job.stage}
+                  state={steamJobProgressState(job)}
+                  value={null}
+                />
                 <small>{date(job.completed_at || job.created_at)}</small>
                 {job.error && <ErrorBox>{job.error}</ErrorBox>}
               </li>

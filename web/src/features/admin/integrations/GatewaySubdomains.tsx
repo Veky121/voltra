@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {usePendingSetting} from '../../shared/PendingSettings';
 import {useState} from 'react';
 import {api, Button, Input, Select, useAPI, unwrap} from '../../../lib';
@@ -180,6 +181,7 @@ export function GatewaySubdomains({gateway}: {gateway: Record<string, any>}) {
               type="submit"
               disabled={busy || query.loading || !!query.error || !selectedDomain || !selectedIntegration}
             >
+              {busy && <TerminalSpinner />}
               {busy ? 'Checking...' : 'Save domain setup'}
             </Button>
           )}
@@ -231,6 +233,7 @@ export function GatewaySubdomains({gateway}: {gateway: Record<string, any>}) {
           </div>
           <div className="settings-actions">
             <Button type="submit" disabled={busy || !selectedDomain}>
+              {busy && <TerminalSpinner />}
               {busy ? 'Connecting...' : 'Connect DNS'}
             </Button>
           </div>

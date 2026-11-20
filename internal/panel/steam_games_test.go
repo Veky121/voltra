@@ -372,7 +372,9 @@ func TestSteamGameProvisioningIdempotencyAndAllocations(t *testing.T) {
 	if err != nil || num(count["n"]) != 1 {
 		t.Fatal("crash recovery reinstalled an already finished provision")
 	}
-	input["memory"] = 16384
+	// A changed request under the same request_id: memory differs from the default.
+	originalMemory := input["memory"]
+	input["memory"] = num(input["memory"]) + 1024
 	infraExpect(t, mux, admin, "POST", endpoint, input, 409)
 	f.mu.Lock()
 	creates := f.Creates
@@ -381,7 +383,7 @@ func TestSteamGameProvisioningIdempotencyAndAllocations(t *testing.T) {
 		t.Fatal("duplicate bootstrap")
 	}
 	// A deleted completed request cannot silently create a replacement server.
-	input["memory"] = 12288
+	input["memory"] = originalMemory
 	if err = a.exec(ctx, "DELETE FROM servers WHERE id=$1", server["id"]); err != nil {
 		t.Fatal(err)
 	}

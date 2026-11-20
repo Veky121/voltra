@@ -2,9 +2,12 @@ import {templateSetupRuleProblems, type TemplateSetupValidation} from './templat
 import {miBToGB} from '../../resourceUnits.ts';
 import {
   templateAgreementsAccepted,
+  templateAcceptanceRequired,
+  templateVariableControl,
   templateVariableProblem,
   type TemplateVariableDefinition,
   type GameAgreement,
+  type GameAcceptance,
 } from './gameTemplateModel.ts';
 import {installationAcknowledgementVariable} from '../server-settings/startupSettingsModel.ts';
 
@@ -46,6 +49,7 @@ export type TemplateReadiness = {
   variables: (TemplateVariableDefinition & {name: string})[];
   environment: Record<string, string>;
   agreements?: GameAgreement[];
+  acceptances?: GameAcceptance[];
 };
 export function templateSetupProblems(input: TemplateReadiness): SetupProblem[] {
   const problems: SetupProblem[] = [];
@@ -64,13 +68,25 @@ export function templateSetupProblems(input: TemplateReadiness): SetupProblem[] 
   else if (input.disk > input.diskMaximum)
     add('game-server-storage', `Storage exceeds the host's available ${miBToGB(input.diskMaximum)} GB.`);
   if (!input.imageValid) add('game-runtime-image', 'Choose an available runtime image in advanced settings.');
-  if (input.steamError) add(undefined, 'Review the Steam installation settings above.');
-  if (input.privateContent && (!input.privateSupported || input.node?.private_content_ready !== true))
-    add('game-server-node', 'Private Steam installation requires a supported host and trusted worker.');
-  if (!templateAgreementsAccepted(input.agreements, input.environment))
-    add(undefined, 'Accept the required publisher terms above.');
+  if (input.steamError) add('game-template-steam', 'Review the Steam installation settings.');
+  if (input.privateContent && !input.privateSupported)
+    add('game-template-steam', 'This recipe cannot use your Steam account yet. Choose Anonymous Steam installation.');
+  else if (input.privateContent && input.node?.private_content_ready !== true)
+    add('game-server-node', 'Choose a host with a trusted private Steam worker, or use Anonymous Steam installation.');
+  for (const agreement of input.agreements ?? [])
+    if (!templateAgreementsAccepted([agreement], input.environment))
+      add(`game-template-${agreement.environment}`, `Accept the ${agreement.title}.`);
+  for (const acceptance of input.acceptances ?? []) {
+    const variable = input.variables.find(item => item.env_variable === acceptance.environment);
+    if (
+      templateAcceptanceRequired(acceptance) &&
+      (!variable || templateVariableControl(variable, input.environment).required) &&
+      input.environment[acceptance.environment] !== acceptance.accept_value
+    )
+      add(`game-template-${acceptance.environment}`, `Accept the ${acceptance.title}.`);
+  }
   if (input.node && input.node.setup_available !== false && !input.steamError) {
-    if (input.portsError) add('game-template-ports', 'Port checks failed. Retry the check above.');
+    if (input.portsError) add('game-template-ports', 'Port checks failed. Retry the port check.');
     else if (input.portsLoading || !input.portsReady)
       add('game-template-ports', 'Waiting for automatic port checks to finish.');
   }
@@ -85,6 +101,7 @@ export function templateSetupProblems(input: TemplateReadiness): SetupProblem[] 
       'Ask an administrator to assign an unused GIANTS game and DLC licence, or turn off automatic game downloads to upload an installer.'
     );
   for (const variable of input.variables) {
+    if (input.acceptances?.some(acceptance => acceptance.environment === variable.env_variable)) continue;
     const problem = templateVariableProblem(variable, input.environment);
     if (problem) add(`game-template-${variable.env_variable}`, `${variable.name}: ${problem}`);
     else if (

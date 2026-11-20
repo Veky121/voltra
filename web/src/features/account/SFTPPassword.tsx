@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {useState} from 'react';
 import {api, Button, Input, useAPI} from '../../lib';
 import {SettingsRow, SettingsSection} from '../../ui/Settings';
@@ -23,7 +24,9 @@ export default function SFTPPassword({userID}: {userID?: string}) {
       <PageError error={q.error} />
       <Notice action={a} />
       {q.loading && !user ? (
-        <p role="status">Loading password status...</p>
+        <p role="status">
+          <TerminalSpinner /> Loading password status...
+        </p>
       ) : (
         user && (
           <>
@@ -109,6 +112,7 @@ export default function SFTPPassword({userID}: {userID?: string}) {
                 />
                 <div className="settings-actions">
                   <Button type="submit" disabled={a.busy || q.loading}>
+                    {a.busy && <TerminalSpinner />}
                     {a.busy ? 'Saving...' : admin ? 'Set SFTP password' : 'Save SFTP password'}
                   </Button>
                 </div>

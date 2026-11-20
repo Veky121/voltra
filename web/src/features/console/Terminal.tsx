@@ -6,8 +6,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '../../components/ui/dropdown-menu';
+import {Button} from '../../components/ui/button';
+import {TerminalProgress} from '../../ui/TerminalProgress';
 import {requestServerPower} from '../servers/serverPower';
-import {memo, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {consoleViewport, consoleViewportChunks, type ConsoleRange} from './consoleViewport';
 import {Icon} from '../../Icons';
 import {can, Notice, useAction, useServer} from '../shared/common';
@@ -19,6 +21,7 @@ import {
   type ConsoleHistoryChunk,
 } from './consoleHistory';
 import {stripConsoleControls} from './consoleOutput';
+import {installProgressDetail, type InstallStage} from './installProgress';
 
 const HistoryChunk = memo(function HistoryChunk({chunk}: {chunk: ConsoleHistoryChunk}) {
   return (
@@ -41,6 +44,10 @@ export default function Terminal({
   status,
   connection,
   busy,
+  installStages,
+  canReadInstallLog,
+  installHistory,
+  installAttempt,
   onClear,
   onSend,
 }: {
@@ -48,6 +55,10 @@ export default function Terminal({
   status: string;
   connection: string;
   busy: boolean;
+  installStages?: InstallStage[];
+  canReadInstallLog: boolean;
+  installHistory: ConsoleHistory;
+  installAttempt: number;
   onClear: () => void;
   onSend: (command: string, done: () => void) => void;
 }) {
@@ -59,16 +70,28 @@ export default function Terminal({
   const output = useRef<HTMLPreElement>(null),
     input = useRef<HTMLInputElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false),
-    [historyOpen, setHistoryOpen] = useState(false);
+    [historyOpen, setHistoryOpen] = useState(false),
+    [openLog, setOpenLog] = useState<'install' | 'startup' | null>(null);
+  const hasInstallStages = !!installStages;
+  const startup = installStages?.find(stage => stage.id === 'start');
+  const startupFailed = startup?.state === 'failed';
+  const canShowStartup = status === 'starting' || startup?.state === 'running' || startupFailed;
+  const canShowInstall = canReadInstallLog && hasInstallStages && status !== 'running';
+  const showInstallHistory = canShowInstall && openLog === 'install';
+  const showStartupHistory = canShowStartup && (startupFailed || openLog === 'startup') && !showInstallHistory;
+  const showOutput = !hasInstallStages || showInstallHistory || status === 'running' || showStartupHistory;
+  const selectedHistory = showInstallHistory ? installHistory : logHistory;
+  const logLabel = showInstallHistory ? 'install log' : 'console output';
+  const outputId = useId();
   const historyIndex = useRef(-1),
     draft = useRef('');
   const [heldHistory, setHeldHistory] = useState<ConsoleHistory | null>(null);
-  const currentHistory = useRef(logHistory),
+  const currentHistory = useRef(selectedHistory),
     pointerSelecting = useRef(false);
   const selectionWindow = useRef<ConsoleRange | null>(null);
   const [viewport, setViewport] = useState({top: 0, height: 400, lineHeight: 20.8});
-  currentHistory.current = logHistory;
-  const displayed = heldHistory ?? logHistory;
+  currentHistory.current = selectedHistory;
+  const displayed = heldHistory ?? selectedHistory;
   const range = consoleViewport(
     displayed.count,
     viewport.top,
@@ -96,12 +119,23 @@ export default function Terminal({
     const observer = new ResizeObserver(measureViewport);
     if (output.current) observer.observe(output.current);
     return () => observer.disconnect();
-  }, []);
+  }, [showOutput]);
   useEffect(() => {
     pointerSelecting.current = false;
     setHeldHistory(null);
     setAutoScroll(true);
+    setOpenLog(null);
   }, [base]);
+  useEffect(() => {
+    if (!hasInstallStages) setOpenLog(null);
+  }, [hasInstallStages]);
+  const selectedAttempt = showInstallHistory ? installAttempt : null;
+  useLayoutEffect(() => {
+    if (output.current?.contains(window.getSelection()?.anchorNode ?? null)) window.getSelection()?.removeAllRanges();
+    pointerSelecting.current = false;
+    selectionWindow.current = null;
+    setHeldHistory(null);
+  }, [selectedAttempt]);
   const working = busy || action.busy,
     running = status === 'running';
   const plainLog = () => stripConsoleControls(consoleHistoryText(displayed));
@@ -110,7 +144,7 @@ export default function Terminal({
       output.current.scrollTop = output.current.scrollHeight;
       measureViewport();
     }
-  }, [displayed, autoScroll, heldHistory]);
+  }, [displayed, autoScroll, heldHistory, showOutput]);
   useEffect(() => {
     const selectionInOutput = () => {
       const selection = window.getSelection();
@@ -141,12 +175,18 @@ export default function Terminal({
       document.removeEventListener('pointercancel', releasePointer);
     };
   }, []);
-  function saveLog() {
+  function toggleLog(log: 'install' | 'startup') {
+    window.getSelection()?.removeAllRanges();
+    setHeldHistory(null);
+    setAutoScroll(true);
+    setOpenLog(current => (current === log ? null : log));
+  }
+  function saveLog(text: string, kind: 'console' | 'install') {
     setToolsOpen(false);
-    const url = URL.createObjectURL(new Blob([plainLog()], {type: 'text/plain'}));
+    const url = URL.createObjectURL(new Blob([text], {type: 'text/plain'}));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${server.name}-console.log`;
+    anchor.download = `${server.name}-${kind}.log`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -194,17 +234,17 @@ export default function Terminal({
             <IconButton
               type="button"
               className="console-icon-button"
-              aria-label="Copy console output"
-              title="Copy console output"
+              aria-label={`Copy ${logLabel}`}
+              title={`Copy ${logLabel}`}
               disabled={!displayed.count || working}
               onClick={() =>
                 void action.run(
                   async () => {
                     if (!navigator.clipboard)
-                      throw new Error('Clipboard access is unavailable. Use Save console log to keep a copy.');
+                      throw new Error('Clipboard access is unavailable. Use the Save option to keep a copy.');
                     await navigator.clipboard.writeText(plainLog());
                   },
-                  () => action.setSuccess('Console output copied.')
+                  () => action.setSuccess(showInstallHistory ? 'Install log copied.' : 'Console output copied.')
                 )
               }
             >
@@ -215,7 +255,7 @@ export default function Terminal({
               className="console-icon-button"
               aria-label="Clear console display"
               title="Clear display"
-              disabled={!displayed.count}
+              disabled={!displayed.count || showInstallHistory}
               onClick={() => {
                 setHeldHistory(null);
                 onClear();
@@ -237,13 +277,24 @@ export default function Terminal({
               </DropdownMenuTrigger>
               <DropdownMenuContent className="console-dropdown" align="end">
                 <p className="console-history-budget">
-                  {logHistory.count.toLocaleString()} / {CONSOLE_HISTORY_LINES.toLocaleString()} lines | up to{' '}
-                  {(CONSOLE_HISTORY_CHARACTERS * 2) / 1024 ** 2} MiB
+                  {selectedHistory.count.toLocaleString()} / {CONSOLE_HISTORY_LINES.toLocaleString()} lines | up to{' '}
+                  {(CONSOLE_HISTORY_CHARACTERS * 2) / 1024 ** 2} MB
                 </p>
-                <DropdownMenuItem disabled={!displayed.count} onClick={saveLog}>
+                <DropdownMenuItem
+                  disabled={!displayed.count}
+                  onClick={() => saveLog(plainLog(), showInstallHistory ? 'install' : 'console')}
+                >
                   <Icon name="download" />
-                  Save console log
+                  {showInstallHistory ? 'Save install log' : 'Save console log'}
                 </DropdownMenuItem>
+                {canReadInstallLog && !showInstallHistory && installHistory.count > 0 && (
+                  <DropdownMenuItem
+                    onClick={() => saveLog(stripConsoleControls(consoleHistoryText(installHistory)), 'install')}
+                  >
+                    <Icon name="download" />
+                    Save install log
+                  </DropdownMenuItem>
+                )}
                 {can(permissions, 'control.stop') && (
                   <DropdownMenuItem
                     className="console-force-stop"
@@ -271,17 +322,62 @@ export default function Terminal({
             </DropdownMenu>
           </div>
         </div>
-        <div className="console-terminal-body">
+        {installStages && (
+          <div className="console-install">
+            <ol role="list" aria-label="Installation stages" className="console-install-stages">
+              {installStages.map(({id, label, state, progress}) => (
+                <li key={id}>
+                  <TerminalProgress
+                    label={label}
+                    value={progress?.value}
+                    detail={installProgressDetail(progress)}
+                    state={state}
+                    statusText={label === 'Ready to start' ? '' : undefined}
+                    width={20}
+                    className={progress ? undefined : 'console-install-indeterminate'}
+                  />
+                </li>
+              ))}
+            </ol>
+            {canShowStartup && (!startupFailed || showInstallHistory) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="console-install-toggle"
+                aria-expanded={showStartupHistory}
+                aria-controls={outputId}
+                onClick={() => toggleLog('startup')}
+              >
+                {showStartupHistory ? 'Hide' : 'Show'} live startup console
+              </Button>
+            )}
+            {canShowInstall && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="console-install-toggle"
+                aria-expanded={showInstallHistory}
+                aria-controls={outputId}
+                onClick={() => toggleLog('install')}
+              >
+                {showInstallHistory ? 'Hide' : 'Show'} full install log
+              </Button>
+            )}
+          </div>
+        )}
+        <div id={outputId} className="console-terminal-body" hidden={!showOutput}>
           <pre
             ref={output}
             className="console-output"
-            aria-label="Server console output"
+            aria-label={showInstallHistory ? 'Full install log' : 'Server console output'}
             tabIndex={0}
             onPointerDown={event => {
               if (event.button === 0) {
                 selectionWindow.current = currentRange.current;
                 pointerSelecting.current = true;
-                setHeldHistory(old => old ?? logHistory);
+                setHeldHistory(old => old ?? selectedHistory);
                 setAutoScroll(false);
               }
             }}

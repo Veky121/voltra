@@ -1,0 +1,20 @@
+/* Terminal-style progress shared across the app. */
+.terminal-progress{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;row-gap:2px;min-width:0;font:calc(12.5px * var(--ui-font-scale,1))/1.6 'IBM Plex Mono',ui-monospace,monospace;color:var(--text,var(--foreground))}
+.terminal-progress-glyph{flex:0 0 1.2em;text-align:center}
+.terminal-progress.is-done .terminal-progress-glyph{color:var(--green,#77d4a6)}
+.terminal-progress.is-failed .terminal-progress-glyph{color:var(--red)}
+.terminal-progress.is-waiting{color:var(--muted)}
+.terminal-progress-label{min-width:0;overflow-wrap:anywhere}
+.terminal-progress-meter{display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:0 8px;min-width:0;max-width:100%}
+.terminal-progress-bar{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;color:var(--accent);letter-spacing:-.02em}
+.terminal-progress.is-done .terminal-progress-bar{color:var(--green,#77d4a6)}
+.terminal-progress.is-failed .terminal-progress-bar{color:var(--red)}
+.terminal-progress-percent{min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
+.terminal-progress-detail{min-width:0;overflow-wrap:anywhere;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Braille spinner, stepped through with CSS: no timers, nothing to clean up. */
+.terminal-spinner{display:inline-block;width:1.2em;text-align:center;font-family:'IBM Plex Mono',ui-monospace,monospace;color:var(--accent)}
+.terminal-spinner::before{content:'⠋';animation:terminal-spin .8s steps(1,end) infinite}
+@keyframes terminal-spin{0%{content:'⠋'}10%{content:'⠙'}20%{content:'⠹'}30%{content:'⠸'}40%{content:'⠼'}50%{content:'⠴'}60%{content:'⠦'}70%{content:'⠧'}80%{content:'⠇'}90%{content:'⠏'}}
+@media(prefers-reduced-motion:reduce){.terminal-spinner::before{animation:none;content:'⠿'}}
+@media(max-width:560px){.terminal-progress-meter{flex-basis:100%;order:3;padding-inline-start:min(1em,4%)}
+.terminal-progress-detail{order:4}}

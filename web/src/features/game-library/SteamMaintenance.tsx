@@ -1,3 +1,4 @@
+import {TerminalProgress} from '../../ui/TerminalProgress';
 import {SettingsSkeleton} from '../../ui/SettingsSkeleton';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
 import './games-ui.css';
@@ -7,6 +8,7 @@ import {api, Button, Card, ErrorBox, Input, Select} from '../../lib';
 import {can, date, json, useServer} from '../shared/common';
 import {
   activeSteamJob,
+  steamJobProgressState,
   checkDue,
   steamJobLabel,
   stoppedServer,
@@ -287,11 +289,12 @@ function SteamControls({
             <ul>
               {status.jobs.map(item => (
                 <li key={item.id}>
-                  <div>
-                    <strong>{item.operation}</strong>
-                    <span className="badge">{item.status.replaceAll('_', ' ')}</span>
-                  </div>
-                  <p>{item.detail || item.stage}</p>
+                  <TerminalProgress
+                    label={`${item.operation} · ${item.status.replaceAll('_', ' ')}`}
+                    detail={item.detail || item.stage}
+                    state={steamJobProgressState(item)}
+                    value={null}
+                  />
                   <small className="muted">{date(item.completed_at || item.started_at || item.created_at)}</small>
                   {item.error && <ErrorBox>{item.error}</ErrorBox>}
                   <SteamJobLog job={item} />
@@ -365,12 +368,12 @@ function SteamJobProgress({job}: {job: SteamJob}) {
       <div role="status" aria-live="polite">
         <strong>{steamJobLabel(job)}</strong>
         <span className="badge">{job.status.replaceAll('_', ' ')}</span>
+        <TerminalProgress
+          label={job.stage?.replaceAll('_', ' ') || steamJobLabel(job)}
+          ariaLabel="Steam job progress"
+          detail={job.detail}
+        />
       </div>
-      <progress aria-label="Steam job progress" />
-      <p>
-        {job.stage?.replaceAll('_', ' ')}
-        {job.detail ? ` · ${job.detail}` : ''}
-      </p>
       <SteamJobLog job={job} />
     </div>
   );

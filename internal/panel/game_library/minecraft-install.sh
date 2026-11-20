@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+echo '[voltra:install] begin'
+echo '[voltra:stage] prepare'
 if [[ "${EULA_ACCEPTED:-false}" != "true" ]]; then
     echo "Accept the Minecraft EULA before installing."
     exit 1

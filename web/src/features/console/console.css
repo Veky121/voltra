@@ -61,3 +61,14 @@
 /* Touch targets: phones and touch screens get 44px console tools. */
 @media(max-width:760px),(pointer:coarse){.console-view .console-icon-button{width:44px;height:44px;min-height:44px;padding:12px}.console-view .console-icon-button>svg{width:16px;height:16px}.console-view .console-command-bar{min-height:60px}.console-view .console-tools-menu button,.console-view .console-history-list>button{min-height:44px}}
 @media(max-width:760px),(pointer:coarse){.console-dropdown [data-slot=dropdown-menu-item]{min-height:44px}}
+
+.console-view .console-install{display:grid;justify-items:start;gap:10px;min-width:0;padding:12px 14px;background:var(--surface-muted);color:var(--text)}
+.console-view .console-install-stages{display:grid;gap:5px;width:100%;min-width:0;margin:0;padding:0;list-style:none}
+.console-view .console-install-stages li{min-width:0}
+.console-view .console-install .terminal-progress{color:var(--text)}
+.console-view .console-install .terminal-progress.is-waiting,.console-view .console-install .terminal-progress-detail{color:var(--muted)}
+.console-view .console-install .terminal-progress-detail{overflow-wrap:anywhere;min-width:0}
+.console-view .console-install-indeterminate .terminal-progress-bar,.console-view .console-install-indeterminate .terminal-progress-percent{display:none}
+/* A quiet toggle: the stages are the focus, the raw log is there when wanted. */
+.console-view .console-install-toggle{min-height:28px;padding:3px 10px;background:transparent;border:1px solid var(--line);color:var(--muted);font:500 12px/1.4 'IBM Plex Mono',monospace}
+.console-view .console-install-toggle:hover{color:var(--text);filter:none}

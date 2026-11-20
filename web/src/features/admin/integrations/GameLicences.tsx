@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../../ui/TerminalProgress';
 import {Feedback} from '../../../notifications';
 import {IntegrationLayout} from './IntegrationLayout';
 import {SettingsSection, SettingsRow} from '../../../ui/Settings';
@@ -127,7 +128,13 @@ export function GameLicences() {
                     }
                   }}
                 >
-                  {busy ? 'Working...' : 'Look up key'}
+                  {busy ? (
+                    <>
+                      <TerminalSpinner /> Working...
+                    </>
+                  ) : (
+                    'Look up key'
+                  )}
                 </Button>
               }
             />

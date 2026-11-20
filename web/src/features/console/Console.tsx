@@ -1,6 +1,7 @@
 import {observeLivePath, isLivePathFresh} from '../../hooks/liveEvents';
 import {useEffect, useRef, useState} from 'react';
-import {api, Button, Input, Select, Field, Modal} from '../../lib';
+import {api, Button, Input, Select, Field, Modal, useAPI, unwrap} from '../../lib';
+import {Feedback} from '../../notifications';
 import {useServerTelemetry} from '../servers/ServerDashboard';
 import Terminal from './Terminal';
 import {consoleOutput} from './consoleOutput';
@@ -10,10 +11,20 @@ import {appendConsoleHistory, emptyConsoleHistory} from './consoleHistory';
 import {ConsoleLineQueue, CONSOLE_QUEUE_FRAME_MS} from './consoleQueue';
 import {ConsoleReplayOverlap} from './consoleReplay';
 import {consoleRunChanged, consoleRunID} from './consoleRun';
+import {
+  emptyInstallProgress,
+  installAttemptBoundary,
+  isInstallBegin,
+  installStages,
+  isInstallMarker,
+  readInstallHistory,
+  readInstallRuntime,
+  type InstallStage,
+} from './installProgress';
 import {acquireServerSocket, type WingsConnection} from '../servers/serverSocket';
 import './console.css';
 import {can, json, Notice, PageError, useAction, useServer} from '../shared/common';
-import type {ConsoleHistoryPage} from '../../types/api';
+import type {Account, ConsoleHistoryPage, Resource} from '../../types/api';
 import type {StartupResponse} from '../server-settings/startupSettingsModel';
 
 const featureErrors: Record<string, string[]> = {
@@ -38,12 +49,24 @@ const featureErrors: Record<string, string[]> = {
 };
 export default function Console() {
   const {base, server, permissions} = useServer();
+  const account = useAPI<Resource<Account>>('/api/client/account');
+  const canReadInstallLog = unwrap(account.data)?.root_admin === true;
+  const canReadConsole = can(permissions, 'websocket.connect');
   const a = useAction();
   const featureAction = useAction();
   const telemetry = useServerTelemetry();
+  const attempt = server.installation_attempt ?? '';
+  const installFailed = server.status === 'install_failed' || server.status === 'reinstall_failed';
+  const isInstalling = !installFailed && (!!server.is_installing || server.status === 'installing');
   const installing = useRef(false);
-  installing.current = !!server.is_installing || server.status === 'installing';
+  installing.current = isInstalling;
   const [history, setHistory] = useState(emptyConsoleHistory),
+    [installHistory, setInstallHistory] = useState(emptyConsoleHistory),
+    [installAttempt, setInstallAttempt] = useState(0),
+    [installation, setInstallation] = useState(emptyInstallProgress),
+    [waitingForFirstStart, setWaitingForFirstStart] = useState(false),
+    [safeFeed, setSafeFeed] = useState<{attempt: string; phase: string; stages: InstallStage[]}>(),
+    [stageFeedError, setStageFeedError] = useState(''),
     [status, setStatus] = useState('unknown'),
     [connection, setConnection] = useState('Connecting'),
     [socketError, setSocketError] = useState(''),
@@ -56,6 +79,42 @@ export default function Console() {
   useEffect(() => {
     if (telemetry.state !== 'unknown') setStatus(telemetry.state);
   }, [telemetry.state]);
+  useEffect(() => {
+    if (isInstalling) setWaitingForFirstStart(true);
+    else if (status === 'running') setWaitingForFirstStart(false);
+  }, [isInstalling, status]);
+  const phase = installFailed ? 'failed' : isInstalling ? 'installing' : 'installed';
+  const safeStages = safeFeed?.attempt === attempt && safeFeed.phase === phase ? safeFeed.stages : [];
+  useEffect(() => {
+    if (canReadInstallLog || !canReadConsole) return;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function readStages() {
+      let retry = false;
+      try {
+        const response = await api<{stages: InstallStage[]}>(`${base}/install-progress`, {signal: abort.signal});
+        if (abort.signal.aborted) return;
+        setSafeFeed({attempt, phase, stages: response.stages});
+        setStageFeedError('');
+      } catch (error) {
+        if (abort.signal.aborted) return;
+        const message = error instanceof Error ? error.message : '';
+        if (message.trim() !== '404 page not found') {
+          setStageFeedError('Could not refresh installation stages.');
+          retry = true;
+        }
+      }
+      // An idle, installed page only needs replay. Server state changes start a
+      // fresh read so the final install and first-start states are collected too.
+      if (retry || isInstalling || status === 'starting')
+        timer = setTimeout(readStages, retry || document.hidden ? 5000 : 1000);
+    }
+    void readStages();
+    return () => {
+      abort.abort();
+      clearTimeout(timer);
+    };
+  }, [base, canReadInstallLog, canReadConsole, attempt, phase, isInstalling, status]);
   const socket = useRef<WebSocket | null>(null),
     pendingLines = useRef(new ConsoleLineQueue()),
     statusRef = useRef(status),
@@ -65,6 +124,12 @@ export default function Console() {
   useEffect(() => {
     pendingLines.current.clear();
     setHistory(emptyConsoleHistory());
+    setInstallHistory(emptyConsoleHistory());
+    setInstallation(emptyInstallProgress);
+    let installModel = emptyInstallProgress;
+    let installChanged = false;
+    let installLines: string[] = [];
+    let resetInstallHistory = false;
     let active = true;
     // The page's shared Wings socket; transfer tracking listens on it too.
     const held = acquireServerSocket(base),
@@ -72,7 +137,12 @@ export default function Console() {
     let drainTimer: ReturnType<typeof setTimeout> | undefined;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const scheduleDrain = () => {
-      if (!active || drainTimer !== undefined || !pendingLines.current.size) return;
+      if (
+        !active ||
+        drainTimer !== undefined ||
+        (!pendingLines.current.size && !installChanged && !installLines.length && !resetInstallHistory)
+      )
+        return;
       drainTimer = setTimeout(drain, document.hidden || reducedMotion.matches ? 0 : CONSOLE_QUEUE_FRAME_MS);
     };
     const drain = () => {
@@ -80,7 +150,42 @@ export default function Console() {
       if (!active) return;
       const incoming = pendingLines.current.take(performance.now(), document.hidden || reducedMotion.matches);
       if (incoming.length) setHistory(old => (active ? appendConsoleHistory(old, incoming) : old));
+      if (installChanged) {
+        installChanged = false;
+        setInstallation(installModel);
+      }
+      if (installLines.length || resetInstallHistory) {
+        const batch = installLines;
+        const reset = resetInstallHistory;
+        installLines = [];
+        resetInstallHistory = false;
+        if (reset) setInstallAttempt(old => old + 1);
+        setInstallHistory(old => appendConsoleHistory(reset ? emptyConsoleHistory() : old, batch));
+      }
       scheduleDrain();
+    };
+    const updateInstall = (next: typeof installModel) => {
+      if (next === installModel) return;
+      installModel = next;
+      installChanged = true;
+      scheduleDrain();
+    };
+    const newInstall = () => {
+      installLines = [];
+      resetInstallHistory = true;
+      updateInstall(emptyInstallProgress);
+      scheduleDrain();
+    };
+    const readInstallLine = (event: string, line: string) => {
+      if (event === 'panel message' && line === installAttemptBoundary) newInstall();
+      if (event === 'install output') {
+        if (installModel.runtime === 'running' || isInstallBegin(line)) newInstall();
+        if (!isInstallMarker(line)) {
+          installLines.push(line);
+          scheduleDrain();
+        }
+      }
+      updateInstall(readInstallHistory(installModel, event, line));
     };
     const queueLines = (...lines: string[]) => {
       pendingLines.current.enqueue(lines);
@@ -101,6 +206,7 @@ export default function Console() {
     const overlap = new ConsoleReplayOverlap();
     const savedOverlap = new ConsoleReplayOverlap();
     let cursor = '0',
+      installCursor = 0n,
       socketReady = false,
       replayedSaved = false,
       requestedLiveLogs = false;
@@ -150,6 +256,8 @@ export default function Console() {
         savedOverlap.clear();
         pendingLines.current.clear();
         setHistory(emptyConsoleHistory());
+        newInstall();
+        installCursor = 0n;
       }
       if (saved.truncated)
         queueLines(
@@ -159,6 +267,7 @@ export default function Console() {
       for (const entry of saved.data ?? []) {
         const text = consoleOutput(String(entry.line ?? ''), entry.event, true);
         if (!text) continue;
+        const id = BigInt(entry.id);
         const at = new Date(entry.created_at);
         const stamp =
           (entry.event === 'panel message' || entry.event === 'steam output') && !Number.isNaN(at.getTime())
@@ -167,9 +276,13 @@ export default function Console() {
         for (const line of text.split(/\r?\n/)) {
           if (overlap.consume(entry.event, line)) continue;
           if (historyMode === 'live') savedOverlap.record(entry.event, line);
+          if (id > installCursor) readInstallLine(entry.event, line);
+          if (entry.event === 'install output' || (entry.event === 'panel message' && line === installAttemptBoundary))
+            continue;
           if (!replayedSaved) restored.push(stamp + line);
           else queueLines(stamp + line);
         }
+        if (id > installCursor) installCursor = id;
       }
       if (restored.length) setHistory(old => (active ? appendConsoleHistory(old, restored) : old));
       replayedSaved = true;
@@ -231,6 +344,7 @@ export default function Console() {
         if (historyMode === 'legacy') queueLines(line);
         observedState = next;
       }
+      if (showingLive() && !installing.current) updateInstall(readInstallRuntime(installModel, next));
       statusRef.current = next;
       setStatus(next);
     };
@@ -243,13 +357,18 @@ export default function Console() {
       const clean = consoleOutput(s, event);
       if (!clean) return;
       const colored = consoleOutput(s, event, true);
-      if (showingLive())
+      if (showingLive()) {
         for (const line of colored.split(/\r?\n/)) {
           if (historyMode !== 'legacy' && savedOverlap.consume(event, line)) continue;
           if (historyMode !== 'legacy') overlap.record(event, line);
+          if (event === 'install output') {
+            readInstallLine(event, line);
+            continue;
+          }
           queueLines(line);
         }
-      if (statusRef.current === 'running') return;
+      }
+      if (event === 'install output' || statusRef.current === 'running') return;
       const f = features.current.find(f => featureErrors[f]?.some(e => clean.toLowerCase().includes(e)));
       if (f) setFeature(f);
       if (features.current.includes('hytale_oauth')) {
@@ -297,6 +416,13 @@ export default function Console() {
             case 'daemon message':
               append(String(args[0] || ''), message.event);
               break;
+            case 'install started':
+              if (showingLive()) {
+                if (historyMode !== 'legacy' && savedOverlap.consume('panel message', installAttemptBoundary)) break;
+                if (historyMode !== 'legacy') overlap.record('panel message', installAttemptBoundary);
+                newInstall();
+              }
+              break;
             case 'status':
               observeState(String(args[0]));
               break;
@@ -324,7 +450,7 @@ export default function Console() {
       held.release();
       socket.current = null;
     };
-  }, [base]);
+  }, [base, attempt]);
   useEffect(() => {
     if (feature === 'java_version')
       api<StartupResponse>(`${base}/startup`)
@@ -357,16 +483,65 @@ export default function Console() {
       },
       () => setFeature('')
     );
+  const showInstall =
+    isInstalling ||
+    installFailed ||
+    (status !== 'running' &&
+      (waitingForFirstStart ||
+        (canReadInstallLog
+          ? installation.runtime !== 'running' &&
+            (installation.stages.length > 0 || installation.marked || !!installation.outcome)
+          : safeStages.length > 0)));
+  const installView = showInstall
+    ? !canReadInstallLog && safeStages.length
+      ? safeStages.map(stage =>
+          stage.id === 'start' && status === 'starting' && !isInstalling && !installFailed
+            ? {...stage, label: 'Starting server', state: 'running' as const}
+            : stage
+        )
+      : installStages(
+          canReadInstallLog ? installation : emptyInstallProgress,
+          phase,
+          status === 'unknown' && installation.runtime === 'starting' ? 'starting' : status
+        )
+    : undefined;
+  const installerFailed = installView?.some(stage => stage.state === 'failed' && stage.id !== 'start');
+  const startupFailed = installView?.some(stage => stage.state === 'failed' && stage.id === 'start');
+  const expectedSocketRestriction = showInstall && /^Server is (?:installing|install_failed)\.$/.test(socketError);
   return (
     <section className="console-view" aria-label="Server console">
       <Notice action={a} />
-      <PageError error={socketError} />
+      <PageError error={expectedSocketRestriction ? '' : socketError} />
       <PageError error={historyError} />
+      <Feedback eventKey={`install-progress:${base}`} tone="error" message={canReadInstallLog ? '' : stageFeedError} />
+      <Feedback
+        eventKey={`install-failed:${base}`}
+        tone="error"
+        title="Installation failed"
+        message={
+          installerFailed
+            ? canReadInstallLog
+              ? 'Review the full install log, check disk space and network access on the node, then retry the installation.'
+              : 'Ask your server administrator to review the install log and check the node before retrying.'
+            : ''
+        }
+      />
+      <PageError
+        error={
+          startupFailed
+            ? 'The server went offline during its first start. Review the console output before retrying.'
+            : ''
+        }
+      />
       <Terminal
         history={history}
         status={status}
         connection={connection}
         busy={a.busy}
+        installStages={installView}
+        canReadInstallLog={canReadInstallLog}
+        installHistory={installHistory}
+        installAttempt={installAttempt}
         onClear={() => {
           pendingLines.current.clear();
           setHistory(emptyConsoleHistory());

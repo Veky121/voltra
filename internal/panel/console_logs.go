@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,70 @@ import (
 
 const consoleLogBytes = 8 << 20
 const consoleLogLineBytes = 16 << 10
+
+// Wings' install started frame has no output. Store a fixed panel message so
+// older schemas can retain attempt boundaries with their existing event check.
+const consoleInstallBoundary = "[Voltra]: Installer attempt started."
+
+// A panel-created marker carries the same identity through pending and complete.
+const consoleInstallMarkerPrefix = consoleInstallBoundary + " "
+
+func consoleInstallationAttempt(installationID string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(installationID, "pending:"), "complete:")
+}
+
+// lockServerForReinstall takes the console-history lock before the server row.
+// A console collector holds that lock while its insert needs a key-share lock
+// on the same row, so taking them in the opposite order can deadlock.
+func lockServerForReinstall(ctx context.Context, tx pgx.Tx, serverID int64) (pgx.Rows, error) {
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('voltra:console-history:'||$1::bigint::text,0))", serverID); err != nil {
+		return nil, err
+	}
+	return tx.Query(ctx, "SELECT * FROM servers WHERE id=$1 FOR UPDATE", serverID)
+}
+
+func (a *App) persistConsoleInstallStart(ctx context.Context, tx pgx.Tx, serverID int64, installationID string) error {
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('voltra:console-history:'||$1::bigint::text,0))", serverID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO console_log_entries(server_id,event,line) VALUES($1,'panel message',$2)",
+		serverID, consoleInstallMarkerPrefix+consoleInstallationAttempt(installationID)); err != nil {
+		return err
+	}
+	return a.trimConsoleLogs(ctx, tx, serverID)
+}
+
+type consoleInstallScope struct {
+	start, end int64
+	marked     bool
+}
+
+// Read the persisted attempt and its boundaries from the same snapshot. Pending
+// legacy attempts can replay output after their lifecycle transition even when
+// the collector missed the Wings boundary. Older completed archives keep the
+// original boundary fallback.
+func readConsoleInstallScope(ctx context.Context, tx pgx.Tx, id any) (scope consoleInstallScope, status string, err error) {
+	err = tx.QueryRow(ctx, `WITH current_attempt AS (
+ SELECT id,status,updated_at,coalesce(installation_id,'') AS installation_id FROM servers WHERE id=$1
+ ), boundaries AS (
+ SELECT s.*,
+ (SELECT max(id) FROM console_log_entries WHERE server_id=s.id AND event='panel message'
+   AND line=$2||regexp_replace(s.installation_id,'^(pending:|complete:)','')) AS marker,
+ (s.installation_id LIKE 'pending:%' OR s.status IS NOT DISTINCT FROM 'installing') AS pending
+ FROM current_attempt s
+ ), archive AS (
+ SELECT b.*,coalesce((SELECT min(e.id) FROM console_log_entries e WHERE e.server_id=b.id
+  AND e.id>coalesce(b.marker,0) AND e.event='panel message' AND starts_with(e.line,$2)),9223372036854775807) AS finish
+ FROM boundaries b
+ ) SELECT CASE WHEN pending AND status IS DISTINCT FROM 'install_failed' AND status IS DISTINCT FROM 'reinstall_failed'
+  THEN 'installing' ELSE coalesce(status,'') END, marker IS NOT NULL,
+ coalesce(marker,CASE WHEN pending THEN coalesce((SELECT min(e.id)-1 FROM console_log_entries e
+   WHERE e.server_id=b.id AND e.id<b.finish AND e.created_at>=b.updated_at),b.finish)
+  ELSE (SELECT max(e.id) FROM console_log_entries e WHERE e.server_id=b.id AND e.id<b.finish
+   AND e.event='panel message' AND e.line=$3) END,0), finish
+ FROM archive b`, id, consoleInstallMarkerPrefix, consoleInstallBoundary).Scan(&status, &scope.marked, &scope.start, &scope.end)
+	return
+}
 
 type consoleLogEntry struct{ Event, Line string }
 
@@ -86,16 +151,21 @@ func (a *App) appendConsoleLogs(ctx context.Context, serverID int64, owner strin
  SELECT $1,event,line FROM unnest($2::text[],$3::text[]) WITH ORDINALITY AS e(event,line,position) ORDER BY position`, serverID, events, lines); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM console_log_entries WHERE server_id=$1 AND id <= (
- SELECT max(id) FROM (SELECT id,row_number() OVER(ORDER BY id DESC) AS n,
- sum(octet_length(line)) OVER(ORDER BY id DESC) AS bytes FROM console_log_entries WHERE server_id=$1) tail
- WHERE n>$2 OR bytes>$3)`, serverID, a.consoleLogLimit(), consoleLogBytes); err != nil {
+	if err = a.trimConsoleLogs(ctx, tx, serverID); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, "UPDATE console_log_collectors SET last_event_at=now() WHERE server_id=$1", serverID); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func (a *App) trimConsoleLogs(ctx context.Context, tx pgx.Tx, serverID int64) error {
+	_, err := tx.Exec(ctx, `DELETE FROM console_log_entries WHERE server_id=$1 AND id <= (
+ SELECT max(id) FROM (SELECT id,row_number() OVER(ORDER BY id DESC) AS n,
+ sum(octet_length(line)) OVER(ORDER BY id DESC) AS bytes FROM console_log_entries WHERE server_id=$1) tail
+ WHERE n>$2 OR bytes>$3)`, serverID, a.consoleLogLimit(), consoleLogBytes)
+	return err
 }
 
 func (a *App) recordConsolePower(ctx context.Context, serverID int64, signal, stage string) {
@@ -183,8 +253,19 @@ func (a *App) consoleHistory(w http.ResponseWriter, r *http.Request, streamLimit
 			after = newest
 		}
 	}
-	rows, err := tx.Query(r.Context(), `SELECT id::text AS id,event,line,created_at FROM console_log_entries
- WHERE server_id=$1 AND id>$2 AND id<=$3 AND ($4 OR event<>'install output') ORDER BY console_log_entries.id LIMIT $5`, s["id"], after, newest, boolean(u["root_admin"]), limit+1)
+	scope, _, err := readConsoleInstallScope(r.Context(), tx, s["id"])
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	rows, err := tx.Query(r.Context(), `SELECT id::text AS id,event,
+ CASE WHEN event='panel message' AND starts_with(line,$8) THEN $10 ELSE line END AS line,created_at
+ FROM console_log_entries WHERE server_id=$1 AND id>$2 AND id<=$3
+ AND (event<>'install output' OR ($4 AND id>$6 AND id<$7))
+ AND (event<>'panel message' OR (NOT starts_with(line,$8) OR id=$6)
+     AND (NOT $9 OR line<>$10))
+ ORDER BY console_log_entries.id LIMIT $5`, s["id"], after, newest, boolean(u["root_admin"]), limit+1,
+		scope.start, scope.end, consoleInstallMarkerPrefix, scope.marked, consoleInstallBoundary)
 	if err != nil {
 		fail(w, err)
 		return
@@ -225,6 +306,7 @@ func (a *App) RunConsoleLogs(ctx context.Context) {
 	type worker struct {
 		cancel context.CancelFunc
 		node   int64
+		wake   chan struct{}
 	}
 	workers := map[int64]worker{}
 	var wg sync.WaitGroup
@@ -236,6 +318,9 @@ func (a *App) RunConsoleLogs(ctx context.Context) {
 	}()
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	hints, takeHints, unsubscribe := a.readChanges.subscribe()
+	defer unsubscribe()
+	var wakeAttempts []liveReadChange
 	for {
 		servers, err := a.query(ctx, `SELECT id,uuid,node_id FROM servers s WHERE status IS DISTINCT FROM 'suspended'
  AND NOT EXISTS(SELECT 1 FROM server_transfers t WHERE t.server_id=s.id AND t.successful IS NULL)`)
@@ -246,14 +331,23 @@ func (a *App) RunConsoleLogs(ctx context.Context) {
 				wanted[id] = true
 				if old, exists := workers[id]; exists {
 					if old.node == node {
+						for _, hint := range wakeAttempts {
+							if hint.global || slices.Contains(hint.servers, id) {
+								select {
+								case old.wake <- struct{}{}:
+								default:
+								}
+							}
+						}
 						continue
 					}
 					old.cancel()
 				}
 				workerCtx, cancel := context.WithCancel(ctx)
-				workers[id] = worker{cancel, node}
+				wake := make(chan struct{}, 1)
+				workers[id] = worker{cancel, node, wake}
 				wg.Add(1)
-				go func(s M) { defer wg.Done(); a.collectConsoleLogs(workerCtx, s) }(server)
+				go func(s M) { defer wg.Done(); a.collectConsoleLogs(workerCtx, s, wake) }(server)
 			}
 			for id, w := range workers {
 				if !wanted[id] {
@@ -262,10 +356,45 @@ func (a *App) RunConsoleLogs(ctx context.Context) {
 				}
 			}
 		}
+		wakeAttempts = nil
+		for wakeAttempts == nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				wakeAttempts = []liveReadChange{}
+			case <-hints:
+				for _, hint := range takeHints() {
+					if hint.domain == consoleInstallCaptureHint {
+						wakeAttempts = append(wakeAttempts, hint)
+					}
+				}
+			}
+		}
+	}
+}
+
+const consoleInstallCaptureHint = "console-install-capture"
+
+// Wings requests the script after registering the server and before running the
+// installer. Wake the collector here, when the socket route already exists.
+func (a *App) awaitConsoleInstallCapture(ctx context.Context, id int64) {
+	a.readChanges.publishScoped([]int64{id}, consoleInstallCaptureHint)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		var ready bool
+		err := a.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM console_log_collectors
+ WHERE server_id=$1 AND connected AND lease_until>now())`, id).Scan(&ready)
+		if err != nil || ready {
+			return
+		}
 		select {
 		case <-ctx.Done():
-			return
-		case <-ticker.C:
+			return // Capture is best effort if the node socket is unavailable.
+		case <-tick.C:
 		}
 	}
 }
@@ -273,7 +402,8 @@ func (a *App) RunConsoleLogs(ctx context.Context) {
 func (a *App) consoleLogLease(ctx context.Context, id int64, owner string) (bool, error) {
 	var claimed string
 	err := a.DB.QueryRow(ctx, `INSERT INTO console_log_collectors(server_id,lease_owner,lease_until) VALUES($1,$2,now()+interval '45 seconds')
- ON CONFLICT(server_id) DO UPDATE SET lease_owner=$2,lease_until=now()+interval '45 seconds'
+ ON CONFLICT(server_id) DO UPDATE SET lease_owner=$2,lease_until=now()+interval '45 seconds',
+ connected=console_log_collectors.connected AND console_log_collectors.lease_owner=$2 AND console_log_collectors.lease_until>now()
  WHERE console_log_collectors.lease_until<now() OR console_log_collectors.lease_owner=$2 RETURNING lease_owner`, id, owner).Scan(&claimed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
@@ -341,7 +471,7 @@ func (s *consoleCaptureState) diagnose(now time.Time, err error) bool {
 	return true
 }
 
-func (a *App) collectConsoleLogs(ctx context.Context, server M) {
+func (a *App) collectConsoleLogs(ctx context.Context, server M, wake <-chan struct{}) {
 	id, owner := num(server["id"]), randomToken(24)
 	capture := &consoleCaptureState{}
 	for ctx.Err() == nil {
@@ -365,6 +495,7 @@ func (a *App) collectConsoleLogs(ctx context.Context, server M) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-wake:
 		case <-time.After(5 * time.Second):
 		}
 	}
@@ -527,7 +658,7 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 	defer tick.Stop()
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
-	authenticated, state := false, capture.serverState
+	authenticated, ready, state := false, false, capture.serverState
 	authDeadline := time.NewTimer(15 * time.Second)
 	defer authDeadline.Stop()
 	for {
@@ -564,9 +695,7 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 				if !authenticated {
 					authenticated = true
 					authDeadline.Stop()
-					if _, err = a.DB.Exec(ctx, "UPDATE console_log_collectors SET connected=true WHERE server_id=$1 AND lease_owner=$2", server["id"], owner); err != nil {
-						return err
-					}
+
 					// Seed an empty archive from Wings' retained tail. Reconnects to an
 					// existing archive must not repeatedly append the same old output.
 					var hasOutput bool
@@ -586,12 +715,26 @@ func (a *App) consoleLogSessionWithState(ctx context.Context, server M, owner st
 				}
 			case "jwt error":
 				return fmt.Errorf("console capture authentication rejected")
+			case "install started":
+				if authenticated {
+					add("panel message", consoleInstallBoundary)
+					if err = flush(ctx); err != nil {
+						return err
+					}
+				}
 			case "console output", "daemon message", "install output":
 				if authenticated {
 					attach(false)
 					add(m.Event, text)
 				}
 			case "status":
+				// Wings sends initial status after registering its listeners.
+				if authenticated && !ready {
+					if _, err = a.DB.Exec(ctx, "UPDATE console_log_collectors SET connected=true WHERE server_id=$1 AND lease_owner=$2", server["id"], owner); err != nil {
+						return err
+					}
+					ready = true
+				}
 				if authenticated {
 					attach(text == "offline" && state == "offline")
 				}

@@ -1,3 +1,4 @@
+import {TerminalSpinner} from '../../ui/TerminalProgress';
 import {Feedback} from '../../notifications';
 import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {IconButton} from '../../ui/IconButton';
@@ -765,7 +766,7 @@ const FileExplorer = memo(function FileExplorer({
       <Feedback tone="error" message={searchError} />
       {searching && (
         <p className="explorer-message" role="status">
-          Searching inside folders…
+          <TerminalSpinner /> Searching inside folders…
         </p>
       )}
       {filter.trim() && (
