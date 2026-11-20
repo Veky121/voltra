@@ -11,7 +11,7 @@
 .console-view .console-connection>span{width:5px;height:5px;border-radius:50%;background:var(--amber)}
 .console-view .console-connection.connection-connected>span{background:var(--green,#62d9a0)}
 .console-view .console-connection.connection-disconnected>span{background:var(--red)}
-.console-view .console-terminal-body{position:relative;min-width:0;background:var(--surface-muted)}
+.console-view .console-terminal-body{position:relative;min-width:0;overflow:clip;background:var(--surface-muted)}
 .console-view .console-terminal .console-output{display:block;width:100%;height:clamp(320px,44vh,520px);min-width:0;margin:0;padding:14px;border:0;border-radius:0;background:var(--surface-muted);color:var(--text);overflow:auto;overflow-anchor:none;white-space:pre;user-select:text;font:400 13px/1.6 'IBM Plex Mono',monospace;tab-size:4;scrollbar-color:var(--line-strong) transparent;scrollbar-width:thin}
 .console-view .console-terminal .console-output:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .console-view .console-line{display:block;height:1lh}
@@ -62,13 +62,52 @@
 @media(max-width:760px),(pointer:coarse){.console-view .console-icon-button{width:44px;height:44px;min-height:44px;padding:12px}.console-view .console-icon-button>svg{width:16px;height:16px}.console-view .console-command-bar{min-height:60px}.console-view .console-tools-menu button,.console-view .console-history-list>button{min-height:44px}}
 @media(max-width:760px),(pointer:coarse){.console-dropdown [data-slot=dropdown-menu-item]{min-height:44px}}
 
-.console-view .console-install{display:grid;justify-items:start;gap:10px;min-width:0;padding:12px 14px;background:var(--surface-muted);color:var(--text)}
-.console-view .console-install-stages{display:grid;gap:5px;width:100%;min-width:0;margin:0;padding:0;list-style:none}
+.console-view .console-empty{color:var(--muted);white-space:normal;overflow-wrap:anywhere}
+
+.console-view .console-install{
+  position:absolute;
+  inset:0 0 auto;
+  z-index:1;
+  display:grid;
+  grid-template-rows:1fr;
+  pointer-events:none;
+}
+.console-view .console-install-inner{position:relative;min-height:0;min-width:0;overflow:hidden;color:var(--text)}
+.console-view .console-install-inner::before{content:"";position:absolute;inset:0;background:var(--surface-muted)}
+.console-view .console-install-stages{
+  position:relative;
+  display:grid;
+  gap:2px;
+  margin:0;
+  padding:8px 14px 14px;
+  list-style:none;
+}
 .console-view .console-install-stages li{min-width:0}
-.console-view .console-install .terminal-progress{color:var(--text)}
-.console-view .console-install .terminal-progress.is-waiting,.console-view .console-install .terminal-progress-detail{color:var(--muted)}
-.console-view .console-install .terminal-progress-detail{overflow-wrap:anywhere;min-width:0}
-.console-view .console-install-indeterminate .terminal-progress-bar,.console-view .console-install-indeterminate .terminal-progress-percent{display:none}
-/* A quiet toggle: the stages are the focus, the raw log is there when wanted. */
-.console-view .console-install-toggle{min-height:28px;padding:3px 10px;background:transparent;border:1px solid var(--line);color:var(--muted);font:500 12px/1.4 'IBM Plex Mono',monospace}
-.console-view .console-install-toggle:hover{color:var(--text);filter:none}
+.console-view .console-install .terminal-progress{column-gap:7px}
+.console-view .console-install .terminal-progress-meter{flex-basis:auto;order:0;padding-inline-start:0}
+@supports (backdrop-filter:blur(6px)){
+  .console-view .console-install-inner::before{
+    background:color-mix(in srgb,var(--surface-muted) 82%,transparent);
+    backdrop-filter:blur(6px);
+    mask-image:linear-gradient(#000 calc(100% - 8px),transparent);
+  }
+}
+@media(prefers-reduced-transparency:reduce),(forced-colors:active){
+  .console-view .console-install-inner::before{background:var(--surface-muted);backdrop-filter:none;mask-image:none}
+}
+@media(forced-colors:active){
+  .console-view .console-install-inner::before{background:Canvas;border-bottom:1px solid CanvasText}
+}
+@media(max-width:420px){
+  .console-view .console-install-stages{padding-inline:12px}
+  .console-view .console-install .terminal-progress-detail{display:none}
+}
+
+.console-view .console-install[data-state=exiting]{animation:console-install-exit 450ms ease both}
+@keyframes console-install-exit{
+  to{grid-template-rows:0fr;transform:translateY(-24px);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .console-view .console-install[data-state=exiting]{animation:console-install-fade 120ms ease both}
+}
+@keyframes console-install-fade{to{opacity:0}}

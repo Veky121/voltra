@@ -20,13 +20,9 @@ const can = (permissions, permission) => permissions.includes(permission);
 const button = ({variant: _variant, size: _size, ...props}) => el('button', props);
 const terminalProgress = loadModule(url('ui/TerminalProgress.tsx'), {'./terminalProgressModel': progress});
 
-test('startup console is available during starting, and uses the live log for copy and save', async () => {
+function terminalFixture({reducedMotion = false, overlayFocused = false} = {}) {
   const buttons = new Map();
-  let log = null;
-  let copied;
-  let downloaded;
-  let saved;
-  let copyAction;
+  let copied, downloaded, saved, copyAction;
   const Button = props => {
     buttons.set(
       props['aria-label'] ||
@@ -37,37 +33,66 @@ test('startup console is available during starting, and uses the live log for co
     );
     return button(props);
   };
-  let firstNull;
-  const draw = (Component, props) => {
-    firstNull = true;
-    return render(Component, props);
+  let completion, effectIndex, changed, focus;
+  const activeElement = {};
+  const effects = [];
+  const pendingEffects = [];
+  const timers = new Map();
+  let now = 0;
+  const globals = {
+    window: {
+      matchMedia: query => {
+        assert.equal(query, '(prefers-reduced-motion: reduce)');
+        return {matches: reducedMotion};
+      },
+    },
+    document: {activeElement},
+    setTimeout(fn, delay) {
+      const timer = Symbol();
+      timers.set(timer, {fn, at: now + delay});
+      return timer;
+    },
+    clearTimeout: timer => timers.delete(timer),
   };
+  const overlay = loadModule(
+    url('features/console/InstallOverlay.tsx'),
+    {
+      react: {
+        useState: () => [
+          completion,
+          next => {
+            changed = true;
+            completion = next;
+          },
+        ],
+        useEffect: (run, deps) => {
+          const index = effectIndex++;
+          const old = effects[index];
+          if (old && deps.every((dep, i) => Object.is(dep, old.deps[i]))) return;
+          pendingEffects.push(() => {
+            old?.cleanup?.();
+            effects[index] = {deps, cleanup: run()};
+          });
+        },
+      },
+      '../../ui/TerminalProgress': terminalProgress,
+      './installProgress': install,
+    },
+    globals
+  );
   const {default: Terminal} = loadModule(
     url('features/console/Terminal.tsx'),
     {
-      react: {
-        ...react,
-        useState(initial) {
-          const state = react.useState(initial);
-          if (initial === null && firstNull) {
-            firstNull = false;
-            return [log, next => (log = next(log))];
-          }
-          return state;
-        },
-      },
       '../../ui/IconButton': {IconButton: Button},
-      '../../components/ui/button': {Button},
       '../../components/ui/dropdown-menu': {
         DropdownMenu: children,
         DropdownMenuTrigger: nil,
         DropdownMenuContent: children,
         DropdownMenuItem: Button,
       },
-      '../../ui/TerminalProgress': terminalProgress,
       '../../Icons': {Icon: nil},
       '../shared/common': {
-        useServer: () => ({server: {name: 'Server'}, base: '/server', permissions: []}),
+        useServer: () => ({server: {name: 'Server'}, base: '/server', permissions: ['control.console']}),
         useAction: () => ({
           run: work => (copyAction = work()),
           setSuccess: nil,
@@ -78,11 +103,20 @@ test('startup console is available during starting, and uses the live log for co
       './consoleViewport': viewport,
       './consoleOutput': output,
       './consoleHistory': history,
-      './installProgress': install,
+      './InstallOverlay': {
+        InstallOverlay: overlay.InstallOverlay,
+        useInstallOverlay: (scope, active, success) =>
+          overlay.useInstallOverlay(
+            scope,
+            active,
+            success,
+            {current: {contains: element => overlayFocused && element === activeElement}},
+            {current: {focus: options => (focus = options)}}
+          ),
+      },
     },
     {
       navigator: {clipboard: {writeText: async text => (copied = text)}},
-      window: {getSelection: () => null},
       URL: {createObjectURL: blob => ((saved = blob), 'blob:test'), revokeObjectURL: nil},
       document: {
         body: {appendChild: nil},
@@ -96,29 +130,168 @@ test('startup console is available during starting, and uses the live log for co
       setTimeout: nil,
     }
   );
+  const log = (...lines) => history.appendConsoleHistory(history.emptyConsoleHistory(), lines);
   const props = {
-    status: 'starting',
+    status: 'offline',
     connection: 'Connected',
-    history: history.appendConsoleHistory(history.emptyConsoleHistory(), ['JVM and mod loader output']),
-    installHistory: history.appendConsoleHistory(history.emptyConsoleHistory(), ['Installer diagnostic']),
-    installStages: [{id: 'start', label: 'Starting server', state: 'running'}],
+    history: log('JVM and mod loader output'),
+    installHistory: log('Installer diagnostic', '#### 25%', '######## 52%'),
+    installStream: log('Installer diagnostic'),
+    installScope: '/server:attempt',
     installAttempt: 1,
+    installSuccess: 'Installed',
+    canReadInstallLog: true,
+    installStages: [
+      {id: 'prepare', label: 'Setting up environment', state: 'done'},
+      {id: 'loader', label: 'Installing loader', state: 'done'},
+      {id: 'download', label: 'Downloading server', state: 'running', progress: {value: 52}},
+      {id: 'start', label: 'Starting server', state: 'waiting'},
+    ],
   };
-  const owner = draw(Terminal, props);
-  assert.match(owner, /aria-expanded="false"[^>]*>Show live startup console<\/button>/);
-  assert.doesNotMatch(owner, /full install log|Installer diagnostic|Save install log/);
-  assert.match(draw(Terminal, {...props, status: 'unknown'}), /Show live startup console/);
-  assert.match(draw(Terminal, {...props, canReadInstallLog: true}), /Show full install log/);
-  // Simulate the selected log in the server render hook, then use its actual
-  // toolbar handlers. The live console uses the same output element and tools.
-  buttons.get('Show live startup console')();
-  assert.match(draw(Terminal, props), /aria-expanded="true"[^>]*>Hide live startup console<\/button>/);
-  buttons.get('Copy console output')();
-  await copyAction;
-  assert.equal(copied, 'JVM and mod loader output');
-  buttons.get('Save console log')();
-  assert.equal(downloaded, 'Server-console.log');
-  assert.equal(await saved.text(), 'JVM and mod loader output');
+  const draw = overrides => {
+    let markup;
+    do {
+      effectIndex = 0;
+      changed = false;
+      buttons.clear();
+      markup = render(Terminal, {...props, ...overrides});
+      for (const run of pendingEffects.splice(0)) run();
+    } while (changed);
+    return markup;
+  };
+  const advance = delay => {
+    now += delay;
+    for (const [timer, {fn, at}] of timers) {
+      if (at > now) continue;
+      timers.delete(timer);
+      fn();
+    }
+  };
+  return {
+    draw,
+    advance,
+    log,
+    props,
+    focus: () => focus,
+    copy: async label => {
+      buttons.get(label)();
+      await copyAction;
+      return copied;
+    },
+    save: async label => {
+      buttons.get(label)();
+      return [downloaded, await saved.text()];
+    },
+  };
+}
+
+test('install stages overlay the streaming console and completed stages collapse into one row', () => {
+  const f = terminalFixture();
+  const markup = f.draw();
+  assert.match(markup, /class="console-terminal-body"><div class="console-install" data-state="active"/);
+  assert.match(markup, /role="list" aria-label="Installation stages"/);
+  assert.match(markup, /2 steps done/);
+  assert.doesNotMatch(markup, /Setting up environment|Installing loader/);
+  assert.match(markup, /role="status">Downloading server<\/span>/);
+  assert.match(markup, /role="progressbar" aria-label="Downloading server"[^>]*aria-valuenow="52"/);
+  assert.match(markup, /Starting server.*Waiting/);
+  const indices = [
+    'console-terminal-header',
+    'Installation stages',
+    'Server console output',
+    'Installer diagnostic',
+    'JVM and mod loader output',
+    'console-command-bar',
+  ].map(text => markup.indexOf(text));
+  assert.ok(indices.every((index, i) => index >= 0 && (i === 0 || index > indices[i - 1])));
+  assert.doesNotMatch(markup, /Show full install log|Show live startup console|#### 25%/);
+  const stages = f.props.installStages.map(stage =>
+    stage.id === 'download' ? {...stage, progress: {value: 53}} : stage
+  );
+  const tick = f.draw({installStages: stages});
+  assert.match(tick, /role="status">Downloading server<\/span>/);
+  assert.match(tick, /aria-valuenow="53"/);
+});
+
+test('first startup streams by default and copy and save export the two logs separately', async () => {
+  const f = terminalFixture();
+  const markup = f.draw({
+    status: 'starting',
+    installStages: [{id: 'start', label: 'Starting server', state: 'running'}],
+  });
+  assert.match(markup, /role="progressbar" aria-label="Starting server"/);
+  assert.match(markup, /JVM and mod loader output/);
+  assert.equal(await f.copy('Copy console output'), 'JVM and mod loader output');
+  assert.equal(await f.copy('Copy install log'), 'Installer diagnostic\n#### 25%\n######## 52%');
+  assert.deepEqual(await f.save('Save console log'), ['Server-console.log', 'JVM and mod loader output']);
+  assert.deepEqual(await f.save('Save install log'), [
+    'Server-install.log',
+    'Installer diagnostic\n#### 25%\n######## 52%',
+  ]);
+});
+
+test('safe stages appear with allowed runtime output or a quiet permissions message', () => {
+  const f = terminalFixture();
+  const owner = {canReadInstallLog: false};
+  for (const data of [owner, {...owner, history: f.log()}]) {
+    const markup = f.draw(data);
+    assert.match(markup, /aria-label="Downloading server"[^>]*aria-valuenow="52"/);
+    assert.doesNotMatch(markup, /Installer diagnostic|Copy install log|Save install log/);
+    if (data.history) {
+      assert.match(markup, /Installer output is visible to administrators/);
+      assert.doesNotMatch(markup, /JVM and mod loader output/);
+    } else {
+      assert.match(markup, /JVM and mod loader output/);
+      assert.doesNotMatch(markup, /Installer output is visible to administrators/);
+    }
+  }
+});
+
+test('an observed successful first start waits, exits, and unmounts without stealing focus', () => {
+  const f = terminalFixture();
+  const success = {installStages: undefined, installSuccess: 'Server started', status: 'running'};
+  assert.doesNotMatch(f.draw(success), /class="console-install"/);
+  f.draw();
+  assert.match(f.draw(success), /data-state="success".*Server started/);
+  f.advance(999);
+  assert.match(f.draw(success), /data-state="success"/);
+  f.advance(1);
+  assert.match(f.draw(success), /data-state="exiting"/);
+  f.advance(449);
+  assert.match(f.draw(success), /data-state="exiting"/);
+  f.advance(1);
+  const done = f.draw(success);
+  assert.doesNotMatch(done, /class="console-install"/);
+  assert.match(done, /JVM and mod loader output/);
+  assert.equal(f.focus(), undefined);
+});
+
+test('ready-to-start success uses the reduced-motion duration and restores focus if needed', () => {
+  const f = terminalFixture({reducedMotion: true, overlayFocused: true});
+  f.draw();
+  const installed = {installStages: undefined};
+  assert.match(f.draw(installed), /data-state="success".*>Installed<\/span>/);
+  f.advance(1000);
+  assert.match(f.draw(installed), /data-state="exiting"/);
+  f.advance(119);
+  assert.match(f.draw(installed), /data-state="exiting"/);
+  assert.equal(f.focus(), undefined);
+  f.advance(1);
+  assert.doesNotMatch(f.draw(installed), /class="console-install"/);
+  assert.deepEqual(f.focus(), {preventScroll: true});
+});
+
+test('a failed stage remains visible and cancels an exit in progress', () => {
+  const f = terminalFixture();
+  f.draw();
+  f.draw({installStages: undefined});
+  f.advance(1000);
+  assert.match(f.draw({installStages: undefined}), /data-state="exiting"/);
+  const failed = {installStages: [{id: 'start', label: 'Starting server', state: 'failed'}]};
+  assert.match(f.draw(failed), /data-state="active".*Starting server failed.*is-failed.*?/);
+  f.advance(5000);
+  assert.match(f.draw(failed), /data-state="active"/);
+  assert.equal(f.focus(), undefined);
 });
 
 test('a failed transfer emits island feedback and shows a failed count with the dock closed', () => {

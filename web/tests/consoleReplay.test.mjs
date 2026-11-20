@@ -20,6 +20,7 @@ function fixture({regular = false, server = {}} = {}) {
   const doc = Object.assign(new EventTarget(), {hidden: false});
   let history = emptyConsoleHistory(),
     installHistory = emptyConsoleHistory(),
+    installStream = emptyConsoleHistory(),
     safeStages = [],
     installation = installProgress.emptyInstallProgress,
     historyHook = 0,
@@ -39,6 +40,7 @@ function fixture({regular = false, server = {}} = {}) {
           state = typeof update === 'function' ? update(state) : update;
           if (historyIndex === 0) history = state;
           if (historyIndex === 1) installHistory = state;
+          if (historyIndex === 2) installStream = state;
           if (initial === installProgress.emptyInstallProgress) installation = state;
           if (state?.stages && typeof state.phase === 'string') safeStages = state.stages;
         },
@@ -173,6 +175,7 @@ function fixture({regular = false, server = {}} = {}) {
     emit: data => subscriber?.({status: 200, data}),
     text: () => consoleHistoryText(history),
     installText: () => consoleHistoryText(installHistory),
+    installStream: () => consoleHistoryText(installStream),
     installation: () => installation,
     safeStages: () => safeStages,
     feedback,
@@ -181,7 +184,7 @@ function fixture({regular = false, server = {}} = {}) {
 }
 const entry = line => ({event: 'console output', line});
 
-test('install progress redraws stay in the full log and survive gameplay history rotation', async () => {
+test('the stream collapses redraws while the installer export survives gameplay history rotation', async () => {
   const f = fixture();
   try {
     const redraws = '### 20.0%\r###### 60.0%\r########## 100.0%';
@@ -192,11 +195,16 @@ test('install progress redraws stay in the full log and survive gameplay history
       data: [
         {event: 'install output', line: 'Downloading server'},
         {event: 'install output', line: redraws},
+        {event: 'install output', line: 'Checking archive...\rArchive ready'},
         {event: 'install output', line: 'Extracting archive'},
       ],
     });
     assert.doesNotMatch(f.text(), /\d+\.0%/);
-    assert.equal(f.installText(), `Downloading server\n${redraws.replaceAll('\r', '\n')}\nExtracting archive`);
+    assert.equal(
+      f.installText(),
+      `Downloading server\n${redraws.replaceAll('\r', '\n')}\nChecking archive...\nArchive ready\nExtracting archive`
+    );
+    assert.equal(f.installStream(), 'Downloading server\nArchive ready\nExtracting archive');
     assert.deepEqual(
       f.installation().stages.map(stage => stage.id),
       ['download', 'extract']
@@ -252,6 +260,7 @@ test('saved retry boundaries replace the full log and keep installer lines out o
     assert.equal(f.installation().outcome, undefined);
     assert.equal(f.installation().stages[0].progress.value, 37);
     assert.equal(f.installText(), '### 37%\nCurrent diagnostic');
+    assert.equal(f.installStream(), 'Current diagnostic');
     assert.doesNotMatch(f.text(), /diagnostic|Installer attempt started/);
   } finally {
     f.cleanup();

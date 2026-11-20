@@ -160,6 +160,11 @@ function toolProgress(line: string): {id?: StageID; progress?: Progress} | undef
   }
 }
 
+/** The progress overlay summarizes redraw frames. Keep them in the raw export. */
+export function isInstallRedraw(line: string): boolean {
+  return toolProgress(stripConsoleControls(line).trim())?.progress !== undefined;
+}
+
 export function isInstallMarker(line: string): boolean {
   return /^\[voltra:(?:install|stage|progress)\](?:\s|$)/.test(stripConsoleControls(line).trimStart());
 }
