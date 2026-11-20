@@ -1,3 +1,6 @@
+import {connectionAddress} from './connectionAddress.ts';
+import type {ProxyRoute, ServerAllocation, ServerSubdomain} from '../../types/api';
+
 type Row = Record<string, any>;
 export function portConnectionActions(
   port: Row,
@@ -51,4 +54,46 @@ export function groupPortRoutes(routes: Row[]): (Row & {members: Row[]})[] {
       last_error: [...new Set(members.map(r => r.last_error).filter(Boolean))].join(' '),
     };
   });
+}
+
+export type PlayerAddress = {
+  label: string;
+  value: string;
+  /** Where the address comes from, most shareable first. */
+  source: 'subdomain' | 'public' | 'local';
+  /** A local test address that was never published. */
+  simulated: boolean;
+};
+
+export function playerAddress(
+  port: Pick<ServerAllocation, 'ip' | 'port' | 'protocols' | 'protocol_source'>,
+  routes: ProxyRoute[],
+  domain: Partial<Pick<ServerSubdomain, 'hostname' | 'dns_matches' | 'dns_status' | 'cleanup_pending'>> & {
+    route?: {public_port: number};
+  },
+  preferredProtocol?: string
+): PlayerAddress {
+  if (domain.hostname && domain.route && domain.dns_status !== 'error' && !domain.cleanup_pending) {
+    const simulated = domain.dns_status === 'simulated';
+    if (domain.dns_matches || simulated)
+      return {
+        label: simulated ? 'Test address' : 'Player address',
+        value: connectionAddress(domain.hostname, domain.route.public_port),
+        source: 'subdomain',
+        simulated,
+      };
+  }
+  const configured = routes.filter(
+    route => route.desired_present !== false && ['applied', 'simulated'].includes(route.status)
+  );
+  const protocol = preferredProtocol || (port.protocol_source === 'game' ? port.protocols?.[0] : undefined);
+  const route = configured.find(route => route.protocol === protocol) ?? configured[0];
+  if (route)
+    return {
+      label: route.status === 'simulated' ? 'Test address' : 'Player address',
+      value: connectionAddress(route.public_host, route.public_port),
+      source: 'public',
+      simulated: route.status === 'simulated',
+    };
+  return {label: 'Local address', value: connectionAddress(port.ip, port.port), source: 'local', simulated: false};
 }

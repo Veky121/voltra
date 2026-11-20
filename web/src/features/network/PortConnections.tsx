@@ -1,14 +1,16 @@
 import {Feedback} from '../../notifications';
-import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
-import {useEffect, useState} from 'react';
-import {RefreshCw} from 'lucide-react';
+import {SkeletonLine} from '../../ui/CollectionSkeleton';
+import {useEffect, useState, type ComponentProps} from 'react';
+import {FlaskConical, Plus, RefreshCw} from 'lucide-react';
 import {api, Button, Input, Modal, useAPI} from '../../lib';
+import {Badge} from '../../components/ui/badge';
+import {Button as MiraButton} from '../../components/ui/button';
 import {SettingsSection} from '../../ui/Settings';
 import {CopyButton} from '../../ui/CopyButton';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {can, items, PageError, useServer, value} from '../shared/common';
 import {connectionAddress as address} from './connectionAddress';
-import {portConnectionActions, groupPortRoutes} from './portConnectionActions';
+import {portConnectionActions, groupPortRoutes, playerAddress, type PlayerAddress} from './portConnectionActions';
 import {
   emptyNetworkSandbox,
   networkSandboxAllowed,
@@ -35,8 +37,76 @@ const routeStatus = (r: Row) =>
       : r.status === 'applied'
         ? 'Configured'
         : r.status === 'error'
-          ? 'Needs attention'
+          ? 'Error'
           : 'Pending';
+const domainStatus = (domain: {dns_status?: string; dns_matches?: boolean; cleanup_pending?: boolean}) =>
+  domain.cleanup_pending
+    ? 'Removing'
+    : domain.dns_status === 'simulated'
+      ? 'Test only'
+      : domain.dns_status === 'error'
+        ? 'DNS error'
+        : domain.dns_matches
+          ? 'DNS matches'
+          : 'DNS pending';
+const statusTone = (status: string) =>
+  status === 'Configured' || status === 'DNS matches'
+    ? 'ok'
+    : status === 'Error' || status === 'DNS error'
+      ? 'error'
+      : status === 'Pending' || status === 'DNS pending' || status === 'Removing'
+        ? 'warn'
+        : 'neutral';
+// The words carry the state; the dot only repeats it in colour.
+function PortStatus({status, title}: {status: string; title?: string}) {
+  return (
+    <span className="port-status" data-status={status} data-tone={statusTone(status)} title={title}>
+      <span className="port-status-dot" aria-hidden="true" />
+      {status}
+    </span>
+  );
+}
+function shareHealth(share: PlayerAddress) {
+  if (share.simulated) return {status: 'Test only', detail: 'Simulated on this computer. Nothing is published.'};
+  if (share.source === 'subdomain') return {status: 'DNS matches', detail: 'Share this address with players.'};
+  if (share.source === 'public')
+    return {status: 'Configured', detail: 'Share this address with players. Game reachability is not verified.'};
+  return {status: 'Local only', detail: 'Not reachable from the internet.'};
+}
+// Quiet page actions. `tone` picks the outline, ghost or destructive ghost look.
+function PortAction({
+  tone = 'ghost',
+  className = '',
+  ...props
+}: ComponentProps<typeof MiraButton> & {tone?: 'ghost' | 'outline' | 'danger'}) {
+  return (
+    <MiraButton
+      type="button"
+      variant={tone === 'outline' ? 'outline' : 'ghost'}
+      data-tone={tone}
+      className={`port-action ${className}`}
+      {...props}
+    />
+  );
+}
+function PortsSkeleton() {
+  return (
+    <div className="port-skeleton server-skeleton" role="status" aria-label="Loading ports" aria-busy="true">
+      <span className="button-feedback-sr">Loading ports</span>
+      <div className="port-share" aria-hidden="true">
+        <SkeletonLine width={96} small />
+        <SkeletonLine width={260} />
+        <SkeletonLine width={180} small />
+      </div>
+      {[220, 190].map(width => (
+        <div className="port-item" key={width} aria-hidden="true">
+          <SkeletonLine width={width} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function PortConnections() {
   const {base, server, permissions, reload} = useServer();
   const allocations = useAPI<ResourceList<ServerAllocation>>(`${base}/network/allocations`),
@@ -63,7 +133,7 @@ export default function PortConnections() {
   const testView = networkSandboxView(testState, ports);
   const setupData = testing ? testView.setup : realSetup,
     domainData = testing ? testView.domain : realDomain;
-  const routes: Row[] = (admin ? setupData?.routes || [] : items(publicRoutes.data)).filter(
+  const routes = (admin ? setupData?.routes || [] : items(publicRoutes.data)).filter(
     (r: Row) => !(r.desired_present === false && r.status === 'applied')
   );
   const [editor, setEditor] = useState<{kind: 'forward' | 'domain'; port: Row} | null>(null);
@@ -245,44 +315,77 @@ export default function PortConnections() {
       await api(`${base}/subdomain`, {method: 'DELETE'});
     }, true);
   }
+  const primary = ports.find(port => port.is_default);
+  const share = primary
+    ? playerAddress(
+        primary,
+        portRoutes(primary),
+        domain.error ? {} : domainData,
+        server.game === 'minecraft' ? 'tcp' : realSetup?.primary_protocol
+      )
+    : null;
   const loadError = allocations.error || account.error || setup.error || publicRoutes.error || domain.error;
+  const health = share && shareHealth(share);
+  // A subdomain that exists but is not the shared address yet deserves a word of why.
+  const domainHeld =
+    share && share.source !== 'subdomain' && !domain.error && domainData.hostname
+      ? domainData.cleanup_pending
+        ? 'is being removed.'
+        : domainData.dns_status === 'error'
+          ? 'is not used until its DNS record is fixed.'
+          : 'replaces this address once its DNS record matches.'
+      : '';
   return (
     <section className="operations-page network-page settings-responsive" aria-label="Network">
       {testAvailable && (
-        <div className="network-local-test">
-          <span>{testing ? 'Local test mode. No public DNS or forwarding changes.' : 'Local network actions'}</span>
-          {testing && (
-            <Button
-              variant="secondary"
+        <div className="network-local-test" data-active={testing || undefined}>
+          <span className="network-local-test-label">
+            <FlaskConical size={14} aria-hidden="true" />
+            {testing ? 'Local test mode. No public DNS or forwarding changes.' : 'Local network actions'}
+          </span>
+          <div className="network-local-test-actions">
+            {testing && (
+              <PortAction
+                disabled={busy}
+                onClick={() => {
+                  setTestState(emptyNetworkSandbox());
+                  setEditor(null);
+                  setError('');
+                }}
+              >
+                Reset test
+              </PortAction>
+            )}
+            <PortAction
               disabled={busy}
               onClick={() => {
-                setTestState(emptyNetworkSandbox());
+                setTestRequested(!testing);
                 setEditor(null);
                 setError('');
               }}
             >
-              Reset test
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => {
-              setTestRequested(!testing);
-              setEditor(null);
-              setError('');
-            }}
-          >
-            {testing ? 'Exit test mode' : 'Try actions locally'}
-          </Button>
+              {testing ? 'Exit test mode' : 'Try actions locally'}
+            </PortAction>
+          </div>
         </div>
       )}
       <SettingsSection
+        className="port-settings"
         title="Server ports"
         action={
-          <div className="server-proxy-actions">
+          <div className="port-toolbar">
+            <PortAction
+              size="icon"
+              aria-label="Refresh ports"
+              title="Refresh ports"
+              disabled={busy || allocations.loading}
+              onClick={refresh}
+            >
+              <RefreshCw aria-hidden="true" />
+            </PortAction>
             {!testing && can(permissions, 'allocation.create') && (
-              <Button
+              <PortAction
+                tone="outline"
                 disabled={busy}
                 onClick={() =>
                   void run(async () => {
@@ -290,151 +393,208 @@ export default function PortConnections() {
                   })
                 }
               >
+                <Plus aria-hidden="true" />
                 Assign port
-              </Button>
+              </PortAction>
             )}
-            <Button
-              variant="secondary"
-              aria-label="Refresh ports"
-              title="Refresh ports"
-              disabled={busy || allocations.loading}
-              onClick={refresh}
-            >
-              <RefreshCw size={14} />
-            </Button>
           </div>
         }
       >
         <PageError error={loadError} />
         {!editor && <PageError error={error} onDismiss={() => setError('')} />}
-        {allocations.loading && !allocations.data && <CollectionSkeleton label="Loading ports" count={3} />}
-        <div className="port-connections">
-          {items(allocations.data).map(port => {
-            const capability = portConnectionActions(
-                port,
-                setup.error ? undefined : setupData,
-                domain.error ? undefined : domainData,
-                admin,
-                writable
-              ),
-              ownRoutes = portRoutes(port);
-            return (
-              <div key={port.id} className="port-connection">
-                <div className="port-connection-main">
-                  <CopyButton className="button secondary port-address-copy" value={address(port.ip, port.port)} />
-                  <span
-                    className="badge"
-                    title={port.protocol_source === 'forwarding' ? 'Configured forwarding protocol' : 'Game protocol'}
-                  >
-                    {port.protocols?.length
-                      ? [...port.protocols]
-                          .sort()
-                          .map((p: string) => p.toUpperCase())
-                          .join(' & ')
-                      : 'Not specified'}
-                  </span>
-                  <div className="port-connection-actions">
-                    {admin && (capability.forward || ownRoutes.length > 0) && (
-                      <Button variant="secondary" disabled={busy} onClick={() => openForward(port)}>
-                        {ownRoutes.length ? 'Edit forwarding' : 'Forward port'}
-                      </Button>
-                    )}
-                    {capability.subdomain && (
-                      <Button variant="secondary" disabled={busy} onClick={() => openDomain(port)}>
-                        {domainData.hostname ? 'Edit subdomain' : 'Add subdomain'}
-                      </Button>
-                    )}
-                    {!testing && !port.is_default && can(permissions, 'allocation.delete') && (
-                      <Button
-                        variant="danger"
-                        disabled={busy}
-                        onClick={async () => {
-                          if (
-                            await confirmAction({
-                              title: 'Unassign port?',
-                              description: `Unassign ${address(port.ip, port.port)}?`,
-                              confirmLabel: 'Unassign',
-                              danger: true,
-                            })
-                          )
-                            void run(async () => {
-                              await api(`${base}/network/allocations/${port.id}`, {method: 'DELETE'});
-                            });
-                        }}
-                      >
-                        Unassign
-                      </Button>
-                    )}
+        {allocations.loading && !allocations.data && <PortsSkeleton />}
+        {share && health && (
+          <div className="port-share" data-source={share.source}>
+            <span className="port-share-label">{share.label}</span>
+            <div className="port-share-line">
+              <code className="port-share-value">
+                {share.value.replace(/:\d+$/, '')}
+                <wbr />
+                {share.value.match(/:\d+$/)?.[0]}
+              </code>
+              <CopyButton
+                className="port-share-copy"
+                aria-label={`Copy ${share.label.toLowerCase()} ${share.value}`}
+                value={share.value}
+              >
+                Copy
+              </CopyButton>
+            </div>
+            <p className="port-share-health">
+              <PortStatus status={health.status} />
+              <span>{health.detail}</span>
+            </p>
+            {domainHeld && (
+              <p className="port-share-health">
+                <PortStatus status={domainStatus(domainData)} />
+                <span>
+                  <code>{domainData.hostname}</code> {domainHeld}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+        {ports.length > 0 && (
+          <ul className="port-list" aria-label="Assigned ports">
+            {ports.map(port => {
+              const capability = portConnectionActions(
+                  port,
+                  setup.error ? undefined : setupData,
+                  domain.error ? undefined : domainData,
+                  admin,
+                  writable
+                ),
+                ownRoutes = portRoutes(port);
+              const localAddress = address(port.ip, port.port);
+              const domainAddress = port.is_default && domainData.hostname;
+              const dnsError = domainData.dns_status === 'error';
+              const protocol = (port.protocols || []).slice().sort().join(' & ').toUpperCase();
+              const allocationLabel = port.is_default ? 'Primary port' : 'Additional port';
+              const mapped = ownRoutes.length > 0 || !!domainAddress;
+              return (
+                <li key={port.id} className="port-item" aria-label={`${allocationLabel} ${localAddress}`}>
+                  <div className="port-item-head">
+                    <div className="port-item-identity">
+                      <CopyButton
+                        className="port-address"
+                        value={localAddress}
+                        aria-label={`Copy local address ${localAddress}`}
+                      />
+                      {port.is_default && (
+                        <Badge variant="secondary" className="port-primary">
+                          Primary
+                        </Badge>
+                      )}
+                      {protocol && (
+                        <span
+                          className="port-protocol"
+                          title={
+                            port.protocol_source === 'forwarding' ? 'Configured forwarding protocol' : 'Game protocol'
+                          }
+                        >
+                          {protocol}
+                        </span>
+                      )}
+                      {!mapped && <PortStatus status="Not forwarded" title="Reachable on the local network only." />}
+                    </div>
+                    <div className="port-item-actions">
+                      {admin && (capability.forward || ownRoutes.length > 0) && (
+                        <PortAction disabled={busy} onClick={() => openForward(port)}>
+                          {ownRoutes.length ? 'Edit forwarding' : 'Forward port'}
+                        </PortAction>
+                      )}
+                      {capability.subdomain && (
+                        <PortAction disabled={busy} onClick={() => openDomain(port)}>
+                          {domainData.hostname ? 'Edit subdomain' : 'Add subdomain'}
+                        </PortAction>
+                      )}
+                      {!testing && !port.is_default && can(permissions, 'allocation.delete') && (
+                        <PortAction
+                          tone="danger"
+                          disabled={busy}
+                          aria-label={`Unassign ${localAddress}`}
+                          onClick={async () => {
+                            if (
+                              await confirmAction({
+                                title: 'Unassign port?',
+                                description: `Unassign ${address(port.ip, port.port)}?`,
+                                confirmLabel: 'Unassign',
+                                danger: true,
+                              })
+                            )
+                              void run(async () => {
+                                await api(`${base}/network/allocations/${port.id}`, {method: 'DELETE'});
+                              });
+                          }}
+                        >
+                          Unassign
+                        </PortAction>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {groupPortRoutes(ownRoutes).map(route => (
-                  <div key={route.id} className="port-public-address">
-                    <span className="port-address-label">Public</span>
-                    <CopyButton value={address(route.public_host, route.public_port)} />
-                    <span>{String(route.protocol).toUpperCase()}</span>
-                    <span
-                      className="badge"
-                      title={
-                        testing
-                          ? 'Local simulation. No public forwarding exists.'
-                          : 'Gateway configuration status. Game reachability is unverified.'
-                      }
-                    >
-                      {routeStatus(route)}
-                    </span>
-                    {route.last_error && <Feedback tone="error" message={<>{route.last_error}</>} />}
-                  </div>
-                ))}
-                {port.is_default && domainData.hostname && (
-                  <div className="port-public-address">
-                    <span className="port-address-label">Subdomain</span>
-                    <CopyButton
-                      value={
-                        domainData.route?.public_port
-                          ? address(domainData.hostname, domainData.route.public_port)
-                          : domainData.hostname
-                      }
-                    />
-                    <span>
-                      {domainData.dns_status === 'simulated'
-                        ? 'Test only'
-                        : domainData.dns_status === 'error'
-                          ? 'DNS needs attention'
-                          : domainData.dns_matches
-                            ? 'DNS matches'
-                            : 'DNS pending'}
-                    </span>
-                    {writable && domainData.dns_status === 'error' && (
-                      <Button
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(async () => {
-                            await api(`${base}/subdomain/retry`, {method: 'POST'});
-                          })
-                        }
-                      >
-                        Retry DNS
-                      </Button>
-                    )}
-                    {writable && !capability.subdomain && (
-                      <Button variant="danger" disabled={busy} onClick={() => void removeDomain()}>
-                        Remove subdomain
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {port.is_default && domainData.cleanup_pending && (
-                  <p className="network-status-note" role="status">
-                    Subdomain removal pending.
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {!allocations.loading && !allocations.error && !items(allocations.data).length && (
-          <p className="server-proxy-note">No ports assigned.</p>
+                  {mapped && (
+                    <ul className="port-mappings" aria-label={`Public addresses for ${localAddress}`}>
+                      {groupPortRoutes(ownRoutes).map(route => {
+                        const publicAddress = address(route.public_host, route.public_port);
+                        return (
+                          <li key={route.id} className="port-mapping">
+                            <span className="port-mapping-kind">Public</span>
+                            <CopyButton
+                              className="port-address"
+                              value={publicAddress}
+                              aria-label={`Copy public address ${publicAddress}`}
+                            />
+                            <span className="port-protocol">{String(route.protocol).toUpperCase()}</span>
+                            <PortStatus
+                              status={routeStatus(route)}
+                              title={
+                                testing
+                                  ? 'Local simulation.'
+                                  : 'Gateway configuration status. Game reachability is unverified.'
+                              }
+                            />
+                            {route.last_error && (
+                              <Feedback tone="error" title="Port forwarding" message={<>{route.last_error}</>} />
+                            )}
+                          </li>
+                        );
+                      })}
+                      {domainAddress && (
+                        <li className="port-mapping">
+                          <span className="port-mapping-kind">Subdomain</span>
+                          <CopyButton
+                            className="port-address"
+                            value={
+                              domainData.route?.public_port
+                                ? address(domainAddress, domainData.route.public_port)
+                                : domainAddress
+                            }
+                            aria-label={`Copy subdomain ${domainAddress}`}
+                          />
+                          <span className="port-protocol">{domainData.route?.protocol?.toUpperCase() || ''}</span>
+                          <PortStatus status={domainStatus(domainData)} />
+                          {writable && (dnsError || !capability.subdomain) && (
+                            <div className="port-mapping-actions">
+                              {dnsError && (
+                                <PortAction
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(async () => {
+                                      await api(`${base}/subdomain/retry`, {method: 'POST'});
+                                    })
+                                  }
+                                >
+                                  Retry DNS
+                                </PortAction>
+                              )}
+                              {!capability.subdomain && (
+                                <PortAction tone="danger" disabled={busy} onClick={() => void removeDomain()}>
+                                  Remove subdomain
+                                </PortAction>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                  {port.is_default && domainData.cleanup_pending && (
+                    <p className="port-item-note" role="status">
+                      Subdomain removal pending.
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {!allocations.loading && !allocations.error && !ports.length && (
+          <p className="port-empty">
+            <strong>No ports assigned.</strong>
+            {!testing && can(permissions, 'allocation.create')
+              ? ' Assign a port to give this server an address.'
+              : ' An administrator can assign one to this server.'}
+          </p>
         )}
       </SettingsSection>
       {editor && (
@@ -445,41 +605,48 @@ export default function PortConnections() {
           }}
         >
           <div className="port-action-editor">
-            <p className="port-action-target">{address(editor.port.ip, editor.port.port)}</p>
+            <p className="port-action-target">
+              {editor.port.is_default ? 'Primary port' : 'Port'}{' '}
+              <code>{address(editor.port.ip, editor.port.port)}</code>
+            </p>
             <PageError error={error} onDismiss={() => setError('')} />
             {editor.kind === 'forward' ? (
               <>
-                {groupPortRoutes(portRoutes(editor.port)).map(route => (
-                  <div key={route.id} className="port-forward-record">
-                    <div>
-                      <strong>{address(route.public_host, route.public_port)}</strong>
-                      <span>
-                        {String(route.protocol).toUpperCase()} / {routeStatus(route)}
-                      </span>
-                      {route.last_error && <Feedback tone="error" message={<>{route.last_error}</>} />}
-                    </div>
-                    <div className="server-proxy-actions">
-                      {route.status !== 'applied' && route.status !== 'simulated' && (
-                        <Button
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              for (const member of route.members || [route]) await apply(member);
-                            })
-                          }
-                        >
-                          Retry
-                        </Button>
-                      )}
-                      {route.desired_present !== false && (
-                        <Button variant="danger" disabled={busy} onClick={() => void removeRoute(route)}>
-                          Stop forwarding
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {portRoutes(editor.port).length > 0 && (
+                  <ul className="port-forward-records" aria-label="Current forwarding">
+                    {groupPortRoutes(portRoutes(editor.port)).map(route => (
+                      <li key={route.id} className="port-forward-record">
+                        <div>
+                          <strong>{address(route.public_host, route.public_port)}</strong>
+                          <span className="port-protocol">{String(route.protocol).toUpperCase()}</span>
+                          <PortStatus status={routeStatus(route)} />
+                          {route.last_error && (
+                            <Feedback tone="error" title="Port forwarding" message={<>{route.last_error}</>} />
+                          )}
+                        </div>
+                        <div className="server-proxy-actions">
+                          {route.status !== 'applied' && route.status !== 'simulated' && (
+                            <PortAction
+                              disabled={busy}
+                              onClick={() =>
+                                void run(async () => {
+                                  for (const member of route.members || [route]) await apply(member);
+                                })
+                              }
+                            >
+                              Retry
+                            </PortAction>
+                          )}
+                          {route.desired_present !== false && (
+                            <PortAction tone="danger" disabled={busy} onClick={() => void removeRoute(route)}>
+                              Stop forwarding
+                            </PortAction>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {!!capabilities?.clients.length && (
                   <form
                     onSubmit={e => {
@@ -536,6 +703,7 @@ export default function PortConnections() {
                           placeholder="Automatic"
                           onChange={e => setPublicPort(e.target.value)}
                         />
+                        <small>Leave empty to pick a free port automatically.</small>
                       </label>
                       <div className="actions">
                         <Button
@@ -585,7 +753,10 @@ export default function PortConnections() {
                   )}
                   {label && selectedDomainRoute && (
                     <p className="port-domain-preview">
-                      {address(`play.${label}.${selectedDomainRoute.domain}`, selectedDomainRoute.public_port)}
+                      Players will join at{' '}
+                      <code>
+                        {address(`play.${label}.${selectedDomainRoute.domain}`, selectedDomainRoute.public_port)}
+                      </code>
                     </p>
                   )}
                   <div className="actions">

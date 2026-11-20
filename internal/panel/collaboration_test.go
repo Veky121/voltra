@@ -291,6 +291,44 @@ func collabRequest(t *testing.T, a *App, userID int64, method, path string, body
 	return res.Code, out
 }
 
+func TestCollaborationActivityIPFilterRespectsVisibility(t *testing.T) {
+	a, ctx := collabTestApp(t)
+	owner, server := collabFixture(t, a, ctx, "http://127.0.0.1:8080")
+	admin, err := a.insert(ctx, "users", M{"uuid": newUUID(), "username": "admin", "email": "admin@example.test", "root_admin": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range []M{
+		{"actor_id": owner["id"], "ip": "192.0.2.1"},
+		{"actor_id": admin["id"], "ip": "192.0.2.2"},
+		{"actor_id": owner["id"], "ip": "2001:db8::1"},
+	} {
+		fixture["server_id"] = server["id"]
+		fixture["event"] = "server:power.start"
+		if _, err := a.insert(ctx, "activity_logs", fixture); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := "/api/client/servers/" + str(server["uuid_short"]) + "/activity?filter%5Bip%5D=192.0.2."
+	for _, tc := range []struct {
+		user M
+		want int
+	}{{owner, 1}, {admin, 2}} {
+		code, out := collabRequest(t, a, num(tc.user["id"]), "GET", path, nil)
+		data := asSlice(out["data"])
+		page := asMap(asMap(out["meta"])["pagination"])
+		if code != http.StatusOK || len(data) != tc.want || num(page["total"]) != int64(tc.want) {
+			t.Fatalf("IP filter for %s: status=%d response=%v", tc.user["username"], code, out)
+		}
+		for _, row := range data {
+			ip := str(asMap(asMap(row)["attributes"])["ip"])
+			if !strings.HasPrefix(ip, "192.0.2.") || (!boolean(tc.user["root_admin"]) && ip != "192.0.2.1") {
+				t.Fatalf("unexpected IP %q for %s", ip, tc.user["username"])
+			}
+		}
+	}
+}
+
 func TestCollaborationPostgresSchedulingAndSubusers(t *testing.T) {
 	a, ctx := collabTestApp(t)
 	var mu sync.Mutex
@@ -653,6 +691,11 @@ func TestCollaborationSchedulerDelaysRecoveryAndOffline(t *testing.T) {
 	backup, e := a.one(ctx, "SELECT * FROM backups WHERE server_id=$1", s["id"])
 	if e != nil || len(asSlice(backup["ignored_files"])) != 2 {
 		t.Fatal("backup ignore payload not passed", backup, e)
+	}
+	audit, e := a.one(ctx, "SELECT properties FROM activity_logs WHERE server_id=$1 AND event='server:backup.start'", s["id"])
+	name := str(asMap(audit["properties"])["name"])
+	if e != nil || name == "" || name != str(backup["name"]) {
+		t.Fatalf("scheduled backup audit name = %q, backup name = %q, err = %v", name, backup["name"], e)
 	}
 	listed, err := a.listBackups(ctx, num(s["id"]), "newest")
 	if err != nil || len(listed) != 1 {

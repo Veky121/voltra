@@ -1,6 +1,7 @@
 import {Skeleton} from '../components/ui/skeleton';
 import {Card} from '../components/ui/card';
 import './collectionSkeleton.css';
+import '../features/activity/serverActivity.css';
 import '../features/backups/backups.css';
 import '../features/schedules/scheduleRows.css';
 import '../features/shared/operations-ui.css';
@@ -180,28 +181,22 @@ export function CollectionSkeleton({
           ))}
         </div>
       ) : layout === 'activity' ? (
-        <div className="table-wrap operations-table" aria-hidden="true">
-          <table className="table">
-            <thead>
-              <tr>
-                {['Event', 'Actor', 'IP address', 'When', 'Details'].map(name => (
-                  <th key={name}>{name}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {list.map(i => (
-                <tr key={i}>
-                  {[180, 72, 90, 114, 65].map((width, j) => (
-                    <td key={j}>
-                      <SkeletonLine width={width} small />
-                      {j === 0 && <SkeletonLine width={120} small />}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="activity-day" aria-hidden="true">
+          <div className="activity-day-heading">
+            <SkeletonLine width={48} small />
+          </div>
+          <div className="activity-list">
+            {list.map(i => (
+              <div className="activity-row" key={i}>
+                <Skeleton className="activity-skeleton-icon" />
+                <span className="activity-main">
+                  <SkeletonLine width={`${[46, 30, 54, 26, 38][i % 5]}%`} />
+                  <SkeletonLine width={104} small />
+                </span>
+                <SkeletonLine width={44} small />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="skeleton-plain-list">

@@ -1,16 +1,7 @@
-import {CollectionSkeleton} from '../../ui/CollectionSkeleton';
 import {usePendingSetting} from '../shared/PendingSettings';
 import {confirmAction} from '../../ui/ConfirmAction';
 import {PageHeading} from '../../ui/PageHeading';
 import {Disclosure, DisclosureTrigger} from '../../ui/Disclosure';
-import {
-  Table as MiraTable,
-  TableHeader as MiraTableHeader,
-  TableRow as MiraTableRow,
-  TableHead as MiraTableHead,
-  TableBody as MiraTableBody,
-  TableCell as MiraTableCell,
-} from '../../components/ui/table';
 import {SectionTabs} from '../../ui/SectionTabs';
 import {DesktopAppInfo} from '../desktop/desktop';
 import {NavIcon} from '../../Icons';
@@ -18,103 +9,18 @@ import DesktopApps from './DesktopApps';
 import SFTPPassword from './SFTPPassword';
 import Appearance from './Appearance';
 import {SettingsRow, SettingsSection} from '../../ui/Settings';
+import ActivityFeed from '../activity/ServerActivity';
 import {accountNickname} from './accountProfile';
 import './accountProfile.css';
 import {useState} from 'react';
 import {Route, Routes} from 'react-router-dom';
-import {api, useAPI, useTranslation, Button, Input, Textarea, Card} from '../../lib';
-import {date, items, json, Notice, PageError, Pager, useAction, value} from '../shared/common';
-import type {Account, ActivityLog, ApiKey, Resource, ResourceList, SSHKey} from '../../types/api';
+import {api, useAPI, Button, Input, Textarea, Card} from '../../lib';
+import {date, items, json, Notice, PageError, useAction, value} from '../shared/common';
+import type {Account, ApiKey, Resource, ResourceList, SSHKey} from '../../types/api';
 
+/** Account activity uses the same feed as a server's, without the server-only filters. */
 export function Activity({path}: {path: string}) {
-  const t = useTranslation('activity');
-  const [event, setEvent] = useState(''),
-    [ip, setIP] = useState(''),
-    [page, setPage] = useState(1);
-  const r = useAPI<ResourceList<ActivityLog>>(
-    `${path}?page=${page}&per_page=25&include=actor&sort=-timestamp&filter[event]=${encodeURIComponent(
-      event
-    )}&filter[ip]=${encodeURIComponent(ip)}`
-  );
-  return (
-    <section className="operations-page activity-page">
-      <div className="toolbar server-page-toolbar">
-        <h2>Activity</h2>
-        <Button variant="secondary" onClick={r.reload}>
-          Refresh
-        </Button>
-      </div>
-      <div className="toolbar operations-filters">
-        <Input
-          aria-label="Filter events"
-          value={event}
-          placeholder="Filter events"
-          onChange={e => {
-            setEvent(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Input
-          aria-label="Filter IP address"
-          value={ip}
-          placeholder="Filter IP address"
-          onChange={e => {
-            setIP(e.target.value);
-            setPage(1);
-          }}
-        />
-      </div>
-      <PageError error={r.error} />
-      {r.loading && !r.data ? (
-        <CollectionSkeleton label="Loading activity" layout="activity" count={5} />
-      ) : (
-        <div className="table-wrap operations-table">
-          <MiraTable className="table">
-            <MiraTableHeader>
-              <MiraTableRow>
-                <MiraTableHead>Event</MiraTableHead>
-                <MiraTableHead>Actor</MiraTableHead>
-                <MiraTableHead>IP address</MiraTableHead>
-                <MiraTableHead>When</MiraTableHead>
-                <MiraTableHead>Details</MiraTableHead>
-              </MiraTableRow>
-            </MiraTableHeader>
-            <MiraTableBody>
-              {items(r.data).map((a, i) => (
-                <MiraTableRow key={a.id || i}>
-                  <MiraTableCell>
-                    <div>
-                      {t(
-                        a.event.replace(':', '.'),
-                        {...a.properties, email: a.properties?.nickname || 'User'},
-                        a.description || a.event
-                      )}
-                    </div>
-                    <small className="muted">
-                      <code>{a.event}</code>
-                    </small>
-                  </MiraTableCell>
-                  <MiraTableCell>
-                    {value(a.relationships?.actor) ? accountNickname(value(a.relationships?.actor)!) : 'System'}
-                  </MiraTableCell>
-                  <MiraTableCell>{a.ip}</MiraTableCell>
-                  <MiraTableCell>{date(a.timestamp)}</MiraTableCell>
-                  <MiraTableCell>
-                    <Disclosure>
-                      <DisclosureTrigger>Properties</DisclosureTrigger>
-                      <pre>{JSON.stringify(a.properties, null, 2)}</pre>
-                    </Disclosure>
-                  </MiraTableCell>
-                </MiraTableRow>
-              ))}
-            </MiraTableBody>
-          </MiraTable>
-        </div>
-      )}
-      {!r.loading && !items(r.data).length && <p className="operations-empty">No activity found.</p>}
-      <Pager data={r.data} page={page} setPage={setPage} />
-    </section>
-  );
+  return <ActivityFeed path={path} scope="account" />;
 }
 function Profile() {
   const r = useAPI<Resource<Account>>('/api/client/account');

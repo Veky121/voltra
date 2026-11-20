@@ -16,7 +16,7 @@ import {ServerTransfers} from './features/servers/ServerTransfers';
 import {readyRoute} from './hooks/readyRoute';
 
 const Account = lazy(() => import('./features/account/Account').then(module => ({default: module.Account})));
-const Activity = lazy(() => import('./features/account/Account').then(module => ({default: module.Activity})));
+const Activity = lazy(() => import('./features/activity/ServerActivity'));
 const Console = lazy(() => import('./features/console/Console'));
 const Files = lazy(() => import('./features/files/Files'));
 const Backups = lazy(() => import('./features/backups/Backups').then(module => ({default: module.Backups})));

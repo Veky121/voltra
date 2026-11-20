@@ -1,5 +1,7 @@
+import type {ProxyRoute} from '../types/api';
+
 type Row = Record<string, any>;
-export type NetworkSandbox = {routes: Row[]; nextID: number; label: string; domainRouteID: number | null};
+export type NetworkSandbox = {routes: ProxyRoute[]; nextID: number; label: string; domainRouteID: number | null};
 export const emptyNetworkSandbox = (): NetworkSandbox => ({routes: [], nextID: -1, label: '', domainRouteID: null});
 export function networkSandboxAllowed(
   development: boolean,
@@ -28,7 +30,7 @@ export function networkSandboxView(state: NetworkSandbox, ports: Row[]) {
     public_port_start: 1024,
     public_port_end: 65535,
   };
-  const choices: Row[] = state.routes
+  const choices = state.routes
     .filter(r => ports.some(p => p.is_default && p.id === r.allocation_id))
     .map(r => ({...r, domain: 'voltra.test'}));
   const route = choices.find(r => r.id === state.domainRouteID);

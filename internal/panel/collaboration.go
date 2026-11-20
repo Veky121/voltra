@@ -1111,7 +1111,7 @@ func (a *App) collabSchedulerRun(ctx context.Context, runID int64) (bool, error)
 		var backup M
 		backup, actionErr = a.createBackup(actionCtx, server, M{"name": "Scheduled backup " + str(schedule["id"]) + " at " + now(), "ignored": strings.Split(str(task["payload"]), "\n"), "truncate": true})
 		if actionErr == nil {
-			_ = a.audit(actionCtx, 0, num(server["id"]), "server:backup.start", M{"backup": backup["uuid"], "source": "scheduled", "schedule_id": schedule["id"], "schedule_name": schedule["name"]})
+			_ = a.audit(actionCtx, 0, num(server["id"]), "server:backup.start", M{"backup": backup["uuid"], "name": backup["name"], "source": "scheduled", "schedule_id": schedule["id"], "schedule_name": schedule["name"]})
 		}
 	default:
 		actionErr = bad("Unknown task action.")
@@ -1727,6 +1727,15 @@ func (a *App) collabActivity(w http.ResponseWriter, r *http.Request) {
 	if filter := r.URL.Query().Get("filter[event]"); filter != "" {
 		args = append(args, "%"+filter+"%")
 		where += fmt.Sprintf(" AND event ILIKE $%d", len(args))
+	}
+	if filter := strings.TrimSpace(r.URL.Query().Get("filter[ip]")); server != nil && filter != "" {
+		args = append(args, filter)
+		where += fmt.Sprintf(" AND strpos(ip, $%d) > 0", len(args))
+		// Match only addresses the caller can see in the response.
+		if !boolean(user["root_admin"]) {
+			args = append(args, user["id"])
+			where += fmt.Sprintf(" AND actor_id=$%d", len(args))
+		}
 	}
 	where += " AND event NOT IN ('server:file.upload')"
 	if server != nil && !boolean(user["root_admin"]) {

@@ -140,9 +140,14 @@ export function ServerPageSkeleton({path}: {path: string}) {
         </div>
       )}
       {section === 'activity' && (
-        <div className="toolbar operations-filters" aria-hidden="true">
-          <SkeletonControl />
-          <SkeletonControl />
+        <div className="activity-filters" aria-hidden="true">
+          <div className="activity-filter-fields">
+            <SkeletonControl wide />
+            <SkeletonControl />
+          </div>
+          <div className="activity-skeleton-presets">
+            <SkeletonLine width={320} small />
+          </div>
         </div>
       )}
       <CollectionSkeleton

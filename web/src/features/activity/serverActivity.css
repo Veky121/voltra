@@ -1,0 +1,548 @@
+.server-activity {
+  container-type: inline-size;
+  --activity-hue: var(--muted);
+}
+
+/* Filters: one quiet row of fields, then the quick filters. No card around them. */
+.activity-filters {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.activity-filter-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.activity-filter-fields > input {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 380px;
+}
+
+.activity-filter-fields > .activity-filter-ip {
+  flex: 0 1 180px;
+}
+
+.activity-presets[data-slot=toggle-group] {
+  flex-wrap: wrap;
+  gap: 4px;
+  width: auto;
+}
+
+.activity-presets [data-slot=toggle-group-item] {
+  height: auto;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-control-radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  font-weight: 400;
+  filter: none;
+}
+
+.activity-presets [data-slot=toggle-group-item]:hover {
+  background: var(--ui-hover);
+  color: var(--text);
+}
+
+.activity-presets [data-slot=toggle-group-item]:is([data-pressed], [aria-pressed=true]) {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--text);
+}
+
+/* Feed */
+.activity-feed {
+  transition: opacity 120ms;
+}
+
+.activity-feed[aria-busy=true] {
+  opacity: 0.55;
+}
+
+.activity-day {
+  margin-bottom: 22px;
+}
+
+.activity-day-heading {
+  margin: 0 0 8px;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius);
+  background: var(--ui-surface);
+}
+
+.activity-item + .activity-item,
+.collection-skeleton .activity-row + .activity-row {
+  border-top: 1px solid var(--ui-divider);
+}
+
+/* A row is a plain block, or a button when it has details. Both share one fixed
+   grid, so opening details or loading another page never moves a column. */
+.activity-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+  filter: none;
+}
+
+button.activity-row {
+  cursor: pointer;
+}
+
+button.activity-row:hover {
+  background: var(--ui-hover);
+  filter: none;
+}
+
+button.activity-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.activity-item:first-child > .activity-row {
+  border-radius: calc(var(--ui-card-radius) - 1px) calc(var(--ui-card-radius) - 1px) 0 0;
+}
+
+.activity-item:last-child > .activity-row {
+  border-radius: 0 0 calc(var(--ui-card-radius) - 1px) calc(var(--ui-card-radius) - 1px);
+}
+
+.activity-item:only-child > .activity-row {
+  border-radius: calc(var(--ui-card-radius) - 1px);
+}
+
+.activity-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--activity-hue) 11%, transparent);
+  color: color-mix(in srgb, var(--activity-hue) 82%, var(--text));
+}
+
+.activity-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Category colour lives in the icon only, and stays close to the surface. */
+.activity-item[data-category=power] { --activity-hue: #7cc79d; }
+.activity-item[data-category=backup] { --activity-hue: #86aeea; }
+.activity-item[data-category=files] { --activity-hue: #d8b87a; }
+.activity-item[data-category=console] { --activity-hue: #b3a1e3; }
+.activity-item[data-category=schedules] { --activity-hue: #72c2c9; }
+.activity-item[data-category=access],
+.activity-item[data-category=account] { --activity-hue: #dd9dbb; }
+.activity-item[data-category=network] { --activity-hue: #9aa2ee; }
+.activity-item[data-category=database] { --activity-hue: #8fc7b6; }
+.activity-item[data-failed] { --activity-hue: var(--red, #ff797e); }
+
+.activity-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.activity-title {
+  overflow-wrap: anywhere;
+  font-size: calc(13px * var(--ui-font-scale, 1));
+  line-height: 1.45;
+}
+
+.activity-count {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ui-hover);
+  color: var(--muted);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  vertical-align: 1px;
+}
+
+.activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.activity-meta > span:not(:last-child)::after {
+  content: "·";
+  margin-left: 6px;
+  color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.activity-actor[data-person] {
+  color: color-mix(in srgb, var(--text) 86%, var(--muted));
+  font-weight: 500;
+}
+
+.activity-failures {
+  color: var(--red, #ff797e);
+}
+
+.activity-when {
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.activity-chevron {
+  width: 16px;
+  height: 16px;
+  color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+button.activity-row:is(:hover, :focus-visible) .activity-chevron {
+  color: var(--text);
+}
+
+.activity-end {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  text-align: center;
+}
+
+.activity-empty[data-slot=empty] {
+  flex: none;
+  gap: 14px;
+  padding: 56px 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius);
+  background: var(--ui-surface);
+}
+
+.activity-empty [data-slot=empty-title] {
+  font-size: calc(14px * var(--ui-font-scale, 1));
+  font-weight: 500;
+}
+
+.activity-empty [data-slot=empty-description] {
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  line-height: 1.6;
+}
+
+/* Loading keeps the shape of the feed (ui/CollectionSkeleton, layout "activity"). */
+.activity-skeleton-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50% !important;
+}
+
+.collection-skeleton .activity-main {
+  gap: 9px;
+}
+
+.collection-skeleton .activity-day-heading,
+.activity-skeleton-presets {
+  display: flex;
+  align-items: center;
+  min-height: 17px;
+}
+
+.activity-skeleton-presets {
+  min-height: 30px;
+}
+
+.activity-filters .skeleton-control-wide {
+  max-width: 380px;
+}
+
+.activity-filters .skeleton-control:not(.skeleton-control-wide) {
+  flex: 0 1 180px;
+}
+
+/* Details sheet */
+.activity-sheet[data-slot=sheet-content] {
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  border-left: 1px solid var(--ui-border);
+  overflow-wrap: anywhere;
+}
+
+.activity-sheet [data-slot=sheet-header] {
+  gap: 4px;
+  padding: 20px 56px 16px 22px;
+}
+
+.activity-sheet [data-slot=sheet-description] {
+  margin: 0;
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+}
+
+/* The global button rule would paint the close control as a primary action. */
+.activity-sheet [data-slot=sheet-close] {
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  filter: none;
+}
+
+.activity-sheet [data-slot=sheet-close]:hover {
+  background: var(--ui-hover);
+  color: var(--text);
+}
+
+.activity-sheet [data-slot=sheet-title] {
+  margin: 0;
+  font-size: calc(15px * var(--ui-font-scale, 1));
+  line-height: 1.45;
+}
+
+.activity-details {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 22px 24px;
+  border-top: 1px solid var(--ui-divider);
+  font-size: calc(13px * var(--ui-font-scale, 1));
+}
+
+.activity-details h3 {
+  margin: 20px 0 6px;
+  color: var(--muted);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.activity-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 2px;
+}
+
+.activity-detail-heading h3 {
+  margin: 0;
+}
+
+.activity-raw-toggle[data-slot=toggle] {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  font-weight: 500;
+  filter: none;
+}
+
+.activity-raw-toggle[data-slot=toggle]:hover {
+  background: var(--ui-hover);
+  color: var(--text);
+}
+
+.activity-raw-toggle[data-slot=toggle]:is([data-pressed], [aria-pressed=true]) {
+  border-color: var(--ui-border);
+  background: var(--ui-hover);
+  color: var(--text);
+}
+
+.activity-detail-fields {
+  display: block;
+  margin: 0;
+}
+
+.activity-detail-fields > div {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 12px;
+  padding: 7px 0;
+  line-height: 1.5;
+}
+
+.activity-detail-fields > div + div,
+.activity-detail-fields + .activity-detail-fields > div:first-child {
+  border-top: 1px solid var(--ui-divider);
+}
+
+.activity-detail-fields dt {
+  color: var(--muted);
+}
+
+.activity-detail-fields dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.activity-detail-fields dd code {
+  display: block;
+  color: var(--muted);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  line-height: 1.7;
+}
+
+.activity-detail-fields[data-nested] > div {
+  grid-template-columns: 84px minmax(0, 1fr);
+  padding: 2px 0;
+  border: 0;
+}
+
+.activity-detail-empty {
+  color: var(--muted);
+}
+
+.activity-detail-list,
+.activity-detail-times,
+.activity-detail-runs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-detail-list > li + li {
+  margin-top: 2px;
+}
+
+.activity-detail-times > li,
+.activity-detail-runs > li {
+  padding: 6px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-detail-times > li + li,
+.activity-detail-runs > li + li {
+  border-top: 1px solid var(--ui-divider);
+}
+
+.activity-detail-runs > li {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.activity-detail-runs > li > span:last-child {
+  color: var(--muted);
+}
+
+.activity-detail-runs > li[data-outcome=failed] > span:nth-child(2) {
+  color: var(--red, #ff797e);
+}
+
+.activity-detail-raw {
+  margin: 8px 0 0;
+  padding: 12px;
+  border: 1px solid var(--ui-divider);
+  border-radius: var(--ui-control-radius);
+  background: var(--ui-input);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  line-height: 1.6;
+}
+
+:is(
+  .activity-raw-toggle,
+  .activity-detail-raw,
+  .activity-presets [data-slot=toggle-group-item],
+  .activity-sheet [data-slot=sheet-close]
+):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@container (max-width: 560px) {
+  .activity-filter-fields {
+    flex-direction: column;
+  }
+
+  .activity-filter-fields > input,
+  .activity-filter-fields > .activity-filter-ip {
+    flex: none;
+    max-width: none;
+  }
+
+  /* Quick filters scroll sideways inside their own strip instead of stacking. */
+  .activity-presets[data-slot=toggle-group] {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .activity-row {
+    grid-template-columns: 30px minmax(0, 1fr) auto 14px;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .activity-row > :is(.activity-icon, .activity-skeleton-icon) {
+    align-self: start;
+  }
+
+  .activity-row > .activity-when {
+    align-self: start;
+    padding-top: 2px;
+  }
+
+}
+
+@media (max-width: 480px) {
+  .activity-detail-fields > div {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .activity-detail-runs > li {
+    grid-template-columns: 104px minmax(0, 1fr) auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-feed,
+  [data-slot=sheet-overlay]:has(~ .activity-sheet),
+  .activity-sheet[data-slot=sheet-content] {
+    animation: none;
+    transition: none;
+    transform: none;
+    translate: none;
+  }
+}

@@ -1,6 +1,6 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
-import {portConnectionActions, groupPortRoutes} from '../src/features/network/portConnectionActions.ts';
+import {portConnectionActions, groupPortRoutes, playerAddress} from '../src/features/network/portConnectionActions.ts';
 const port = {id: 7, is_default: true};
 const setup = {allocations: [{id: 7, forward_client_ids: [2]}], clients: [{id: 1}, {id: 2}]};
 const domain = {choices: [{id: 11}]};
@@ -38,4 +38,49 @@ test('same address and destination combine protocols without hiding errors', () 
   const failed = groupPortRoutes([tcp, {...udp, status: 'error', last_error: 'UDP failed'}])[0];
   assert.equal(failed.status, 'error');
   assert.equal(failed.last_error, 'UDP failed');
+});
+
+test('the player address skips pending DNS, failed routes and routes being removed', () => {
+  const port = {ip: '::1', port: 25565, protocols: ['tcp'], protocol_source: 'game'};
+  const gateway = {public_host: 'example.test', public_port: 1024, status: 'applied', protocol: 'tcp'};
+  const dns = {hostname: 'play.example.test', dns_matches: false, route: {public_port: 1024}};
+  const shared = {label: 'Player address', value: 'example.test:1024', source: 'public', simulated: false};
+  assert.deepEqual(playerAddress(port, [gateway], dns), shared);
+  assert.deepEqual(playerAddress(port, [gateway], {...dns, dns_matches: true}), {
+    label: 'Player address',
+    value: 'play.example.test:1024',
+    source: 'subdomain',
+    simulated: false,
+  });
+  assert.deepEqual(playerAddress(port, [{...gateway, protocol: 'udp', public_port: 25565}, gateway], dns), shared);
+  assert.deepEqual(playerAddress(port, [gateway], {...dns, dns_matches: true, dns_status: 'error'}), shared);
+  assert.deepEqual(playerAddress(port, [gateway], {...dns, dns_matches: true, cleanup_pending: true}), shared);
+  assert.deepEqual(playerAddress(port, [{...gateway, status: 'simulated'}], {...dns, dns_status: 'simulated'}), {
+    label: 'Test address',
+    value: 'play.example.test:1024',
+    source: 'subdomain',
+    simulated: true,
+  });
+  assert.deepEqual(playerAddress(port, [{...gateway, status: 'simulated'}], {}), {
+    label: 'Test address',
+    value: 'example.test:1024',
+    source: 'public',
+    simulated: true,
+  });
+  assert.deepEqual(
+    playerAddress(
+      port,
+      [
+        {...gateway, desired_present: false},
+        {...gateway, status: 'error'},
+      ],
+      dns
+    ),
+    {
+      label: 'Local address',
+      value: '[::1]:25565',
+      source: 'local',
+      simulated: false,
+    }
+  );
 });
